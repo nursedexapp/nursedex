@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SITE_PASSWORD = process.env.SITE_PASSWORD!;
+const SITE_PASSWORD = process.env.SITE_PASSWORD;
 
 export function middleware(request: NextRequest) {
+  if (!SITE_PASSWORD) {
+    return NextResponse.next();
+  }
+
   const authCookie = request.cookies.get("site-auth");
   if (authCookie?.value === SITE_PASSWORD) {
     return NextResponse.next();
@@ -16,7 +20,7 @@ export function middleware(request: NextRequest) {
   // Redirect to login page
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("from", request.nextUrl.pathname);
-  return NextResponse.rewrite(loginUrl);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
