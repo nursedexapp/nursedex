@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environment
+.env
+.env.local
+.env.production
+.env.development
+
+# OS
+.DS_Store
+
+# MCP config (contains auth tokens)
+.mcp.json
+
+# Documents & Legal (not code)
+Documents/
+Legal/
+
+# Claude
+.claude/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+*.tsbuildinfo
+next-env.d.ts

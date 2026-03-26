@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  /* Brand Colors */
+  --color-teal: #2A7B6F;
+  --color-teal-dark: #1F5C53;
+  --color-teal-light: #3A9B8D;
+  --color-sage: #A8C5B5;
+  --color-sage-light: #C4D9CF;
+  --color-sage-dark: #8BAF9D;
+  --color-cream: #F5D5A8;
+  --color-cream-light: #FAE8CD;
+  --color-cream-dark: #E8BF82;
+  --color-warm-white: #FBF9F7;
+  --color-soft-black: #2D3436;
+  --color-soft-black-light: #636E72;
+
+  /* Semantic Colors */
+  --color-success: #2D8B5F;
+  --color-warning: #D4A843;
+  --color-error: #C0555A;
+  --color-info: #3A8B9B;
+
+  /* Spacing */
+  --spacing-section: 8rem;
+
+  /* Font families — reference next/font CSS variables */
+  --font-heading: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-body: var(--font-dm-sans), "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", "Fira Code", monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-soft-black);
+  background-color: var(--color-warm-white);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

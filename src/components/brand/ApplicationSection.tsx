@@ -1,0 +1,512 @@
+const designPrinciples = [
+  {
+    title: "Clarity over Cleverness",
+    description:
+      "Every screen should be self-explanatory. If someone needs a tutorial, we've failed.",
+  },
+  {
+    title: "Warmth through Detail",
+    description:
+      "Rounded corners, soft shadows, warm colors. Every pixel should feel approachable.",
+  },
+  {
+    title: "Progressive Disclosure",
+    description:
+      "Don't overwhelm. Show what matters now, reveal more on demand.",
+  },
+  {
+    title: "Trust Signals Everywhere",
+    description:
+      "Verified badges, clear pricing, honest disclaimers. Trust is earned at every touchpoint.",
+  },
+  {
+    title: "Mobile-First, Always",
+    description:
+      "Most families will search on their phones. Design for the smallest screen first.",
+  },
+];
+
+const accessibilityChecklist = [
+  "WCAG 2.1 AA compliance",
+  "4.5:1 contrast for text",
+  "44px touch targets",
+  "2px teal focus outlines",
+  "Alt text on all images",
+  "Full keyboard navigation",
+  "prefers-reduced-motion",
+];
+
+const coBrandingRules = [
+  "Side-by-side with divider",
+  "Clear space always maintained",
+  "Never smaller than partner logo",
+  "Always in brand colors",
+];
+
+export default function ApplicationSection() {
+  return (
+    <section id="application">
+      {/* ────────────────────────────────────────────────── */}
+      {/* THE BRAND IN ACTION — a full NurseDex search mock */}
+      {/* This replaces "Putting it all together"           */}
+      {/* ────────────────────────────────────────────────── */}
+      <div className="bg-warm-white px-6 sm:px-12 lg:px-24 pt-32 pb-20">
+        <div className="max-w-7xl mx-auto">
+          <h2 className="font-heading text-4xl sm:text-5xl lg:text-6xl text-teal-dark max-w-3xl leading-[1.05] mb-6">
+            How it could come together.
+          </h2>
+          <p className="font-body text-soft-black-light max-w-lg">
+            This is a conceptual mockup showing the brand tokens applied to a
+            search interface. It is not a design for the actual product.
+          </p>
+        </div>
+      </div>
+
+      {/* Conceptual mockup */}
+      <div className="bg-soft-black px-4 sm:px-8 lg:px-16 py-12 sm:py-16">
+        <div className="max-w-5xl mx-auto">
+          {/* Browser chrome — hidden on mobile */}
+          <div className="hidden sm:flex bg-soft-black-light/30 rounded-t-xl px-4 py-3 items-center gap-2">
+            <div className="flex gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-error/60" />
+              <div className="w-3 h-3 rounded-full bg-warning/60" />
+              <div className="w-3 h-3 rounded-full bg-success/60" />
+            </div>
+            <div className="flex-1 bg-soft-black/40 rounded-md px-4 py-1.5 ml-4">
+              <span className="font-body text-[11px] text-warm-white/40">nursedex.com/search?care=elder&amp;location=long-island</span>
+            </div>
+          </div>
+
+          {/* App frame */}
+          <div className="bg-warm-white rounded-xl sm:rounded-t-none sm:rounded-b-xl overflow-hidden shadow-2xl">
+            {/* Nav bar */}
+            <div className="bg-teal px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-teal-dark flex items-center justify-center">
+                  <span className="font-heading text-sm font-semibold text-warm-white tracking-[-0.06em] leading-none">ND</span>
+                </div>
+                <span className="font-heading text-base text-warm-white hidden sm:inline">NurseDex</span>
+              </div>
+              <div className="flex items-center gap-6">
+                <span className="font-body text-sm text-warm-white/80 hidden sm:inline">Find a Nurse</span>
+                <span className="font-body text-sm text-warm-white/80 hidden sm:inline">How It Works</span>
+                <div className="bg-warm-white text-teal font-body text-xs font-medium px-4 py-2 rounded-lg">
+                  Sign In
+                </div>
+              </div>
+            </div>
+
+            {/* Search bar */}
+            <div className="bg-sage/15 px-6 py-5 border-b border-sage/20">
+              <div className="flex flex-col sm:flex-row gap-3 max-w-3xl">
+                <div className="flex-1 bg-warm-white rounded-xl px-4 py-3 border border-sage/30">
+                  <span className="font-body text-sm text-soft-black">Elder Care</span>
+                </div>
+                <div className="flex-1 bg-warm-white rounded-xl px-4 py-3 border border-sage/30">
+                  <span className="font-body text-sm text-soft-black-light">Long Island, NY</span>
+                </div>
+                <div className="bg-teal text-warm-white font-body text-sm font-medium px-6 py-3 rounded-xl text-center">
+                  Search
+                </div>
+              </div>
+            </div>
+
+            {/* Results */}
+            <div className="px-6 py-6">
+              <p className="font-body text-sm text-soft-black-light mb-5">
+                <span className="font-semibold text-soft-black">24 nurses</span> found for Elder Care near Long Island
+              </p>
+
+              {/* Nurse cards — the star moment */}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Card 1 — Featured */}
+                <div className="bg-warm-white rounded-2xl border border-cream-dark overflow-hidden">
+                  <div className="bg-sage/20 h-36 relative flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-sage/40 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-sage-dark/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                      </svg>
+                    </div>
+                    <span className="absolute top-3 left-3 bg-cream text-teal font-body text-[10px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-full border border-cream-dark">
+                      Featured
+                    </span>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-1.5">
+                      <h5 className="font-heading text-base text-soft-black">Maria Santos</h5>
+                      <span className="bg-teal text-warm-white font-body text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full">Verified</span>
+                    </div>
+                    <div className="flex gap-1.5 mb-2">
+                      <span className="bg-sage/25 text-teal-dark font-body text-[11px] px-2 py-0.5 rounded-full">RN</span>
+                      <span className="bg-sage/25 text-teal-dark font-body text-[11px] px-2 py-0.5 rounded-full">Elder Care</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 mb-2">
+                      {[1,2,3,4,5].map(s => (
+                        <svg key={s} className={`w-3.5 h-3.5 ${s <= 5 ? "text-warning" : "text-cream-dark"}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                      <span className="font-body text-[11px] text-soft-black-light ml-1">5.0 (12)</span>
+                    </div>
+                    <p className="font-body text-xs text-soft-black-light leading-relaxed line-clamp-2">
+                      12 years of experience in elder care and post-surgical recovery on Long Island.
+                    </p>
+                    <p className="font-body text-[11px] text-sage-dark mt-2">3 miles away</p>
+                  </div>
+                </div>
+
+                {/* Card 2 */}
+                <div className="bg-warm-white rounded-2xl border border-cream-dark overflow-hidden">
+                  <div className="bg-sage/20 h-36 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-sage/40 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-sage-dark/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-1.5">
+                      <h5 className="font-heading text-base text-soft-black">James O&apos;Brien</h5>
+                      <span className="bg-teal text-warm-white font-body text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full">Verified</span>
+                    </div>
+                    <div className="flex gap-1.5 mb-2">
+                      <span className="bg-sage/25 text-teal-dark font-body text-[11px] px-2 py-0.5 rounded-full">LPN</span>
+                      <span className="bg-sage/25 text-teal-dark font-body text-[11px] px-2 py-0.5 rounded-full">Elder Care</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 mb-2">
+                      {[1,2,3,4,5].map(s => (
+                        <svg key={s} className={`w-3.5 h-3.5 ${s <= 4 ? "text-warning" : "text-cream-dark"}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                      <span className="font-body text-[11px] text-soft-black-light ml-1">4.0 (8)</span>
+                    </div>
+                    <p className="font-body text-xs text-soft-black-light leading-relaxed line-clamp-2">
+                      Compassionate LPN with 8 years helping families across Nassau County.
+                    </p>
+                    <p className="font-body text-[11px] text-sage-dark mt-2">5 miles away</p>
+                  </div>
+                </div>
+
+                {/* Card 3 */}
+                <div className="bg-warm-white rounded-2xl border border-cream-dark overflow-hidden hidden sm:block">
+                  <div className="bg-sage/20 h-36 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-sage/40 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-sage-dark/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between mb-1.5">
+                      <h5 className="font-heading text-base text-soft-black">Patricia Chen</h5>
+                      <span className="bg-teal text-warm-white font-body text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full">Verified</span>
+                    </div>
+                    <div className="flex gap-1.5 mb-2">
+                      <span className="bg-sage/25 text-teal-dark font-body text-[11px] px-2 py-0.5 rounded-full">CNA</span>
+                      <span className="bg-sage/25 text-teal-dark font-body text-[11px] px-2 py-0.5 rounded-full">Elder Care</span>
+                      <span className="bg-sage/25 text-teal-dark font-body text-[11px] px-2 py-0.5 rounded-full">Memory Care</span>
+                    </div>
+                    <div className="flex items-center gap-0.5 mb-2">
+                      {[1,2,3,4,5].map(s => (
+                        <svg key={s} className={`w-3.5 h-3.5 ${s <= 4 ? "text-warning" : "text-cream-dark"}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                      <span className="font-body text-[11px] text-soft-black-light ml-1">4.5 (15)</span>
+                    </div>
+                    <p className="font-body text-xs text-soft-black-light leading-relaxed line-clamp-2">
+                      Specializing in memory care and dementia support. Fluent in English and Mandarin.
+                    </p>
+                    <p className="font-body text-[11px] text-sage-dark mt-2">7 miles away</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────────── */}
+      {/* DESIGN PRINCIPLES — quiet, editorial               */}
+      {/* ────────────────────────────────────────────────── */}
+      <div className="bg-warm-white px-6 sm:px-12 lg:px-24 py-32">
+        <div className="max-w-5xl mx-auto">
+          <div className="divide-y divide-sage/20">
+            {designPrinciples.map((item, i) => (
+              <div
+                key={item.title}
+                className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 lg:gap-16 py-12 first:pt-0 last:pb-0 items-baseline"
+              >
+                <p className="font-body text-soft-black-light leading-relaxed">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────────── */}
+      {/* COMPONENT TOKENS — buttons on a dark stage         */}
+      {/* ────────────────────────────────────────────────── */}
+      <div className="bg-teal-dark px-6 sm:px-12 lg:px-24 py-32">
+        <div className="max-w-5xl mx-auto">
+          <p className="font-body text-xs uppercase tracking-[0.4em] text-sage/40 mb-16">
+            Component tokens
+          </p>
+
+          {/* Buttons — large, centered */}
+          <div className="flex flex-wrap items-center justify-center gap-5 mb-8">
+            <button className="bg-teal text-warm-white font-body text-base font-medium px-8 py-4 rounded-xl">
+              Primary Button
+            </button>
+            <button className="bg-sage text-soft-black font-body text-base font-medium px-8 py-4 rounded-xl">
+              Secondary
+            </button>
+            <button className="bg-transparent text-warm-white border border-warm-white/30 font-body text-base font-medium px-8 py-4 rounded-xl">
+              Ghost
+            </button>
+            <button className="bg-error text-warm-white font-body text-base font-medium px-8 py-4 rounded-xl">
+              Danger
+            </button>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-3 mb-32">
+            <span className="bg-cream text-teal font-body text-xs font-medium uppercase tracking-wider px-4 py-1.5 rounded-full border border-cream-dark">
+              Featured
+            </span>
+            <span className="bg-teal text-warm-white font-body text-xs font-medium uppercase tracking-wider px-4 py-1.5 rounded-full">
+              Verified
+            </span>
+            <span className="bg-sage/30 text-warm-white font-body text-xs px-3 py-1.5 rounded-full">
+              RN
+            </span>
+            <span className="bg-sage/30 text-warm-white font-body text-xs px-3 py-1.5 rounded-full">
+              Elder Care
+            </span>
+            <span className="bg-sage/30 text-warm-white font-body text-xs px-3 py-1.5 rounded-full">
+              Pediatric
+            </span>
+          </div>
+
+          {/* Input states — side by side on dark */}
+          <p className="font-body text-xs uppercase tracking-[0.4em] text-sage/40 mb-10">
+            Input states
+          </p>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+              <p className="font-body text-[10px] uppercase tracking-widest text-sage/50 mb-2">Default</p>
+              <div className="bg-warm-white border border-cream-dark rounded-xl px-4 py-3 font-body text-sm text-soft-black-light">
+                Placeholder...
+              </div>
+            </div>
+            <div>
+              <p className="font-body text-[10px] uppercase tracking-widest text-sage/50 mb-2">Focus</p>
+              <div className="bg-warm-white border-2 border-teal rounded-xl px-4 py-3 font-body text-sm text-soft-black ring-2 ring-teal/20">
+                Active input
+              </div>
+            </div>
+            <div>
+              <p className="font-body text-[10px] uppercase tracking-widest text-sage/50 mb-2">Error</p>
+              <div className="bg-warm-white border-2 border-error rounded-xl px-4 py-3 font-body text-sm text-soft-black">
+                Invalid entry
+              </div>
+              <p className="font-body text-xs text-error mt-1.5">Required field.</p>
+            </div>
+            <div>
+              <p className="font-body text-[10px] uppercase tracking-widest text-sage/50 mb-2">Disabled</p>
+              <div className="bg-warm-white/50 border border-sage/20 rounded-xl px-4 py-3 font-body text-sm text-soft-black-light/30">
+                Disabled
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────────── */}
+      {/* GRID & SPACING — clean, technical                  */}
+      {/* ────────────────────────────────────────────────── */}
+      <div className="bg-warm-white px-6 sm:px-12 lg:px-24 py-32">
+        <div className="max-w-5xl mx-auto">
+          <p className="font-body text-xs uppercase tracking-[0.4em] text-sage-dark mb-16">
+            Grid &amp; spacing
+          </p>
+
+          <div className="grid md:grid-cols-3 gap-12 mb-20">
+            {[
+              { label: "Desktop", width: "1440px", cols: 12, gutters: "24px" },
+              { label: "Tablet", width: "768px", cols: 8, gutters: "16px" },
+              { label: "Mobile", width: "375px", cols: 4, gutters: "16px" },
+            ].map((bp) => (
+              <div key={bp.label}>
+                <p className="font-heading text-3xl text-teal-dark mb-1">{bp.width}</p>
+                <p className="font-body text-xs text-soft-black-light mb-6">
+                  {bp.cols} columns · {bp.gutters} gutters
+                </p>
+                <div className="flex gap-[2px]">
+                  {Array.from({ length: bp.cols }).map((_, i) => (
+                    <div key={i} className="flex-1 h-24 bg-teal/10 rounded-sm" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Spacing scale — proportional blocks */}
+          <p className="font-body text-xs text-soft-black-light mb-6">Spacing scale (px)</p>
+          <div className="flex items-end gap-2 sm:gap-3">
+            {[4, 8, 12, 16, 24, 32, 48, 64, 96, 128].map((size) => (
+              <div key={size} className="flex flex-col items-center gap-2">
+                <div
+                  className="bg-teal/15 rounded-sm"
+                  style={{ width: `${Math.max(size * 0.6, 8)}px`, height: `${size}px` }}
+                />
+                <span className="font-body text-[10px] text-soft-black-light">{size}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────────── */}
+      {/* EMAIL — full-bleed dark with the mock as star      */}
+      {/* ────────────────────────────────────────────────── */}
+      <div className="bg-soft-black px-6 sm:px-12 lg:px-24 py-32">
+        <div className="max-w-5xl mx-auto flex flex-col items-center">
+          <p className="font-body text-xs uppercase tracking-[0.4em] text-sage/40 mb-16">
+            Email template
+          </p>
+
+          {/* Email mock — centered, larger */}
+          <div className="w-full max-w-sm mb-16">
+            <div className="bg-teal rounded-t-xl px-6 py-5 flex items-center justify-center">
+              <span className="font-heading text-xl text-warm-white tracking-tight">NurseDex</span>
+            </div>
+            <div className="bg-warm-white px-8 py-10 space-y-4">
+              <p className="font-heading text-lg text-soft-black">Welcome to NurseDex</p>
+              <p className="font-body text-sm text-soft-black-light leading-relaxed">
+                You&apos;re one step closer to finding the right care for your family. Browse verified nurse profiles and connect directly, no agencies, no middlemen.
+              </p>
+              <div className="pt-4 flex justify-center">
+                <div className="bg-teal text-warm-white font-body text-sm font-medium px-8 py-3 rounded-xl">
+                  Start Searching
+                </div>
+              </div>
+            </div>
+            <div className="bg-soft-black-light/20 rounded-b-xl px-6 py-4 text-center border-t border-warm-white/5">
+              <p className="font-body text-[10px] text-warm-white/40">
+                Unsubscribe · Privacy Policy · Long Island, NY
+              </p>
+            </div>
+          </div>
+
+          {/* Email rules — minimal */}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 w-full">
+            {[
+              { label: "Header", rule: "Logo on teal bar, centered" },
+              { label: "Body", rule: "DM Sans fallback, single column, 600px max" },
+              { label: "CTA", rule: "One teal button per email, rounded" },
+              { label: "Footer", rule: "Dark bg, unsubscribe link, CAN-SPAM" },
+            ].map((item) => (
+              <div key={item.label}>
+                <p className="font-body text-[10px] uppercase tracking-widest text-sage/50 mb-2">{item.label}</p>
+                <p className="font-body text-sm text-warm-white/70">{item.rule}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────────── */}
+      {/* ACCESSIBILITY + CO-BRANDING — side by side          */}
+      {/* ────────────────────────────────────────────────── */}
+      <div className="bg-warm-white px-6 sm:px-12 lg:px-24 py-32">
+        <div className="max-w-5xl mx-auto grid lg:grid-cols-2 gap-20">
+          {/* Accessibility */}
+          <div>
+            <p className="font-body text-xs uppercase tracking-[0.4em] text-sage-dark mb-10">
+              Accessibility
+            </p>
+            <ul className="space-y-5">
+              {accessibilityChecklist.map((item) => (
+                <li key={item} className="flex items-center gap-3">
+                  <span className="w-5 h-5 rounded-full bg-teal/10 flex items-center justify-center shrink-0">
+                    <svg className="w-3 h-3 text-teal" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                  <span className="font-body text-sm text-soft-black">{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Co-branding */}
+          <div>
+            <p className="font-body text-xs uppercase tracking-[0.4em] text-sage-dark mb-10">
+              Co-branding
+            </p>
+            <div className="flex items-center gap-8 mb-10">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-16 h-16 rounded-xl bg-teal flex items-center justify-center">
+                  <span className="font-heading text-xl font-semibold text-warm-white tracking-[-0.06em] leading-none">ND</span>
+                </div>
+                <span className="font-body text-[10px] text-sage-dark">NurseDex</span>
+              </div>
+              <div className="w-px h-16 bg-sage/30" />
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-14 h-14 rounded-xl bg-cream-dark/40 flex items-center justify-center">
+                  <span className="font-body text-xs text-soft-black-light">Partner</span>
+                </div>
+                <span className="font-body text-[10px] text-sage-dark">Partner Co.</span>
+              </div>
+            </div>
+            <ul className="space-y-3">
+              {coBrandingRules.map((rule) => (
+                <li key={rule} className="flex items-start gap-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sage mt-2 shrink-0" />
+                  <span className="font-body text-sm text-soft-black-light">{rule}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      {/* ────────────────────────────────────────────────── */}
+      {/* BACK COVER                                         */}
+      {/* ────────────────────────────────────────────────── */}
+      <div className="bg-teal-dark">
+        <div className="px-6 sm:px-12 lg:px-24 py-32 max-w-5xl mx-auto flex flex-col items-center text-center gap-8">
+          <div className="w-20 h-20 rounded-2xl bg-teal border-2 border-sage/30 flex items-center justify-center">
+            <span className="font-heading text-3xl font-semibold text-warm-white tracking-[-0.06em] leading-none select-none">ND</span>
+          </div>
+
+          <h3 className="font-heading text-3xl sm:text-4xl text-warm-white">
+            NurseDex
+          </h3>
+
+          <p className="font-body text-sage text-lg">
+            Questions about the brand? Reach out.
+          </p>
+
+          <div className="space-y-2">
+            <p className="font-body text-warm-white/80">contact@nursedex.com</p>
+            <p className="font-body text-warm-white/80">www.nursedex.com</p>
+          </div>
+
+          <div className="w-8 h-0.5 bg-sage/30 rounded-full" />
+
+          <p className="font-body text-sm text-sage/60 italic">
+            Built with care on Long Island, NY.
+          </p>
+
+          <p className="font-body text-xs tracking-widest text-sage/40 uppercase">
+            Version 1.0 &middot; 2026
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
