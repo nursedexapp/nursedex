@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   title: "NurseDex",
   description: "Find care that feels like family.",
   manifest: "/site.webmanifest",
+};
+
+export const viewport: Viewport = {
   themeColor: "#2A7B6F",
 };
 
