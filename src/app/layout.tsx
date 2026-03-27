@@ -23,6 +23,8 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "NurseDex",
   description: "Find care that feels like family.",
+  manifest: "/site.webmanifest",
+  themeColor: "#2A7B6F",
 };
 
 export default function RootLayout({

@@ -30,9 +30,9 @@ export default function LogoSection() {
           </p>
           <div className="bg-cream/60 rounded-xl px-6 py-4 max-w-md">
             <p className="font-body text-sm text-soft-black-light">
-              This monogram is a working direction, not finalized.
-              The typographic approach (Fraunces serif ligature) is approved.
-              Final refinements to kerning and proportions are in progress.
+              The ND monogram is the approved mark for NurseDex.
+              It uses Fraunces semibold with tight kerning on a teal background.
+              This mark is used across favicon, app icon, and all brand applications.
             </p>
           </div>
         </div>
