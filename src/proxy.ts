@@ -9,10 +9,11 @@ export async function proxy(request: NextRequest) {
     if (SITE_PASSWORD) {
       const authCookie = request.cookies.get("site-auth");
       if (authCookie?.value !== SITE_PASSWORD) {
-        if (request.nextUrl.pathname === "/api/login") {
+        if (request.nextUrl.pathname === "/api/login"
+          || request.nextUrl.pathname === "/brand-login") {
           return NextResponse.next();
         }
-        const loginUrl = new URL("/login", request.url);
+        const loginUrl = new URL("/brand-login", request.url);
         loginUrl.searchParams.set("from", request.nextUrl.pathname);
         return NextResponse.redirect(loginUrl);
       }

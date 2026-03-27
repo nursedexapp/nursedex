@@ -1,0 +1,260 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { PASSWORD } from "@/lib/constants";
+
+export type AuthResult = {
+  error?: string;
+  success?: string;
+};
+
+export async function signUp(formData: FormData): Promise<AuthResult> {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const tosAccepted = formData.get("tos") === "on";
+
+  if (!email || !password) {
+    return { error: "Email and password are required." };
+  }
+
+  if (password.length < PASSWORD.MIN_LENGTH) {
+    return { error: `Password must be at least ${PASSWORD.MIN_LENGTH} characters.` };
+  }
+
+  if (!tosAccepted) {
+    return { error: "You must accept the Terms of Service and Privacy Policy." };
+  }
+
+  const supabase = await createClient();
+
+  // Check blocked emails
+  const { data: blocked } = await supabase
+    .from("blocked_emails")
+    .select("id")
+    .eq("email", email.toLowerCase())
+    .single();
+
+  if (blocked) {
+    return { error: "This email address cannot be used to create an account." };
+  }
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://nursedex.com"}/auth/callback`,
+    },
+  });
+
+  if (error) {
+    if (error.message.includes("already registered")) {
+      return { error: "An account with this email already exists." };
+    }
+    return { error: error.message };
+  }
+
+  // Update tos_accepted_at via the users table
+  // The trigger will have created the users row by now
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    await supabase
+      .from("users")
+      .update({
+        tos_accepted_at: new Date().toISOString(),
+        tos_version: "1.0",
+      })
+      .eq("id", user.id);
+  }
+
+  return { success: "Check your email for a confirmation link." };
+}
+
+export async function signIn(formData: FormData): Promise<AuthResult> {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+
+  if (!email || !password) {
+    return { error: "Email and password are required." };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    if (error.message.includes("Email not confirmed")) {
+      return { error: "Please confirm your email before signing in. Check your inbox for a confirmation link." };
+    }
+    return { error: "Invalid email or password." };
+  }
+
+  // Check if user has a role
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.role) {
+      redirect("/role-select");
+    }
+  }
+
+  redirect("/dashboard");
+}
+
+export async function signInWithGoogle(): Promise<void> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://nursedex.com"}/auth/callback`,
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+      },
+    },
+  });
+
+  if (error) {
+    return;
+  }
+
+  if (data.url) {
+    redirect(data.url);
+  }
+}
+
+export async function forgotPassword(formData: FormData): Promise<AuthResult> {
+  const email = formData.get("email") as string;
+
+  if (!email) {
+    return { error: "Email is required." };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://nursedex.com"}/auth/callback?next=/reset-password`,
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: "If an account exists with this email, you will receive a password reset link." };
+}
+
+export async function resetPassword(formData: FormData): Promise<AuthResult> {
+  const password = formData.get("password") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+
+  if (!password || !confirmPassword) {
+    return { error: "Both fields are required." };
+  }
+
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match." };
+  }
+
+  if (password.length < PASSWORD.MIN_LENGTH) {
+    return { error: `Password must be at least ${PASSWORD.MIN_LENGTH} characters.` };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  redirect("/login?message=password_reset");
+}
+
+export async function resendConfirmation(formData: FormData): Promise<AuthResult> {
+  const email = formData.get("email") as string;
+
+  if (!email) {
+    return { error: "Email is required." };
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://nursedex.com"}/auth/callback`,
+    },
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: "Confirmation email sent. Check your inbox." };
+}
+
+export async function selectRole(formData: FormData): Promise<void> {
+  const role = formData.get("role") as string;
+
+  if (role !== "nurse" && role !== "family") {
+    return;
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Update user role
+  await supabase.from("users").update({ role }).eq("id", user.id);
+
+  // Create the corresponding profile
+  if (role === "nurse") {
+    // Generate a temporary slug
+    const { data: userData } = await supabase
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .single();
+
+    const baseName = userData?.first_name && userData?.last_name
+      ? `${userData.first_name}-${userData.last_name}`.toLowerCase().replace(/[^a-z0-9-]/g, "")
+      : user.id.slice(0, 8);
+
+    await supabase.from("nurse_profiles").insert({
+      user_id: user.id,
+      slug: `${baseName}-${Date.now().toString(36)}`,
+      credential: "hha", // placeholder, updated during onboarding
+    });
+  } else {
+    await supabase.from("family_profiles").insert({
+      user_id: user.id,
+    });
+  }
+
+  redirect("/dashboard");
+}
+
+export async function signOut(): Promise<void> {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/");
+}
