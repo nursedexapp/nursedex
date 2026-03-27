@@ -1,0 +1,84 @@
+// Pricing
+export const PRICING = {
+  NURSE_FEATURED_MONTHLY: 29,
+  FAMILY_ACCESS_MONTHLY: 19.99,
+} as const;
+
+// Tier limits
+export const TIER_LIMITS = {
+  free: {
+    bioMaxLength: 150,
+    maxPhotos: 1,
+    maxCareTypes: 2,
+  },
+  featured: {
+    bioMaxLength: 500,
+    maxPhotos: 3,
+    maxCareTypes: Infinity,
+  },
+} as const;
+
+// Rate limits
+export const RATE_LIMITS = {
+  REVEALS_CAPTCHA_THRESHOLD: 10,
+  REVEALS_HARD_CAP: 25,
+  REVEALS_WINDOW_HOURS: 24,
+  CONSECUTIVE_CAPTCHA_DAYS_FLAG: 3,
+} as const;
+
+// Grace periods
+export const GRACE_PERIODS = {
+  PAYMENT_FAILURE_DAYS: 3,
+  CANCELLED_ACCESS_DAYS: 60,
+} as const;
+
+// Photo upload
+export const PHOTO_UPLOAD = {
+  MAX_SIZE_BYTES: 5 * 1024 * 1024, // 5MB
+  MAX_DIMENSION_PX: 1200,
+  ALLOWED_TYPES: ["image/jpeg", "image/png", "image/webp"] as const,
+  SIGNED_URL_TTL_SECONDS: 4 * 60 * 60, // 4 hours
+} as const;
+
+// Search
+export const SEARCH = {
+  RESULTS_PER_PAGE: 15,
+} as const;
+
+// Session
+export const SESSION = {
+  ACCESS_TOKEN_LIFETIME_SECONDS: 3600, // 1 hour
+  REFRESH_TOKEN_LIFETIME_DAYS: 7,
+} as const;
+
+// Reviews
+export const REVIEWS = {
+  MAX_PENDING_EXTERNAL: 5,
+  NURSE_RESPONSE_MAX_LENGTH: 500,
+} as const;
+
+// Upsell
+export const UPSELL = {
+  SAVES_BEFORE_TOAST: 3,
+  PAUSE_DAYS: 30,
+} as const;
+
+// Verification SLA (in hours)
+export const VERIFICATION_SLA = {
+  FEATURED_HOURS: 24,
+  FREE_HOURS: 72,
+  ALERT_THRESHOLD: 0.75, // alert at 75% of SLA
+} as const;
+
+// Password
+export const PASSWORD = {
+  MIN_LENGTH: 8,
+} as const;
+
+// Physical address (CAN-SPAM)
+export const BUSINESS_ADDRESS = {
+  line1: "2197 Louis Kossuth Avenue",
+  city: "Ronkonkoma",
+  state: "NY",
+  zip: "11779",
+} as const;

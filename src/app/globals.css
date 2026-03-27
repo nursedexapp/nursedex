@@ -1,7 +1,10 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-@theme {
-  /* Brand Colors */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* ── Brand Colors (keep for direct use: bg-teal, text-sage, etc.) ── */
   --color-teal: #2A7B6F;
   --color-teal-dark: #1F5C53;
   --color-teal-light: #3A9B8D;
@@ -15,19 +18,59 @@
   --color-soft-black: #2D3436;
   --color-soft-black-light: #636E72;
 
-  /* Semantic Colors */
+  /* ── Semantic Colors ── */
   --color-success: #2D8B5F;
   --color-warning: #D4A843;
   --color-error: #C0555A;
   --color-info: #3A8B9B;
 
-  /* Spacing */
+  /* ── Spacing ── */
   --spacing-section: 8rem;
 
-  /* Font families — reference next/font CSS variables */
+  /* ── Font families ── */
   --font-heading: var(--font-fraunces), Georgia, "Times New Roman", serif;
   --font-body: var(--font-dm-sans), "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", "Fira Code", monospace;
+
+  /* ── shadcn/ui theme tokens ── */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --color-background: var(--warm-white);
+  --color-foreground: var(--soft-black);
+  --color-card: var(--warm-white);
+  --color-card-foreground: var(--soft-black);
+  --color-popover: var(--warm-white);
+  --color-popover-foreground: var(--soft-black);
+  --color-primary: var(--teal);
+  --color-primary-foreground: #FFFFFF;
+  --color-secondary: var(--sage-light);
+  --color-secondary-foreground: var(--soft-black);
+  --color-muted: var(--sage-light);
+  --color-muted-foreground: var(--soft-black-light);
+  --color-accent: var(--cream-light);
+  --color-accent-foreground: var(--soft-black);
+  --color-destructive: var(--error);
+  --color-destructive-foreground: #FFFFFF;
+  --color-border: #D4D4D8;
+  --color-input: #D4D4D8;
+  --color-ring: var(--teal);
+  --color-chart-1: var(--teal);
+  --color-chart-2: var(--sage);
+  --color-chart-3: var(--cream);
+  --color-chart-4: var(--teal-light);
+  --color-chart-5: var(--sage-dark);
+
+  --color-sidebar: var(--warm-white);
+  --color-sidebar-foreground: var(--soft-black);
+  --color-sidebar-primary: var(--teal);
+  --color-sidebar-primary-foreground: #FFFFFF;
+  --color-sidebar-accent: var(--cream-light);
+  --color-sidebar-accent-foreground: var(--soft-black);
+  --color-sidebar-border: #D4D4D8;
+  --color-sidebar-ring: var(--teal);
 }
 
 html {
