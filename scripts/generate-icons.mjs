@@ -9,12 +9,11 @@ const root = join(__dirname, "..");
 // Generate an ND monogram icon at a given size
 async function generateIcon(size, borderRadius = 0) {
   const fontSize = Math.round(size * 0.55);
-  const yOffset = Math.round(size * 0.06); // slight visual center adjustment
 
   const svg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${size}" height="${size}" rx="${borderRadius}" fill="#2A7B6F"/>
     <text
-      x="50%" y="${50 + (yOffset / size) * 100}%"
+      x="50%" y="47%"
       dominant-baseline="central"
       text-anchor="middle"
       font-family="Georgia, 'Times New Roman', serif"
