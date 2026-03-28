@@ -29,7 +29,7 @@
 
   /* ── Font families ── */
   --font-heading: var(--font-fraunces), Georgia, "Times New Roman", serif;
-  --font-body: var(--font-dm-sans), "Helvetica Neue", Arial, sans-serif;
+  --font-body: var(--font-dm-sans), "Helvetica Neue", sans-serif;
   --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", "Fira Code", monospace;
 
   /* ── shadcn/ui theme tokens ── */
@@ -45,7 +45,7 @@
   --color-popover: var(--warm-white);
   --color-popover-foreground: var(--soft-black);
   --color-primary: var(--teal);
-  --color-primary-foreground: #FFFFFF;
+  --color-primary-foreground: var(--warm-white);
   --color-secondary: var(--sage-light);
   --color-secondary-foreground: var(--soft-black);
   --color-muted: var(--sage-light);
@@ -53,9 +53,9 @@
   --color-accent: var(--cream-light);
   --color-accent-foreground: var(--soft-black);
   --color-destructive: var(--error);
-  --color-destructive-foreground: #FFFFFF;
-  --color-border: #D4D4D8;
-  --color-input: #D4D4D8;
+  --color-destructive-foreground: var(--warm-white);
+  --color-border: #C8D2D0;
+  --color-input: #C8D2D0;
   --color-ring: var(--teal);
   --color-chart-1: var(--teal);
   --color-chart-2: var(--sage);
@@ -66,10 +66,10 @@
   --color-sidebar: var(--warm-white);
   --color-sidebar-foreground: var(--soft-black);
   --color-sidebar-primary: var(--teal);
-  --color-sidebar-primary-foreground: #FFFFFF;
+  --color-sidebar-primary-foreground: var(--warm-white);
   --color-sidebar-accent: var(--cream-light);
   --color-sidebar-accent-foreground: var(--soft-black);
-  --color-sidebar-border: #D4D4D8;
+  --color-sidebar-border: #C8D2D0;
   --color-sidebar-ring: var(--teal);
 }
 

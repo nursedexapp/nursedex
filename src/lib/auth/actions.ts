@@ -51,7 +51,8 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     if (error.message.includes("already registered")) {
       return { error: "An account with this email already exists." };
     }
-    return { error: error.message };
+    console.error("Signup error:", error.message);
+    return { error: "Something went wrong. Please try again in a moment." };
   }
 
   // Update tos_accepted_at via the users table
@@ -201,7 +202,8 @@ export async function resendConfirmation(formData: FormData): Promise<AuthResult
   });
 
   if (error) {
-    return { error: error.message };
+    console.error("Resend confirmation error:", error.message);
+    return { error: "Something went wrong. Please try again in a moment." };
   }
 
   return { success: "Confirmation email sent. Check your inbox." };
