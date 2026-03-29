@@ -233,7 +233,7 @@ export default function ApplicationSection() {
       <div className="bg-warm-white px-6 sm:px-12 lg:px-24 py-32">
         <div className="max-w-5xl mx-auto">
           <div className="divide-y divide-sage/20">
-            {designPrinciples.map((item, i) => (
+            {designPrinciples.map((item) => (
               <div
                 key={item.title}
                 className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 lg:gap-16 py-12 first:pt-0 last:pb-0 items-baseline"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { Check, Eye, EyeOff, Heart, Loader2, Mail, Stethoscope } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
