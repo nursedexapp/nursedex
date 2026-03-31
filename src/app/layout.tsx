@@ -21,9 +21,25 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NurseDex",
-  description: "Find care that feels like family.",
+  title: "NurseDex | Long Island's Trusted Nurse Directory",
+  description:
+    "Find verified, trusted caregivers on Long Island. Join the waitlist for early access to NurseDex.",
   manifest: "/site.webmanifest",
+  openGraph: {
+    title: "NurseDex | Long Island's Trusted Nurse Directory",
+    description:
+      "Find verified, trusted caregivers on Long Island. Join the waitlist for early access.",
+    url: "https://nursedex.com",
+    siteName: "NurseDex",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "NurseDex | Long Island's Trusted Nurse Directory",
+    description:
+      "Find verified, trusted caregivers on Long Island. Join the waitlist for early access.",
+  },
 };
 
 export const viewport: Viewport = {

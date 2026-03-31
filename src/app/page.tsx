@@ -1,20 +1,21 @@
-import Link from "next/link";
+import { LandingPage } from "@/components/landing/LandingPage";
 
-export default function Home() {
-  return (
-    <main className="min-h-screen flex items-center justify-center bg-warm-white">
-      <div className="text-center">
-        <h1 className="font-heading text-5xl text-teal mb-4">NurseDex</h1>
-        <p className="font-body text-xl text-soft-black-light mb-8">
-          Find care that feels like family.
-        </p>
-        <Link
-          href="/brand"
-          className="inline-block bg-teal text-warm-white px-8 py-3 rounded-lg font-body font-medium hover:bg-teal-dark transition-colors"
-        >
-          View Brand Guidelines
-        </Link>
-      </div>
-    </main>
-  );
+type PageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function Home({ searchParams }: PageProps) {
+  const params = await searchParams;
+
+  // Capture UTM parameters for waitlist attribution
+  const utmParts = ["utm_source", "utm_medium", "utm_campaign"]
+    .map((key) => {
+      const val = params[key];
+      return typeof val === "string" ? `${key}=${val}` : null;
+    })
+    .filter(Boolean);
+
+  const referralSource = utmParts.length > 0 ? utmParts.join("&") : undefined;
+
+  return <LandingPage referralSource={referralSource} />;
 }

@@ -38,6 +38,9 @@ export const ANALYTICS_EVENTS = {
   HIRE_CLAIMED: "hire_claimed",
   HIRE_CONFIRMED: "hire_confirmed",
 
+  // Waitlist
+  WAITLIST_SIGNUP: "waitlist_signup",
+
   // General
   CONTACT_FORM_SUBMITTED: "contact_form_submitted",
   PAGE_VIEWED: "page_viewed",

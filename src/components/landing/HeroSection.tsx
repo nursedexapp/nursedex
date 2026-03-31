@@ -1,0 +1,122 @@
+import { WaitlistForm } from "./WaitlistForm";
+
+type HeroSectionProps = {
+  role: "nurse" | "family";
+  onRoleChange: (role: "nurse" | "family") => void;
+  referralSource?: string;
+  onSignup?: () => void;
+  waitlistCount?: number | null;
+  hasSignedUp?: boolean;
+};
+
+const copy = {
+  family: {
+    headline: "Find care that feels like family.",
+    subheadline:
+      "NurseDex connects Long Island families with verified, trusted caregivers. Browse real profiles, read honest reviews, and hire with confidence.",
+  },
+  nurse: {
+    headline: "Grow your care practice on Long Island.",
+    subheadline:
+      "NurseDex puts you in front of families actively looking for care. Build your profile, showcase your skills, and connect directly with clients.",
+  },
+};
+
+export function HeroSection({
+  role,
+  onRoleChange,
+  referralSource,
+  onSignup,
+  waitlistCount,
+  hasSignedUp,
+}: HeroSectionProps) {
+  return (
+    <section className="relative flex flex-col overflow-hidden bg-teal-dark px-6 text-center">
+      {/* Decorative outline rings — no fills, clipped by section edges */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -right-24 -top-24 h-[400px] w-[400px] rounded-full border border-warm-white/10" />
+        <div className="absolute -left-32 bottom-1/4 h-[300px] w-[300px] rounded-full border border-warm-white/[0.07]" />
+      </div>
+
+      {/* Top bar */}
+      <div className="relative mx-auto flex w-full max-w-4xl items-center justify-between py-6">
+        <p className="font-heading text-2xl text-warm-white">NurseDex</p>
+        <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 font-body text-xs text-warm-white/80">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-sage" />
+          Long Island, NY
+        </span>
+      </div>
+
+      <div className="relative mx-auto flex max-w-2xl flex-col items-center pb-8 pt-10">
+        {/* Role toggle */}
+        <div className="mb-8 inline-flex rounded-full border border-white/10 bg-white/5 p-1" role="radiogroup" aria-label="I am a">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={role === "family"}
+            onClick={() => onRoleChange("family")}
+            className={`cursor-pointer rounded-full px-5 py-2 font-body text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-1 focus-visible:ring-offset-teal-dark focus-visible:outline-none ${
+              role === "family"
+                ? "bg-teal text-warm-white shadow-sm"
+                : "text-sage-light hover:text-warm-white"
+            }`}
+          >
+            I need care
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={role === "nurse"}
+            onClick={() => onRoleChange("nurse")}
+            className={`cursor-pointer rounded-full px-5 py-2 font-body text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-1 focus-visible:ring-offset-teal-dark focus-visible:outline-none ${
+              role === "nurse"
+                ? "bg-teal text-warm-white shadow-sm"
+                : "text-sage-light hover:text-warm-white"
+            }`}
+          >
+            I&apos;m a caregiver
+          </button>
+        </div>
+
+        <h1
+          key={`headline-${role}`}
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 font-heading text-4xl leading-tight text-warm-white sm:text-5xl md:text-6xl"
+        >
+          {copy[role].headline}
+        </h1>
+
+        <p
+          key={`sub-${role}`}
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 mx-auto mt-6 max-w-xl font-body text-lg text-warm-white/70"
+        >
+          {copy[role].subheadline}
+        </p>
+
+        {/* Waitlist form */}
+        <div id="waitlist" className="mt-10">
+          <WaitlistForm role={role} referralSource={referralSource} variant="hero" onSignup={onSignup} hasSignedUp={hasSignedUp} />
+          <div className="mt-3 space-y-1">
+            {role === "nurse" ? (
+              <p className="font-body text-sm text-cream-light">
+                First 100 caregivers get priority placement. No spam, ever.
+              </p>
+            ) : waitlistCount ? (
+              <p className="font-body text-sm text-sage-light/70">
+                Join {waitlistCount}+ people already on the waitlist.
+              </p>
+            ) : (
+              <p className="font-body text-sm text-sage-light/60">
+                We&apos;ll only email you when we launch. No spam, ever.
+              </p>
+            )}
+            {role === "nurse" && waitlistCount && (
+              <p className="font-body text-sm text-sage-light/70">
+                Join {waitlistCount}+ people already on the waitlist.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
