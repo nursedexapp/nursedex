@@ -44,7 +44,7 @@ export function FAQSection({ role }: FAQSectionProps) {
   const allFaqs = [roleFaq, ...faqs.shared];
 
   return (
-    <section className="bg-white px-6 py-20 border-t border-sage-light/40 min-h-[700px]">
+    <section className="bg-white px-6 pt-20 pb-10 border-t border-sage-light/40">
       <div className="mx-auto max-w-2xl">
         <h2 className="font-heading text-3xl text-soft-black sm:text-4xl">
           Frequently asked questions
