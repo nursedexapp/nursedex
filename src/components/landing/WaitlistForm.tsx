@@ -256,7 +256,7 @@ export function WaitlistForm({
         className={`inline-flex h-12 w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-6 font-body font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-60 sm:w-auto ${
           isFooter
             ? "bg-warm-white text-teal hover:bg-sage-light focus:ring-warm-white/40"
-            : "bg-teal text-warm-white hover:bg-teal-dark focus:ring-teal/40"
+            : "bg-warm-white text-teal hover:bg-sage-light focus:ring-warm-white/40"
         }`}
       >
         {submitState === "submitting" ? <><Spinner /> Joining...</> : "Join the Waitlist"}
