@@ -78,7 +78,7 @@ export function HowItWorksSection({ role }: HowItWorksSectionProps) {
               </div>
 
               {/* Content */}
-              <div className={`pb-8 ${i === currentSteps.length - 1 ? "pb-0" : ""}`}>
+              <div className={i === currentSteps.length - 1 ? "" : "pb-8"}>
                 <div className="flex items-center gap-3">
                   <step.icon className="h-5 w-5 text-teal-light" />
                   <h3 className="font-heading text-xl text-soft-black">
