@@ -7,8 +7,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 
 // Generate an ND monogram icon at a given size
-async function generateIcon(size, borderRadius = 0) {
-  const fontSize = Math.round(size * 0.55);
+async function generateIcon(size, borderRadius = 0, fontScale = 0.55) {
+  const fontSize = Math.round(size * fontScale);
 
   const svg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
     <rect width="${size}" height="${size}" rx="${borderRadius}" fill="#2A7B6F"/>
@@ -26,6 +26,7 @@ async function generateIcon(size, borderRadius = 0) {
 
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
+
 
 // Generate ICO file (contains 16px and 32px PNGs)
 function createIco(buffers16, buffers32) {
@@ -70,11 +71,16 @@ async function main() {
   const png192 = await generateIcon(192, 24);
   const png512 = await generateIcon(512, 64);
 
+  // Social media avatar: ND monogram, no rounded corners, extra padding for circle crops
+  const socialAvatar = await generateIcon(512, 0, 0.45);
+
   // Save static PNGs to public/
   writeFileSync(join(root, "public", "icon-192.png"), png192);
   writeFileSync(join(root, "public", "icon-512.png"), png512);
+  writeFileSync(join(root, "public", "social-avatar.png"), socialAvatar);
   console.log("  public/icon-192.png");
   console.log("  public/icon-512.png");
+  console.log("  public/social-avatar.png");
 
   // Generate and save favicon.ico
   const ico = createIco(png16, png32);
