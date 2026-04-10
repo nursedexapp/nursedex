@@ -150,6 +150,15 @@ export enum CommunicationPreference {
   TEXT = "text",
 }
 
+export const COMMUNICATION_PREFERENCE_LABELS: Record<
+  CommunicationPreference,
+  string
+> = {
+  [CommunicationPreference.EMAIL]: "Email",
+  [CommunicationPreference.PHONE]: "Phone",
+  [CommunicationPreference.TEXT]: "Text",
+};
+
 export enum SubscriptionStatus {
   ACTIVE = "active",
   PAST_DUE = "past_due",

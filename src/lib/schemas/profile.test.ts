@@ -1,0 +1,264 @@
+import { describe, it, expect } from "vitest";
+import {
+  step1Schema,
+  step2Schema,
+  step3Schema,
+  step4Schema,
+  step5Schema,
+} from "@/lib/schemas/profile";
+import { NurseTier } from "@/types/enums";
+
+describe("step1Schema", () => {
+  it("accepts valid data", () => {
+    const result = step1Schema.safeParse({
+      first_name: "Jane",
+      last_name: "Doe",
+      gender: "female",
+      years_experience: 5,
+      languages: ["English"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty first name", () => {
+    const result = step1Schema.safeParse({
+      first_name: "",
+      last_name: "Doe",
+      gender: "female",
+      years_experience: 5,
+      languages: ["English"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects negative years", () => {
+    const result = step1Schema.safeParse({
+      first_name: "Jane",
+      last_name: "Doe",
+      gender: "female",
+      years_experience: -1,
+      languages: ["English"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects years over 70", () => {
+    const result = step1Schema.safeParse({
+      first_name: "Jane",
+      last_name: "Doe",
+      gender: "female",
+      years_experience: 71,
+      languages: ["English"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty languages", () => {
+    const result = step1Schema.safeParse({
+      first_name: "Jane",
+      last_name: "Doe",
+      gender: "female",
+      years_experience: 5,
+      languages: [],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("step2Schema", () => {
+  it("free tier allows max 2 care types", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "rn",
+      license_number: "123456",
+      care_types: ["elderly", "pediatric", "hospice"],
+      primary_care_type: "elderly",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("free tier accepts 2 care types", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "rn",
+      license_number: "123456",
+      care_types: ["elderly", "pediatric"],
+      primary_care_type: "elderly",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("featured tier allows unlimited care types", () => {
+    const schema = step2Schema(NurseTier.FEATURED);
+    const result = schema.safeParse({
+      credential: "rn",
+      license_number: "123456",
+      care_types: [
+        "elderly",
+        "pediatric",
+        "hospice",
+        "memory_care",
+        "wound_care",
+      ],
+      primary_care_type: "elderly",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("requires primary care type when multiple selected", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "rn",
+      license_number: "123456",
+      care_types: ["elderly", "pediatric"],
+      primary_care_type: null,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("allows null primary when only one care type", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "rn",
+      license_number: "123456",
+      care_types: ["elderly"],
+      primary_care_type: null,
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("step3Schema", () => {
+  it("accepts explicitly empty optional fields", () => {
+    const result = step3Schema.safeParse({
+      skills: [],
+      availability_commitment: [],
+      time_slots: [],
+      rate_min: null,
+      rate_max: null,
+      has_transportation: false,
+      covid_vaccinated: null,
+      care_philosophy: null,
+      additional_certs: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects rate_max less than rate_min", () => {
+    const result = step3Schema.safeParse({
+      rate_min: 50,
+      rate_max: 30,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts equal rate_min and rate_max", () => {
+    const result = step3Schema.safeParse({
+      rate_min: 40,
+      rate_max: 40,
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("step4Schema", () => {
+  it("free tier limits bio to 150 chars", () => {
+    const schema = step4Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      bio: "x".repeat(151),
+      photos: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("free tier allows 150 char bio", () => {
+    const schema = step4Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      bio: "x".repeat(150),
+      photos: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("featured tier allows up to 500 char bio", () => {
+    const schema = step4Schema(NurseTier.FEATURED);
+    const result = schema.safeParse({
+      bio: "x".repeat(500),
+      photos: [],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("free tier limits to 1 photo", () => {
+    const schema = step4Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      bio: "My bio",
+      photos: ["a.jpg", "b.jpg"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("featured tier allows up to 3 photos", () => {
+    const schema = step4Schema(NurseTier.FEATURED);
+    const result = schema.safeParse({
+      bio: "My bio",
+      photos: ["a.jpg", "b.jpg", "c.jpg"],
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("step5Schema", () => {
+  it("requires at least email or phone", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "",
+      contact_phone: "",
+      communication_preference: "email",
+      zip_code: "11701",
+      travel_radius_miles: 25,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts email only", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "jane@example.com",
+      contact_phone: "",
+      communication_preference: "email",
+      zip_code: "11701",
+      travel_radius_miles: 25,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts phone only", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "",
+      contact_phone: "(631) 555-0123",
+      communication_preference: "phone",
+      zip_code: "11701",
+      travel_radius_miles: 25,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid zip code", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "jane@example.com",
+      communication_preference: "email",
+      zip_code: "1170",
+      travel_radius_miles: 25,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects travel radius over 100", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "jane@example.com",
+      communication_preference: "email",
+      zip_code: "11701",
+      travel_radius_miles: 101,
+    });
+    expect(result.success).toBe(false);
+  });
+});

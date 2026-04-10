@@ -70,6 +70,22 @@ export const VERIFICATION_SLA = {
   ALERT_THRESHOLD: 0.75, // alert at 75% of SLA
 } as const;
 
+// Profile completeness weights (must total 100)
+export const COMPLETENESS_WEIGHTS = {
+  photo: 15,
+  bio: 15,
+  skills: 10,
+  care_philosophy: 10,
+  availability_commitment: 10,
+  time_slots: 5,
+  rate: 10,
+  has_transportation: 5,
+  covid_vaccinated: 5,
+  additional_certs: 5,
+  travel_radius_miles: 5,
+  languages_extra: 5, // beyond default "English"
+} as const;
+
 // Password
 export const PASSWORD = {
   MIN_LENGTH: 8,

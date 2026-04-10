@@ -72,6 +72,42 @@ export interface NurseProfile {
   updated_at: string;
 }
 
+/** Shape of the onboarding wizard draft stored in localStorage */
+export interface NurseProfileDraft {
+  // Step 1: Basics
+  first_name?: string;
+  last_name?: string;
+  gender?: string;
+  years_experience?: number;
+  languages?: string[];
+  // Step 2: Credentials
+  credential?: string;
+  license_number?: string;
+  care_types?: string[];
+  primary_care_type?: string;
+  // Step 3: Skills & Details
+  skills?: string[];
+  availability_commitment?: string[];
+  time_slots?: string[];
+  rate_min?: number;
+  rate_max?: number;
+  has_transportation?: boolean;
+  covid_vaccinated?: boolean;
+  care_philosophy?: string;
+  additional_certs?: string[];
+  // Step 4: Bio & Photos
+  bio?: string;
+  photos?: string[]; // storage paths, not URLs
+  // Step 5: Contact
+  contact_email?: string;
+  contact_phone?: string;
+  communication_preference?: string;
+  zip_code?: string;
+  travel_radius_miles?: number;
+  // Meta
+  completed_step?: number;
+}
+
 export interface FamilyProfile {
   id: string;
   user_id: string;

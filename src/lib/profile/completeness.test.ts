@@ -1,0 +1,120 @@
+import { describe, it, expect } from "vitest";
+import { calculateCompleteness } from "@/lib/profile/completeness";
+import type { Skill, AvailabilityCommitment, TimeSlot } from "@/types/enums";
+
+const EMPTY_PROFILE = {
+  photos: [] as string[],
+  bio: null,
+  skills: [] as Skill[],
+  care_philosophy: null,
+  availability_commitment: [] as AvailabilityCommitment[],
+  time_slots: [] as TimeSlot[],
+  rate_min: null,
+  rate_max: null,
+  has_transportation: false,
+  covid_vaccinated: null,
+  additional_certs: [] as string[],
+  travel_radius_miles: null,
+  languages: ["English"],
+};
+
+const FULL_PROFILE = {
+  photos: ["photo1.jpg"],
+  bio: "A great nurse with years of experience.",
+  skills: ["medication_management", "vital_signs"] as Skill[],
+  care_philosophy: "I treat every patient like family.",
+  availability_commitment: ["full_time"] as AvailabilityCommitment[],
+  time_slots: ["weekdays", "evenings"] as TimeSlot[],
+  rate_min: 25,
+  rate_max: 40,
+  has_transportation: true,
+  covid_vaccinated: true,
+  additional_certs: ["BLS", "ACLS"],
+  travel_radius_miles: 25,
+  languages: ["English", "Spanish"],
+};
+
+describe("calculateCompleteness", () => {
+  it("returns 0% for an empty profile", () => {
+    const { score, missing } = calculateCompleteness(EMPTY_PROFILE);
+    expect(score).toBe(0);
+    expect(missing.length).toBe(12);
+  });
+
+  it("returns 100% for a fully complete profile", () => {
+    const { score, missing } = calculateCompleteness(FULL_PROFILE);
+    expect(score).toBe(100);
+    expect(missing.length).toBe(0);
+  });
+
+  it("scores photo at 15 points", () => {
+    const { score } = calculateCompleteness({
+      ...EMPTY_PROFILE,
+      photos: ["photo.jpg"],
+    });
+    expect(score).toBe(15);
+  });
+
+  it("scores bio at 15 points", () => {
+    const { score } = calculateCompleteness({
+      ...EMPTY_PROFILE,
+      bio: "My bio text",
+    });
+    expect(score).toBe(15);
+  });
+
+  it("does not count empty/whitespace bio", () => {
+    const { score } = calculateCompleteness({
+      ...EMPTY_PROFILE,
+      bio: "   ",
+    });
+    expect(score).toBe(0);
+  });
+
+  it("scores has_transportation only when true", () => {
+    const { score: withoutTransport } = calculateCompleteness(EMPTY_PROFILE);
+    const { score: withTransport } = calculateCompleteness({
+      ...EMPTY_PROFILE,
+      has_transportation: true,
+    });
+    expect(withTransport - withoutTransport).toBe(5);
+  });
+
+  it("scores covid_vaccinated when explicitly set (even false)", () => {
+    const { score: unset } = calculateCompleteness(EMPTY_PROFILE);
+    const { score: setFalse } = calculateCompleteness({
+      ...EMPTY_PROFILE,
+      covid_vaccinated: false,
+    });
+    expect(setFalse - unset).toBe(5);
+  });
+
+  it("scores extra languages only when more than English", () => {
+    const { score: englishOnly } = calculateCompleteness(EMPTY_PROFILE);
+    const { score: bilingual } = calculateCompleteness({
+      ...EMPTY_PROFILE,
+      languages: ["English", "Spanish"],
+    });
+    expect(bilingual - englishOnly).toBe(5);
+  });
+
+  it("scores rate when either min or max is set", () => {
+    const { score: noRate } = calculateCompleteness(EMPTY_PROFILE);
+    const { score: minOnly } = calculateCompleteness({
+      ...EMPTY_PROFILE,
+      rate_min: 20,
+    });
+    expect(minOnly - noRate).toBe(10);
+  });
+
+  it("lists correct missing items", () => {
+    const { missing } = calculateCompleteness({
+      ...FULL_PROFILE,
+      photos: [],
+      bio: null,
+    });
+    expect(missing).toContain("Add a professional photo");
+    expect(missing).toContain("Write your bio");
+    expect(missing.length).toBe(2);
+  });
+});
