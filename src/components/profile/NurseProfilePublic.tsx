@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -32,8 +33,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { PublicNurseProfile } from "@/lib/profile/queries";
+import { RevealCTA } from "@/components/reveals/RevealCTA";
 
 type ViewMode = "anon" | "free" | "subscribed";
+type RevealMode = "anon" | "no_sub" | "subscribed" | null;
 
 interface NurseProfilePublicProps {
   nurse: PublicNurseProfile;
@@ -41,6 +44,7 @@ interface NurseProfilePublicProps {
   licenseVerifyUrl: string | null;
   distanceMiles: number | null;
   viewMode: ViewMode;
+  revealMode?: RevealMode;
 }
 
 export function NurseProfilePublic({
@@ -49,6 +53,7 @@ export function NurseProfilePublic({
   licenseVerifyUrl,
   distanceMiles,
   viewMode,
+  revealMode = null,
 }: NurseProfilePublicProps) {
   const credentialLabel =
     CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
@@ -57,16 +62,18 @@ export function NurseProfilePublic({
     <div className="space-y-6">
       {/* Header: photo + name + credential */}
       <div className="flex gap-6">
-        <div className="size-28 shrink-0 overflow-hidden rounded-xl border border-sage/20 bg-sage/10 sm:size-32">
+        <div className="border-sage/20 bg-sage/10 relative size-28 shrink-0 overflow-hidden rounded-xl border sm:size-32">
           {photoUrl ? (
-            <img
+            <Image
               src={photoUrl}
               alt={`${nurse.first_name} ${nurse.last_name}`}
-              className="size-full object-cover"
+              fill
+              sizes="(min-width: 640px) 128px, 112px"
+              className="object-cover"
             />
           ) : (
             <div className="flex size-full items-center justify-center">
-              <ImageIcon className="size-10 text-muted-foreground/40" />
+              <ImageIcon className="text-muted-foreground/40 size-10" />
             </div>
           )}
         </div>
@@ -83,7 +90,7 @@ export function NurseProfilePublic({
           <p className="text-muted-foreground">{credentialLabel}</p>
 
           {nurse.years_experience !== null && (
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-sm">
               {nurse.years_experience} year
               {nurse.years_experience !== 1 ? "s" : ""} of experience
             </p>
@@ -94,7 +101,7 @@ export function NurseProfilePublic({
             <div className="mt-2 flex items-center gap-1">
               <Star className="size-4 fill-amber-400 text-amber-400" />
               <span className="text-sm font-medium">{nurse.avg_rating}</span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 ({nurse.review_count} review
                 {nurse.review_count !== 1 ? "s" : ""})
               </span>
@@ -103,7 +110,7 @@ export function NurseProfilePublic({
 
           {/* Distance */}
           {distanceMiles !== null && (
-            <div className="mt-2 flex items-center gap-1 text-sm text-muted-foreground">
+            <div className="text-muted-foreground mt-2 flex items-center gap-1 text-sm">
               <MapPin className="size-4" />
               {distanceMiles === 0
                 ? "In your area"
@@ -144,7 +151,7 @@ export function NurseProfilePublic({
             <Card className="border-sage/20">
               <CardContent className="pt-4">
                 <h2 className="mb-2 text-sm font-semibold">About</h2>
-                <p className="whitespace-pre-line text-sm leading-relaxed">
+                <p className="text-sm leading-relaxed whitespace-pre-line">
                   {nurse.bio}
                 </p>
               </CardContent>
@@ -156,7 +163,7 @@ export function NurseProfilePublic({
             <Card className="border-sage/20">
               <CardContent className="pt-4">
                 <h2 className="mb-2 text-sm font-semibold">Care Philosophy</h2>
-                <p className="whitespace-pre-line text-sm italic leading-relaxed text-muted-foreground">
+                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line italic">
                   &ldquo;{nurse.care_philosophy}&rdquo;
                 </p>
               </CardContent>
@@ -190,7 +197,7 @@ export function NurseProfilePublic({
                   <div className="space-y-2 text-sm">
                     {nurse.availability_commitment.length > 0 && (
                       <div className="flex items-start gap-2">
-                        <Clock className="mt-0.5 size-4 text-muted-foreground" />
+                        <Clock className="text-muted-foreground mt-0.5 size-4" />
                         <span>
                           {nurse.availability_commitment
                             .map(
@@ -244,13 +251,13 @@ export function NurseProfilePublic({
                 <div className="space-y-2 text-sm">
                   {nurse.languages.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <Languages className="size-4 text-muted-foreground" />
+                      <Languages className="text-muted-foreground size-4" />
                       {nurse.languages.join(", ")}
                     </div>
                   )}
                   {nurse.has_transportation && (
                     <div className="flex items-center gap-2">
-                      <Car className="size-4 text-muted-foreground" />
+                      <Car className="text-muted-foreground size-4" />
                       Has own transportation
                     </div>
                   )}
@@ -284,7 +291,7 @@ export function NurseProfilePublic({
               <Separator className="bg-sage/20" />
               <div className="text-sm">
                 <h2 className="mb-2 font-semibold">License Information</h2>
-                <div className="space-y-1 text-muted-foreground">
+                <div className="text-muted-foreground space-y-1">
                   <p>
                     <strong>Credential:</strong> {credentialLabel}
                   </p>
@@ -299,13 +306,13 @@ export function NurseProfilePublic({
                       href={licenseVerifyUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-teal hover:underline"
+                      className="text-teal inline-flex items-center gap-1 hover:underline"
                     >
                       Verify this license on the NY State database
                       <ExternalLink className="size-3" />
                     </a>
                   )}
-                  <p className="mt-2 text-xs text-muted-foreground/70">
+                  <p className="text-muted-foreground/70 mt-2 text-xs">
                     NurseDex does not verify or monitor licenses. Families are
                     responsible for confirming current licensure.
                   </p>
@@ -319,6 +326,7 @@ export function NurseProfilePublic({
           <ContactSection
             nurse={nurse}
             viewMode={viewMode}
+            revealMode={revealMode}
           />
         </>
       )}
@@ -333,24 +341,24 @@ function AnonCTA({ name }: { name: string }) {
   return (
     <Card className="border-teal/20 bg-teal/5">
       <CardContent className="py-6 text-center">
-        <Lock className="mx-auto mb-3 size-8 text-teal/60" />
+        <Lock className="text-teal/60 mx-auto mb-3 size-8" />
         <h2 className="font-heading text-lg font-semibold">
           Want to learn more about {name}?
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Create a free account to view full profiles, including bio, skills,
           availability, and reviews.
         </p>
         <div className="mt-4 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
           <Link
             href="/signup"
-            className="rounded-lg bg-teal px-6 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-teal-dark"
+            className="bg-teal font-body hover:bg-teal-dark rounded-lg px-6 py-2.5 text-sm font-medium text-white transition-colors"
           >
             Sign up free
           </Link>
           <Link
             href="/login"
-            className="font-body text-sm text-teal transition-colors hover:text-teal-dark"
+            className="font-body text-teal hover:text-teal-dark text-sm transition-colors"
           >
             Already have an account? Log in
           </Link>
@@ -361,14 +369,20 @@ function AnonCTA({ name }: { name: string }) {
 }
 
 /**
- * Contact section with different states based on subscription.
+ * Contact section. Shows either the revealed contact info (server-rendered
+ * when the family has already revealed this nurse) or a reveal CTA that
+ * triggers paywall → checkout → reveal.
+ *
+ * For nurses/admins viewing other profiles, no contact info is shown.
  */
 function ContactSection({
   nurse,
   viewMode,
+  revealMode,
 }: {
   nurse: PublicNurseProfile;
   viewMode: "free" | "subscribed";
+  revealMode: "anon" | "no_sub" | "subscribed" | null;
 }) {
   const prefLabel = nurse.communication_preference
     ? COMMUNICATION_PREFERENCE_LABELS[
@@ -376,64 +390,76 @@ function ContactSection({
       ]
     : null;
 
-  if (viewMode === "free") {
+  // Revealed: server-render the contact info directly.
+  if (viewMode === "subscribed") {
     return (
-      <Card className="border-teal/20 bg-teal/5">
-        <CardContent className="py-6 text-center">
-          <Lock className="mx-auto mb-3 size-8 text-teal/60" />
-          <h2 className="font-heading text-lg font-semibold">
-            Contact {nurse.first_name}
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Subscribe to reveal contact information and reach out directly.
-          </p>
-          {prefLabel && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              {nurse.first_name} prefers to be contacted by{" "}
-              {prefLabel.toLowerCase()}
-            </p>
-          )}
-          <Link
-            href="/dashboard"
-            className="mt-4 inline-block rounded-lg bg-teal px-6 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-teal-dark"
-          >
-            Subscribe to contact
-          </Link>
+      <Card className="border-sage/20">
+        <CardContent className="pt-4">
+          <h2 className="mb-3 text-sm font-semibold">Contact Information</h2>
+          <div className="space-y-3 text-sm">
+            {nurse.contact_email && (
+              <a
+                href={`mailto:${nurse.contact_email}?subject=NurseDex%20Inquiry`}
+                className="text-teal flex items-center gap-2 hover:underline"
+              >
+                <Mail className="size-4" />
+                {nurse.contact_email}
+              </a>
+            )}
+            {nurse.contact_phone && (
+              <>
+                <a
+                  href={`tel:${nurse.contact_phone}`}
+                  className="text-teal flex items-center gap-2 hover:underline"
+                >
+                  <Phone className="size-4" />
+                  Call {nurse.contact_phone}
+                </a>
+                <a
+                  href={`sms:${nurse.contact_phone}`}
+                  className="text-teal flex items-center gap-2 hover:underline"
+                >
+                  <MessageSquare className="size-4" />
+                  Text {nurse.contact_phone}
+                </a>
+              </>
+            )}
+            {prefLabel && (
+              <div className="text-muted-foreground flex items-center gap-2">
+                <MessageSquare className="size-4" />
+                Prefers contact by {prefLabel.toLowerCase()}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
   }
 
-  // Subscribed + revealed: show full contact info
+  // Family/anon viewer: reveal CTA. For nurses/admins (revealMode === null
+  // and viewMode === free), show nothing.
+  if (revealMode === null) return null;
+
   return (
-    <Card className="border-sage/20">
-      <CardContent className="pt-4">
-        <h2 className="mb-3 text-sm font-semibold">Contact Information</h2>
-        <div className="space-y-3 text-sm">
-          {nurse.contact_email && (
-            <a
-              href={`mailto:${nurse.contact_email}?subject=NurseDex%20Inquiry`}
-              className="flex items-center gap-2 text-teal hover:underline"
-            >
-              <Mail className="size-4" />
-              {nurse.contact_email}
-            </a>
-          )}
-          {nurse.contact_phone && (
-            <a
-              href={`tel:${nurse.contact_phone}`}
-              className="flex items-center gap-2 text-teal hover:underline"
-            >
-              <Phone className="size-4" />
-              {nurse.contact_phone}
-            </a>
-          )}
-          {prefLabel && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MessageSquare className="size-4" />
-              Prefers contact by {prefLabel.toLowerCase()}
-            </div>
-          )}
+    <Card className="border-teal/20 bg-teal/5">
+      <CardContent className="py-6 text-center">
+        <Lock className="text-teal/60 mx-auto mb-3 size-8" />
+        <h2 className="font-heading text-lg font-semibold">
+          Contact {nurse.first_name}
+        </h2>
+        {prefLabel && (
+          <p className="text-muted-foreground mt-1 text-xs">
+            {nurse.first_name} prefers to be contacted by{" "}
+            {prefLabel.toLowerCase()}
+          </p>
+        )}
+        <div className="mt-4 flex justify-center">
+          <RevealCTA
+            nurseUserId={nurse.user_id}
+            nurseFirstName={nurse.first_name}
+            returnTo={`/nurses/${nurse.slug}`}
+            mode={revealMode}
+          />
         </div>
       </CardContent>
     </Card>

@@ -17,8 +17,19 @@ function Spinner({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       aria-hidden="true"
     >
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
     </svg>
   );
 }
@@ -40,7 +51,7 @@ function CopyLinkButton() {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 font-body text-sm text-sage-light transition-colors hover:bg-white/10 hover:text-warm-white"
+      className="font-body text-sage-light hover:text-warm-white inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm transition-colors hover:bg-white/10"
     >
       {copied ? (
         <>
@@ -130,14 +141,17 @@ export function WaitlistForm({
   const isFooter = variant === "footer";
   const isHeader = variant === "header";
 
-  const isSignedUp = submitState === "success" || submitState === "already" || hasSignedUp;
+  const isSignedUp =
+    submitState === "success" || submitState === "already" || hasSignedUp;
 
   if (isSignedUp) {
     if (isHeader) {
       return (
         <div className="flex items-center gap-2">
-          <CheckCircle className="h-4 w-4 text-teal" />
-          <p className="font-body text-sm font-medium text-teal">You&apos;re on the list!</p>
+          <CheckCircle className="text-teal h-4 w-4" />
+          <p className="font-body text-teal text-sm font-medium">
+            You&apos;re on the list!
+          </p>
         </div>
       );
     }
@@ -146,22 +160,24 @@ export function WaitlistForm({
       <div
         className={`rounded-xl px-6 py-8 text-center ${
           isFooter
-            ? "max-w-md mx-auto border border-white/20 bg-teal-dark/40"
+            ? "bg-teal-dark/40 mx-auto max-w-md border border-white/20"
             : "border border-white/15 bg-white/10"
         }`}
       >
-        <CheckCircle className={`mx-auto mb-3 h-8 w-8 ${isFooter ? "text-sage-light" : "text-teal-light"}`} />
-        <p className="font-heading text-xl text-warm-white">
+        <CheckCircle
+          className={`mx-auto mb-3 h-8 w-8 ${isFooter ? "text-sage-light" : "text-teal-light"}`}
+        />
+        <p className="font-heading text-warm-white text-xl">
           {message || "You're on the list!"}
         </p>
-        <p className="mt-4 font-body text-sm text-sage-light">
+        <p className="font-body text-sage-light mt-4 text-sm">
           Know someone who would love NurseDex?
         </p>
         <div className="mt-3 flex items-center justify-center gap-3">
           <CopyLinkButton />
           <a
             href={`sms:?body=${encodeURIComponent("Check out NurseDex, a new directory for finding trusted caregivers on Long Island: https://nursedex.com")}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 font-body text-sm text-sage-light transition-colors hover:bg-white/10 hover:text-warm-white"
+            className="font-body text-sage-light hover:text-warm-white inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm transition-colors hover:bg-white/10"
           >
             Text a friend
           </a>
@@ -193,10 +209,10 @@ export function WaitlistForm({
             type="email"
             placeholder="Enter your email"
             disabled={submitState === "submitting"}
-            className="h-9 w-40 rounded-lg border border-sage-light/60 bg-white px-3 font-body text-sm text-soft-black placeholder:text-soft-black-light/50 disabled:opacity-60 focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal/30 sm:w-48"
+            className="border-sage-light/60 font-body text-soft-black placeholder:text-soft-black-light/50 focus:border-teal focus:ring-teal/30 h-9 w-40 rounded-lg border bg-white px-3 text-sm focus:ring-1 focus:outline-none disabled:opacity-60 sm:w-48"
           />
           {(errors.email || submitState === "error") && (
-            <p className="absolute left-0 top-full mt-1 whitespace-nowrap font-body text-xs text-error">
+            <p className="font-body text-error absolute top-full left-0 mt-1 text-xs whitespace-nowrap">
               {errors.email?.message || message}
             </p>
           )}
@@ -204,9 +220,15 @@ export function WaitlistForm({
         <button
           type="submit"
           disabled={submitState === "submitting"}
-          className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-teal px-4 font-body text-sm font-medium text-warm-white transition-colors hover:bg-teal-dark disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-teal/40 focus:ring-offset-1"
+          className="bg-teal font-body text-warm-white hover:bg-teal-dark focus:ring-teal/40 inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-4 text-sm font-medium transition-colors focus:ring-2 focus:ring-offset-1 focus:outline-none disabled:opacity-60"
         >
-          {submitState === "submitting" ? <><Spinner className="h-3.5 w-3.5" /> Joining...</> : "Join"}
+          {submitState === "submitting" ? (
+            <>
+              <Spinner className="h-3.5 w-3.5" /> Joining...
+            </>
+          ) : (
+            "Join"
+          )}
         </button>
       </form>
     );
@@ -215,7 +237,7 @@ export function WaitlistForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className={`flex w-full items-stretch justify-center gap-3 sm:items-start ${isFooter ? "max-w-md mx-auto flex-col sm:flex-row" : "max-w-lg mx-auto flex-col sm:flex-row"}`}
+      className={`flex w-full items-stretch justify-center gap-3 sm:items-start ${isFooter ? "mx-auto max-w-md flex-col sm:flex-row" : "mx-auto max-w-lg flex-col sm:flex-row"}`}
     >
       {/* Honeypot: hidden from real users, bots will fill it */}
       <input
@@ -236,10 +258,10 @@ export function WaitlistForm({
           type="email"
           placeholder="Enter your email"
           disabled={submitState === "submitting"}
-          className={`h-12 w-full rounded-lg px-4 font-body disabled:opacity-60 focus:outline-none focus:ring-2 ${
+          className={`font-body h-12 w-full rounded-lg px-4 focus:ring-2 focus:outline-none disabled:opacity-60 ${
             isFooter
-              ? "border border-sage-light bg-warm-white text-soft-black placeholder:text-soft-black-light/50 focus:border-teal-light focus:ring-warm-white/30"
-              : "border border-white/60 bg-white/90 text-soft-black placeholder:text-soft-black-light/50 focus:border-white focus:ring-white/30"
+              ? "border-sage-light bg-warm-white text-soft-black placeholder:text-soft-black-light/50 focus:border-teal-light focus:ring-warm-white/30 border"
+              : "text-soft-black placeholder:text-soft-black-light/50 border border-white/60 bg-white/90 focus:border-white focus:ring-white/30"
           }`}
         />
         {errors.email && (
@@ -253,13 +275,19 @@ export function WaitlistForm({
       <button
         type="submit"
         disabled={submitState === "submitting"}
-        className={`inline-flex h-12 w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-6 font-body font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-60 sm:w-auto ${
+        className={`font-body inline-flex h-12 w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-lg px-6 font-medium transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:opacity-60 sm:w-auto ${
           isFooter
-            ? "bg-warm-white text-teal-dark hover:bg-cream hover:scale-[1.02] focus:ring-warm-white/40"
-            : "bg-warm-white text-teal-dark hover:bg-cream hover:scale-[1.02] focus:ring-warm-white/40"
+            ? "bg-warm-white text-teal-dark hover:bg-cream focus:ring-warm-white/40 hover:scale-[1.02]"
+            : "bg-warm-white text-teal-dark hover:bg-cream focus:ring-warm-white/40 hover:scale-[1.02]"
         }`}
       >
-        {submitState === "submitting" ? <><Spinner /> Joining...</> : "Join the Waitlist"}
+        {submitState === "submitting" ? (
+          <>
+            <Spinner /> Joining...
+          </>
+        ) : (
+          "Join the Waitlist"
+        )}
       </button>
     </form>
   );

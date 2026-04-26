@@ -13,7 +13,15 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="space-y-4 animate-pulse"><div className="h-6 w-40 rounded bg-sage/20" /><div className="h-4 w-56 rounded bg-sage/20" /><div className="mt-8 h-11 w-full rounded-lg bg-sage/20" /></div>}>
+    <Suspense
+      fallback={
+        <div className="animate-pulse space-y-4">
+          <div className="bg-sage/20 h-6 w-40 rounded" />
+          <div className="bg-sage/20 h-4 w-56 rounded" />
+          <div className="bg-sage/20 mt-8 h-11 w-full rounded-lg" />
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   );
@@ -74,7 +82,7 @@ function LoginForm() {
     <div>
       <div className="mb-8">
         <h2 className="font-heading text-2xl">Welcome back</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm">
           Your Long Island care community is waiting.{" "}
           <Link href="/signup" className="text-teal font-medium underline">
             New here? Create an account
@@ -86,14 +94,19 @@ function LoginForm() {
 
       <div className="relative my-6">
         <Separator className="bg-sage/20" />
-        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
+        <span className="bg-background text-muted-foreground absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 text-xs">
           or continue with email
         </span>
       </div>
 
       <form action={handleSubmit} className="space-y-4">
         {error && (
-          <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg bg-error/10 px-4 py-3 text-sm text-error outline-none">
+          <div
+            ref={errorRef}
+            tabIndex={-1}
+            role="alert"
+            className="bg-error/10 text-error rounded-lg px-4 py-3 text-sm outline-none"
+          >
             {error}
             {showResend && (
               <Button
@@ -102,20 +115,25 @@ function LoginForm() {
                 size="sm"
                 onClick={handleResend}
                 disabled={resendLoading}
-                className="mt-1 h-auto px-0 text-teal"
+                className="text-teal mt-1 h-auto px-0"
               >
                 {resendLoading ? (
                   <>
                     <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
                     Sending...
                   </>
-                ) : "Resend confirmation email"}
+                ) : (
+                  "Resend confirmation email"
+                )}
               </Button>
             )}
           </div>
         )}
         {success && (
-          <div role="status" className="rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
+          <div
+            role="status"
+            className="bg-success/10 text-success rounded-lg px-4 py-3 text-sm"
+          >
             {success}
           </div>
         )}
@@ -139,7 +157,7 @@ function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <Link
               href="/forgot-password"
-              className="text-sm text-teal font-medium underline underline-offset-2 hover:text-teal-dark transition-colors"
+              className="text-teal hover:text-teal-dark text-sm font-medium underline underline-offset-2 transition-colors"
             >
               Forgot password?
             </Link>
@@ -156,7 +174,7 @@ function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center cursor-pointer text-soft-black-light hover:text-soft-black transition-colors"
+              className="text-soft-black-light hover:text-soft-black absolute top-1/2 right-1 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center transition-colors"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
@@ -170,7 +188,7 @@ function LoginForm() {
 
         <Button
           type="submit"
-          className="w-full h-11 bg-teal text-warm-white font-semibold text-base hover:bg-teal-dark transition-colors disabled:bg-teal/50 disabled:cursor-not-allowed"
+          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
           disabled={loading}
         >
           {loading ? (
@@ -178,7 +196,9 @@ function LoginForm() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Signing in...
             </>
-          ) : "Sign in"}
+          ) : (
+            "Sign in"
+          )}
         </Button>
       </form>
     </div>

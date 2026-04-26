@@ -16,9 +16,7 @@ export function WelcomeFamily({ firstName }: WelcomeFamilyProps) {
           You have taken the first step toward finding quality care for your
           family on Long Island.
         </Text>
-        <Text style={paragraph}>
-          Here is how NurseDex works:
-        </Text>
+        <Text style={paragraph}>Here is how NurseDex works:</Text>
         <Text style={listItem}>
           <strong>1. Search</strong> for nurses by specialty, location,
           availability, and more.

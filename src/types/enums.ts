@@ -119,7 +119,10 @@ export enum AvailabilityCommitment {
   LIVE_IN = "live_in",
 }
 
-export const AVAILABILITY_COMMITMENT_LABELS: Record<AvailabilityCommitment, string> = {
+export const AVAILABILITY_COMMITMENT_LABELS: Record<
+  AvailabilityCommitment,
+  string
+> = {
   [AvailabilityCommitment.FULL_TIME]: "Full-Time",
   [AvailabilityCommitment.PART_TIME]: "Part-Time",
   [AvailabilityCommitment.PER_DIEM]: "Per Diem",

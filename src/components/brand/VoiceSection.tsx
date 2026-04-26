@@ -11,18 +11,15 @@ const voiceAttributes = [
   },
   {
     attribute: "Confident but not authoritative",
-    description:
-      "We know our stuff, but we're guides, not gatekeepers.",
+    description: "We know our stuff, but we're guides, not gatekeepers.",
   },
   {
     attribute: "Helpful but not patronizing",
-    description:
-      "We anticipate needs without assuming incompetence.",
+    description: "We anticipate needs without assuming incompetence.",
   },
   {
     attribute: "Professional but not stiff",
-    description:
-      "Polished and reliable, but never robotic or cold.",
+    description: "Polished and reliable, but never robotic or cold.",
   },
 ];
 
@@ -107,8 +104,7 @@ const beforeAfter = [
   {
     label: "Email Subject",
     before: "Your NurseDex Account Update",
-    after:
-      "Welcome to NurseDex. Let's find your family the right care",
+    after: "Welcome to NurseDex. Let's find your family the right care",
   },
 ];
 
@@ -137,15 +133,15 @@ export default function VoiceSection() {
       {/* -------------------------------------------------- */}
       {/* Section Header + Brand Voice — editorial dark block */}
       {/* -------------------------------------------------- */}
-      <div className="bg-soft-black px-6 sm:px-12 lg:px-24 pt-32 pb-32">
-        <div className="max-w-6xl mx-auto">
-          <p className="font-heading italic text-3xl sm:text-4xl lg:text-5xl leading-snug text-warm-white max-w-4xl mb-16">
+      <div className="bg-soft-black px-6 pt-32 pb-32 sm:px-12 lg:px-24">
+        <div className="mx-auto max-w-6xl">
+          <p className="font-heading text-warm-white mb-16 max-w-4xl text-3xl leading-snug italic sm:text-4xl lg:text-5xl">
             NurseDex speaks like a knowledgeable friend who happens to work in
             healthcare. Not a doctor giving a diagnosis. Not a corporate
             operator reading a script.
           </p>
 
-          <p className="font-body text-lg text-sage/70 max-w-2xl">
+          <p className="font-body text-sage/70 max-w-2xl text-lg">
             We&apos;re the person you&apos;d call at 10 PM when you need real
             advice about finding a home health aide for your mom.
           </p>
@@ -155,16 +151,12 @@ export default function VoiceSection() {
       {/* -------------------------------------------------- */}
       {/* Voice Attributes */}
       {/* -------------------------------------------------- */}
-      <div className="bg-warm-white px-6 sm:px-12 lg:px-24 py-24 max-w-6xl mx-auto">
-
+      <div className="bg-warm-white mx-auto max-w-6xl px-6 py-24 sm:px-12 lg:px-24">
         {/* Voice Attributes — stacked list with sage rules */}
-        <div className="divide-y divide-sage/30">
+        <div className="divide-sage/30 divide-y">
           {voiceAttributes.map((item) => (
-            <div
-              key={item.attribute}
-              className="py-6 first:pt-0 last:pb-0"
-            >
-              <h4 className="font-heading text-xl text-teal-dark mb-1">
+            <div key={item.attribute} className="py-6 first:pt-0 last:pb-0">
+              <h4 className="font-heading text-teal-dark mb-1 text-xl">
                 {item.attribute}
               </h4>
               <p className="font-body text-soft-black-light leading-relaxed">
@@ -178,17 +170,17 @@ export default function VoiceSection() {
       {/* -------------------------------------------------- */}
       {/* Tone Spectrum — full-bleed colored bands */}
       {/* -------------------------------------------------- */}
-      <div className="px-6 sm:px-12 lg:px-24 py-16 max-w-6xl mx-auto">
-        <h3 className="font-heading text-3xl sm:text-4xl lg:text-5xl text-teal-dark mb-4">
+      <div className="mx-auto max-w-6xl px-6 py-16 sm:px-12 lg:px-24">
+        <h3 className="font-heading text-teal-dark mb-4 text-3xl sm:text-4xl lg:text-5xl">
           Tone Spectrum
         </h3>
         <p className="font-body text-soft-black-light mb-10 max-w-2xl">
-          Our voice stays consistent, but our tone adapts to context. Here&apos;s
-          how we shift across different touchpoints.
+          Our voice stays consistent, but our tone adapts to context.
+          Here&apos;s how we shift across different touchpoints.
         </p>
 
         {/* Spectrum Bar — taller */}
-        <div className="flex rounded-xl overflow-hidden mb-10 h-4">
+        <div className="mb-10 flex h-4 overflow-hidden rounded-xl">
           {toneSpectrum.map((item) => (
             <div key={item.context} className={`flex-1 ${item.color}`} />
           ))}
@@ -198,12 +190,12 @@ export default function VoiceSection() {
       {/* Full-width tone bands */}
       {toneSpectrum.map((item) => (
         <div key={item.context} className={`${item.color} w-full`}>
-          <div className="px-6 sm:px-12 lg:px-24 py-8 max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-12">
-            <div className="sm:w-64 shrink-0">
-              <p className="font-heading text-base text-warm-white leading-tight">
+          <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-8 sm:flex-row sm:items-center sm:gap-12 sm:px-12 lg:px-24">
+            <div className="shrink-0 sm:w-64">
+              <p className="font-heading text-warm-white text-base leading-tight">
                 {item.context}
               </p>
-              <p className="font-body text-xs text-warm-white/70 mt-1">
+              <p className="font-body text-warm-white/70 mt-1 text-xs">
                 {item.mood}
               </p>
             </div>
@@ -217,20 +209,20 @@ export default function VoiceSection() {
       {/* -------------------------------------------------- */}
       {/* Writing Do's and Don'ts — full-bleed */}
       {/* -------------------------------------------------- */}
-      <div className="px-6 sm:px-12 lg:px-24 py-16">
-        <div className="max-w-6xl mx-auto mb-10">
-          <p className="font-body text-xs uppercase tracking-[0.4em] text-sage-dark">
+      <div className="px-6 py-16 sm:px-12 lg:px-24">
+        <div className="mx-auto mb-10 max-w-6xl">
+          <p className="font-body text-sage-dark text-xs tracking-[0.4em] uppercase">
             Writing Do&apos;s &amp; Don&apos;ts
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid gap-8 md:grid-cols-2">
           {/* Do's */}
           <div className="bg-teal-dark rounded-2xl p-8 sm:p-10">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="w-8 h-8 rounded-full bg-success flex items-center justify-center">
+            <div className="mb-6 flex items-center gap-3">
+              <span className="bg-success flex h-8 w-8 items-center justify-center rounded-full">
                 <svg
-                  className="w-4 h-4 text-warm-white"
+                  className="text-warm-white h-4 w-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -243,14 +235,14 @@ export default function VoiceSection() {
                   />
                 </svg>
               </span>
-              <p className="font-body text-xs uppercase tracking-[0.25em] text-sage">
+              <p className="font-body text-sage text-xs tracking-[0.25em] uppercase">
                 Do
               </p>
             </div>
             <ul className="space-y-4">
               {writingDos.map((item) => (
                 <li key={item} className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sage mt-2 shrink-0" />
+                  <span className="bg-sage mt-2 h-1.5 w-1.5 shrink-0 rounded-full" />
                   <span className="font-body text-warm-white leading-relaxed">
                     {item}
                   </span>
@@ -260,11 +252,11 @@ export default function VoiceSection() {
           </div>
 
           {/* Don'ts */}
-          <div className="bg-cream-light rounded-2xl p-8 sm:p-10 border border-cream-dark">
-            <div className="flex items-center gap-3 mb-6">
-              <span className="w-8 h-8 rounded-full bg-error flex items-center justify-center">
+          <div className="bg-cream-light border-cream-dark rounded-2xl border p-8 sm:p-10">
+            <div className="mb-6 flex items-center gap-3">
+              <span className="bg-error flex h-8 w-8 items-center justify-center rounded-full">
                 <svg
-                  className="w-4 h-4 text-warm-white"
+                  className="text-warm-white h-4 w-4"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -277,14 +269,14 @@ export default function VoiceSection() {
                   />
                 </svg>
               </span>
-              <p className="font-body text-xs uppercase tracking-[0.25em] text-sage-dark">
+              <p className="font-body text-sage-dark text-xs tracking-[0.25em] uppercase">
                 Don&apos;t
               </p>
             </div>
             <ul className="space-y-4">
               {writingDonts.map((item) => (
                 <li key={item} className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cream-dark mt-2 shrink-0" />
+                  <span className="bg-cream-dark mt-2 h-1.5 w-1.5 shrink-0 rounded-full" />
                   <span className="font-body text-soft-black-light leading-relaxed">
                     {item}
                   </span>
@@ -299,28 +291,35 @@ export default function VoiceSection() {
       {/* Before / After Samples — white bg, no cream-dark borders */}
       {/* -------------------------------------------------- */}
       {beforeAfter.map((item, i) => (
-        <div key={item.label} className={i % 2 === 0 ? "bg-white" : "bg-warm-white"}>
-          <div className="px-6 sm:px-12 lg:px-24 py-20 max-w-6xl mx-auto">
-            <p className="font-body text-[10px] uppercase tracking-[0.4em] text-sage-dark mb-10">
+        <div
+          key={item.label}
+          className={i % 2 === 0 ? "bg-white" : "bg-warm-white"}
+        >
+          <div className="mx-auto max-w-6xl px-6 py-20 sm:px-12 lg:px-24">
+            <p className="font-body text-sage-dark mb-10 text-[10px] tracking-[0.4em] uppercase">
               {item.label}
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-16">
               {/* Before */}
               <div>
-                <p className="font-body text-[10px] uppercase tracking-widest text-error/60 mb-3 md:hidden">Before</p>
-                <p className="font-heading text-2xl sm:text-3xl text-soft-black-light/40 leading-snug line-through decoration-error/60 decoration-2">
+                <p className="font-body text-error/60 mb-3 text-[10px] tracking-widest uppercase md:hidden">
+                  Before
+                </p>
+                <p className="font-heading text-soft-black-light/40 decoration-error/60 text-2xl leading-snug line-through decoration-2 sm:text-3xl">
                   {item.before}
                 </p>
               </div>
 
               {/* Separator on mobile */}
-              <div className="h-px bg-sage/20 md:hidden" />
+              <div className="bg-sage/20 h-px md:hidden" />
 
               {/* After */}
               <div>
-                <p className="font-body text-[10px] uppercase tracking-widest text-teal/60 mb-3 md:hidden">After</p>
-                <p className="font-heading text-2xl sm:text-3xl text-teal-dark leading-snug">
+                <p className="font-body text-teal/60 mb-3 text-[10px] tracking-widest uppercase md:hidden">
+                  After
+                </p>
+                <p className="font-heading text-teal-dark text-2xl leading-snug sm:text-3xl">
                   {item.after}
                 </p>
               </div>
@@ -333,18 +332,18 @@ export default function VoiceSection() {
       {/* Naming Conventions — simple two-column text list */}
       {/* -------------------------------------------------- */}
       <div className="bg-white">
-        <div className="px-6 sm:px-12 lg:px-24 pt-16 pb-24 max-w-6xl mx-auto">
-          <p className="font-body text-xs uppercase tracking-[0.4em] text-sage-dark mb-10">
+        <div className="mx-auto max-w-6xl px-6 pt-16 pb-24 sm:px-12 lg:px-24">
+          <p className="font-body text-sage-dark mb-10 text-xs tracking-[0.4em] uppercase">
             Naming Conventions
           </p>
 
-          <div className="divide-y divide-sage/20">
+          <div className="divide-sage/20 divide-y">
             {namingConventions.map((item) => (
               <div
                 key={item.category}
-                className="py-5 first:pt-0 last:pb-0 grid sm:grid-cols-[200px_1fr] gap-2 sm:gap-8"
+                className="grid gap-2 py-5 first:pt-0 last:pb-0 sm:grid-cols-[200px_1fr] sm:gap-8"
               >
-                <p className="font-body text-xs uppercase tracking-[0.25em] text-sage-dark font-semibold pt-0.5">
+                <p className="font-body text-sage-dark pt-0.5 text-xs font-semibold tracking-[0.25em] uppercase">
                   {item.category}
                 </p>
                 <p className="font-body text-soft-black leading-relaxed">

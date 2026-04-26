@@ -8,11 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckboxGroup } from "./CheckboxGroup";
 import {
-  Skill,
   SKILL_LABELS,
-  AvailabilityCommitment,
   AVAILABILITY_COMMITMENT_LABELS,
-  TimeSlot,
   TIME_SLOT_LABELS,
 } from "@/types/enums";
 import { cn } from "@/lib/utils";
@@ -47,11 +44,7 @@ const timeSlotOptions = Object.entries(TIME_SLOT_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
 
-export function SkillsFields({
-  values,
-  onChange,
-  errors,
-}: SkillsFieldsProps) {
+export function SkillsFields({ values, onChange, errors }: SkillsFieldsProps) {
   const [certInput, setCertInput] = useState("");
 
   const addCert = () => {
@@ -74,7 +67,7 @@ export function SkillsFields({
       {/* Skills */}
       <div className="space-y-2">
         <Label>Skills and experience</Label>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Select all that apply. These help families find the right match.
         </p>
         <CheckboxGroup
@@ -84,7 +77,7 @@ export function SkillsFields({
           columns={2}
         />
         {errors.skills && (
-          <p className="text-xs text-destructive">{errors.skills}</p>
+          <p className="text-destructive text-xs">{errors.skills}</p>
         )}
       </div>
 
@@ -98,7 +91,7 @@ export function SkillsFields({
           columns={2}
         />
         {errors.availability_commitment && (
-          <p className="text-xs text-destructive">
+          <p className="text-destructive text-xs">
             {errors.availability_commitment}
           </p>
         )}
@@ -114,7 +107,7 @@ export function SkillsFields({
           columns={3}
         />
         {errors.time_slots && (
-          <p className="text-xs text-destructive">{errors.time_slots}</p>
+          <p className="text-destructive text-xs">{errors.time_slots}</p>
         )}
       </div>
 
@@ -123,7 +116,7 @@ export function SkillsFields({
         <Label>Hourly rate range (optional)</Label>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            <span className="text-muted-foreground absolute top-1/2 left-2.5 -translate-y-1/2 text-sm">
               $
             </span>
             <Input
@@ -139,9 +132,9 @@ export function SkillsFields({
               aria-label="Minimum hourly rate"
             />
           </div>
-          <span className="text-sm text-muted-foreground">to</span>
+          <span className="text-muted-foreground text-sm">to</span>
           <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+            <span className="text-muted-foreground absolute top-1/2 left-2.5 -translate-y-1/2 text-sm">
               $
             </span>
             <Input
@@ -157,13 +150,13 @@ export function SkillsFields({
               aria-label="Maximum hourly rate"
             />
           </div>
-          <span className="text-sm text-muted-foreground">/hr</span>
+          <span className="text-muted-foreground text-sm">/hr</span>
         </div>
         {errors.rate_min && (
-          <p className="text-xs text-destructive">{errors.rate_min}</p>
+          <p className="text-destructive text-xs">{errors.rate_min}</p>
         )}
         {errors.rate_max && (
-          <p className="text-xs text-destructive">{errors.rate_max}</p>
+          <p className="text-destructive text-xs">{errors.rate_max}</p>
         )}
       </div>
 
@@ -227,7 +220,7 @@ export function SkillsFields({
       {/* Care philosophy */}
       <div className="space-y-2">
         <Label htmlFor="care_philosophy">Care philosophy (optional)</Label>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           What drives your approach to care? Families love hearing this.
         </p>
         <Textarea
@@ -238,11 +231,11 @@ export function SkillsFields({
           rows={3}
           maxLength={500}
         />
-        <p className="text-right text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-right text-xs">
           {values.care_philosophy.length}/500
         </p>
         {errors.care_philosophy && (
-          <p className="text-xs text-destructive">{errors.care_philosophy}</p>
+          <p className="text-destructive text-xs">{errors.care_philosophy}</p>
         )}
       </div>
 
@@ -260,7 +253,7 @@ export function SkillsFields({
               <button
                 type="button"
                 onClick={() => removeCert(cert)}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10"
+                className="hover:bg-foreground/10 ml-0.5 rounded-full p-0.5"
               >
                 <X className="size-3" />
                 <span className="sr-only">Remove {cert}</span>

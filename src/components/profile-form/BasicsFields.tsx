@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LanguageInput } from "./LanguageInput";
-import { Gender, GENDER_LABELS } from "@/types/enums";
+import { GENDER_LABELS } from "@/types/enums";
 import { cn } from "@/lib/utils";
 
 interface BasicsFieldsProps {
@@ -33,7 +33,7 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
             aria-invalid={errors.first_name ? true : undefined}
           />
           {errors.first_name && (
-            <p className="text-xs text-destructive">{errors.first_name}</p>
+            <p className="text-destructive text-xs">{errors.first_name}</p>
           )}
         </div>
         <div className="space-y-2">
@@ -46,7 +46,7 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
             aria-invalid={errors.last_name ? true : undefined}
           />
           {errors.last_name && (
-            <p className="text-xs text-destructive">{errors.last_name}</p>
+            <p className="text-destructive text-xs">{errors.last_name}</p>
           )}
         </div>
       </div>
@@ -54,7 +54,11 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
       {/* Gender */}
       <div className="space-y-2">
         <Label>Gender</Label>
-        <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Gender">
+        <div
+          className="grid grid-cols-2 gap-2"
+          role="radiogroup"
+          aria-label="Gender"
+        >
           {Object.entries(GENDER_LABELS).map(([value, label]) => {
             const isSelected = values.gender === value;
             return (
@@ -89,7 +93,7 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
           })}
         </div>
         {errors.gender && (
-          <p className="text-xs text-destructive">{errors.gender}</p>
+          <p className="text-destructive text-xs">{errors.gender}</p>
         )}
       </div>
 
@@ -111,7 +115,7 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
           aria-invalid={errors.years_experience ? true : undefined}
         />
         {errors.years_experience && (
-          <p className="text-xs text-destructive">{errors.years_experience}</p>
+          <p className="text-destructive text-xs">{errors.years_experience}</p>
         )}
       </div>
 
@@ -124,7 +128,7 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
           error={errors.languages}
         />
         {errors.languages && (
-          <p className="text-xs text-destructive">{errors.languages}</p>
+          <p className="text-destructive text-xs">{errors.languages}</p>
         )}
       </div>
     </>

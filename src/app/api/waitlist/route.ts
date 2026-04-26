@@ -37,7 +37,10 @@ export async function POST(request: NextRequest) {
     // Bot protection: reject if honeypot field has a value
     if (honeypot) {
       // Return success to not reveal the trap
-      return NextResponse.json({ success: true, message: "You're on the list!" });
+      return NextResponse.json({
+        success: true,
+        message: "You're on the list!",
+      });
     }
 
     // Rate limiting by IP
@@ -56,7 +59,11 @@ export async function POST(request: NextRequest) {
 
     if (count !== null && count >= 5) {
       return NextResponse.json(
-        { success: false, message: "Too many signups from this network. Please try again later." },
+        {
+          success: false,
+          message:
+            "Too many signups from this network. Please try again later.",
+        },
         { status: 429 },
       );
     }
@@ -109,17 +116,23 @@ export async function GET() {
       .select("*", { count: "exact", head: true });
 
     if (count === null || count < DISPLAY_THRESHOLD) {
-      return NextResponse.json({ show: false }, {
-        headers: { "Cache-Control": "public, s-maxage=300" },
-      });
+      return NextResponse.json(
+        { show: false },
+        {
+          headers: { "Cache-Control": "public, s-maxage=300" },
+        },
+      );
     }
 
     // Round down to nearest 10
     const rounded = Math.floor(count / 10) * 10;
 
-    return NextResponse.json({ show: true, count: rounded }, {
-      headers: { "Cache-Control": "public, s-maxage=300" },
-    });
+    return NextResponse.json(
+      { show: true, count: rounded },
+      {
+        headers: { "Cache-Control": "public, s-maxage=300" },
+      },
+    );
   } catch {
     return NextResponse.json({ show: false });
   }

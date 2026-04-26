@@ -31,7 +31,9 @@ interface OnboardingWizardProps {
   initialPhotoUrls: (string | null)[];
 }
 
-function parseZodErrors(error: { issues: Array<{ path: PropertyKey[]; message: string }> }) {
+function parseZodErrors(error: {
+  issues: Array<{ path: PropertyKey[]; message: string }>;
+}) {
   const fieldErrors: Record<string, string> = {};
   for (const issue of error.issues) {
     const field = String(issue.path[0]);
@@ -59,7 +61,8 @@ export function OnboardingWizard({
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [photoUrls, setPhotoUrls] = useState<(string | null)[]>(initialPhotoUrls);
+  const [photoUrls, setPhotoUrls] =
+    useState<(string | null)[]>(initialPhotoUrls);
 
   const tier: NurseTier = profile.tier;
 
@@ -296,12 +299,12 @@ export function OnboardingWizard({
   if (!loaded) {
     return (
       <div className="mx-auto w-full max-w-2xl animate-pulse space-y-6">
-        <div className="h-8 w-48 rounded bg-sage/20" />
-        <div className="h-4 w-72 rounded bg-sage/20" />
+        <div className="bg-sage/20 h-8 w-48 rounded" />
+        <div className="bg-sage/20 h-4 w-72 rounded" />
         <div className="space-y-4">
-          <div className="h-10 rounded bg-sage/20" />
-          <div className="h-10 rounded bg-sage/20" />
-          <div className="h-10 rounded bg-sage/20" />
+          <div className="bg-sage/20 h-10 rounded" />
+          <div className="bg-sage/20 h-10 rounded" />
+          <div className="bg-sage/20 h-10 rounded" />
         </div>
       </div>
     );
@@ -415,9 +418,11 @@ export function OnboardingWizard({
               const newPhotos = value as string[];
               // Keep existing URLs for photos that didn't change
               setPhotoUrls(
-                newPhotos.map((path, i) => {
+                newPhotos.map((path) => {
                   const existingIdx = (draft.photos || []).indexOf(path);
-                  return existingIdx >= 0 ? photoUrls[existingIdx] ?? null : null;
+                  return existingIdx >= 0
+                    ? (photoUrls[existingIdx] ?? null)
+                    : null;
                 }),
               );
             }

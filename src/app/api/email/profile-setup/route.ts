@@ -28,9 +28,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const { Resend } = await import("resend");
-    const { ProfileSetupComplete } = await import(
-      "@/lib/email/templates/ProfileSetupComplete"
-    );
+    const { ProfileSetupComplete } =
+      await import("@/lib/email/templates/ProfileSetupComplete");
 
     const resend = new Resend(process.env.RESEND_API_KEY);
 

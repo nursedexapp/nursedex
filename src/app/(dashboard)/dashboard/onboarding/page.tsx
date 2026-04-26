@@ -34,17 +34,16 @@ export default async function OnboardingPage() {
   }
 
   // Fetch signed URLs for any existing photos
-  const photoUrls = profile.photos.length > 0
-    ? await getSignedPhotoUrls(profile.photos)
-    : [];
+  const photoUrls =
+    profile.photos.length > 0 ? await getSignedPhotoUrls(profile.photos) : [];
 
   return (
-    <div className="min-h-screen bg-warm-white px-4 py-8 sm:px-6 lg:px-8">
+    <div className="bg-warm-white min-h-screen px-4 py-8 sm:px-6 lg:px-8">
       <Suspense
         fallback={
           <div className="mx-auto w-full max-w-2xl animate-pulse space-y-6">
-            <div className="h-8 w-48 rounded bg-sage/20" />
-            <div className="h-4 w-72 rounded bg-sage/20" />
+            <div className="bg-sage/20 h-8 w-48 rounded" />
+            <div className="bg-sage/20 h-4 w-72 rounded" />
           </div>
         }
       >

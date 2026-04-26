@@ -27,15 +27,15 @@ function LoginForm() {
   };
 
   return (
-    <main className="min-h-screen bg-teal-dark flex items-center justify-center px-6">
+    <main className="bg-teal-dark flex min-h-screen items-center justify-center px-6">
       <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center mb-12">
-          <div className="w-16 h-16 rounded-xl bg-teal flex items-center justify-center mb-6">
-            <span className="font-heading text-2xl font-semibold text-warm-white tracking-[-0.06em] leading-none select-none">
+        <div className="mb-12 flex flex-col items-center">
+          <div className="bg-teal mb-6 flex h-16 w-16 items-center justify-center rounded-xl">
+            <span className="font-heading text-warm-white text-2xl leading-none font-semibold tracking-[-0.06em] select-none">
               ND
             </span>
           </div>
-          <h1 className="font-heading text-2xl text-warm-white">NurseDex</h1>
+          <h1 className="font-heading text-warm-white text-2xl">NurseDex</h1>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -48,16 +48,14 @@ function LoginForm() {
             }}
             placeholder="Password"
             autoFocus
-            className="w-full bg-warm-white/10 border border-sage/30 rounded-xl px-4 py-3 font-body text-warm-white placeholder:text-sage/50 focus:outline-none focus:border-sage focus:ring-1 focus:ring-sage/30"
+            className="bg-warm-white/10 border-sage/30 font-body text-warm-white placeholder:text-sage/50 focus:border-sage focus:ring-sage/30 w-full rounded-xl border px-4 py-3 focus:ring-1 focus:outline-none"
           />
           {error && (
-            <p className="font-body text-sm text-error mt-2">
-              Wrong password.
-            </p>
+            <p className="font-body text-error mt-2 text-sm">Wrong password.</p>
           )}
           <button
             type="submit"
-            className="w-full mt-4 bg-teal text-warm-white font-body font-medium py-3 rounded-xl hover:bg-teal-light transition-colors"
+            className="bg-teal text-warm-white font-body hover:bg-teal-light mt-4 w-full rounded-xl py-3 font-medium transition-colors"
           >
             Enter
           </button>

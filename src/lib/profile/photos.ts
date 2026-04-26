@@ -41,9 +41,7 @@ export async function getSignedUploadUrl(
  * Get a signed URL to display a nurse photo.
  * Returns a placeholder path if the photo cannot be loaded.
  */
-export async function getSignedPhotoUrl(
-  path: string,
-): Promise<string | null> {
+export async function getSignedPhotoUrl(path: string): Promise<string | null> {
   if (!path) return null;
 
   const supabase = await createClient();
@@ -100,7 +98,10 @@ export async function validateUploadedPhoto(
   if (!isValid) {
     // Clean up invalid file
     await supabase.storage.from(BUCKET).remove([path]);
-    return { valid: false, error: "File is not a valid image (JPG, PNG, or WebP)" };
+    return {
+      valid: false,
+      error: "File is not a valid image (JPG, PNG, or WebP)",
+    };
   }
 
   return { valid: true };

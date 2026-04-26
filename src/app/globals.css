@@ -5,24 +5,24 @@
 
 @theme inline {
   /* ── Brand Colors (keep for direct use: bg-teal, text-sage, etc.) ── */
-  --color-teal: #2A7B6F;
-  --color-teal-dark: #1F5C53;
-  --color-teal-light: #3A9B8D;
-  --color-sage: #A8C5B5;
-  --color-sage-light: #C4D9CF;
-  --color-sage-dark: #8BAF9D;
-  --color-cream: #F5D5A8;
-  --color-cream-light: #FAE8CD;
-  --color-cream-dark: #E8BF82;
-  --color-warm-white: #FBF9F7;
-  --color-soft-black: #2D3436;
-  --color-soft-black-light: #636E72;
+  --color-teal: #2a7b6f;
+  --color-teal-dark: #1f5c53;
+  --color-teal-light: #3a9b8d;
+  --color-sage: #a8c5b5;
+  --color-sage-light: #c4d9cf;
+  --color-sage-dark: #8baf9d;
+  --color-cream: #f5d5a8;
+  --color-cream-light: #fae8cd;
+  --color-cream-dark: #e8bf82;
+  --color-warm-white: #fbf9f7;
+  --color-soft-black: #2d3436;
+  --color-soft-black-light: #636e72;
 
   /* ── Semantic Colors ── */
-  --color-success: #2D8B5F;
-  --color-warning: #D4A843;
-  --color-error: #C0555A;
-  --color-info: #3A8B9B;
+  --color-success: #2d8b5f;
+  --color-warning: #d4a843;
+  --color-error: #c0555a;
+  --color-info: #3a8b9b;
 
   /* ── Spacing ── */
   --spacing-section: 8rem;
@@ -30,7 +30,8 @@
   /* ── Font families ── */
   --font-heading: var(--font-fraunces), Georgia, "Times New Roman", serif;
   --font-body: var(--font-dm-sans), "Helvetica Neue", sans-serif;
-  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", "Fira Code", monospace;
+  --font-mono:
+    var(--font-jetbrains-mono), "JetBrains Mono", "Fira Code", monospace;
 
   /* ── shadcn/ui theme tokens ── */
   --radius-sm: 0.25rem;
@@ -54,8 +55,8 @@
   --color-accent-foreground: var(--soft-black);
   --color-destructive: var(--error);
   --color-destructive-foreground: var(--warm-white);
-  --color-border: #C8D2D0;
-  --color-input: #C8D2D0;
+  --color-border: #c8d2d0;
+  --color-input: #c8d2d0;
   --color-ring: var(--teal);
   --color-chart-1: var(--teal);
   --color-chart-2: var(--sage);
@@ -69,10 +70,9 @@
   --color-sidebar-primary-foreground: var(--warm-white);
   --color-sidebar-accent: var(--cream-light);
   --color-sidebar-accent-foreground: var(--soft-black);
-  --color-sidebar-border: #C8D2D0;
+  --color-sidebar-border: #c8d2d0;
   --color-sidebar-ring: var(--teal);
 }
-
 
 body {
   font-family: var(--font-body);
@@ -81,6 +81,12 @@ body {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

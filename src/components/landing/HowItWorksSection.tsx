@@ -1,4 +1,11 @@
-import { Search, UserCheck, Heart, ClipboardList, Eye, Users } from "lucide-react";
+import {
+  Search,
+  UserCheck,
+  Heart,
+  ClipboardList,
+  Eye,
+  Users,
+} from "lucide-react";
 
 type HowItWorksSectionProps = {
   role: "nurse" | "family";
@@ -53,10 +60,10 @@ export function HowItWorksSection({ role }: HowItWorksSectionProps) {
   return (
     <section className="bg-sage-light/20 px-6 py-16 sm:py-20">
       <div className="mx-auto max-w-2xl">
-        <h2 className="font-heading text-3xl text-soft-black sm:text-4xl">
+        <h2 className="font-heading text-soft-black text-3xl sm:text-4xl">
           How NurseDex works
         </h2>
-        <p className="mt-3 font-body text-soft-black-light">
+        <p className="font-body text-soft-black-light mt-3">
           {role === "family"
             ? "Three steps to finding the right caregiver."
             : "Three steps to growing your practice."}
@@ -67,25 +74,25 @@ export function HowItWorksSection({ role }: HowItWorksSectionProps) {
             <div key={step.title} className="relative flex gap-6">
               {/* Number column with connecting line */}
               <div className="flex flex-col items-center">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-teal bg-white">
-                  <span className="font-heading text-lg text-teal">
+                <div className="border-teal flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 bg-white">
+                  <span className="font-heading text-teal text-lg">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                 </div>
                 {i < currentSteps.length - 1 && (
-                  <div className="w-px flex-1 bg-sage-light" />
+                  <div className="bg-sage-light w-px flex-1" />
                 )}
               </div>
 
               {/* Content */}
               <div className={i === currentSteps.length - 1 ? "" : "pb-8"}>
                 <div className="flex items-center gap-3">
-                  <step.icon className="h-5 w-5 text-teal-light" />
-                  <h3 className="font-heading text-xl text-soft-black">
+                  <step.icon className="text-teal-light h-5 w-5" />
+                  <h3 className="font-heading text-soft-black text-xl">
                     {step.title}
                   </h3>
                 </div>
-                <p className="mt-2 font-body leading-relaxed text-soft-black-light">
+                <p className="font-body text-soft-black-light mt-2 leading-relaxed">
                   {step.description}
                 </p>
               </div>

@@ -6,6 +6,8 @@ import { VerificationBanner } from "@/components/dashboard/VerificationBanner";
 import { CompletenessCard } from "@/components/dashboard/CompletenessCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { FeaturedUpsell } from "@/components/dashboard/FeaturedUpsell";
+import { ManageFeatured } from "@/components/dashboard/ManageFeatured";
+import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 
@@ -17,17 +19,52 @@ export default async function DashboardPage() {
 
   // Family dashboard (minimal for now)
   if (!isNurse) {
+    const { data: familyProfile } = await supabase
+      .from("family_profiles")
+      .select("survey_completed")
+      .eq("user_id", user.id)
+      .single();
+    const hasTakenSurvey = familyProfile?.survey_completed === true;
+
     return (
       <div className="p-6 sm:p-8">
         <h1 className="font-heading text-2xl font-semibold">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Welcome back, {user.first_name || user.email}
         </p>
-        <Card className="mt-6 border-sage/20">
-          <CardContent className="pt-6 text-sm text-muted-foreground">
-            Family dashboard features are coming soon. You will be able to
-            search for nurses, save favorites, and manage your subscription
-            here.
+
+        {!hasTakenSurvey && (
+          <Card className="border-teal/30 bg-teal/5 mt-6">
+            <CardContent className="flex flex-col items-start gap-3 pt-6">
+              <h2 className="font-heading text-lg font-semibold">
+                Find your match in 4 quick questions
+              </h2>
+              <p className="text-soft-black-light text-sm">
+                Take the survey and we&apos;ll show you nurses on Long Island
+                who fit what you&apos;re looking for.
+              </p>
+              <Link
+                href="/survey"
+                className="bg-teal hover:bg-teal-dark inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-medium text-white transition-colors"
+              >
+                Take the survey
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="border-sage/20 mt-6">
+          <CardContent className="text-muted-foreground pt-6 text-sm">
+            Saved nurses, recent reveals, and your subscription will appear here
+            as you use NurseDex.{" "}
+            <Link href="/nurses" className="text-teal hover:underline">
+              Browse nurses
+            </Link>{" "}
+            or{" "}
+            <Link href="/dashboard/saved" className="text-teal hover:underline">
+              see your saved list
+            </Link>
+            .
           </CardContent>
         </Card>
       </div>
@@ -44,7 +81,7 @@ export default async function DashboardPage() {
   if (!profile) {
     return (
       <div className="p-6 sm:p-8">
-        <p className="text-sm text-muted-foreground">Profile not found.</p>
+        <p className="text-muted-foreground text-sm">Profile not found.</p>
       </div>
     );
   }
@@ -60,21 +97,21 @@ export default async function DashboardPage() {
         <h1 className="font-heading text-2xl font-semibold">
           Welcome to NurseDex
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Let's get your profile set up so families on Long Island can find you.
         </p>
-        <Card className="mt-6 border-teal/30 bg-teal/5">
+        <Card className="border-teal/30 bg-teal/5 mt-6">
           <CardContent className="flex flex-col items-start gap-3 pt-6">
             <h2 className="font-heading text-lg font-semibold">
               Finish setting up your profile
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Complete your profile in just a few minutes. You will need your
               license number and a professional photo.
             </p>
             <Link
               href="/dashboard/onboarding"
-              className="inline-flex h-8 items-center justify-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80"
+              className="bg-primary text-primary-foreground hover:bg-primary/80 inline-flex h-8 items-center justify-center rounded-lg px-3 text-sm font-medium transition-all"
             >
               Continue Setup
             </Link>
@@ -87,11 +124,18 @@ export default async function DashboardPage() {
   // Calculate completeness
   const { score, missing } = calculateCompleteness(profile);
 
+  // For Featured nurses, fetch the subscription so we can render the
+  // "Manage subscription" card with renewal info.
+  const featuredSub =
+    profile.tier === "featured"
+      ? await getActiveSubscription(user.id, "nurse_featured")
+      : null;
+
   return (
     <div className="p-6 sm:p-8">
       <div className="mb-6">
         <h1 className="font-heading text-2xl font-semibold">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Welcome back, {user.first_name || "there"}
         </p>
       </div>
@@ -112,12 +156,11 @@ export default async function DashboardPage() {
           <QuickActions
             slug={profile.slug}
             isAvailable={profile.is_available}
-            tier={profile.tier}
           />
 
           {/* Reviews placeholder */}
           <Card className="border-sage/20">
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            <CardContent className="text-muted-foreground py-8 text-center text-sm">
               Reviews will appear here once families start leaving feedback.
             </CardContent>
           </Card>
@@ -125,12 +168,23 @@ export default async function DashboardPage() {
 
         {/* Sidebar column */}
         <div className="space-y-6">
-          {/* Featured upsell (only for free tier) */}
-          {profile.tier === "free" && <FeaturedUpsell />}
+          {/* Featured upsell (free tier) or Manage card (featured tier) */}
+          {profile.tier === "free" && (
+            <FeaturedUpsell
+              isVerified={profile.verification_status === "verified"}
+            />
+          )}
+          {profile.tier === "featured" && featuredSub && (
+            <ManageFeatured
+              renewsOn={featuredSub.current_period_end}
+              cancelAtPeriodEnd={featuredSub.cancel_at_period_end}
+              isPastDue={featuredSub.status === "past_due"}
+            />
+          )}
 
           {/* Confirmed hires placeholder */}
           <Card className="border-sage/20">
-            <CardContent className="py-6 text-center text-sm text-muted-foreground">
+            <CardContent className="text-muted-foreground py-6 text-center text-sm">
               Confirmed hires will appear here.
             </CardContent>
           </Card>

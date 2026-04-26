@@ -4,12 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckboxGroup } from "./CheckboxGroup";
 import { TierLimitBanner } from "./TierLimitBanner";
-import {
-  Credential,
-  CREDENTIAL_LABELS,
-  CareType,
-  CARE_TYPE_LABELS,
-} from "@/types/enums";
+import { CREDENTIAL_LABELS, CareType, CARE_TYPE_LABELS } from "@/types/enums";
 import type { NurseTier } from "@/types/enums";
 import { TIER_LIMITS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -47,7 +42,11 @@ export function CredentialsFields({
       {/* Credential type */}
       <div className="space-y-2">
         <Label htmlFor="credential">Credential type</Label>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Credential type">
+        <div
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+          role="radiogroup"
+          aria-label="Credential type"
+        >
           {Object.entries(CREDENTIAL_LABELS).map(([value, label]) => {
             const isSelected = values.credential === value;
             return (
@@ -67,13 +66,13 @@ export function CredentialsFields({
                 <span className="text-sm font-medium">
                   {(value as string).toUpperCase()}
                 </span>
-                <span className="text-xs text-muted-foreground">{label}</span>
+                <span className="text-muted-foreground text-xs">{label}</span>
               </button>
             );
           })}
         </div>
         {errors.credential && (
-          <p className="text-xs text-destructive">{errors.credential}</p>
+          <p className="text-destructive text-xs">{errors.credential}</p>
         )}
       </div>
 
@@ -87,12 +86,12 @@ export function CredentialsFields({
           placeholder="Enter your NY State license number"
           aria-invalid={errors.license_number ? true : undefined}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Your license number will be displayed on your profile so families can
           verify it.
         </p>
         {errors.license_number && (
-          <p className="text-xs text-destructive">{errors.license_number}</p>
+          <p className="text-destructive text-xs">{errors.license_number}</p>
         )}
       </div>
 
@@ -101,7 +100,7 @@ export function CredentialsFields({
         <Label>
           Care types
           {maxCareTypes && (
-            <span className="ml-1 font-normal text-muted-foreground">
+            <span className="text-muted-foreground ml-1 font-normal">
               ({values.care_types.length}/{maxCareTypes})
             </span>
           )}
@@ -131,7 +130,7 @@ export function CredentialsFields({
           />
         )}
         {errors.care_types && (
-          <p className="text-xs text-destructive">{errors.care_types}</p>
+          <p className="text-destructive text-xs">{errors.care_types}</p>
         )}
       </div>
 
@@ -139,13 +138,12 @@ export function CredentialsFields({
       {values.care_types.length > 1 && (
         <div className="space-y-2">
           <Label>Primary care type</Label>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             This will be highlighted on your profile.
           </p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {values.care_types.map((ct) => {
-              const label =
-                CARE_TYPE_LABELS[ct as CareType] || ct;
+              const label = CARE_TYPE_LABELS[ct as CareType] || ct;
               const isSelected = values.primary_care_type === ct;
               return (
                 <button
@@ -179,7 +177,7 @@ export function CredentialsFields({
             })}
           </div>
           {errors.primary_care_type && (
-            <p className="text-xs text-destructive">
+            <p className="text-destructive text-xs">
               {errors.primary_care_type}
             </p>
           )}

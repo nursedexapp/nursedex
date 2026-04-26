@@ -18,7 +18,9 @@ export function AuthProgress() {
   const isCentered = pathname === "/signup/confirm";
 
   return (
-    <div className={`mb-8 flex items-center gap-2 ${isCentered ? "justify-center" : ""}`}>
+    <div
+      className={`mb-8 flex items-center gap-2 ${isCentered ? "justify-center" : ""}`}
+    >
       {steps.map((step, i) => (
         <div key={step.path} className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
@@ -28,7 +30,7 @@ export function AuthProgress() {
               }`}
             />
             <span
-              className={`text-xs hidden sm:inline ${
+              className={`hidden text-xs sm:inline ${
                 i === currentIndex
                   ? "text-soft-black font-medium"
                   : i < currentIndex
@@ -41,7 +43,7 @@ export function AuthProgress() {
           </div>
           {i < steps.length - 1 && (
             <div
-              className={`h-px w-8 sm:w-6 transition-colors ${
+              className={`h-px w-8 transition-colors sm:w-6 ${
                 i < currentIndex ? "bg-teal" : "bg-sage/30"
               }`}
             />

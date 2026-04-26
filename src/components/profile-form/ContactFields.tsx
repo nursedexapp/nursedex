@@ -2,9 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  CommunicationPreference,
-} from "@/types/enums";
+import { CommunicationPreference } from "@/types/enums";
 import { cn } from "@/lib/utils";
 
 const COMM_OPTIONS = [
@@ -44,7 +42,7 @@ export function ContactFields({
           aria-invalid={errors.contact_email ? true : undefined}
         />
         {errors.contact_email && (
-          <p className="text-xs text-destructive">{errors.contact_email}</p>
+          <p className="text-destructive text-xs">{errors.contact_email}</p>
         )}
       </div>
 
@@ -59,11 +57,11 @@ export function ContactFields({
           placeholder="(631) 555-0123"
           aria-invalid={errors.contact_phone ? true : undefined}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Provide at least an email or phone number (or both).
         </p>
         {errors.contact_phone && (
-          <p className="text-xs text-destructive">{errors.contact_phone}</p>
+          <p className="text-destructive text-xs">{errors.contact_phone}</p>
         )}
       </div>
 
@@ -93,7 +91,7 @@ export function ContactFields({
           })}
         </div>
         {errors.communication_preference && (
-          <p className="text-xs text-destructive">
+          <p className="text-destructive text-xs">
             {errors.communication_preference}
           </p>
         )}
@@ -115,12 +113,12 @@ export function ContactFields({
           maxLength={5}
           aria-invalid={errors.zip_code ? true : undefined}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Your zip code is never shown to families. It is only used to calculate
           distance.
         </p>
         {errors.zip_code && (
-          <p className="text-xs text-destructive">{errors.zip_code}</p>
+          <p className="text-destructive text-xs">{errors.zip_code}</p>
         )}
       </div>
 
@@ -147,10 +145,10 @@ export function ContactFields({
             className="w-24"
             aria-invalid={errors.travel_radius_miles ? true : undefined}
           />
-          <span className="text-sm text-muted-foreground">miles</span>
+          <span className="text-muted-foreground text-sm">miles</span>
         </div>
         {errors.travel_radius_miles && (
-          <p className="text-xs text-destructive">
+          <p className="text-destructive text-xs">
             {errors.travel_radius_miles}
           </p>
         )}

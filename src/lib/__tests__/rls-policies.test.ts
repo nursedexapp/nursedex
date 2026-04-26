@@ -21,10 +21,7 @@ beforeAll(() => {
 
 describe("RLS policies - anon user", () => {
   it("can read zip_codes (public table)", async () => {
-    const { data, error } = await anon
-      .from("zip_codes")
-      .select("zip")
-      .limit(1);
+    const { data, error } = await anon.from("zip_codes").select("zip").limit(1);
 
     expect(error).toBeNull();
     expect(data).toBeDefined();
@@ -52,20 +49,14 @@ describe("RLS policies - anon user", () => {
   });
 
   it("cannot read users table (requires auth)", async () => {
-    const { data, error } = await anon
-      .from("users")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("users").select("id").limit(1);
 
     // RLS will return empty array (not an error) when no policies match
     expect(data).toEqual([]);
   });
 
   it("cannot read nurse_profiles as anon (only verified profiles visible to authenticated)", async () => {
-    const { data } = await anon
-      .from("nurse_profiles")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("nurse_profiles").select("id").limit(1);
 
     // Anon should see nothing (RLS requires auth for profile views)
     // or only see verified profiles if the policy allows anon
@@ -73,88 +64,63 @@ describe("RLS policies - anon user", () => {
   });
 
   it("cannot read admin_actions (admin only)", async () => {
-    const { data } = await anon
-      .from("admin_actions")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("admin_actions").select("id").limit(1);
 
     expect(data).toEqual([]);
   });
 
   it("cannot read email_log (admin only)", async () => {
-    const { data } = await anon
-      .from("email_log")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("email_log").select("id").limit(1);
 
     expect(data).toEqual([]);
   });
 
   it("cannot read blocked_emails (admin only)", async () => {
-    const { data } = await anon
-      .from("blocked_emails")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("blocked_emails").select("id").limit(1);
 
     expect(data).toEqual([]);
   });
 
   it("cannot read family_profiles (requires auth)", async () => {
-    const { data } = await anon
-      .from("family_profiles")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("family_profiles").select("id").limit(1);
 
     expect(data).toEqual([]);
   });
 
   it("cannot read subscriptions (requires auth)", async () => {
-    const { data } = await anon
-      .from("subscriptions")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("subscriptions").select("id").limit(1);
 
     expect(data).toEqual([]);
   });
 
   it("cannot read reveals (requires auth)", async () => {
-    const { data } = await anon
-      .from("reveals")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("reveals").select("id").limit(1);
 
     expect(data).toEqual([]);
   });
 
   it("can insert contact_submissions (public form)", async () => {
-    const { error } = await anon
-      .from("contact_submissions")
-      .insert({
-        name: "Test User",
-        email: "test@example.com",
-        message: "This is a test submission from RLS tests.",
-      });
+    const { error } = await anon.from("contact_submissions").insert({
+      name: "Test User",
+      email: "test@example.com",
+      message: "This is a test submission from RLS tests.",
+    });
 
     // Should succeed (public insert policy)
     expect(error).toBeNull();
   });
 
   it("can insert search_gap_log (public insert)", async () => {
-    const { error } = await anon
-      .from("search_gap_log")
-      .insert({
-        filters: { care_type: "elder_care", zip: "11701" },
-        result_count: 0,
-      });
+    const { error } = await anon.from("search_gap_log").insert({
+      filters: { care_type: "elder_care", zip: "11701" },
+      result_count: 0,
+    });
 
     expect(error).toBeNull();
   });
 
   it("cannot read search_gap_log (admin only)", async () => {
-    const { data } = await anon
-      .from("search_gap_log")
-      .select("id")
-      .limit(1);
+    const { data } = await anon.from("search_gap_log").select("id").limit(1);
 
     expect(data).toEqual([]);
   });

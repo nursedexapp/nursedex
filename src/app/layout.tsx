@@ -21,6 +21,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://nursedex.com"),
   title: "NurseDex | Long Island's Trusted Nurse Directory",
   description:
     "Find verified, trusted caregivers on Long Island. Join the waitlist for early access to NurseDex.",
@@ -52,7 +53,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}>
+    <html
+      lang="en"
+      className={`${fraunces.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
+    >
       <body>{children}</body>
     </html>
   );

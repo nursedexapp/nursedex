@@ -22,7 +22,6 @@ export async function generateSlug(
   let candidate = base;
   let suffix = 2;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     let query = supabase
       .from("nurse_profiles")

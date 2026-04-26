@@ -4,33 +4,33 @@ export function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-sage-light/50 bg-warm-white px-6 py-12">
+    <footer className="border-sage-light/50 bg-warm-white border-t px-6 py-12">
       <div className="mx-auto max-w-6xl text-center">
-        <Link href="/" className="font-heading text-2xl text-teal">
+        <Link href="/" className="font-heading text-teal text-2xl">
           NurseDex
         </Link>
-        <p className="mt-1 font-body text-sm text-soft-black-light">
+        <p className="font-body text-soft-black-light mt-1 text-sm">
           Long Island&apos;s trusted nurse directory.
         </p>
 
         <a
           href="mailto:support@nursedex.com"
-          className="mt-4 inline-block font-body text-sm text-soft-black-light underline underline-offset-2 hover:text-soft-black"
+          className="font-body text-soft-black-light hover:text-soft-black mt-4 inline-block text-sm underline underline-offset-2"
         >
           support@nursedex.com
         </a>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-body text-xs text-soft-black-light/70">
+        <div className="font-body text-soft-black-light/70 mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
           <span>&copy; {year} NurseDex LLC</span>
           <Link
             href="/privacy"
-            className="underline underline-offset-2 hover:text-soft-black"
+            className="hover:text-soft-black underline underline-offset-2"
           >
             Privacy Policy
           </Link>
           <Link
             href="/terms"
-            className="underline underline-offset-2 hover:text-soft-black"
+            className="hover:text-soft-black underline underline-offset-2"
           >
             Terms of Service
           </Link>

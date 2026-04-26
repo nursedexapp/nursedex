@@ -16,9 +16,7 @@ export function WelcomeNurse({ firstName }: WelcomeNurseProps) {
           We are excited to have you join our community of healthcare
           professionals on Long Island.
         </Text>
-        <Text style={paragraph}>
-          Here is what to do next:
-        </Text>
+        <Text style={paragraph}>Here is what to do next:</Text>
         <Text style={listItem}>
           <strong>1. Complete your profile</strong> with your credentials,
           experience, and a professional photo.

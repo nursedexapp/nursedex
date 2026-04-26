@@ -54,9 +54,7 @@ export function StepLayout({
                     <div
                       className={cn(
                         "h-0.5 flex-1",
-                        isComplete || isActive
-                          ? "bg-teal"
-                          : "bg-sage/30",
+                        isComplete || isActive ? "bg-teal" : "bg-sage/30",
                       )}
                     />
                   )}
@@ -65,7 +63,9 @@ export function StepLayout({
                       "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
                       isActive && "bg-teal text-white",
                       isComplete && "bg-teal/20 text-teal",
-                      !isActive && !isComplete && "bg-sage/20 text-muted-foreground",
+                      !isActive &&
+                        !isComplete &&
+                        "bg-sage/20 text-muted-foreground",
                     )}
                   >
                     {isComplete ? (
@@ -99,7 +99,7 @@ export function StepLayout({
                   className={cn(
                     "text-xs",
                     isActive
-                      ? "font-medium text-teal"
+                      ? "text-teal font-medium"
                       : "text-muted-foreground",
                   )}
                 >
@@ -113,10 +113,10 @@ export function StepLayout({
 
       {/* Step header */}
       <div className="mb-6">
-        <h1 className="font-heading text-2xl font-semibold text-foreground">
+        <h1 className="font-heading text-foreground text-2xl font-semibold">
           {title}
         </h1>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <p className="text-muted-foreground mt-1 text-sm">{description}</p>
       </div>
 
       {/* Step content */}

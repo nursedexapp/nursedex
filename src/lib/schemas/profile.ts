@@ -114,10 +114,16 @@ export function step4Schema(tier: NurseTier) {
     bio: z
       .string()
       .min(1, "A bio is required")
-      .max(limits.bioMaxLength, `Bio must be under ${limits.bioMaxLength} characters`),
+      .max(
+        limits.bioMaxLength,
+        `Bio must be under ${limits.bioMaxLength} characters`,
+      ),
     photos: z
       .array(z.string())
-      .max(limits.maxPhotos, `Your plan allows up to ${limits.maxPhotos} photo${limits.maxPhotos === 1 ? "" : "s"}`),
+      .max(
+        limits.maxPhotos,
+        `Your plan allows up to ${limits.maxPhotos} photo${limits.maxPhotos === 1 ? "" : "s"}`,
+      ),
   });
 }
 
@@ -201,9 +207,7 @@ export function fullProfileSchema(tier: NurseTier) {
       additional_certs: z.array(z.string().min(1)).default([]),
       // Step 4
       bio: z.string().min(1).max(limits.bioMaxLength),
-      photos: z
-        .array(z.string())
-        .max(limits.maxPhotos),
+      photos: z.array(z.string()).max(limits.maxPhotos),
       // Step 5
       contact_email: z.string().email().or(z.literal("")).nullable(),
       contact_phone: z

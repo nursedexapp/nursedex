@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
     <div>
       <div className="mb-8">
         <h2 className="font-heading text-2xl">Reset your password</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm">
           Enter your email and we will send you a reset link.{" "}
           <Link href="/login" className="text-teal font-medium underline">
             Back to sign in
@@ -44,7 +44,12 @@ export default function ForgotPasswordPage() {
 
       <form action={handleSubmit} className="space-y-4">
         {error && (
-          <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg bg-error/10 px-4 py-3 text-sm text-error outline-none">
+          <div
+            ref={errorRef}
+            tabIndex={-1}
+            role="alert"
+            className="bg-error/10 text-error rounded-lg px-4 py-3 text-sm outline-none"
+          >
             {error}
           </div>
         )}
@@ -65,7 +70,7 @@ export default function ForgotPasswordPage() {
 
         <Button
           type="submit"
-          className="w-full h-11 bg-teal text-warm-white font-semibold text-base hover:bg-teal-dark transition-colors disabled:bg-teal/50 disabled:cursor-not-allowed"
+          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
           disabled={loading}
         >
           {loading ? (
@@ -73,7 +78,9 @@ export default function ForgotPasswordPage() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Sending...
             </>
-          ) : "Send reset link"}
+          ) : (
+            "Send reset link"
+          )}
         </Button>
       </form>
     </div>

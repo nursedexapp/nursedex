@@ -23,32 +23,36 @@ export default function RoleSelectPage() {
     <div>
       <div className="mb-8">
         <h2 className="font-heading text-2xl">How will you use NurseDex?</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm">
           This helps us personalize your experience.
         </p>
       </div>
 
-      <div role="radiogroup" aria-label="Account type" className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+      <div
+        role="radiogroup"
+        aria-label="Account type"
+        className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2"
+      >
         <button
           role="radio"
           aria-checked={selected === "nurse"}
           onClick={() => !loading && setSelected("nurse")}
           disabled={loading}
-          className="text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="focus-visible:ring-teal rounded-lg text-left focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Card
             className={`transition-all ${
               selected === "nurse"
-                ? "border-teal ring-2 ring-teal/20"
+                ? "border-teal ring-teal/20 ring-2"
                 : "border-sage/20 hover:border-sage"
             }`}
           >
             <CardHeader>
-              <Stethoscope className="h-6 w-6 text-teal mb-1" />
+              <Stethoscope className="text-teal mb-1 h-6 w-6" />
               <CardTitle className="text-lg">I am a nurse</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Create a profile, get found by families, and grow your practice.
               </p>
             </CardContent>
@@ -60,22 +64,23 @@ export default function RoleSelectPage() {
           aria-checked={selected === "family"}
           onClick={() => !loading && setSelected("family")}
           disabled={loading}
-          className="text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="focus-visible:ring-teal rounded-lg text-left focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Card
             className={`transition-all ${
               selected === "family"
-                ? "border-teal ring-2 ring-teal/20"
+                ? "border-teal ring-teal/20 ring-2"
                 : "border-sage/20 hover:border-sage"
             }`}
           >
             <CardHeader>
-              <Heart className="h-6 w-6 text-teal mb-1" />
+              <Heart className="text-teal mb-1 h-6 w-6" />
               <CardTitle className="text-lg">I need care</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Find qualified nurses in your area and connect with them directly.
+              <p className="text-muted-foreground text-sm">
+                Find qualified nurses in your area and connect with them
+                directly.
               </p>
             </CardContent>
           </Card>
@@ -84,7 +89,7 @@ export default function RoleSelectPage() {
 
       <Button
         onClick={handleSubmit}
-        className="w-full h-11 bg-teal text-warm-white font-semibold text-base hover:bg-teal-dark transition-colors disabled:bg-teal/50 disabled:cursor-not-allowed"
+        className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
         disabled={!selected || loading}
       >
         {loading ? (
@@ -92,7 +97,9 @@ export default function RoleSelectPage() {
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Setting up...
           </>
-        ) : "Continue"}
+        ) : (
+          "Continue"
+        )}
       </Button>
     </div>
   );

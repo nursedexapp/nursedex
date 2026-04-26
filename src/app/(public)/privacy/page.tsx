@@ -9,34 +9,32 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <main className="min-h-screen bg-warm-white px-6 py-16">
+    <main className="bg-warm-white min-h-screen px-6 py-16">
       <article className="mx-auto max-w-2xl">
         <Link
           href="/"
-          className="mb-8 inline-block font-heading text-2xl text-teal hover:text-teal-dark transition-colors"
+          className="font-heading text-teal hover:text-teal-dark mb-8 inline-block text-2xl transition-colors"
         >
           NurseDex
         </Link>
 
-        <h1 className="font-heading text-3xl text-soft-black sm:text-4xl">
+        <h1 className="font-heading text-soft-black text-3xl sm:text-4xl">
           Privacy Policy
         </h1>
-        <p className="mt-2 font-body text-sm text-soft-black-light">
+        <p className="font-body text-soft-black-light mt-2 text-sm">
           Last updated: March 31, 2026
         </p>
 
-        <div className="mt-10 space-y-8 font-body text-soft-black-light leading-relaxed">
+        <div className="font-body text-soft-black-light mt-10 space-y-8 leading-relaxed">
           <section>
-            <h2 className="font-heading text-xl text-soft-black">
-              Who we are
-            </h2>
+            <h2 className="font-heading text-soft-black text-xl">Who we are</h2>
             <p className="mt-3">
               NurseDex LLC (&quot;NurseDex,&quot; &quot;we,&quot;
               &quot;us&quot;) operates nursedex.com, a directory connecting Long
               Island families with verified caregivers. You can reach us at{" "}
               <a
                 href="mailto:support@nursedex.com"
-                className="text-teal underline underline-offset-2 hover:text-teal-dark"
+                className="text-teal hover:text-teal-dark underline underline-offset-2"
               >
                 support@nursedex.com
               </a>
@@ -45,7 +43,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">
+            <h2 className="font-heading text-soft-black text-xl">
               What we collect
             </h2>
             <p className="mt-3">
@@ -63,7 +61,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">
+            <h2 className="font-heading text-soft-black text-xl">
               How we use your information
             </h2>
             <ul className="mt-3 list-disc space-y-2 pl-5">
@@ -86,15 +84,16 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">
+            <h2 className="font-heading text-soft-black text-xl">
               Third-party services
             </h2>
             <p className="mt-3">
               We use trusted third-party service providers for hosting, database
               management, authentication, analytics, email delivery, error
-              monitoring, and bot protection. These providers may process data on
-              our behalf in accordance with their own privacy policies. We only
-              share the minimum data necessary for each service to function.
+              monitoring, and bot protection. These providers may process data
+              on our behalf in accordance with their own privacy policies. We
+              only share the minimum data necessary for each service to
+              function.
             </p>
             <p className="mt-3">
               You can opt out of analytics tracking by enabling &quot;Do Not
@@ -103,7 +102,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">Cookies</h2>
+            <h2 className="font-heading text-soft-black text-xl">Cookies</h2>
             <p className="mt-3">
               NurseDex uses minimal cookies. Our analytics provider may set a
               cookie to distinguish unique visitors. We do not use advertising
@@ -114,7 +113,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">
+            <h2 className="font-heading text-soft-black text-xl">
               Data retention
             </h2>
             <p className="mt-3">
@@ -126,29 +125,21 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">
+            <h2 className="font-heading text-soft-black text-xl">
               Your rights
             </h2>
             <p className="mt-3">You can request to:</p>
             <ul className="mt-3 list-disc space-y-2 pl-5">
-              <li>
-                See what personal data we hold about you.
-              </li>
-              <li>
-                Have your data corrected or deleted.
-              </li>
-              <li>
-                Opt out of analytics tracking.
-              </li>
-              <li>
-                Withdraw from the waitlist at any time.
-              </li>
+              <li>See what personal data we hold about you.</li>
+              <li>Have your data corrected or deleted.</li>
+              <li>Opt out of analytics tracking.</li>
+              <li>Withdraw from the waitlist at any time.</li>
             </ul>
             <p className="mt-3">
               To exercise any of these rights, email{" "}
               <a
                 href="mailto:support@nursedex.com"
-                className="text-teal underline underline-offset-2 hover:text-teal-dark"
+                className="text-teal hover:text-teal-dark underline underline-offset-2"
               >
                 support@nursedex.com
               </a>{" "}
@@ -157,7 +148,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">
+            <h2 className="font-heading text-soft-black text-xl">
               Children&apos;s privacy
             </h2>
             <p className="mt-3">
@@ -169,7 +160,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">
+            <h2 className="font-heading text-soft-black text-xl">
               Changes to this policy
             </h2>
             <p className="mt-3">
@@ -181,12 +172,12 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-xl text-soft-black">Contact</h2>
+            <h2 className="font-heading text-soft-black text-xl">Contact</h2>
             <p className="mt-3">
               Questions about this policy? Email{" "}
               <a
                 href="mailto:support@nursedex.com"
-                className="text-teal underline underline-offset-2 hover:text-teal-dark"
+                className="text-teal hover:text-teal-dark underline underline-offset-2"
               >
                 support@nursedex.com
               </a>
@@ -195,10 +186,10 @@ export default function PrivacyPolicyPage() {
           </section>
         </div>
 
-        <div className="mt-12 border-t border-sage-light/40 pt-6">
+        <div className="border-sage-light/40 mt-12 border-t pt-6">
           <Link
             href="/"
-            className="font-body text-sm text-teal underline underline-offset-2 hover:text-teal-dark"
+            className="font-body text-teal hover:text-teal-dark text-sm underline underline-offset-2"
           >
             Back to NurseDex
           </Link>

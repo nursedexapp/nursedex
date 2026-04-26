@@ -29,15 +29,13 @@ export default async function EditProfilePage() {
   }
 
   const photoUrls =
-    profile.photos.length > 0
-      ? await getSignedPhotoUrls(profile.photos)
-      : [];
+    profile.photos.length > 0 ? await getSignedPhotoUrls(profile.photos) : [];
 
   return (
     <div className="p-6 sm:p-8">
       <div className="mb-6">
         <h1 className="font-heading text-2xl font-semibold">Edit Profile</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Update your profile information. Changes to your name or credential
           will require re-verification.
         </p>

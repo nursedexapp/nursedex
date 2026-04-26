@@ -20,21 +20,21 @@ export function MobileNav({ isLoggedIn }: MobileNavProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger
-        className="cursor-pointer rounded-md p-2 text-soft-black transition-colors hover:bg-sage/10 md:hidden"
+        className="text-soft-black hover:bg-sage/10 cursor-pointer rounded-md p-2 transition-colors md:hidden"
         aria-label="Open menu"
       >
         <Menu className="size-5" />
       </SheetTrigger>
-      <SheetContent side="right" className="w-72 bg-warm-white">
-        <SheetTitle className="font-heading text-xl text-teal">
+      <SheetContent side="right" className="bg-warm-white w-72">
+        <SheetTitle className="font-heading text-teal text-xl">
           NurseDex
         </SheetTitle>
 
         <nav className="flex flex-col gap-1 px-4">
           <Link
-            href="/search"
+            href="/nurses"
             onClick={() => setOpen(false)}
-            className="rounded-lg px-4 py-3 font-body text-sm text-soft-black transition-colors hover:bg-sage/10"
+            className="font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors"
           >
             Find a Nurse
           </Link>
@@ -43,7 +43,7 @@ export function MobileNav({ isLoggedIn }: MobileNavProps) {
             <Link
               href="/dashboard"
               onClick={() => setOpen(false)}
-              className="mt-2 rounded-lg bg-teal px-4 py-3 text-center font-body text-sm font-medium text-white transition-colors hover:bg-teal-dark"
+              className="bg-teal font-body hover:bg-teal-dark mt-2 rounded-lg px-4 py-3 text-center text-sm font-medium text-white transition-colors"
             >
               Dashboard
             </Link>
@@ -52,14 +52,14 @@ export function MobileNav({ isLoggedIn }: MobileNavProps) {
               <Link
                 href="/login"
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-4 py-3 font-body text-sm text-soft-black transition-colors hover:bg-sage/10"
+                className="font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors"
               >
                 Log in
               </Link>
               <Link
                 href="/signup"
                 onClick={() => setOpen(false)}
-                className="mt-2 rounded-lg bg-teal px-4 py-3 text-center font-body text-sm font-medium text-white transition-colors hover:bg-teal-dark"
+                className="bg-teal font-body hover:bg-teal-dark mt-2 rounded-lg px-4 py-3 text-center text-sm font-medium text-white transition-colors"
               >
                 Sign up
               </Link>

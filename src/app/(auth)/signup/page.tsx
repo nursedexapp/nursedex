@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth/actions";
+import { setSurveyHandoffCookie } from "@/lib/family/actions";
 import { Button } from "@/components/ui/button";
 import { GoogleSignInButton } from "@/components/ui/google-sign-in-button";
 import { Input } from "@/components/ui/input";
@@ -13,10 +14,26 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function SignUpPage() {
   const router = useRouter();
+
+  // If the user arrived from /survey/results with their answers, persist
+  // them to a cookie so they survive email confirmation + role select and
+  // can be applied at the end of family onboarding.
+  // Read directly from window.location to avoid useSearchParams() forcing
+  // the whole signup page out of static prerendering.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const survey = new URLSearchParams(window.location.search).get("survey");
+    if (survey) {
+      setSurveyHandoffCookie(survey);
+    }
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    password?: string;
+  }>({});
   const errorRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -63,7 +80,7 @@ export default function SignUpPage() {
     <div>
       <div className="mb-8">
         <h2 className="font-heading text-2xl">Join NurseDex</h2>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm">
           Create your free account.{" "}
           <Link href="/login" className="text-teal font-medium underline">
             Sign in instead
@@ -75,14 +92,19 @@ export default function SignUpPage() {
 
       <div className="relative my-6">
         <Separator className="bg-sage/20" />
-        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-xs text-muted-foreground">
+        <span className="bg-background text-muted-foreground absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 text-xs">
           or continue with email
         </span>
       </div>
 
       <form action={handleSubmit} className="space-y-4">
         {error && (
-          <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg bg-error/10 px-4 py-3 text-sm text-error outline-none">
+          <div
+            ref={errorRef}
+            tabIndex={-1}
+            role="alert"
+            className="bg-error/10 text-error rounded-lg px-4 py-3 text-sm outline-none"
+          >
             {error}
           </div>
         )}
@@ -101,10 +123,15 @@ export default function SignUpPage() {
             aria-invalid={!!fieldErrors.email}
             aria-describedby={fieldErrors.email ? "email-error" : undefined}
             className="h-11"
-            onChange={() => fieldErrors.email && setFieldErrors((prev) => ({ ...prev, email: undefined }))}
+            onChange={() =>
+              fieldErrors.email &&
+              setFieldErrors((prev) => ({ ...prev, email: undefined }))
+            }
           />
           {fieldErrors.email && (
-            <p id="email-error" className="text-xs text-error">{fieldErrors.email}</p>
+            <p id="email-error" className="text-error text-xs">
+              {fieldErrors.email}
+            </p>
           )}
         </div>
 
@@ -121,17 +148,20 @@ export default function SignUpPage() {
               minLength={8}
               autoComplete="new-password"
               aria-invalid={!!fieldErrors.password}
-              aria-describedby={fieldErrors.password ? "password-error" : undefined}
+              aria-describedby={
+                fieldErrors.password ? "password-error" : undefined
+              }
               className="h-11 pr-10"
               onChange={(e) => {
                 setPasswordLength(e.target.value.length);
-                if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                if (fieldErrors.password)
+                  setFieldErrors((prev) => ({ ...prev, password: undefined }));
               }}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-1 top-1/2 -translate-y-1/2 flex h-9 w-9 items-center justify-center cursor-pointer text-soft-black-light hover:text-soft-black transition-colors"
+              className="text-soft-black-light hover:text-soft-black absolute top-1/2 right-1 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center transition-colors"
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? (
@@ -142,15 +172,19 @@ export default function SignUpPage() {
             </button>
           </div>
           {fieldErrors.password ? (
-            <p id="password-error" className="text-xs text-error">{fieldErrors.password}</p>
+            <p id="password-error" className="text-error text-xs">
+              {fieldErrors.password}
+            </p>
           ) : passwordLength > 0 && passwordLength < 8 ? (
-            <p className="text-xs text-muted-foreground">{passwordLength}/8 characters</p>
+            <p className="text-muted-foreground text-xs">
+              {passwordLength}/8 characters
+            </p>
           ) : null}
         </div>
 
         <input type="hidden" name="tos" value="on" />
 
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-muted-foreground text-center text-xs">
           By clicking Join NurseDex, you agree to our{" "}
           <Link href="/terms" className="text-teal underline">
             Terms
@@ -158,12 +192,13 @@ export default function SignUpPage() {
           and{" "}
           <Link href="/privacy" className="text-teal underline">
             Privacy Policy
-          </Link>.
+          </Link>
+          .
         </p>
 
         <Button
           type="submit"
-          className="w-full h-11 bg-teal text-warm-white font-semibold text-base hover:bg-teal-dark transition-colors disabled:bg-teal/50 disabled:cursor-not-allowed"
+          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
           disabled={loading}
         >
           {loading ? (
@@ -171,7 +206,9 @@ export default function SignUpPage() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Joining...
             </>
-          ) : "Join NurseDex"}
+          ) : (
+            "Join NurseDex"
+          )}
         </Button>
       </form>
     </div>

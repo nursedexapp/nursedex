@@ -85,7 +85,7 @@ export function LanguageInput({ value, onChange, error }: LanguageInputProps) {
               <button
                 type="button"
                 onClick={() => removeLanguage(lang)}
-                className="ml-0.5 rounded-full p-0.5 hover:bg-foreground/10"
+                className="hover:bg-foreground/10 ml-0.5 rounded-full p-0.5"
               >
                 <X className="size-3" />
                 <span className="sr-only">Remove {lang}</span>
@@ -115,7 +115,7 @@ export function LanguageInput({ value, onChange, error }: LanguageInputProps) {
         />
 
         {showSuggestions && inputValue.length > 0 && suggestions.length > 0 && (
-          <div className="absolute z-10 mt-1 w-full rounded-lg border border-input bg-popover shadow-md">
+          <div className="border-input bg-popover absolute z-10 mt-1 w-full rounded-lg border shadow-md">
             {suggestions.slice(0, 5).map((lang) => (
               <Button
                 key={lang}

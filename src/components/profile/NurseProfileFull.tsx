@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -8,8 +9,14 @@ import {
   AVAILABILITY_COMMITMENT_LABELS,
   TIME_SLOT_LABELS,
 } from "@/types/enums";
-import type { Credential, CareType, Skill, AvailabilityCommitment, TimeSlot } from "@/types/enums";
-import { MapPin, Clock, Car, Languages, ExternalLink, ImageIcon } from "lucide-react";
+import type {
+  Credential,
+  CareType,
+  Skill,
+  AvailabilityCommitment,
+  TimeSlot,
+} from "@/types/enums";
+import { Clock, Car, Languages, ExternalLink, ImageIcon } from "lucide-react";
 
 interface NurseProfileFullProps {
   nurse: {
@@ -47,12 +54,13 @@ export function NurseProfileFull({
   licenseVerifyUrl,
   isPreview = false,
 }: NurseProfileFullProps) {
-  const credentialLabel = CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
+  const credentialLabel =
+    CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
 
   return (
     <div className="space-y-6">
       {isPreview && (
-        <div className="rounded-lg border border-dashed border-teal/40 bg-teal/5 px-4 py-2 text-center text-sm text-teal">
+        <div className="border-teal/40 bg-teal/5 text-teal rounded-lg border border-dashed px-4 py-2 text-center text-sm">
           This is how families will see your profile
         </div>
       )}
@@ -60,16 +68,18 @@ export function NurseProfileFull({
       {/* Header */}
       <div className="flex gap-6">
         {/* Photo */}
-        <div className="size-28 shrink-0 overflow-hidden rounded-xl border border-sage/20 bg-sage/10">
+        <div className="border-sage/20 bg-sage/10 relative size-28 shrink-0 overflow-hidden rounded-xl border">
           {photoUrl ? (
-            <img
+            <Image
               src={photoUrl}
               alt={`${nurse.first_name} ${nurse.last_name}`}
-              className="size-full object-cover"
+              fill
+              sizes="112px"
+              className="object-cover"
             />
           ) : (
             <div className="flex size-full items-center justify-center">
-              <ImageIcon className="size-10 text-muted-foreground/40" />
+              <ImageIcon className="text-muted-foreground/40 size-10" />
             </div>
           )}
         </div>
@@ -86,8 +96,9 @@ export function NurseProfileFull({
           <p className="text-muted-foreground">{credentialLabel}</p>
 
           {nurse.years_experience !== null && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {nurse.years_experience} year{nurse.years_experience !== 1 ? "s" : ""} of experience
+            <p className="text-muted-foreground mt-1 text-sm">
+              {nurse.years_experience} year
+              {nurse.years_experience !== 1 ? "s" : ""} of experience
             </p>
           )}
 
@@ -96,8 +107,9 @@ export function NurseProfileFull({
             <div className="mt-2 flex items-center gap-1">
               <span className="text-sm font-medium">{nurse.avg_rating}</span>
               <span className="text-amber-400">&#9733;</span>
-              <span className="text-xs text-muted-foreground">
-                ({nurse.review_count} review{nurse.review_count !== 1 ? "s" : ""})
+              <span className="text-muted-foreground text-xs">
+                ({nurse.review_count} review
+                {nurse.review_count !== 1 ? "s" : ""})
               </span>
             </div>
           )}
@@ -130,7 +142,7 @@ export function NurseProfileFull({
         <Card className="border-sage/20">
           <CardContent className="pt-4">
             <h2 className="mb-2 text-sm font-semibold">About</h2>
-            <p className="whitespace-pre-line text-sm leading-relaxed">
+            <p className="text-sm leading-relaxed whitespace-pre-line">
               {nurse.bio}
             </p>
           </CardContent>
@@ -142,7 +154,7 @@ export function NurseProfileFull({
         <Card className="border-sage/20">
           <CardContent className="pt-4">
             <h2 className="mb-2 text-sm font-semibold">Care Philosophy</h2>
-            <p className="whitespace-pre-line text-sm italic leading-relaxed text-muted-foreground">
+            <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line italic">
               &ldquo;{nurse.care_philosophy}&rdquo;
             </p>
           </CardContent>
@@ -176,10 +188,15 @@ export function NurseProfileFull({
               <div className="space-y-2 text-sm">
                 {nurse.availability_commitment.length > 0 && (
                   <div className="flex items-start gap-2">
-                    <Clock className="mt-0.5 size-4 text-muted-foreground" />
+                    <Clock className="text-muted-foreground mt-0.5 size-4" />
                     <span>
                       {nurse.availability_commitment
-                        .map((a) => AVAILABILITY_COMMITMENT_LABELS[a as AvailabilityCommitment] || a)
+                        .map(
+                          (a) =>
+                            AVAILABILITY_COMMITMENT_LABELS[
+                              a as AvailabilityCommitment
+                            ] || a,
+                        )
                         .join(", ")}
                     </span>
                   </div>
@@ -221,13 +238,13 @@ export function NurseProfileFull({
             <div className="space-y-2 text-sm">
               {nurse.languages.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <Languages className="size-4 text-muted-foreground" />
+                  <Languages className="text-muted-foreground size-4" />
                   {nurse.languages.join(", ")}
                 </div>
               )}
               {nurse.has_transportation && (
                 <div className="flex items-center gap-2">
-                  <Car className="size-4 text-muted-foreground" />
+                  <Car className="text-muted-foreground size-4" />
                   Has own transportation
                 </div>
               )}
@@ -261,7 +278,7 @@ export function NurseProfileFull({
           <Separator className="bg-sage/20" />
           <div className="text-sm">
             <h2 className="mb-2 font-semibold">License Information</h2>
-            <div className="space-y-1 text-muted-foreground">
+            <div className="text-muted-foreground space-y-1">
               <p>
                 <strong>Credential:</strong> {credentialLabel}
               </p>
@@ -276,13 +293,13 @@ export function NurseProfileFull({
                   href={licenseVerifyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-teal hover:underline"
+                  className="text-teal inline-flex items-center gap-1 hover:underline"
                 >
                   Verify this license on the NY State database
                   <ExternalLink className="size-3" />
                 </a>
               )}
-              <p className="mt-2 text-xs text-muted-foreground/70">
+              <p className="text-muted-foreground/70 mt-2 text-xs">
                 NurseDex does not verify or monitor licenses. Families are
                 responsible for confirming current licensure.
               </p>

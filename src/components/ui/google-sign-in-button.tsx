@@ -21,7 +21,7 @@ export function GoogleSignInButton() {
       <Button
         type="submit"
         variant="outline"
-        className="w-full h-11 bg-warm-white border-sage-dark/50 shadow-sm hover:bg-sage-light/30 font-semibold text-base disabled:opacity-50 disabled:cursor-not-allowed"
+        className="bg-warm-white border-sage-dark/50 hover:bg-sage-light/30 h-11 w-full text-base font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
         disabled={loading}
       >
         {loading ? (

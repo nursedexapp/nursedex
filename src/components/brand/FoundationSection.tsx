@@ -71,10 +71,10 @@ export default function FoundationSection() {
       {/* -------------------------------------------------- */}
       {/* Brand Story — Pull quote IS the section intro */}
       {/* -------------------------------------------------- */}
-      <div className="bg-cream px-6 sm:px-12 lg:px-24 pt-32 pb-32">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-16 lg:gap-24 items-end">
+      <div className="bg-cream px-6 pt-32 pb-32 sm:px-12 lg:px-24">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 items-end gap-16 lg:grid-cols-[2fr_1fr] lg:gap-24">
           {/* Pull Quote */}
-          <blockquote className="font-heading text-5xl sm:text-6xl lg:text-7xl italic text-soft-black leading-[1.08]">
+          <blockquote className="font-heading text-soft-black text-5xl leading-[1.08] italic sm:text-6xl lg:text-7xl">
             Find care that
             <br />
             feels like family.
@@ -82,14 +82,14 @@ export default function FoundationSection() {
 
           {/* Narrative alongside */}
           <div className="lg:pb-2">
-            <p className="font-body text-base leading-relaxed text-soft-black-light">
-              NurseDex exists because finding trustworthy home healthcare on Long
-              Island shouldn&apos;t feel like navigating a maze of impersonal
-              staffing agencies. Families deserve to find care that feels personal,
-              like a recommendation from a friend. NurseDex is the bridge
-              between families who need qualified, compassionate healthcare
-              professionals and independent nurses who want to be found on their
-              own terms.
+            <p className="font-body text-soft-black-light text-base leading-relaxed">
+              NurseDex exists because finding trustworthy home healthcare on
+              Long Island shouldn&apos;t feel like navigating a maze of
+              impersonal staffing agencies. Families deserve to find care that
+              feels personal, like a recommendation from a friend. NurseDex is
+              the bridge between families who need qualified, compassionate
+              healthcare professionals and independent nurses who want to be
+              found on their own terms.
             </p>
           </div>
         </div>
@@ -98,36 +98,36 @@ export default function FoundationSection() {
       {/* -------------------------------------------------- */}
       {/* Mission & Vision — Full-bleed teal-dark */}
       {/* -------------------------------------------------- */}
-      <div className="bg-teal-dark px-6 sm:px-12 lg:px-24 py-24">
-        <div className="max-w-6xl mx-auto">
-          <h3 className="font-heading text-2xl sm:text-3xl text-sage mb-16">
+      <div className="bg-teal-dark px-6 py-24 sm:px-12 lg:px-24">
+        <div className="mx-auto max-w-6xl">
+          <h3 className="font-heading text-sage mb-16 text-2xl sm:text-3xl">
             Mission &amp; Vision
           </h3>
 
-          <div className="grid md:grid-cols-2 gap-0">
+          <div className="grid gap-0 md:grid-cols-2">
             {/* Mission */}
-            <div className="pr-0 md:pr-12 pb-12 md:pb-0">
-              <p className="font-body text-xs uppercase tracking-[0.25em] text-sage mb-6">
+            <div className="pr-0 pb-12 md:pr-12 md:pb-0">
+              <p className="font-body text-sage mb-6 text-xs tracking-[0.25em] uppercase">
                 Our Mission
               </p>
-              <p className="font-heading text-2xl sm:text-3xl text-warm-white leading-snug">
+              <p className="font-heading text-warm-white text-2xl leading-snug sm:text-3xl">
                 To connect Long Island families directly with qualified,
-                independent healthcare professionals, removing the
-                middleman so real relationships can form.
+                independent healthcare professionals, removing the middleman so
+                real relationships can form.
               </p>
             </div>
 
             {/* Divider */}
-            <div className="hidden md:block absolute left-1/2 w-px bg-sage/30 self-stretch" />
+            <div className="bg-sage/30 absolute left-1/2 hidden w-px self-stretch md:block" />
 
             {/* Vision */}
-            <div className="pl-0 md:pl-12 pt-12 md:pt-0 border-t md:border-t-0 md:border-l border-sage/30">
-              <p className="font-body text-xs uppercase tracking-[0.25em] text-sage mb-6">
+            <div className="border-sage/30 border-t pt-12 pl-0 md:border-t-0 md:border-l md:pt-0 md:pl-12">
+              <p className="font-body text-sage mb-6 text-xs tracking-[0.25em] uppercase">
                 Our Vision
               </p>
-              <p className="font-heading text-2xl sm:text-3xl text-warm-white leading-snug">
-                To become the trusted standard for finding independent healthcare
-                professionals across the United States.
+              <p className="font-heading text-warm-white text-2xl leading-snug sm:text-3xl">
+                To become the trusted standard for finding independent
+                healthcare professionals across the United States.
               </p>
             </div>
           </div>
@@ -137,13 +137,13 @@ export default function FoundationSection() {
       {/* -------------------------------------------------- */}
       {/* Brand Values — Alternating card backgrounds */}
       {/* -------------------------------------------------- */}
-      <div className="bg-warm-white px-6 sm:px-12 lg:px-24 py-24">
-        <div className="max-w-6xl mx-auto">
-          <p className="font-body text-xs uppercase tracking-[0.4em] text-sage-dark mb-10">
+      <div className="bg-warm-white px-6 py-24 sm:px-12 lg:px-24">
+        <div className="mx-auto max-w-6xl">
+          <p className="font-body text-sage-dark mb-10 text-xs tracking-[0.4em] uppercase">
             Brand Values
           </p>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {brandValues.map((value, index) => {
               const isOdd = index % 2 === 0; // 0-indexed, so 0,2,4 are "odd" cards (1st,3rd,5th)
               return (
@@ -151,15 +151,15 @@ export default function FoundationSection() {
                   key={value.number}
                   className={
                     isOdd
-                      ? "rounded-2xl p-8 flex flex-col gap-4 bg-warm-white border-l-4 border-teal"
-                      : "rounded-2xl p-8 flex flex-col gap-4 bg-teal-dark"
+                      ? "bg-warm-white border-teal flex flex-col gap-4 rounded-2xl border-l-4 p-8"
+                      : "bg-teal-dark flex flex-col gap-4 rounded-2xl p-8"
                   }
                 >
                   <span
                     className={
                       isOdd
-                        ? "font-heading text-5xl text-sage/30"
-                        : "font-heading text-5xl text-warm-white/20"
+                        ? "font-heading text-sage/30 text-5xl"
+                        : "font-heading text-warm-white/20 text-5xl"
                     }
                   >
                     {value.number}
@@ -167,8 +167,8 @@ export default function FoundationSection() {
                   <h4
                     className={
                       isOdd
-                        ? "font-heading text-xl text-teal-dark"
-                        : "font-heading text-xl text-warm-white"
+                        ? "font-heading text-teal-dark text-xl"
+                        : "font-heading text-warm-white text-xl"
                     }
                   >
                     {value.title}
@@ -176,8 +176,8 @@ export default function FoundationSection() {
                   <p
                     className={
                       isOdd
-                        ? "font-body text-soft-black-light leading-relaxed text-sm"
-                        : "font-body text-warm-white/80 leading-relaxed text-sm"
+                        ? "font-body text-soft-black-light text-sm leading-relaxed"
+                        : "font-body text-warm-white/80 text-sm leading-relaxed"
                     }
                   >
                     {value.description}
@@ -194,18 +194,18 @@ export default function FoundationSection() {
       {/* -------------------------------------------------- */}
       <div className="grid md:grid-cols-2">
         {/* Left half — We Are (dark) */}
-        <div className="bg-teal-dark px-8 sm:px-12 lg:px-16 py-24">
-          <p className="font-body text-xs uppercase tracking-[0.25em] text-sage mb-4">
+        <div className="bg-teal-dark px-8 py-24 sm:px-12 lg:px-16">
+          <p className="font-body text-sage mb-4 text-xs tracking-[0.25em] uppercase">
             Brand Personality
           </p>
-          <h3 className="font-heading text-3xl sm:text-4xl text-warm-white mb-12">
+          <h3 className="font-heading text-warm-white mb-12 text-3xl sm:text-4xl">
             We Are
           </h3>
           <ul className="space-y-5">
             {weAre.map((trait) => (
               <li key={trait} className="flex items-center gap-4">
-                <span className="w-2 h-2 rounded-full bg-sage shrink-0" />
-                <span className="font-heading text-2xl sm:text-3xl text-warm-white">
+                <span className="bg-sage h-2 w-2 shrink-0 rounded-full" />
+                <span className="font-heading text-warm-white text-2xl sm:text-3xl">
                   {trait}
                 </span>
               </li>
@@ -214,18 +214,18 @@ export default function FoundationSection() {
         </div>
 
         {/* Right half — We Are Not (light) */}
-        <div className="bg-warm-white px-8 sm:px-12 lg:px-16 py-24">
-          <p className="font-body text-xs uppercase tracking-[0.25em] text-sage-dark mb-4">
+        <div className="bg-warm-white px-8 py-24 sm:px-12 lg:px-16">
+          <p className="font-body text-sage-dark mb-4 text-xs tracking-[0.25em] uppercase">
             &nbsp;
           </p>
-          <h3 className="font-heading text-3xl sm:text-4xl text-soft-black-light mb-12">
+          <h3 className="font-heading text-soft-black-light mb-12 text-3xl sm:text-4xl">
             We Are Not
           </h3>
           <ul className="space-y-5">
             {weAreNot.map((trait) => (
               <li key={trait} className="flex items-center gap-4">
-                <span className="w-2 h-2 rounded-full bg-cream-dark shrink-0" />
-                <span className="font-heading text-2xl sm:text-3xl text-soft-black-light/50 line-through decoration-1">
+                <span className="bg-cream-dark h-2 w-2 shrink-0 rounded-full" />
+                <span className="font-heading text-soft-black-light/50 text-2xl line-through decoration-1 sm:text-3xl">
                   {trait}
                 </span>
               </li>
@@ -237,38 +237,38 @@ export default function FoundationSection() {
       {/* -------------------------------------------------- */}
       {/* Target Audiences — Sage background */}
       {/* -------------------------------------------------- */}
-      <div className="bg-sage/10 px-6 sm:px-12 lg:px-24 py-24">
-        <div className="max-w-6xl mx-auto">
-          <p className="font-body text-xs uppercase tracking-[0.4em] text-sage-dark mb-10">
+      <div className="bg-sage/10 px-6 py-24 sm:px-12 lg:px-24">
+        <div className="mx-auto max-w-6xl">
+          <p className="font-body text-sage-dark mb-10 text-xs tracking-[0.4em] uppercase">
             Target Audiences
           </p>
 
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid gap-8 md:grid-cols-2">
             {audiences.map((persona) => (
               <div
                 key={persona.label}
-                className="rounded-2xl overflow-hidden border border-cream-dark flex flex-col"
+                className="border-cream-dark flex flex-col overflow-hidden rounded-2xl border"
               >
                 {/* Persona header */}
                 <div className="bg-teal px-8 py-5">
-                  <h4 className="font-heading text-xl text-warm-white">
+                  <h4 className="font-heading text-warm-white text-xl">
                     {persona.label}
                   </h4>
                 </div>
 
                 {/* Persona body */}
-                <div className="bg-white px-8 py-8 space-y-4 flex-1">
+                <div className="flex-1 space-y-4 bg-white px-8 py-8">
                   <div>
-                    <p className="font-body text-xs uppercase tracking-[0.2em] text-sage-dark mb-1">
+                    <p className="font-body text-sage-dark mb-1 text-xs tracking-[0.2em] uppercase">
                       Demographic
                     </p>
                     <p className="font-body text-soft-black leading-relaxed">
                       {persona.demographic}
                     </p>
                   </div>
-                  <div className="w-full h-px bg-cream-dark" />
+                  <div className="bg-cream-dark h-px w-full" />
                   <div>
-                    <p className="font-body text-xs uppercase tracking-[0.2em] text-sage-dark mb-1">
+                    <p className="font-body text-sage-dark mb-1 text-xs tracking-[0.2em] uppercase">
                       Needs &amp; Pain Points
                     </p>
                     <p className="font-body text-soft-black-light leading-relaxed">

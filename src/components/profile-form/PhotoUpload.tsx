@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { PHOTO_UPLOAD, TIER_LIMITS } from "@/lib/constants";
 import { resizeImage } from "@/lib/profile/resize";
 import {
@@ -59,10 +59,7 @@ export function PhotoUpload({
 
       try {
         // Resize client-side
-        const resized = await resizeImage(
-          file,
-          PHOTO_UPLOAD.MAX_DIMENSION_PX,
-        );
+        const resized = await resizeImage(file, PHOTO_UPLOAD.MAX_DIMENSION_PX);
 
         // Get signed upload URL
         const urlResult = await requestPhotoUploadUrl(file.name);
@@ -138,24 +135,26 @@ export function PhotoUpload({
             return (
               <div
                 key={path}
-                className="relative size-24 overflow-hidden rounded-lg border border-input"
+                className="border-input relative size-24 overflow-hidden rounded-lg border"
               >
                 {url ? (
-                  <img
+                  <Image
                     src={url}
                     alt={`Photo ${i + 1}`}
-                    className="size-full object-cover"
+                    fill
+                    sizes="96px"
+                    className="object-cover"
                   />
                 ) : (
-                  <div className="flex size-full items-center justify-center bg-sage/10">
-                    <ImageIcon className="size-8 text-muted-foreground" />
+                  <div className="bg-sage/10 flex size-full items-center justify-center">
+                    <ImageIcon className="text-muted-foreground size-8" />
                   </div>
                 )}
                 <button
                   type="button"
                   onClick={() => handleRemove(i)}
                   disabled={removingIndex === i}
-                  className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white transition-colors hover:bg-black/80"
+                  className="absolute top-1 right-1 rounded-full bg-black/60 p-0.5 text-white transition-colors hover:bg-black/80"
                 >
                   <X className="size-3.5" />
                   <span className="sr-only">Remove photo</span>
@@ -190,14 +189,16 @@ export function PhotoUpload({
           <Upload
             className={cn(
               "size-8",
-              uploading ? "animate-pulse text-teal" : "text-muted-foreground",
+              uploading ? "text-teal animate-pulse" : "text-muted-foreground",
             )}
           />
           <div>
             <p className="text-sm font-medium">
-              {uploading ? "Uploading..." : "Drop a photo here or click to browse"}
+              {uploading
+                ? "Uploading..."
+                : "Drop a photo here or click to browse"}
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-0.5 text-xs">
               JPG, PNG, or WebP. Max 5MB. ({photos.length}/{maxPhotos})
             </p>
           </div>

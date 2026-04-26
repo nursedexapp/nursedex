@@ -10,7 +10,12 @@ type StickyHeaderProps = {
   onSignup?: () => void;
 };
 
-export function StickyHeader({ hasSignedUp, role, referralSource, onSignup }: StickyHeaderProps) {
+export function StickyHeader({
+  hasSignedUp,
+  role,
+  referralSource,
+  onSignup,
+}: StickyHeaderProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -25,15 +30,21 @@ export function StickyHeader({ hasSignedUp, role, referralSource, onSignup }: St
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 border-b border-sage-light/50 bg-warm-white/90 backdrop-blur-sm transition-all duration-300 ${
+      className={`border-sage-light/50 bg-warm-white/90 fixed inset-x-0 top-0 z-50 border-b backdrop-blur-sm transition-all duration-300 ${
         visible && !hasSignedUp
           ? "translate-y-0 opacity-100"
-          : "-translate-y-full opacity-0 pointer-events-none"
+          : "pointer-events-none -translate-y-full opacity-0"
       }`}
     >
       <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-3">
-        <p className="font-heading text-xl text-teal">NurseDex</p>
-        <WaitlistForm role={role} referralSource={referralSource} variant="header" onSignup={onSignup} hasSignedUp={hasSignedUp} />
+        <p className="font-heading text-teal text-xl">NurseDex</p>
+        <WaitlistForm
+          role={role}
+          referralSource={referralSource}
+          variant="header"
+          onSignup={onSignup}
+          hasSignedUp={hasSignedUp}
+        />
       </div>
     </header>
   );

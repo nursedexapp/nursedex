@@ -13,7 +13,10 @@ describe("Supabase health check", () => {
     expect(key).toBeTruthy();
 
     const supabase = createClient(url!, key!);
-    const { error } = await supabase.from("_non_existent_table").select("*").limit(1);
+    const { error } = await supabase
+      .from("_non_existent_table")
+      .select("*")
+      .limit(1);
     // We expect a "relation does not exist" error, NOT a connection error.
     // That proves the client connected successfully to Supabase.
     expect(error).toBeTruthy();

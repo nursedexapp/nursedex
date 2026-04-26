@@ -12,6 +12,8 @@ import {
   getDistanceBetweenZips,
 } from "@/lib/profile/queries";
 import { createClient } from "@/lib/supabase/server";
+import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
+import { hasRevealedNurse } from "@/lib/reveals/actions";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 import type { Credential } from "@/types/enums";
 
@@ -68,28 +70,26 @@ export default async function NurseProfilePage({
   // Determine view mode based on auth state
   const user = await getCurrentUser();
   let viewMode: "anon" | "free" | "subscribed" = "anon";
+  let revealMode: "anon" | "no_sub" | "subscribed" | null = null;
   let distanceMiles: number | null = null;
 
   if (user) {
     if (user.role === "family") {
-      // Check if family has an active subscription and has revealed this nurse
-      const supabase = await createClient();
-      const { data: reveal } = await supabase
-        .from("reveals")
-        .select("id")
-        .eq("family_user_id", user.id)
-        .eq("nurse_user_id", nurse.user_id)
-        .single();
+      const [hasSub, hasReveal] = await Promise.all([
+        hasActiveFamilyAccess(user.id),
+        hasRevealedNurse(nurse.user_id),
+      ]);
 
-      const { data: subscription } = await supabase
-        .from("subscriptions")
-        .select("status")
-        .eq("user_id", user.id)
-        .eq("plan_type", "family_access")
-        .eq("status", "active")
-        .single();
-
-      viewMode = reveal && subscription ? "subscribed" : "free";
+      if (hasReveal) {
+        viewMode = "subscribed"; // contact info will be server-rendered
+        revealMode = null;
+      } else if (hasSub) {
+        viewMode = "free";
+        revealMode = "subscribed"; // can fire reveal action
+      } else {
+        viewMode = "free";
+        revealMode = "no_sub"; // needs to subscribe
+      }
 
       // Calculate distance if family has a zip code
       if (user.zip_code && nurse.zip_code) {
@@ -99,9 +99,12 @@ export default async function NurseProfilePage({
         );
       }
     } else {
-      // Nurses, admins viewing profiles get the full view (minus contact)
+      // Nurses, admins viewing profiles get the full view (minus contact).
       viewMode = "free";
+      revealMode = null;
     }
+  } else {
+    revealMode = "anon";
   }
 
   // Fetch photo URLs and license verify URL in parallel
@@ -114,7 +117,7 @@ export default async function NurseProfilePage({
   trackProfileView(nurse.user_id);
 
   return (
-    <div className="flex min-h-screen flex-col bg-warm-white">
+    <div className="bg-warm-white flex min-h-screen flex-col">
       <Header />
       <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-8">
         <NurseProfilePublic
@@ -123,6 +126,7 @@ export default async function NurseProfilePage({
           licenseVerifyUrl={licenseVerifyUrl}
           distanceMiles={distanceMiles}
           viewMode={viewMode}
+          revealMode={revealMode}
         />
       </main>
       <Footer />

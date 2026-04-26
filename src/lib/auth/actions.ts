@@ -19,11 +19,15 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
   }
 
   if (password.length < PASSWORD.MIN_LENGTH) {
-    return { error: `Password must be at least ${PASSWORD.MIN_LENGTH} characters.` };
+    return {
+      error: `Password must be at least ${PASSWORD.MIN_LENGTH} characters.`,
+    };
   }
 
   if (!tosAccepted) {
-    return { error: "You must accept the Terms of Service and Privacy Policy." };
+    return {
+      error: "You must accept the Terms of Service and Privacy Policy.",
+    };
   }
 
   const supabase = await createClient();
@@ -90,7 +94,10 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
 
   if (error) {
     if (error.message.includes("Email not confirmed")) {
-      return { error: "Please confirm your email before signing in. Check your inbox for a confirmation link." };
+      return {
+        error:
+          "Please confirm your email before signing in. Check your inbox for a confirmation link.",
+      };
     }
     return { error: "Invalid email or password." };
   }
@@ -154,7 +161,10 @@ export async function forgotPassword(formData: FormData): Promise<AuthResult> {
     return { error: error.message };
   }
 
-  return { success: "If an account exists with this email, you will receive a password reset link." };
+  return {
+    success:
+      "If an account exists with this email, you will receive a password reset link.",
+  };
 }
 
 export async function resetPassword(formData: FormData): Promise<AuthResult> {
@@ -170,7 +180,9 @@ export async function resetPassword(formData: FormData): Promise<AuthResult> {
   }
 
   if (password.length < PASSWORD.MIN_LENGTH) {
-    return { error: `Password must be at least ${PASSWORD.MIN_LENGTH} characters.` };
+    return {
+      error: `Password must be at least ${PASSWORD.MIN_LENGTH} characters.`,
+    };
   }
 
   const supabase = await createClient();
@@ -184,7 +196,9 @@ export async function resetPassword(formData: FormData): Promise<AuthResult> {
   redirect("/login?message=password_reset");
 }
 
-export async function resendConfirmation(formData: FormData): Promise<AuthResult> {
+export async function resendConfirmation(
+  formData: FormData,
+): Promise<AuthResult> {
   const email = formData.get("email") as string;
 
   if (!email) {
@@ -237,9 +251,12 @@ export async function selectRole(formData: FormData): Promise<void> {
       .eq("id", user.id)
       .single();
 
-    const baseName = userData?.first_name && userData?.last_name
-      ? `${userData.first_name}-${userData.last_name}`.toLowerCase().replace(/[^a-z0-9-]/g, "")
-      : user.id.slice(0, 8);
+    const baseName =
+      userData?.first_name && userData?.last_name
+        ? `${userData.first_name}-${userData.last_name}`
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, "")
+        : user.id.slice(0, 8);
 
     await supabase.from("nurse_profiles").insert({
       user_id: user.id,
@@ -252,6 +269,9 @@ export async function selectRole(formData: FormData): Promise<void> {
     });
   }
 
+  if (role === "family") {
+    redirect("/onboarding/family");
+  }
   redirect("/dashboard");
 }
 

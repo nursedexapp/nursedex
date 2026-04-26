@@ -31,31 +31,38 @@ export function HeroSection({
   hasSignedUp,
 }: HeroSectionProps) {
   return (
-    <section className="relative flex flex-col overflow-hidden bg-teal-dark px-6 text-center">
+    <section className="bg-teal-dark relative flex flex-col overflow-hidden px-6 text-center">
       {/* Decorative outline rings — no fills, clipped by section edges */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute -right-24 -top-24 h-[400px] w-[400px] rounded-full border border-warm-white/10" />
-        <div className="absolute -left-32 bottom-1/4 h-[300px] w-[300px] rounded-full border border-warm-white/[0.07]" />
+      <div
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        aria-hidden="true"
+      >
+        <div className="border-warm-white/10 absolute -top-24 -right-24 h-[400px] w-[400px] rounded-full border" />
+        <div className="border-warm-white/[0.07] absolute bottom-1/4 -left-32 h-[300px] w-[300px] rounded-full border" />
       </div>
 
       {/* Top bar */}
       <div className="relative mx-auto flex w-full max-w-4xl items-center justify-between py-6">
-        <p className="font-heading text-2xl text-warm-white">NurseDex</p>
-        <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 font-body text-xs text-warm-white/80">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-sage" />
+        <p className="font-heading text-warm-white text-2xl">NurseDex</p>
+        <span className="font-body text-warm-white/80 flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
+          <span className="bg-sage inline-block h-1.5 w-1.5 rounded-full" />
           Long Island, NY
         </span>
       </div>
 
-      <div className="relative mx-auto flex max-w-2xl flex-col items-center pb-8 pt-10">
+      <div className="relative mx-auto flex max-w-2xl flex-col items-center pt-10 pb-8">
         {/* Role toggle */}
-        <div className="mb-8 inline-flex rounded-full border border-white/10 bg-white/5 p-1" role="radiogroup" aria-label="I am a">
+        <div
+          className="mb-8 inline-flex rounded-full border border-white/10 bg-white/5 p-1"
+          role="radiogroup"
+          aria-label="I am a"
+        >
           <button
             type="button"
             role="radio"
             aria-checked={role === "family"}
             onClick={() => onRoleChange("family")}
-            className={`cursor-pointer rounded-full px-5 py-2 font-body text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-1 focus-visible:ring-offset-teal-dark focus-visible:outline-none ${
+            className={`font-body focus-visible:ring-offset-teal-dark cursor-pointer rounded-full px-5 py-2 text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-1 focus-visible:outline-none ${
               role === "family"
                 ? "bg-teal text-warm-white shadow-sm"
                 : "text-sage-light hover:text-warm-white"
@@ -68,7 +75,7 @@ export function HeroSection({
             role="radio"
             aria-checked={role === "nurse"}
             onClick={() => onRoleChange("nurse")}
-            className={`cursor-pointer rounded-full px-5 py-2 font-body text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-1 focus-visible:ring-offset-teal-dark focus-visible:outline-none ${
+            className={`font-body focus-visible:ring-offset-teal-dark cursor-pointer rounded-full px-5 py-2 text-sm font-medium transition-all focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-1 focus-visible:outline-none ${
               role === "nurse"
                 ? "bg-teal text-warm-white shadow-sm"
                 : "text-sage-light hover:text-warm-white"
@@ -80,37 +87,43 @@ export function HeroSection({
 
         <h1
           key={`headline-${role}`}
-          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 font-heading text-4xl leading-tight text-warm-white sm:text-5xl md:text-6xl"
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 font-heading text-warm-white text-4xl leading-tight motion-safe:duration-300 sm:text-5xl md:text-6xl"
         >
           {copy[role].headline}
         </h1>
 
         <p
           key={`sub-${role}`}
-          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-300 mx-auto mt-6 max-w-xl font-body text-lg text-warm-white/70"
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 font-body text-warm-white/70 mx-auto mt-6 max-w-xl text-lg motion-safe:duration-300"
         >
           {copy[role].subheadline}
         </p>
 
         {/* Waitlist form */}
         <div id="waitlist" className="mt-10">
-          <WaitlistForm role={role} referralSource={referralSource} variant="hero" onSignup={onSignup} hasSignedUp={hasSignedUp} />
+          <WaitlistForm
+            role={role}
+            referralSource={referralSource}
+            variant="hero"
+            onSignup={onSignup}
+            hasSignedUp={hasSignedUp}
+          />
           <div className="mt-3 space-y-1">
             {role === "nurse" ? (
-              <p className="font-body text-sm text-cream-light">
+              <p className="font-body text-cream-light text-sm">
                 First 100 caregivers get priority placement. No spam, ever.
               </p>
             ) : waitlistCount ? (
-              <p className="font-body text-sm text-sage-light/70">
+              <p className="font-body text-sage-light/70 text-sm">
                 Join {waitlistCount}+ people already on the waitlist.
               </p>
             ) : (
-              <p className="font-body text-sm text-sage-light/60">
+              <p className="font-body text-sage-light/60 text-sm">
                 We&apos;ll only email you when we launch. No spam, ever.
               </p>
             )}
             {role === "nurse" && waitlistCount && (
-              <p className="font-body text-sm text-sage-light/70">
+              <p className="font-body text-sage-light/70 text-sm">
                 Join {waitlistCount}+ people already on the waitlist.
               </p>
             )}

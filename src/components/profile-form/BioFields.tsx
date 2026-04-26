@@ -34,7 +34,7 @@ export function BioFields({
       {/* Bio */}
       <div className="space-y-2">
         <Label htmlFor="bio">Your bio</Label>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Tell families about yourself, your experience, and why you love what
           you do.
         </p>
@@ -59,15 +59,13 @@ export function BioFields({
         >
           {bioLength}/{maxBio}
         </p>
-        {errors.bio && (
-          <p className="text-xs text-destructive">{errors.bio}</p>
-        )}
+        {errors.bio && <p className="text-destructive text-xs">{errors.bio}</p>}
       </div>
 
       {/* Photos */}
       <div className="space-y-2">
         <Label>Professional photo</Label>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           A clear, friendly photo helps families feel comfortable reaching out.
         </p>
         <PhotoUpload
@@ -77,7 +75,7 @@ export function BioFields({
           onChange={(photos) => onChange("photos", photos)}
         />
         {errors.photos && (
-          <p className="text-xs text-destructive">{errors.photos}</p>
+          <p className="text-destructive text-xs">{errors.photos}</p>
         )}
       </div>
     </>

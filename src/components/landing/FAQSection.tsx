@@ -37,19 +37,19 @@ export function FAQSection({ role }: FAQSectionProps) {
   const allFaqs = [roleFaq, ...faqs.shared];
 
   return (
-    <section className="bg-white px-6 py-20 border-t border-sage-light/40">
+    <section className="border-sage-light/40 border-t bg-white px-6 py-20">
       <div className="mx-auto max-w-2xl">
-        <h2 className="font-heading text-3xl text-soft-black sm:text-4xl">
+        <h2 className="font-heading text-soft-black text-3xl sm:text-4xl">
           Frequently asked questions
         </h2>
 
         <dl className="mt-12 space-y-8">
           {allFaqs.map((faq, i) => (
             <div key={`${role}-${i}`}>
-              <dt className="font-body text-base font-medium text-soft-black">
+              <dt className="font-body text-soft-black text-base font-medium">
                 {faq.question}
               </dt>
-              <dd className="mt-2 border-l-2 border-teal/30 pl-4 font-body text-base leading-relaxed text-soft-black-light">
+              <dd className="border-teal/30 font-body text-soft-black-light mt-2 border-l-2 pl-4 text-base leading-relaxed">
                 {faq.answer}
               </dd>
             </div>

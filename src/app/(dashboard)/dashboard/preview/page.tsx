@@ -37,7 +37,7 @@ export default async function PreviewPage() {
     <div className="p-6 sm:p-8">
       <div className="mb-6">
         <h1 className="font-heading text-2xl font-semibold">Profile Preview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           See how your profile looks to families.
         </p>
       </div>

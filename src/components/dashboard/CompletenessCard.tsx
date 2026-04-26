@@ -60,27 +60,27 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
           {/* Missing fields */}
           {missing.length > 0 ? (
             <div className="flex-1 space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-muted-foreground text-xs font-medium">
                 Boost your visibility:
               </p>
               {missing.slice(0, 3).map((item) => (
                 <Link
                   key={item}
                   href="/dashboard/edit"
-                  className="flex items-center gap-1 text-sm text-teal hover:underline"
+                  className="text-teal flex items-center gap-1 text-sm hover:underline"
                 >
                   <ChevronRight className="size-3.5" />
                   {item}
                 </Link>
               ))}
               {missing.length > 3 && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   +{missing.length - 3} more
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-sm text-emerald-600 font-medium">
+            <p className="text-sm font-medium text-emerald-600">
               Your profile is fully complete!
             </p>
           )}

@@ -28,7 +28,7 @@ export function LandingPage({ referralSource }: LandingPageProps) {
   }, []);
 
   return (
-    <main className="min-h-screen bg-warm-white">
+    <main className="bg-warm-white min-h-screen">
       <StickyHeader
         hasSignedUp={hasSignedUp}
         role={role}

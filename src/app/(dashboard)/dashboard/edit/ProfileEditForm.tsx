@@ -81,9 +81,9 @@ export function ProfileEditForm({
     if (field === "photos") {
       const newPhotos = value as string[];
       setPhotoUrls(
-        newPhotos.map((path, i) => {
+        newPhotos.map((path) => {
           const existingIdx = values.photos.indexOf(path);
-          return existingIdx >= 0 ? photoUrls[existingIdx] ?? null : null;
+          return existingIdx >= 0 ? (photoUrls[existingIdx] ?? null) : null;
         }),
       );
     }
@@ -122,18 +122,35 @@ export function ProfileEditForm({
         }
         // Map fields to tabs
         if (
-          ["first_name", "last_name", "gender", "years_experience", "languages"].includes(field)
+          [
+            "first_name",
+            "last_name",
+            "gender",
+            "years_experience",
+            "languages",
+          ].includes(field)
         ) {
           tabErrors.add("basics");
         } else if (
-          ["credential", "license_number", "care_types", "primary_care_type"].includes(field)
+          [
+            "credential",
+            "license_number",
+            "care_types",
+            "primary_care_type",
+          ].includes(field)
         ) {
           tabErrors.add("credentials");
         } else if (
           [
-            "skills", "availability_commitment", "time_slots", "rate_min",
-            "rate_max", "has_transportation", "covid_vaccinated",
-            "care_philosophy", "additional_certs",
+            "skills",
+            "availability_commitment",
+            "time_slots",
+            "rate_min",
+            "rate_max",
+            "has_transportation",
+            "covid_vaccinated",
+            "care_philosophy",
+            "additional_certs",
           ].includes(field)
         ) {
           tabErrors.add("skills");
@@ -254,7 +271,7 @@ export function ProfileEditForm({
       </Tabs>
 
       {/* Save button */}
-      <div className="flex justify-end border-t border-sage/20 pt-4">
+      <div className="border-sage/20 flex justify-end border-t pt-4">
         <Button onClick={handleSave} disabled={isSubmitting}>
           {isSubmitting ? "Saving..." : "Save changes"}
         </Button>

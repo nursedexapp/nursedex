@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // Test the slug formatting logic directly (without Supabase)
 function formatSlug(firstName: string, lastName: string, credential: string) {
@@ -19,11 +19,15 @@ describe("slug formatting", () => {
   });
 
   it("strips special characters", () => {
-    expect(formatSlug("Mary-Ann", "O'Brien", "cna")).toBe("mary-ann-obrien-cna");
+    expect(formatSlug("Mary-Ann", "O'Brien", "cna")).toBe(
+      "mary-ann-obrien-cna",
+    );
   });
 
   it("collapses multiple dashes", () => {
-    expect(formatSlug("Jane  ", " Doe", "rn")).toBe("jane--doe-rn".replace(/--+/g, "-"));
+    expect(formatSlug("Jane  ", " Doe", "rn")).toBe(
+      "jane--doe-rn".replace(/--+/g, "-"),
+    );
   });
 
   it("handles single-name edge case", () => {

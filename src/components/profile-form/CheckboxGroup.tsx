@@ -63,7 +63,7 @@ export function CheckboxGroup({
             />
             <span className="flex-1">{label}</span>
             {isDisabled && !isSelected && (
-              <Lock className="size-3.5 text-muted-foreground" />
+              <Lock className="text-muted-foreground size-3.5" />
             )}
           </label>
         );

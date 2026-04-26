@@ -23,9 +23,7 @@ export default function CopyHex({
       className={`group relative cursor-pointer transition-opacity hover:opacity-80 ${className}`}
       title={`Copy ${value}`}
     >
-      <span className={copied ? "opacity-0" : "opacity-100"}>
-        {value}
-      </span>
+      <span className={copied ? "opacity-0" : "opacity-100"}>{value}</span>
       <span
         className={`absolute inset-0 flex items-center transition-opacity ${
           copied ? "opacity-100" : "opacity-0"

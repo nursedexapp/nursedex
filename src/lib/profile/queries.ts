@@ -158,9 +158,7 @@ export async function getNurseBySlug(
  * Check if a slug has a redirect to a new slug.
  * Returns the new slug or null.
  */
-export async function getSlugRedirect(
-  slug: string,
-): Promise<string | null> {
+export async function getSlugRedirect(slug: string): Promise<string | null> {
   const supabase = await createClient();
 
   const { data } = await supabase

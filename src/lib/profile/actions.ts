@@ -285,12 +285,16 @@ export async function updateNurseProfile(
     .single();
 
   if (freshUser) {
-    const expectedSlugBase = `${freshUser.first_name}-${freshUser.last_name}-${data.credential as string}`
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "")
-      .replace(/-+/g, "-");
+    const expectedSlugBase =
+      `${freshUser.first_name}-${freshUser.last_name}-${data.credential as string}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "")
+        .replace(/-+/g, "-");
 
-    if (!currentProfile.slug.startsWith(expectedSlugBase) || credentialChanged) {
+    if (
+      !currentProfile.slug.startsWith(expectedSlugBase) ||
+      credentialChanged
+    ) {
       newSlug = await generateSlug(
         supabase,
         freshUser.first_name || "",
@@ -405,10 +409,7 @@ export async function softDeleteAccount(): Promise<void> {
   const user = await requireAuth();
   const supabase = await createClient();
 
-  await supabase
-    .from("users")
-    .update({ is_deleted: true })
-    .eq("id", user.id);
+  await supabase.from("users").update({ is_deleted: true }).eq("id", user.id);
 
   await supabase.auth.signOut();
   redirect("/");

@@ -7,18 +7,18 @@ export async function Header() {
   const isLoggedIn = !!user;
 
   return (
-    <header className="border-b border-sage-light/50 bg-warm-white">
+    <header className="border-sage-light/50 bg-warm-white border-b">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         {/* Logo */}
-        <Link href="/" className="font-heading text-xl text-teal">
+        <Link href="/" className="font-heading text-teal text-xl">
           NurseDex
         </Link>
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 md:flex">
           <Link
-            href="/search"
-            className="font-body text-sm text-soft-black-light transition-colors hover:text-soft-black"
+            href="/nurses"
+            className="font-body text-soft-black-light hover:text-soft-black text-sm transition-colors"
           >
             Find a Nurse
           </Link>
@@ -26,7 +26,7 @@ export async function Header() {
           {isLoggedIn ? (
             <Link
               href="/dashboard"
-              className="rounded-lg bg-teal px-4 py-2 font-body text-sm font-medium text-white transition-colors hover:bg-teal-dark"
+              className="bg-teal font-body hover:bg-teal-dark rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
             >
               Dashboard
             </Link>
@@ -34,13 +34,13 @@ export async function Header() {
             <div className="flex items-center gap-3">
               <Link
                 href="/login"
-                className="font-body text-sm text-soft-black-light transition-colors hover:text-soft-black"
+                className="font-body text-soft-black-light hover:text-soft-black text-sm transition-colors"
               >
                 Log in
               </Link>
               <Link
                 href="/signup"
-                className="rounded-lg bg-teal px-4 py-2 font-body text-sm font-medium text-white transition-colors hover:bg-teal-dark"
+                className="bg-teal font-body hover:bg-teal-dark rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
               >
                 Sign up
               </Link>
