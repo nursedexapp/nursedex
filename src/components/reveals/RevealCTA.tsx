@@ -12,6 +12,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { TurnstileWidget } from "./TurnstileWidget";
 import { posthog } from "@/lib/posthog";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { revealNurse } from "@/lib/reveals/actions";
@@ -49,17 +50,30 @@ export function RevealCTA({
 }: RevealCTAProps) {
   const router = useRouter();
   const [revealed, setRevealed] = useState<RevealedContact | null>(null);
+  const [captchaOpen, setCaptchaOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const fireReveal = () => {
+  const fireReveal = (turnstileToken?: string) => {
     startTransition(async () => {
       if (posthog.__loaded) {
         posthog.capture(ANALYTICS_EVENTS.REVEAL_ATTEMPTED, {
           nurse_user_id: nurseUserId,
         });
       }
-      const result = await revealNurse(nurseUserId);
+      const result = await revealNurse(nurseUserId, turnstileToken);
       if (!result.success) {
+        if (result.error === "needs_captcha") {
+          setCaptchaOpen(true);
+          return;
+        }
+        if (result.error === "captcha_failed") {
+          toast.error("Verification failed. Please try again.");
+          return;
+        }
+        if (result.error === "rate_limited") {
+          toast.error("You've hit today's reveal limit. Try again tomorrow.");
+          return;
+        }
         toast.error(
           result.error === "no_subscription"
             ? "Subscribe to reveal contact info"
@@ -67,6 +81,7 @@ export function RevealCTA({
         );
         return;
       }
+      setCaptchaOpen(false);
       setRevealed(result.contact ?? null);
       if (posthog.__loaded) {
         posthog.capture(ANALYTICS_EVENTS.REVEAL_COMPLETED, {
@@ -75,6 +90,10 @@ export function RevealCTA({
       }
       router.refresh();
     });
+  };
+
+  const handleCaptchaSolved = (token: string) => {
+    fireReveal(token);
   };
 
   if (revealed) {
@@ -95,19 +114,35 @@ export function RevealCTA({
 
   if (mode === "subscribed") {
     return (
-      <Button onClick={fireReveal} disabled={isPending}>
-        {isPending ? (
-          <>
-            <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-            Revealing...
-          </>
-        ) : (
-          <>
-            <Lock className="mr-1.5 size-3.5" aria-hidden="true" />
-            Reveal contact info
-          </>
-        )}
-      </Button>
+      <>
+        <Button onClick={() => fireReveal()} disabled={isPending}>
+          {isPending ? (
+            <>
+              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              Revealing...
+            </>
+          ) : (
+            <>
+              <Lock className="mr-1.5 size-3.5" aria-hidden="true" />
+              Reveal contact info
+            </>
+          )}
+        </Button>
+        <Dialog open={captchaOpen} onOpenChange={setCaptchaOpen}>
+          <DialogContent>
+            <DialogTitle className="font-heading text-lg font-semibold">
+              Quick check
+            </DialogTitle>
+            <DialogDescription className="text-soft-black-light text-sm">
+              You&apos;ve revealed several nurses today. Please confirm
+              you&apos;re human to keep going.
+            </DialogDescription>
+            <div className="flex justify-center py-2">
+              <TurnstileWidget onSolved={handleCaptchaSolved} />
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
     );
   }
 

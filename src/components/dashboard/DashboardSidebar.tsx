@@ -31,6 +31,7 @@ const FAMILY_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/nurses", label: "Find a Nurse", icon: Search },
   { href: "/dashboard/saved", label: "Saved Nurses", icon: Heart },
+  { href: "/dashboard/revealed", label: "Revealed", icon: Eye },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 

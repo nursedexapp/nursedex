@@ -8,6 +8,8 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { FeaturedUpsell } from "@/components/dashboard/FeaturedUpsell";
 import { ManageFeatured } from "@/components/dashboard/ManageFeatured";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
+import { getRevealedNurses } from "@/lib/reveals/queries";
+import { NurseCard } from "@/components/nurses/NurseCard";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 
@@ -19,11 +21,14 @@ export default async function DashboardPage() {
 
   // Family dashboard (minimal for now)
   if (!isNurse) {
-    const { data: familyProfile } = await supabase
-      .from("family_profiles")
-      .select("survey_completed")
-      .eq("user_id", user.id)
-      .single();
+    const [{ data: familyProfile }, recentReveals] = await Promise.all([
+      supabase
+        .from("family_profiles")
+        .select("survey_completed")
+        .eq("user_id", user.id)
+        .single(),
+      getRevealedNurses(user.id, 3),
+    ]);
     const hasTakenSurvey = familyProfile?.survey_completed === true;
 
     return (
@@ -53,20 +58,46 @@ export default async function DashboardPage() {
           </Card>
         )}
 
-        <Card className="border-sage/20 mt-6">
-          <CardContent className="text-muted-foreground pt-6 text-sm">
-            Saved nurses, recent reveals, and your subscription will appear here
-            as you use NurseDex.{" "}
-            <Link href="/nurses" className="text-teal hover:underline">
-              Browse nurses
-            </Link>{" "}
-            or{" "}
-            <Link href="/dashboard/saved" className="text-teal hover:underline">
-              see your saved list
-            </Link>
-            .
-          </CardContent>
-        </Card>
+        {recentReveals.length > 0 && (
+          <section className="mt-8">
+            <div className="mb-4 flex items-end justify-between">
+              <h2 className="font-heading text-soft-black text-lg font-medium">
+                Recent reveals
+              </h2>
+              <Link
+                href="/dashboard/revealed"
+                className="text-soft-black-light hover:text-teal text-sm underline-offset-4 hover:underline"
+              >
+                View all
+              </Link>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {recentReveals.map((nurse) => (
+                <NurseCard key={nurse.user_id} nurse={nurse} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {recentReveals.length === 0 && (
+          <Card className="border-sage/20 mt-6">
+            <CardContent className="text-muted-foreground pt-6 text-sm">
+              Saved nurses, recent reveals, and your subscription will appear
+              here as you use NurseDex.{" "}
+              <Link href="/nurses" className="text-teal hover:underline">
+                Browse nurses
+              </Link>{" "}
+              or{" "}
+              <Link
+                href="/dashboard/saved"
+                className="text-teal hover:underline"
+              >
+                see your saved list
+              </Link>
+              .
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
