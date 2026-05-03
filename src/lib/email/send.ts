@@ -61,3 +61,29 @@ export async function sendNewReviewEmail(
     console.error("[email] New review email failed:", res.status, body);
   }
 }
+
+interface SendVerifyReviewArgs {
+  to: string;
+  reviewerName: string;
+  verificationToken: string;
+}
+
+export async function sendVerifyReviewEmail(
+  args: SendVerifyReviewArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+
+  const res = await fetch(`${baseUrl}/api/email/verify-review`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Verify review email failed:", res.status, body);
+  }
+}

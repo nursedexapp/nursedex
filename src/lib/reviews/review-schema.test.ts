@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   familyReviewSchema,
+  externalReviewSchema,
   removalRequestSchema,
   REVIEW_TEXT_MIN,
   REVIEW_TEXT_MAX,
@@ -110,6 +111,58 @@ describe("familyReviewSchema", () => {
       reviewer_name: "Sam",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("externalReviewSchema", () => {
+  const baseInput = {
+    link_token: NURSE_ID,
+    rating: 5,
+    reviewer_name: "Pat",
+    reviewer_email: "pat@example.com",
+  };
+
+  it("accepts a minimal external review", () => {
+    const result = externalReviewSchema.safeParse(baseInput);
+    expect(result.success).toBe(true);
+    expect(result.data?.text).toBeNull();
+  });
+
+  it("rejects an invalid email", () => {
+    expect(
+      externalReviewSchema.safeParse({
+        ...baseInput,
+        reviewer_email: "not-an-email",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("normalizes email casing", () => {
+    const result = externalReviewSchema.safeParse({
+      ...baseInput,
+      reviewer_email: "  PAT@Example.COM  ",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.reviewer_email).toBe("pat@example.com");
+  });
+
+  it("forces testimonial_opt_in to false on 1-3 star reviews", () => {
+    const result = externalReviewSchema.safeParse({
+      ...baseInput,
+      rating: 3,
+      testimonial_opt_in: true,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.testimonial_opt_in).toBe(false);
+  });
+
+  it("rejects review text shorter than the minimum", () => {
+    expect(
+      externalReviewSchema.safeParse({
+        ...baseInput,
+        text: "a".repeat(REVIEW_TEXT_MIN - 1),
+      }).success,
+    ).toBe(false);
   });
 });
 

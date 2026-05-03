@@ -7,8 +7,10 @@ import { CompletenessCard } from "@/components/dashboard/CompletenessCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { FeaturedUpsell } from "@/components/dashboard/FeaturedUpsell";
 import { ManageFeatured } from "@/components/dashboard/ManageFeatured";
+import { ReviewLinkCard } from "@/components/dashboard/ReviewLinkCard";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { getRevealedNurses } from "@/lib/reveals/queries";
+import { getOrCreateReviewLink } from "@/lib/reviews/external-actions";
 import { NurseCard } from "@/components/nurses/NurseCard";
 import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
@@ -162,6 +164,13 @@ export default async function DashboardPage() {
       ? await getActiveSubscription(user.id, "nurse_featured")
       : null;
 
+  // Verified nurses get a permanent share link for collecting reviews
+  // from past clients.
+  const reviewLink =
+    profile.verification_status === "verified"
+      ? (await getOrCreateReviewLink()).link
+      : null;
+
   return (
     <div className="p-6 sm:p-8">
       <div className="mb-6">
@@ -189,12 +198,17 @@ export default async function DashboardPage() {
             isAvailable={profile.is_available}
           />
 
-          {/* Reviews placeholder */}
-          <Card className="border-sage/20">
-            <CardContent className="text-muted-foreground py-8 text-center text-sm">
-              Reviews will appear here once families start leaving feedback.
-            </CardContent>
-          </Card>
+          {/* Review link (verified nurses) or pending notice */}
+          {reviewLink ? (
+            <ReviewLinkCard initialToken={reviewLink.token} />
+          ) : (
+            <Card className="border-sage/20">
+              <CardContent className="text-muted-foreground py-8 text-center text-sm">
+                Once your license is verified, you&apos;ll get a shareable
+                link here for collecting reviews from past clients.
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar column */}

@@ -60,3 +60,46 @@ export const removalRequestSchema = z.object({
 });
 
 export type RemovalRequestInput = z.infer<typeof removalRequestSchema>;
+
+/**
+ * External (anonymous) review submission. Mirrors familyReviewSchema but
+ * adds an email and skips the requirement for an authenticated user.
+ */
+export const externalReviewSchema = z
+  .object({
+    link_token: z.string().uuid(),
+    rating: z.number().int().min(1).max(5),
+    reviewer_name: z
+      .string()
+      .trim()
+      .min(1, "First name is required")
+      .max(50, "Keep first name under 50 characters"),
+    reviewer_email: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .email("Enter a valid email"),
+    text: z
+      .string()
+      .trim()
+      .max(REVIEW_TEXT_MAX, `Keep your review under ${REVIEW_TEXT_MAX} characters`)
+      .optional()
+      .or(z.literal("")),
+    testimonial_opt_in: z.boolean().default(false),
+  })
+  .superRefine((data, ctx) => {
+    if (data.text && data.text.length > 0 && data.text.length < REVIEW_TEXT_MIN) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["text"],
+        message: `Add at least ${REVIEW_TEXT_MIN} characters or leave it blank`,
+      });
+    }
+  })
+  .transform((data) => ({
+    ...data,
+    text: data.text && data.text.length > 0 ? data.text : null,
+    testimonial_opt_in: data.rating >= 4 ? data.testimonial_opt_in : false,
+  }));
+
+export type ExternalReviewInput = z.infer<typeof externalReviewSchema>;
