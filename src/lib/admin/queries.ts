@@ -298,3 +298,117 @@ export async function getFlaggedNurses(): Promise<FlaggedNurseRow[]> {
     .filter((n) => n.bad_review_count >= 2)
     .sort((a, b) => b.bad_review_count - a.bad_review_count);
 }
+
+export interface AccountRow {
+  user_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: "nurse" | "family" | "admin" | "super_admin" | null;
+  is_suspended: boolean;
+  is_deleted: boolean;
+  created_at: string;
+}
+
+export async function getAccounts(args: {
+  query?: string;
+  role?: "nurse" | "family";
+}): Promise<AccountRow[]> {
+  const supabase = await createClient();
+
+  let q = supabase
+    .from("users")
+    .select(
+      "id, email, first_name, last_name, role, is_suspended, is_deleted, created_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (args.role) q = q.eq("role", args.role);
+
+  if (args.query) {
+    const safe = args.query.replace(/[,%]/g, "");
+    q = q.or(
+      `email.ilike.%${safe}%,first_name.ilike.%${safe}%,last_name.ilike.%${safe}%`,
+    );
+  }
+
+  const { data } = await q;
+
+  return ((data ?? []) as Array<{
+    id: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+    role: "nurse" | "family" | "admin" | "super_admin" | null;
+    is_suspended: boolean;
+    is_deleted: boolean;
+    created_at: string;
+  }>).map((u) => ({
+    user_id: u.id,
+    email: u.email,
+    first_name: u.first_name,
+    last_name: u.last_name,
+    role: u.role,
+    is_suspended: u.is_suspended,
+    is_deleted: u.is_deleted,
+    created_at: u.created_at,
+  }));
+}
+
+export interface RateLimitFlaggedRow {
+  family_user_id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+  consecutive_captcha_days: number;
+  date: string;
+}
+
+/**
+ * Family accounts with 3+ consecutive captcha-trigger days, the abuse
+ * signal from Phase 4. Latest day per family.
+ */
+export async function getRateLimitFlagged(): Promise<RateLimitFlaggedRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("rate_limit_reveals")
+    .select(
+      `
+      family_user_id,
+      consecutive_captcha_days,
+      date,
+      users:family_user_id ( email, first_name, last_name )
+    `,
+    )
+    .gte("consecutive_captcha_days", 3)
+    .order("date", { ascending: false });
+
+  type Row = {
+    family_user_id: string;
+    consecutive_captcha_days: number;
+    date: string;
+    users: {
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+    } | null;
+  };
+
+  const seen = new Set<string>();
+  const out: RateLimitFlaggedRow[] = [];
+  for (const row of (data ?? []) as unknown as Row[]) {
+    if (seen.has(row.family_user_id)) continue;
+    seen.add(row.family_user_id);
+    if (!row.users) continue;
+    out.push({
+      family_user_id: row.family_user_id,
+      email: row.users.email,
+      first_name: row.users.first_name,
+      last_name: row.users.last_name,
+      consecutive_captcha_days: row.consecutive_captcha_days,
+      date: row.date,
+    });
+  }
+  return out;
+}

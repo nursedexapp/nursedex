@@ -118,6 +118,51 @@ export async function sendVerificationRejectedEmail(
   }
 }
 
+interface SendAccountSuspendedArgs {
+  to: string;
+  firstName?: string;
+}
+export async function sendAccountSuspendedEmail(
+  args: SendAccountSuspendedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/account-suspended`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Account suspended email failed:", res.status, body);
+  }
+}
+
+interface SendAccountRemovedArgs {
+  to: string;
+  firstName?: string;
+  reason: string;
+}
+export async function sendAccountRemovedEmail(
+  args: SendAccountRemovedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/account-removed`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Account removed email failed:", res.status, body);
+  }
+}
+
 interface SendDisputeDecisionArgs {
   to: string;
   recipientType: "nurse" | "reviewer";
