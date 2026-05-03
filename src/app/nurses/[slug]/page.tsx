@@ -18,9 +18,10 @@ import {
   getFamilyReviewForNurse,
   getApprovedReviews,
 } from "@/lib/reviews/queries";
+import { getFamilyHireForNurse } from "@/lib/hires/queries";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 import type { Credential } from "@/types/enums";
-import type { Review } from "@/types/database";
+import type { Review, Hire } from "@/types/database";
 
 interface NurseProfilePageProps {
   params: Promise<{ slug: string }>;
@@ -78,6 +79,7 @@ export default async function NurseProfilePage({
   let revealMode: "anon" | "no_sub" | "subscribed" | null = null;
   let distanceMiles: number | null = null;
   let viewerReview: Review | null = null;
+  let viewerHire: Hire | null = null;
 
   if (user) {
     if (user.role === "family") {
@@ -89,7 +91,10 @@ export default async function NurseProfilePage({
       if (hasReveal) {
         viewMode = "subscribed"; // contact info will be server-rendered
         revealMode = null;
-        viewerReview = await getFamilyReviewForNurse(user.id, nurse.user_id);
+        [viewerReview, viewerHire] = await Promise.all([
+          getFamilyReviewForNurse(user.id, nurse.user_id),
+          getFamilyHireForNurse(user.id, nurse.user_id),
+        ]);
       } else if (hasSub) {
         viewMode = "free";
         revealMode = "subscribed"; // can fire reveal action
@@ -137,6 +142,7 @@ export default async function NurseProfilePage({
           revealMode={revealMode}
           viewerReview={viewerReview}
           viewerFirstName={user?.first_name ?? ""}
+          viewerHire={viewerHire}
           approvedReviews={approvedReviews}
         />
       </main>

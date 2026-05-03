@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { getRevealedNurses } from "@/lib/reveals/queries";
 import { getFamilyReviewsByNurse } from "@/lib/reviews/queries";
 import { ReviewStateAction } from "@/components/reviews/ReviewStateAction";
+import { getFamilyHiresByNurse } from "@/lib/hires/queries";
+import { HireButton } from "@/components/hires/HireButton";
 
 export const metadata: Metadata = {
   title: "Revealed nurses | NurseDex",
@@ -16,10 +18,11 @@ export const metadata: Metadata = {
 export default async function RevealedPage() {
   const user = await requireRole(UserRole.FAMILY);
   const revealed = await getRevealedNurses(user.id);
-  const reviewsByNurse = await getFamilyReviewsByNurse(
-    user.id,
-    revealed.map((n) => n.user_id),
-  );
+  const nurseIds = revealed.map((n) => n.user_id);
+  const [reviewsByNurse, hiresByNurse] = await Promise.all([
+    getFamilyReviewsByNurse(user.id, nurseIds),
+    getFamilyHiresByNurse(user.id, nurseIds),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-5xl p-6 sm:p-8">
@@ -39,6 +42,7 @@ export default async function RevealedPage() {
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {revealed.map((nurse) => {
             const review = reviewsByNurse.get(nurse.user_id) ?? null;
+            const hire = hiresByNurse.get(nurse.user_id) ?? null;
             return (
               <div key={nurse.user_id} className="space-y-3">
                 <div className="relative">
@@ -58,6 +62,11 @@ export default async function RevealedPage() {
                     </div>
                   )}
                 </div>
+                <HireButton
+                  nurseUserId={nurse.user_id}
+                  nurseFirstName={nurse.first_name}
+                  hire={hire}
+                />
                 <ReviewStateAction
                   nurseUserId={nurse.user_id}
                   nurseFirstName={nurse.first_name}

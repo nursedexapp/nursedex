@@ -154,6 +154,7 @@ export interface Hire {
   nurse_user_id: string;
   status: HireStatus;
   claimed_by: "family" | "nurse";
+  claim_token: string | null;
   confirmed_at: string | null;
   created_at: string;
 }

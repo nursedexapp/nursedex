@@ -163,6 +163,57 @@ export async function sendAccountRemovedEmail(
   }
 }
 
+interface SendHireConfirmRequestArgs {
+  to: string;
+  firstName?: string;
+  nurseFirstName: string;
+  claimToken: string;
+}
+export async function sendHireConfirmRequestEmail(
+  args: SendHireConfirmRequestArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/hire-confirm-request`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Hire confirm request email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
+interface SendHireConfirmedArgs {
+  to: string;
+  firstName?: string;
+  familyFirstName: string;
+}
+export async function sendHireConfirmedEmail(
+  args: SendHireConfirmedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/hire-confirmed`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Hire confirmed email failed:", res.status, body);
+  }
+}
+
 interface SendDisputeDecisionArgs {
   to: string;
   recipientType: "nurse" | "reviewer";

@@ -36,7 +36,8 @@ import type { PublicNurseProfile } from "@/lib/profile/queries";
 import { RevealCTA } from "@/components/reveals/RevealCTA";
 import { ReviewStateAction } from "@/components/reviews/ReviewStateAction";
 import { ReviewList } from "@/components/reviews/ReviewList";
-import type { Review } from "@/types/database";
+import { HireButton } from "@/components/hires/HireButton";
+import type { Review, Hire } from "@/types/database";
 import type { ApprovedReview } from "@/lib/reviews/queries";
 
 type ViewMode = "anon" | "free" | "subscribed";
@@ -56,6 +57,8 @@ interface NurseProfilePublicProps {
   viewerFirstName?: string;
   /** Approved public reviews to render under the profile. */
   approvedReviews?: ApprovedReview[];
+  /** The viewer's existing hire row for this nurse, if any. */
+  viewerHire?: Hire | null;
 }
 
 export function NurseProfilePublic({
@@ -68,6 +71,7 @@ export function NurseProfilePublic({
   viewerReview = null,
   viewerFirstName = "",
   approvedReviews = [],
+  viewerHire = null,
 }: NurseProfilePublicProps) {
   const credentialLabel =
     CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
@@ -343,7 +347,7 @@ export function NurseProfilePublic({
             revealMode={revealMode}
           />
 
-          {/* Review CTA, only after the family has revealed */}
+          {/* Hire + review CTAs, only after the family has revealed */}
           {viewMode === "subscribed" && (
             <Card className="border-sage/20">
               <CardContent className="space-y-3 pt-4">
@@ -351,9 +355,16 @@ export function NurseProfilePublic({
                   Worked with {nurse.first_name}?
                 </h2>
                 <p className="text-muted-foreground text-xs">
-                  Share your experience to help other families on Long Island
-                  decide.
+                  Track your hire and share your experience to help other
+                  families on Long Island decide.
                 </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <HireButton
+                    nurseUserId={nurse.user_id}
+                    nurseFirstName={nurse.first_name}
+                    hire={viewerHire}
+                  />
+                </div>
                 <ReviewStateAction
                   nurseUserId={nurse.user_id}
                   nurseFirstName={nurse.first_name}

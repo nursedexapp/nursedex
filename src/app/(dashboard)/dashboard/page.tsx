@@ -8,6 +8,7 @@ import { QuickActions } from "@/components/dashboard/QuickActions";
 import { FeaturedUpsell } from "@/components/dashboard/FeaturedUpsell";
 import { ManageFeatured } from "@/components/dashboard/ManageFeatured";
 import { ReviewLinkCard } from "@/components/dashboard/ReviewLinkCard";
+import { NurseClaimHireCard } from "@/components/hires/NurseClaimHireCard";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { getRevealedNurses } from "@/lib/reveals/queries";
 import { getOrCreateReviewLink } from "@/lib/reviews/external-actions";
@@ -208,6 +209,11 @@ export default async function DashboardPage() {
                 link here for collecting reviews from past clients.
               </CardContent>
             </Card>
+          )}
+
+          {/* Claim a hire (verified nurses only — RLS blocks reveal lookups otherwise) */}
+          {profile.verification_status === "verified" && (
+            <NurseClaimHireCard />
           )}
         </div>
 
