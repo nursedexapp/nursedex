@@ -3,6 +3,7 @@ import { z } from "zod";
 export const REVIEW_TEXT_MIN = 25;
 export const REVIEW_TEXT_MAX = 2000;
 export const REMOVAL_REASON_MAX = 200;
+export const NURSE_RESPONSE_MAX = 500;
 
 /**
  * Family-side platform review submission.
@@ -103,3 +104,17 @@ export const externalReviewSchema = z
   }));
 
 export type ExternalReviewInput = z.infer<typeof externalReviewSchema>;
+
+export const nurseResponseSchema = z.object({
+  review_id: z.string().uuid(),
+  text: z
+    .string()
+    .trim()
+    .min(1, "Write something before saving")
+    .max(
+      NURSE_RESPONSE_MAX,
+      `Keep your response under ${NURSE_RESPONSE_MAX} characters`,
+    ),
+});
+
+export type NurseResponseInput = z.infer<typeof nurseResponseSchema>;

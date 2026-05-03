@@ -14,7 +14,10 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
 import { hasRevealedNurse } from "@/lib/reveals/actions";
-import { getFamilyReviewForNurse } from "@/lib/reviews/queries";
+import {
+  getFamilyReviewForNurse,
+  getApprovedReviews,
+} from "@/lib/reviews/queries";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 import type { Credential } from "@/types/enums";
 import type { Review } from "@/types/database";
@@ -111,10 +114,11 @@ export default async function NurseProfilePage({
     revealMode = "anon";
   }
 
-  // Fetch photo URLs and license verify URL in parallel
-  const [photoUrls, licenseVerifyUrl] = await Promise.all([
+  // Fetch photo URLs, license verify URL, and approved reviews in parallel
+  const [photoUrls, licenseVerifyUrl, approvedReviews] = await Promise.all([
     getPublicPhotoUrls(nurse.photos),
     getLicenseVerifyUrl(nurse.credential),
+    getApprovedReviews(nurse.user_id),
   ]);
 
   // Track profile view (fire and forget, don't block rendering)
@@ -133,6 +137,7 @@ export default async function NurseProfilePage({
           revealMode={revealMode}
           viewerReview={viewerReview}
           viewerFirstName={user?.first_name ?? ""}
+          approvedReviews={approvedReviews}
         />
       </main>
       <Footer />

@@ -3,8 +3,10 @@ import {
   familyReviewSchema,
   externalReviewSchema,
   removalRequestSchema,
+  nurseResponseSchema,
   REVIEW_TEXT_MIN,
   REVIEW_TEXT_MAX,
+  NURSE_RESPONSE_MAX,
 } from "@/lib/schemas/review";
 
 // Valid RFC v4 UUID — Zod 4's .uuid() enforces variant bits.
@@ -161,6 +163,33 @@ describe("externalReviewSchema", () => {
       externalReviewSchema.safeParse({
         ...baseInput,
         text: "a".repeat(REVIEW_TEXT_MIN - 1),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("nurseResponseSchema", () => {
+  it("accepts a normal response", () => {
+    expect(
+      nurseResponseSchema.safeParse({
+        review_id: REVIEW_ID,
+        text: "Thank you so much for the kind words.",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects empty text", () => {
+    expect(
+      nurseResponseSchema.safeParse({ review_id: REVIEW_ID, text: "  " })
+        .success,
+    ).toBe(false);
+  });
+
+  it(`rejects text over ${NURSE_RESPONSE_MAX} characters`, () => {
+    expect(
+      nurseResponseSchema.safeParse({
+        review_id: REVIEW_ID,
+        text: "a".repeat(NURSE_RESPONSE_MAX + 1),
       }).success,
     ).toBe(false);
   });

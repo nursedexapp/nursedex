@@ -35,7 +35,9 @@ import Link from "next/link";
 import type { PublicNurseProfile } from "@/lib/profile/queries";
 import { RevealCTA } from "@/components/reveals/RevealCTA";
 import { ReviewStateAction } from "@/components/reviews/ReviewStateAction";
+import { ReviewList } from "@/components/reviews/ReviewList";
 import type { Review } from "@/types/database";
+import type { ApprovedReview } from "@/lib/reviews/queries";
 
 type ViewMode = "anon" | "free" | "subscribed";
 type RevealMode = "anon" | "no_sub" | "subscribed" | null;
@@ -52,6 +54,8 @@ interface NurseProfilePublicProps {
   viewerReview?: Review | null;
   /** Viewer's first name, prefilled into the review form. */
   viewerFirstName?: string;
+  /** Approved public reviews to render under the profile. */
+  approvedReviews?: ApprovedReview[];
 }
 
 export function NurseProfilePublic({
@@ -63,6 +67,7 @@ export function NurseProfilePublic({
   revealMode = null,
   viewerReview = null,
   viewerFirstName = "",
+  approvedReviews = [],
 }: NurseProfilePublicProps) {
   const credentialLabel =
     CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
@@ -338,7 +343,7 @@ export function NurseProfilePublic({
             revealMode={revealMode}
           />
 
-          {/* Review CTA — only after the family has revealed */}
+          {/* Review CTA, only after the family has revealed */}
           {viewMode === "subscribed" && (
             <Card className="border-sage/20">
               <CardContent className="space-y-3 pt-4">
@@ -358,6 +363,18 @@ export function NurseProfilePublic({
               </CardContent>
             </Card>
           )}
+
+          {/* Public approved reviews */}
+          <Separator className="bg-sage/20" />
+          <section aria-label="Reviews">
+            <h2 className="font-heading text-soft-black mb-3 text-base font-semibold">
+              Reviews
+            </h2>
+            <ReviewList
+              nurseFirstName={nurse.first_name}
+              reviews={approvedReviews}
+            />
+          </section>
         </>
       )}
     </div>

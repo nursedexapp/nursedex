@@ -11,6 +11,7 @@ import {
   LogOut,
   Heart,
   Search,
+  Star,
 } from "lucide-react";
 import { signOut } from "@/lib/auth/actions";
 
@@ -24,6 +25,7 @@ const NURSE_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/edit", label: "Edit Profile", icon: UserPen },
   { href: "/dashboard/preview", label: "Preview", icon: Eye },
+  { href: "/dashboard/reviews", label: "Reviews", icon: Star },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
