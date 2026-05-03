@@ -118,6 +118,34 @@ export async function sendVerificationRejectedEmail(
   }
 }
 
+interface SendDisputeDecisionArgs {
+  to: string;
+  recipientType: "nurse" | "reviewer";
+  recipientName?: string;
+  decision: "keep" | "remove";
+  rating: number;
+  reviewerName: string;
+  notes: string | null;
+}
+
+export async function sendDisputeDecisionEmail(
+  args: SendDisputeDecisionArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/dispute-decision`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Dispute decision email failed:", res.status, body);
+  }
+}
+
 interface SendVerifyReviewArgs {
   to: string;
   reviewerName: string;

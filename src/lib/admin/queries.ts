@@ -126,3 +126,175 @@ export async function getVerificationQueue(): Promise<
   rows.sort(compareVerificationQueueRows);
   return rows;
 }
+
+export interface AdminReviewRow {
+  id: string;
+  nurse_user_id: string;
+  nurse_first_name: string | null;
+  nurse_last_name: string | null;
+  nurse_slug: string;
+  reviewer_name: string;
+  reviewer_email: string | null;
+  rating: number;
+  text: string | null;
+  is_external: boolean;
+  status: "pending" | "approved" | "rejected" | "disputed";
+  removal_requested: boolean;
+  removal_reason: string | null;
+  dispute_reason: string | null;
+  dispute_text: string | null;
+  created_at: string;
+}
+
+interface ReviewJoinRow {
+  id: string;
+  nurse_user_id: string;
+  reviewer_name: string;
+  reviewer_email: string | null;
+  rating: number;
+  text: string | null;
+  is_external: boolean;
+  status: "pending" | "approved" | "rejected" | "disputed";
+  removal_requested: boolean;
+  removal_reason: string | null;
+  dispute_reason: string | null;
+  dispute_text: string | null;
+  created_at: string;
+  nurse: {
+    slug: string;
+    users: {
+      first_name: string | null;
+      last_name: string | null;
+    } | null;
+  } | null;
+}
+
+function shapeReviewRow(r: ReviewJoinRow): AdminReviewRow {
+  return {
+    id: r.id,
+    nurse_user_id: r.nurse_user_id,
+    nurse_first_name: r.nurse?.users?.first_name ?? null,
+    nurse_last_name: r.nurse?.users?.last_name ?? null,
+    nurse_slug: r.nurse?.slug ?? "",
+    reviewer_name: r.reviewer_name,
+    reviewer_email: r.reviewer_email,
+    rating: r.rating,
+    text: r.text,
+    is_external: r.is_external,
+    status: r.status,
+    removal_requested: r.removal_requested,
+    removal_reason: r.removal_reason,
+    dispute_reason: r.dispute_reason,
+    dispute_text: r.dispute_text,
+    created_at: r.created_at,
+  };
+}
+
+const REVIEW_JOIN_SELECT = `
+  id, nurse_user_id, reviewer_name, reviewer_email, rating, text,
+  is_external, status, removal_requested, removal_reason,
+  dispute_reason, dispute_text, created_at,
+  nurse:nurse_profiles!reviews_nurse_user_id_fkey (
+    slug,
+    users!inner (first_name, last_name)
+  )
+` as const;
+
+export async function getPendingReviews(): Promise<AdminReviewRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select(REVIEW_JOIN_SELECT)
+    .eq("status", "pending")
+    .eq("email_verified", true)
+    .order("created_at", { ascending: true });
+  return ((data ?? []) as unknown as ReviewJoinRow[]).map(shapeReviewRow);
+}
+
+export async function getRemovalRequests(): Promise<AdminReviewRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select(REVIEW_JOIN_SELECT)
+    .eq("removal_requested", true)
+    .eq("status", "approved")
+    .order("created_at", { ascending: true });
+  return ((data ?? []) as unknown as ReviewJoinRow[]).map(shapeReviewRow);
+}
+
+export async function getDisputedReviews(): Promise<AdminReviewRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select(REVIEW_JOIN_SELECT)
+    .eq("status", "disputed")
+    .order("created_at", { ascending: true });
+  return ((data ?? []) as unknown as ReviewJoinRow[]).map(shapeReviewRow);
+}
+
+export interface FlaggedNurseRow {
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  slug: string;
+  bad_review_count: number;
+  avg_rating: number | null;
+}
+
+/**
+ * Nurses with 2+ approved 1-3 star reviews. Computed on the fly from
+ * the reviews table — there's no persisted "flagged" flag, the count
+ * is the gate.
+ */
+export async function getFlaggedNurses(): Promise<FlaggedNurseRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reviews")
+    .select(
+      `
+      nurse_user_id,
+      rating,
+      status,
+      nurse:nurse_profiles!reviews_nurse_user_id_fkey (
+        slug,
+        avg_rating,
+        users!inner (first_name, last_name)
+      )
+    `,
+    )
+    .eq("status", "approved")
+    .lte("rating", 3);
+
+  type Row = {
+    nurse_user_id: string;
+    rating: number;
+    status: string;
+    nurse: {
+      slug: string;
+      avg_rating: number | null;
+      users: { first_name: string | null; last_name: string | null } | null;
+    } | null;
+  };
+
+  const counts = new Map<string, FlaggedNurseRow>();
+  for (const row of (data ?? []) as unknown as Row[]) {
+    if (!row.nurse?.users) continue;
+    const existing = counts.get(row.nurse_user_id);
+    if (existing) {
+      existing.bad_review_count += 1;
+    } else {
+      counts.set(row.nurse_user_id, {
+        user_id: row.nurse_user_id,
+        first_name: row.nurse.users.first_name,
+        last_name: row.nurse.users.last_name,
+        slug: row.nurse.slug,
+        bad_review_count: 1,
+        avg_rating: row.nurse.avg_rating,
+      });
+    }
+  }
+
+  return [...counts.values()]
+    .filter((n) => n.bad_review_count >= 2)
+    .sort((a, b) => b.bad_review_count - a.bad_review_count);
+}
