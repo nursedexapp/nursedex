@@ -62,6 +62,62 @@ export async function sendNewReviewEmail(
   }
 }
 
+interface SendVerificationApprovedArgs {
+  to: string;
+  firstName?: string;
+  slug: string;
+}
+
+export async function sendVerificationApprovedEmail(
+  args: SendVerificationApprovedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/verification-approved`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Verification approved email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
+interface SendVerificationRejectedArgs {
+  to: string;
+  firstName?: string;
+  reason: string;
+}
+
+export async function sendVerificationRejectedEmail(
+  args: SendVerificationRejectedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/verification-rejected`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Verification rejected email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
 interface SendVerifyReviewArgs {
   to: string;
   reviewerName: string;

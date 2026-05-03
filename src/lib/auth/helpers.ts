@@ -58,3 +58,24 @@ export async function requireRole(...roles: UserRole[]): Promise<User> {
 
   return user;
 }
+
+/**
+ * Require admin or super_admin. Used by /admin routes. Redirects to /
+ * (not /login) when authed but not an admin so we don't loop a curious
+ * logged-in user back to login.
+ */
+export async function requireAdmin(): Promise<User> {
+  const user = await requireAuth();
+  if (user.role !== "admin" && user.role !== "super_admin") {
+    redirect("/");
+  }
+  return user;
+}
+
+export async function requireSuperAdmin(): Promise<User> {
+  const user = await requireAuth();
+  if (user.role !== "super_admin") {
+    redirect("/admin");
+  }
+  return user;
+}
