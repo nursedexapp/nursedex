@@ -273,6 +273,92 @@ export async function sendSlaAlertAdminEmail(
   }
 }
 
+interface SendSubscriptionConfirmedArgs {
+  to: string;
+  firstName?: string;
+  planType: "nurse_featured" | "family_access";
+  amount: string;
+  nextRenewalLabel: string;
+}
+export async function sendSubscriptionConfirmedEmail(
+  args: SendSubscriptionConfirmedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/subscription-confirmed`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Subscription confirmed email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
+interface SendRenewalSuccessArgs {
+  to: string;
+  firstName?: string;
+  planLabel: string;
+  amount: string;
+  nextRenewalLabel: string;
+}
+export async function sendRenewalSuccessEmail(
+  args: SendRenewalSuccessArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/renewal-success`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Renewal success email failed:", res.status, body);
+  }
+}
+
+interface SendCancellationConfirmationArgs {
+  to: string;
+  firstName?: string;
+  planLabel: string;
+  accessUntilLabel: string;
+  isFamily: boolean;
+}
+export async function sendCancellationConfirmationEmail(
+  args: SendCancellationConfirmationArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(
+    `${baseUrl}/api/email/cancellation-confirmation`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify(args),
+    },
+  );
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Cancellation confirmation email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
 interface SendReviewInviteArgs {
   to: string;
   firstName?: string;

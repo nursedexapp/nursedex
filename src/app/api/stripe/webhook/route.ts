@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { GRACE_PERIODS } from "@/lib/constants";
+import { GRACE_PERIODS, PRICING } from "@/lib/constants";
+import { shouldSendOnce } from "@/lib/cron/email-log";
+import {
+  sendSubscriptionConfirmedEmail,
+  sendRenewalSuccessEmail,
+  sendCancellationConfirmationEmail,
+} from "@/lib/email/send";
 
 // Stripe requires the raw body for signature verification.
 export const dynamic = "force-dynamic";
@@ -103,6 +109,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const stripe = getStripe();
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   await upsertSubscription({ userId, planType, customerId, subscription: sub });
+
+  // Welcome email — dedup by subscription id so a retried webhook
+  // doesn't fire it twice.
+  await maybeNotifyConfirmed({ userId, planType, subscription: sub });
 }
 
 async function handleSubscriptionUpserted(sub: Stripe.Subscription) {
@@ -112,7 +122,7 @@ async function handleSubscriptionUpserted(sub: Stripe.Subscription) {
   const supabase = createServiceRoleClient();
   const { data: existing } = await supabase
     .from("subscriptions")
-    .select("user_id, plan_type")
+    .select("user_id, plan_type, cancel_at_period_end")
     .eq("stripe_subscription_id", sub.id)
     .maybeSingle();
 
@@ -133,6 +143,15 @@ async function handleSubscriptionUpserted(sub: Stripe.Subscription) {
   const customerId =
     typeof sub.customer === "string" ? sub.customer : sub.customer.id;
   await upsertSubscription({ userId, planType, customerId, subscription: sub });
+
+  // Cancellation confirmation: fires the moment cancel_at_period_end
+  // transitions from false (or undefined for a brand new row) to true.
+  // The user-initiated cancel via Customer Portal triggers this update.
+  const wasCancelling = existing?.cancel_at_period_end === true;
+  const isCancelling = sub.cancel_at_period_end === true;
+  if (!wasCancelling && isCancelling) {
+    await maybeNotifyCancellation({ userId, planType, subscription: sub });
+  }
 }
 
 async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
@@ -183,6 +202,26 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     .from("subscriptions")
     .update({ status: "active" })
     .eq("stripe_subscription_id", subId);
+
+  // Renewal email: fire only on recurring renewals, not the initial
+  // subscription_create invoice (the welcome email handles that).
+  if (invoice.billing_reason !== "subscription_cycle") return;
+
+  const { data: row } = await supabase
+    .from("subscriptions")
+    .select("user_id, plan_type")
+    .eq("stripe_subscription_id", subId)
+    .maybeSingle();
+  if (!row) return;
+
+  const stripe = getStripe();
+  const sub = await stripe.subscriptions.retrieve(subId);
+  await maybeNotifyRenewal({
+    userId: row.user_id,
+    planType: row.plan_type as "nurse_featured" | "family_access",
+    subscription: sub,
+    invoiceId: invoice.id ?? subId,
+  });
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
@@ -269,4 +308,119 @@ function invoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
   const sub = invoice.parent?.subscription_details?.subscription;
   if (!sub) return null;
   return typeof sub === "string" ? sub : sub.id;
+}
+
+// ── Lifecycle email helpers ───────────────────────────────────
+
+interface NotifyArgs {
+  userId: string;
+  planType: "nurse_featured" | "family_access";
+  subscription: Stripe.Subscription;
+}
+
+function planLabel(planType: "nurse_featured" | "family_access"): string {
+  return planType === "nurse_featured" ? "Featured" : "Family Access";
+}
+
+function planAmount(planType: "nurse_featured" | "family_access"): string {
+  const dollars =
+    planType === "nurse_featured"
+      ? PRICING.NURSE_FEATURED_MONTHLY
+      : PRICING.FAMILY_ACCESS_MONTHLY;
+  return `$${dollars.toFixed(2)}`;
+}
+
+function nextRenewalLabel(subscription: Stripe.Subscription): string {
+  const item = subscription.items.data[0];
+  return new Date(item.current_period_end * 1000).toLocaleDateString(
+    "en-US",
+    { month: "long", day: "numeric", year: "numeric" },
+  );
+}
+
+async function maybeNotifyConfirmed({
+  userId,
+  planType,
+  subscription,
+}: NotifyArgs): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const ok = await shouldSendOnce(supabase, {
+    recipientUserId: userId,
+    emailType: "subscription_confirmed",
+    dedupKey: subscription.id,
+  });
+  if (!ok) return;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("email, first_name")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!user?.email) return;
+
+  await sendSubscriptionConfirmedEmail({
+    to: user.email,
+    firstName: user.first_name ?? undefined,
+    planType,
+    amount: planAmount(planType),
+    nextRenewalLabel: nextRenewalLabel(subscription),
+  });
+}
+
+async function maybeNotifyRenewal(args: NotifyArgs & { invoiceId: string }): Promise<void> {
+  const supabase = createServiceRoleClient();
+  const ok = await shouldSendOnce(supabase, {
+    recipientUserId: args.userId,
+    emailType: "renewal_success",
+    dedupKey: args.invoiceId,
+  });
+  if (!ok) return;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("email, first_name")
+    .eq("id", args.userId)
+    .maybeSingle();
+  if (!user?.email) return;
+
+  await sendRenewalSuccessEmail({
+    to: user.email,
+    firstName: user.first_name ?? undefined,
+    planLabel: planLabel(args.planType),
+    amount: planAmount(args.planType),
+    nextRenewalLabel: nextRenewalLabel(args.subscription),
+  });
+}
+
+async function maybeNotifyCancellation({
+  userId,
+  planType,
+  subscription,
+}: NotifyArgs): Promise<void> {
+  const supabase = createServiceRoleClient();
+  // Dedup by sub_id + period_end so resubscribe-then-cancel-again on a
+  // future period correctly sends a fresh confirmation.
+  const item = subscription.items.data[0];
+  const dedupKey = `${subscription.id}:${item.current_period_end}`;
+  const ok = await shouldSendOnce(supabase, {
+    recipientUserId: userId,
+    emailType: "cancellation_confirmation",
+    dedupKey,
+  });
+  if (!ok) return;
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("email, first_name")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!user?.email) return;
+
+  await sendCancellationConfirmationEmail({
+    to: user.email,
+    firstName: user.first_name ?? undefined,
+    planLabel: planLabel(planType),
+    accessUntilLabel: nextRenewalLabel(subscription),
+    isFamily: planType === "family_access",
+  });
 }
