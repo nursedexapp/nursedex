@@ -359,6 +359,108 @@ export async function sendCancellationConfirmationEmail(
   }
 }
 
+interface SendRenewalReminderArgs {
+  to: string;
+  firstName?: string;
+  planLabel: string;
+  amount: string;
+  renewalDateLabel: string;
+}
+export async function sendRenewalReminderEmail(
+  args: SendRenewalReminderArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/renewal-reminder`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Renewal reminder email failed:", res.status, body);
+  }
+}
+
+interface SendFeaturedAnalyticsArgs {
+  to: string;
+  firstName?: string;
+  thisWeek: { profileViews: number; saves: number; reveals: number };
+  lastWeek: { profileViews: number; saves: number; reveals: number };
+}
+export async function sendFeaturedAnalyticsEmail(
+  args: SendFeaturedAnalyticsArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/featured-analytics`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Featured analytics email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
+interface SendUpgradeNudgeArgs {
+  to: string;
+  firstName?: string;
+  saveCount: number;
+}
+export async function sendUpgradeNudgeEmail(
+  args: SendUpgradeNudgeArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/upgrade-nudge`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Upgrade nudge email failed:", res.status, body);
+  }
+}
+
+interface SendRateLimitFlaggedAdminArgs {
+  to: string;
+  flaggedCount: number;
+}
+export async function sendRateLimitFlaggedAdminEmail(
+  args: SendRateLimitFlaggedAdminArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/rate-limit-flagged-admin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Rate limit flagged admin email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
 interface SendReviewInviteArgs {
   to: string;
   firstName?: string;
