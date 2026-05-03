@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import posthog from "posthog-js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { BasicsFields } from "@/components/profile-form/BasicsFields";
@@ -12,6 +13,11 @@ import { BioFields } from "@/components/profile-form/BioFields";
 import { ContactFields } from "@/components/profile-form/ContactFields";
 import { fullProfileSchema } from "@/lib/schemas/profile";
 import { updateNurseProfile } from "@/lib/profile/actions";
+import {
+  createNurseFeaturedCheckout,
+  redirectToCheckout,
+} from "@/lib/subscriptions/actions";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { NurseProfile } from "@/types/database";
 import type { NurseTier } from "@/types/enums";
 
@@ -23,6 +29,36 @@ interface ProfileEditFormProps {
   userZip: string;
   userCommPref: string;
   photoUrls: (string | null)[];
+}
+
+function showFeaturedUpsellToast() {
+  if (posthog.__loaded) {
+    posthog.capture(ANALYTICS_EVENTS.FEATURED_UPSELL_SHOWN, {
+      surface: "profile_edit",
+    });
+  }
+
+  toast.success("Profile updated", {
+    description:
+      "A family saved your profile. Featured nurses get priority verification, top placement in search, analytics, and a verified badge.",
+    duration: 12000,
+    action: {
+      label: "Upgrade",
+      onClick: async () => {
+        if (posthog.__loaded) {
+          posthog.capture(ANALYTICS_EVENTS.FEATURED_UPSELL_CLICKED, {
+            surface: "profile_edit",
+          });
+        }
+        const result = await createNurseFeaturedCheckout();
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
+        await redirectToCheckout(result);
+      },
+    },
+  });
 }
 
 export function ProfileEditForm({
@@ -177,6 +213,9 @@ export function ProfileEditForm({
 
     if (saveResult.error) {
       toast.error(saveResult.error);
+    } else if (saveResult.upsellHint) {
+      showFeaturedUpsellToast();
+      router.refresh();
     } else {
       toast.success("Profile updated");
       router.refresh();

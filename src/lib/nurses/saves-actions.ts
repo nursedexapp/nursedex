@@ -54,12 +54,22 @@ export async function toggleSavedNurse(
     return { success: false, isSaved: false, error: error.message };
   }
 
-  // Best-effort analytics increment — don't fail the save if it errors.
+  // Best-effort analytics increment, don't fail the save if it errors.
   await supabase
     .rpc("increment_nurse_analytics", {
       p_nurse_user_id: nurseUserId,
       p_field: "saves",
     })
+    .then(
+      () => undefined,
+      () => undefined,
+    );
+
+  // Best-effort upsell counter for the saved nurse. RLS would block a
+  // family from writing to the nurse's row directly, so this goes through
+  // a SECURITY DEFINER RPC.
+  await supabase
+    .rpc("increment_save_count_for_upsell", { p_nurse_user_id: nurseUserId })
     .then(
       () => undefined,
       () => undefined,

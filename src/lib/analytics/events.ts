@@ -16,6 +16,8 @@ export const ANALYTICS_EVENTS = {
   PHOTO_UPLOADED: "photo_uploaded",
   AVAILABILITY_TOGGLED: "availability_toggled",
   FEATURED_UPGRADE: "featured_upgrade",
+  FEATURED_UPSELL_SHOWN: "featured_upsell_shown",
+  FEATURED_UPSELL_CLICKED: "featured_upsell_clicked",
 
   // Family
   SURVEY_STARTED: "survey_started",

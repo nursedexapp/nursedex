@@ -12,10 +12,12 @@ import {
   removePhoto,
 } from "./photos";
 import { sendProfileSetupEmail } from "@/lib/email/send";
+import { shouldShowFeaturedUpsell, markUpsellShown } from "./upsell";
 
 export type ProfileActionResult = {
   error?: string;
   success?: string;
+  upsellHint?: boolean;
 };
 
 // ── Fetch nurse profile for the current user ────────────────
@@ -346,24 +348,30 @@ export async function updateNurseProfile(
     return { error: "Could not save changes. Please try again." };
   }
 
-  // Recalculate completeness
+  // Recalculate completeness + read the upsell-gate fields in one round trip
   const { data: updatedProfile } = await supabase
     .from("nurse_profiles")
     .select(
-      "photos, bio, skills, care_philosophy, availability_commitment, time_slots, rate_min, rate_max, has_transportation, covid_vaccinated, additional_certs, travel_radius_miles, languages",
+      "photos, bio, skills, care_philosophy, availability_commitment, time_slots, rate_min, rate_max, has_transportation, covid_vaccinated, additional_certs, travel_radius_miles, languages, tier, verification_status, save_count_for_upsell, last_upsell_shown_at",
     )
     .eq("user_id", user.id)
     .single();
 
+  let upsellHint = false;
   if (updatedProfile) {
     const { score } = calculateCompleteness(updatedProfile);
     await supabase
       .from("nurse_profiles")
       .update({ profile_completeness: score })
       .eq("user_id", user.id);
+
+    if (shouldShowFeaturedUpsell(updatedProfile)) {
+      upsellHint = true;
+      await markUpsellShown(supabase, user.id);
+    }
   }
 
-  return { success: "Profile updated" };
+  return { success: "Profile updated", upsellHint };
 }
 
 // ── Toggle availability ─────────────────────────────────────
