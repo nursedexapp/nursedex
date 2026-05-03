@@ -9,6 +9,7 @@ import {
   Flag,
   Users,
   BarChart3,
+  KeyRound,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,12 @@ const NAV: NavItem[] = [
     href: "/admin/analytics",
     label: "Analytics",
     icon: BarChart3,
+    superAdminOnly: true,
+  },
+  {
+    href: "/admin/admins",
+    label: "Admins",
+    icon: KeyRound,
     superAdminOnly: true,
   },
 ];
