@@ -118,3 +118,46 @@ export const nurseResponseSchema = z.object({
 });
 
 export type NurseResponseInput = z.infer<typeof nurseResponseSchema>;
+
+export const DISPUTE_REASONS = [
+  "Factually inaccurate",
+  "Not a real client",
+  "Personal attack or harassment",
+  "Defamatory",
+  "Other",
+] as const;
+export type DisputeReason = (typeof DISPUTE_REASONS)[number];
+
+export const DISPUTE_TEXT_MAX = 500;
+
+export const disputeReviewSchema = z
+  .object({
+    review_id: z.string().uuid(),
+    reason: z.enum(DISPUTE_REASONS),
+    text: z
+      .string()
+      .trim()
+      .max(
+        DISPUTE_TEXT_MAX,
+        `Keep your explanation under ${DISPUTE_TEXT_MAX} characters`,
+      )
+      .optional()
+      .or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    // "Other" requires a free-text explanation; the canned reasons
+    // don't, but anything provided still has to fit the cap.
+    if (data.reason === "Other" && (!data.text || data.text.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["text"],
+        message: "Please describe the issue when selecting Other",
+      });
+    }
+  })
+  .transform((data) => ({
+    ...data,
+    text: data.text && data.text.length > 0 ? data.text : null,
+  }));
+
+export type DisputeReviewInput = z.infer<typeof disputeReviewSchema>;

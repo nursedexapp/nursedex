@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getNurseReviews } from "@/lib/reviews/queries";
 import { NurseResponseForm } from "@/components/reviews/NurseResponseForm";
+import { DisputeReviewDialog } from "@/components/reviews/DisputeReviewDialog";
 import type { Review } from "@/types/database";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ export default async function ReviewsPage() {
   const reviews = await getNurseReviews(user.id);
 
   const approved = reviews.filter((r) => r.status === "approved");
+  const disputed = reviews.filter((r) => r.status === "disputed");
   const pending = reviews.filter(
     (r) => r.status === "pending" && r.email_verified,
   );
@@ -46,6 +48,7 @@ export default async function ReviewsPage() {
                 key={review.id}
                 review={review}
                 showResponseForm={false}
+                showDisputeButton={false}
               />
             ))}
           </div>
@@ -53,7 +56,7 @@ export default async function ReviewsPage() {
       )}
 
       {approved.length > 0 && (
-        <section>
+        <section className="mb-8">
           <h2 className="text-soft-black mb-2 text-sm font-semibold">
             Published
           </h2>
@@ -63,6 +66,25 @@ export default async function ReviewsPage() {
                 key={review.id}
                 review={review}
                 showResponseForm={true}
+                showDisputeButton={true}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {disputed.length > 0 && (
+        <section>
+          <h2 className="text-soft-black mb-2 text-sm font-semibold">
+            Under investigation
+          </h2>
+          <div className="space-y-3">
+            {disputed.map((review) => (
+              <ReviewRow
+                key={review.id}
+                review={review}
+                showResponseForm={true}
+                showDisputeButton={false}
               />
             ))}
           </div>
@@ -100,9 +122,11 @@ function EmptyState() {
 function ReviewRow({
   review,
   showResponseForm,
+  showDisputeButton,
 }: {
   review: Review;
   showResponseForm: boolean;
+  showDisputeButton: boolean;
 }) {
   return (
     <Card className="border-sage/20">
@@ -117,6 +141,14 @@ function ReviewRow({
                 className="border-sage/30 bg-sage/5 text-[10px]"
               >
                 External
+              </Badge>
+            )}
+            {review.status === "disputed" && (
+              <Badge
+                variant="outline"
+                className="border-amber-200 bg-amber-50 text-[10px] text-amber-900"
+              >
+                Under review
               </Badge>
             )}
           </div>
@@ -139,12 +171,17 @@ function ReviewRow({
             </p>
           </div>
         )}
-        {showResponseForm && (
-          <div className="pt-1">
-            <NurseResponseForm
-              reviewId={review.id}
-              existingResponse={review.nurse_response}
-            />
+        {(showResponseForm || showDisputeButton) && (
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {showResponseForm && (
+              <NurseResponseForm
+                reviewId={review.id}
+                existingResponse={review.nurse_response}
+              />
+            )}
+            {showDisputeButton && (
+              <DisputeReviewDialog reviewId={review.id} />
+            )}
           </div>
         )}
       </CardContent>

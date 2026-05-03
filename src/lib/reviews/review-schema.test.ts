@@ -4,9 +4,11 @@ import {
   externalReviewSchema,
   removalRequestSchema,
   nurseResponseSchema,
+  disputeReviewSchema,
   REVIEW_TEXT_MIN,
   REVIEW_TEXT_MAX,
   NURSE_RESPONSE_MAX,
+  DISPUTE_TEXT_MAX,
 } from "@/lib/schemas/review";
 
 // Valid RFC v4 UUID — Zod 4's .uuid() enforces variant bits.
@@ -192,6 +194,63 @@ describe("nurseResponseSchema", () => {
         text: "a".repeat(NURSE_RESPONSE_MAX + 1),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("disputeReviewSchema", () => {
+  it("accepts a canned reason without explanation", () => {
+    expect(
+      disputeReviewSchema.safeParse({
+        review_id: REVIEW_ID,
+        reason: "Factually inaccurate",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires a free-text explanation when reason is Other", () => {
+    expect(
+      disputeReviewSchema.safeParse({
+        review_id: REVIEW_ID,
+        reason: "Other",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      disputeReviewSchema.safeParse({
+        review_id: REVIEW_ID,
+        reason: "Other",
+        text: "This review references the wrong nurse.",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an unknown reason", () => {
+    expect(
+      disputeReviewSchema.safeParse({
+        review_id: REVIEW_ID,
+        reason: "Just because",
+      }).success,
+    ).toBe(false);
+  });
+
+  it(`rejects text over ${DISPUTE_TEXT_MAX} characters`, () => {
+    expect(
+      disputeReviewSchema.safeParse({
+        review_id: REVIEW_ID,
+        reason: "Defamatory",
+        text: "a".repeat(DISPUTE_TEXT_MAX + 1),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("transforms empty string text to null", () => {
+    const result = disputeReviewSchema.safeParse({
+      review_id: REVIEW_ID,
+      reason: "Personal attack or harassment",
+      text: "",
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.text).toBeNull();
   });
 });
 

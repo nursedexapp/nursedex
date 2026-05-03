@@ -6,7 +6,9 @@ import { requireRole } from "@/lib/auth/helpers";
 import { UserRole } from "@/types/enums";
 import {
   nurseResponseSchema,
+  disputeReviewSchema,
   type NurseResponseInput,
+  type DisputeReviewInput,
 } from "@/lib/schemas/review";
 import { containsProfanity } from "./profanity";
 
@@ -79,6 +81,52 @@ export async function saveNurseResponse(
 
   if (error) {
     console.error("[reviews] save response failed:", error.message);
+    return { success: false, error: "unknown" };
+  }
+
+  revalidatePath("/dashboard/reviews");
+  return { success: true };
+}
+
+export type DisputeReviewError =
+  | "invalid"
+  | "not_eligible"
+  | "unknown";
+
+export interface DisputeReviewResult {
+  success: boolean;
+  error?: DisputeReviewError;
+  fieldErrors?: Record<string, string>;
+}
+
+export async function disputeReview(
+  raw: unknown,
+): Promise<DisputeReviewResult> {
+  const parsed = disputeReviewSchema.safeParse(raw);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const f = String(issue.path[0]);
+      if (!fieldErrors[f]) fieldErrors[f] = issue.message;
+    }
+    return { success: false, error: "invalid", fieldErrors };
+  }
+  const input: DisputeReviewInput = parsed.data;
+
+  await requireRole(UserRole.NURSE);
+  const supabase = await createClient();
+
+  const { error } = await supabase.rpc("dispute_review", {
+    p_review_id: input.review_id,
+    p_reason: input.reason,
+    p_text: input.text,
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { success: false, error: "not_eligible" };
+    }
+    console.error("[reviews] dispute failed:", error.message);
     return { success: false, error: "unknown" };
   }
 

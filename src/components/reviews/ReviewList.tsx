@@ -31,6 +31,14 @@ export function ReviewList({ nurseFirstName, reviews }: ReviewListProps) {
                 <span className="text-sm font-medium">
                   {review.reviewer_name}
                 </span>
+                {review.is_disputed && (
+                  <Badge
+                    variant="outline"
+                    className="border-amber-200 bg-amber-50 text-[10px] text-amber-900"
+                  >
+                    Under review
+                  </Badge>
+                )}
               </div>
               <time className="text-muted-foreground text-xs">
                 {formatDate(review.created_at)}
