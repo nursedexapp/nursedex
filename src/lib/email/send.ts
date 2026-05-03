@@ -163,6 +163,116 @@ export async function sendAccountRemovedEmail(
   }
 }
 
+interface SendPaymentFailureWarningArgs {
+  to: string;
+  firstName?: string;
+  dayNumber: 1 | 2;
+  planLabel: string;
+  consequenceLabel: string;
+  portalUrl: string;
+}
+export async function sendPaymentFailureWarningEmail(
+  args: SendPaymentFailureWarningArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/payment-failure-warning`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Payment failure warning email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
+interface SendPaymentFailureFinalArgs {
+  to: string;
+  firstName?: string;
+  planLabel: string;
+  consequenceSummary: string;
+  portalUrl: string;
+}
+export async function sendPaymentFailureFinalEmail(
+  args: SendPaymentFailureFinalArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/payment-failure-final`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Payment failure final email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
+interface SendAccessExpiryReminderArgs {
+  to: string;
+  firstName?: string;
+  daysUntilExpiry: number;
+  expiryDateLabel: string;
+}
+export async function sendAccessExpiryReminderEmail(
+  args: SendAccessExpiryReminderArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/access-expiry-reminder`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Access expiry reminder email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
+interface SendSlaAlertAdminArgs {
+  to: string;
+  approachingCount: number;
+  overdueCount: number;
+}
+export async function sendSlaAlertAdminEmail(
+  args: SendSlaAlertAdminArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/sla-alert-admin`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] SLA alert admin email failed:", res.status, body);
+  }
+}
+
 interface SendReviewInviteArgs {
   to: string;
   firstName?: string;
