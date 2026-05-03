@@ -176,6 +176,8 @@ export interface Review {
   dispute_reason: string | null;
   dispute_text: string | null;
   admin_decision: string | null;
+  removal_requested: boolean;
+  removal_reason: string | null;
   created_at: string;
   updated_at: string;
 }

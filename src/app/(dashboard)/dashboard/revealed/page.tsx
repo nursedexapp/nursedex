@@ -6,6 +6,8 @@ import { UserRole } from "@/types/enums";
 import { NurseCard } from "@/components/nurses/NurseCard";
 import { Badge } from "@/components/ui/badge";
 import { getRevealedNurses } from "@/lib/reveals/queries";
+import { getFamilyReviewsByNurse } from "@/lib/reviews/queries";
+import { ReviewStateAction } from "@/components/reviews/ReviewStateAction";
 
 export const metadata: Metadata = {
   title: "Revealed nurses | NurseDex",
@@ -14,6 +16,10 @@ export const metadata: Metadata = {
 export default async function RevealedPage() {
   const user = await requireRole(UserRole.FAMILY);
   const revealed = await getRevealedNurses(user.id);
+  const reviewsByNurse = await getFamilyReviewsByNurse(
+    user.id,
+    revealed.map((n) => n.user_id),
+  );
 
   return (
     <div className="mx-auto w-full max-w-5xl p-6 sm:p-8">
@@ -23,7 +29,7 @@ export default async function RevealedPage() {
         </h1>
         <p className="text-soft-black-light mt-1 text-sm">
           Nurses whose contact info you&apos;ve unlocked. You can always come
-          back here to message them.
+          back here to message them or leave a review.
         </p>
       </header>
 
@@ -31,25 +37,36 @@ export default async function RevealedPage() {
         <EmptyState />
       ) : (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {revealed.map((nurse) => (
-            <div key={nurse.user_id} className="relative">
-              <NurseCard nurse={nurse} />
-              {nurse.access_expires_at && (
-                <div className="absolute top-2 right-2 z-10">
-                  <Badge
-                    variant="outline"
-                    className="border-amber-200 bg-amber-50 text-amber-900"
-                  >
-                    Access until{" "}
-                    {new Date(nurse.access_expires_at).toLocaleDateString(
-                      "en-US",
-                      { month: "short", day: "numeric" },
-                    )}
-                  </Badge>
+          {revealed.map((nurse) => {
+            const review = reviewsByNurse.get(nurse.user_id) ?? null;
+            return (
+              <div key={nurse.user_id} className="space-y-3">
+                <div className="relative">
+                  <NurseCard nurse={nurse} />
+                  {nurse.access_expires_at && (
+                    <div className="absolute top-2 right-2 z-10">
+                      <Badge
+                        variant="outline"
+                        className="border-amber-200 bg-amber-50 text-amber-900"
+                      >
+                        Access until{" "}
+                        {new Date(nurse.access_expires_at).toLocaleDateString(
+                          "en-US",
+                          { month: "short", day: "numeric" },
+                        )}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+                <ReviewStateAction
+                  nurseUserId={nurse.user_id}
+                  nurseFirstName={nurse.first_name}
+                  defaultFirstName={user.first_name ?? ""}
+                  review={review}
+                />
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

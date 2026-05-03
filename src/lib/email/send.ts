@@ -35,3 +35,29 @@ export async function sendProfileSetupEmail(
     console.error("[email] Profile setup email failed:", res.status, body);
   }
 }
+
+interface SendNewReviewArgs {
+  nurseUserId: string;
+  rating: number;
+  reviewerName: string;
+}
+
+export async function sendNewReviewEmail(
+  args: SendNewReviewArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+
+  const res = await fetch(`${baseUrl}/api/email/new-review`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] New review email failed:", res.status, body);
+  }
+}

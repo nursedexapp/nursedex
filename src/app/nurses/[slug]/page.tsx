@@ -14,8 +14,10 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
 import { hasRevealedNurse } from "@/lib/reveals/actions";
+import { getFamilyReviewForNurse } from "@/lib/reviews/queries";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 import type { Credential } from "@/types/enums";
+import type { Review } from "@/types/database";
 
 interface NurseProfilePageProps {
   params: Promise<{ slug: string }>;
@@ -72,6 +74,7 @@ export default async function NurseProfilePage({
   let viewMode: "anon" | "free" | "subscribed" = "anon";
   let revealMode: "anon" | "no_sub" | "subscribed" | null = null;
   let distanceMiles: number | null = null;
+  let viewerReview: Review | null = null;
 
   if (user) {
     if (user.role === "family") {
@@ -83,6 +86,7 @@ export default async function NurseProfilePage({
       if (hasReveal) {
         viewMode = "subscribed"; // contact info will be server-rendered
         revealMode = null;
+        viewerReview = await getFamilyReviewForNurse(user.id, nurse.user_id);
       } else if (hasSub) {
         viewMode = "free";
         revealMode = "subscribed"; // can fire reveal action
@@ -127,6 +131,8 @@ export default async function NurseProfilePage({
           distanceMiles={distanceMiles}
           viewMode={viewMode}
           revealMode={revealMode}
+          viewerReview={viewerReview}
+          viewerFirstName={user?.first_name ?? ""}
         />
       </main>
       <Footer />

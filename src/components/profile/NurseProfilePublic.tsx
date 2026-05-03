@@ -34,6 +34,8 @@ import {
 import Link from "next/link";
 import type { PublicNurseProfile } from "@/lib/profile/queries";
 import { RevealCTA } from "@/components/reveals/RevealCTA";
+import { ReviewStateAction } from "@/components/reviews/ReviewStateAction";
+import type { Review } from "@/types/database";
 
 type ViewMode = "anon" | "free" | "subscribed";
 type RevealMode = "anon" | "no_sub" | "subscribed" | null;
@@ -45,6 +47,11 @@ interface NurseProfilePublicProps {
   distanceMiles: number | null;
   viewMode: ViewMode;
   revealMode?: RevealMode;
+  /** The viewer's existing platform review for this nurse, if any. Only
+   *  meaningful when viewMode === "subscribed". */
+  viewerReview?: Review | null;
+  /** Viewer's first name, prefilled into the review form. */
+  viewerFirstName?: string;
 }
 
 export function NurseProfilePublic({
@@ -54,6 +61,8 @@ export function NurseProfilePublic({
   distanceMiles,
   viewMode,
   revealMode = null,
+  viewerReview = null,
+  viewerFirstName = "",
 }: NurseProfilePublicProps) {
   const credentialLabel =
     CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
@@ -328,6 +337,27 @@ export function NurseProfilePublic({
             viewMode={viewMode}
             revealMode={revealMode}
           />
+
+          {/* Review CTA — only after the family has revealed */}
+          {viewMode === "subscribed" && (
+            <Card className="border-sage/20">
+              <CardContent className="space-y-3 pt-4">
+                <h2 className="text-sm font-semibold">
+                  Worked with {nurse.first_name}?
+                </h2>
+                <p className="text-muted-foreground text-xs">
+                  Share your experience to help other families on Long Island
+                  decide.
+                </p>
+                <ReviewStateAction
+                  nurseUserId={nurse.user_id}
+                  nurseFirstName={nurse.first_name}
+                  defaultFirstName={viewerFirstName}
+                  review={viewerReview}
+                />
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

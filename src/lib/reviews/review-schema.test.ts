@@ -1,0 +1,141 @@
+import { describe, it, expect } from "vitest";
+import {
+  familyReviewSchema,
+  removalRequestSchema,
+  REVIEW_TEXT_MIN,
+  REVIEW_TEXT_MAX,
+} from "@/lib/schemas/review";
+
+// Valid RFC v4 UUID — Zod 4's .uuid() enforces variant bits.
+const NURSE_ID = "11111111-1111-4111-8111-111111111111";
+const REVIEW_ID = "22222222-2222-4222-8222-222222222222";
+
+describe("familyReviewSchema", () => {
+  it("accepts a minimal review with no text", () => {
+    const result = familyReviewSchema.safeParse({
+      nurse_user_id: NURSE_ID,
+      rating: 5,
+      reviewer_name: "Sam",
+      testimonial_opt_in: true,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.text).toBeNull();
+    expect(result.data?.testimonial_opt_in).toBe(true);
+  });
+
+  it("rejects ratings outside 1..5", () => {
+    expect(
+      familyReviewSchema.safeParse({
+        nurse_user_id: NURSE_ID,
+        rating: 0,
+        reviewer_name: "Sam",
+      }).success,
+    ).toBe(false);
+
+    expect(
+      familyReviewSchema.safeParse({
+        nurse_user_id: NURSE_ID,
+        rating: 6,
+        reviewer_name: "Sam",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects review text shorter than the minimum when not blank", () => {
+    const result = familyReviewSchema.safeParse({
+      nurse_user_id: NURSE_ID,
+      rating: 4,
+      reviewer_name: "Sam",
+      text: "a".repeat(REVIEW_TEXT_MIN - 1),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts review text right at the minimum", () => {
+    const result = familyReviewSchema.safeParse({
+      nurse_user_id: NURSE_ID,
+      rating: 4,
+      reviewer_name: "Sam",
+      text: "a".repeat(REVIEW_TEXT_MIN),
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.text?.length).toBe(REVIEW_TEXT_MIN);
+  });
+
+  it("rejects text longer than the maximum", () => {
+    const result = familyReviewSchema.safeParse({
+      nurse_user_id: NURSE_ID,
+      rating: 5,
+      reviewer_name: "Sam",
+      text: "a".repeat(REVIEW_TEXT_MAX + 1),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("forces testimonial_opt_in to false on 1-3 star reviews", () => {
+    const result = familyReviewSchema.safeParse({
+      nurse_user_id: NURSE_ID,
+      rating: 2,
+      reviewer_name: "Sam",
+      testimonial_opt_in: true,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.testimonial_opt_in).toBe(false);
+  });
+
+  it("preserves testimonial_opt_in on 4+ star reviews", () => {
+    const result = familyReviewSchema.safeParse({
+      nurse_user_id: NURSE_ID,
+      rating: 5,
+      reviewer_name: "Sam",
+      testimonial_opt_in: true,
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.testimonial_opt_in).toBe(true);
+  });
+
+  it("requires a non-empty first name", () => {
+    const result = familyReviewSchema.safeParse({
+      nurse_user_id: NURSE_ID,
+      rating: 5,
+      reviewer_name: "   ",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an invalid nurse_user_id", () => {
+    const result = familyReviewSchema.safeParse({
+      nurse_user_id: "not-a-uuid",
+      rating: 5,
+      reviewer_name: "Sam",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("removalRequestSchema", () => {
+  it("accepts a normal reason", () => {
+    expect(
+      removalRequestSchema.safeParse({
+        review_id: REVIEW_ID,
+        reason: "It contains personal info I want removed.",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects empty reason", () => {
+    expect(
+      removalRequestSchema.safeParse({ review_id: REVIEW_ID, reason: "  " })
+        .success,
+    ).toBe(false);
+  });
+
+  it("rejects oversized reason", () => {
+    expect(
+      removalRequestSchema.safeParse({
+        review_id: NURSE_ID,
+        reason: "a".repeat(201),
+      }).success,
+    ).toBe(false);
+  });
+});
