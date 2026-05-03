@@ -64,6 +64,7 @@ export async function approveVerification(
     .update({
       verification_status: "verified",
       verification_rejected_reason: null,
+      verified_at: new Date().toISOString(),
     })
     .eq("user_id", input.user_id);
 

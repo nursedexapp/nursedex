@@ -163,6 +163,51 @@ export async function sendAccountRemovedEmail(
   }
 }
 
+interface SendReviewInviteArgs {
+  to: string;
+  firstName?: string;
+  reviewLinkUrl: string;
+}
+export async function sendReviewInviteEmail(
+  args: SendReviewInviteArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/review-invite`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Review invite email failed:", res.status, body);
+  }
+}
+
+interface SendHireFollowupArgs {
+  to: string;
+  firstName?: string;
+}
+export async function sendHireFollowupEmail(
+  args: SendHireFollowupArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/hire-followup`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Hire followup email failed:", res.status, body);
+  }
+}
+
 interface SendHireConfirmRequestArgs {
   to: string;
   firstName?: string;

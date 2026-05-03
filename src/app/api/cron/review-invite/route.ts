@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from "next/server";
+import { verifyCronAuth } from "@/lib/cron/auth";
+import { shouldSendOnce } from "@/lib/cron/email-log";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { sendReviewInviteEmail } from "@/lib/email/send";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Daily 13:00 UTC (9am ET in summer, 8am ET in winter).
+ *
+ * Finds verified nurses whose verified_at is between 14 and 28 days
+ * ago and who haven't received a review invite email yet, then mails
+ * them their share link with a nudge to invite past clients.
+ *
+ * Safe to run daily; the email_log dedup keeps a nurse from getting
+ * the email more than once per "review_invite" event.
+ */
+export async function GET(request: NextRequest) {
+  const unauth = verifyCronAuth(request);
+  if (unauth) return unauth;
+
+  const supabase = createServiceRoleClient();
+  const now = Date.now();
+  const earliest = new Date(now - 28 * DAY_MS).toISOString();
+  const latest = new Date(now - 14 * DAY_MS).toISOString();
+
+  const { data, error } = await supabase
+    .from("nurse_profiles")
+    .select(
+      `
+      user_id,
+      verified_at,
+      users!inner ( email, first_name, is_deleted, is_suspended ),
+      nurse_review_links!nurse_review_links_nurse_user_id_fkey ( token )
+    `,
+    )
+    .eq("verification_status", "verified")
+    .gte("verified_at", earliest)
+    .lte("verified_at", latest);
+
+  if (error) {
+    console.error("[cron review-invite] query failed:", error.message);
+    return NextResponse.json({ error: "Query failed" }, { status: 500 });
+  }
+
+  type Row = {
+    user_id: string;
+    verified_at: string;
+    users: {
+      email: string;
+      first_name: string | null;
+      is_deleted: boolean;
+      is_suspended: boolean;
+    } | null;
+    nurse_review_links: { token: string }[] | { token: string } | null;
+  };
+
+  let sent = 0;
+  let skipped = 0;
+
+  for (const row of (data ?? []) as unknown as Row[]) {
+    if (!row.users || row.users.is_deleted || row.users.is_suspended) {
+      skipped++;
+      continue;
+    }
+    const link = Array.isArray(row.nurse_review_links)
+      ? row.nurse_review_links[0]
+      : row.nurse_review_links;
+    if (!link?.token) {
+      skipped++;
+      continue;
+    }
+
+    const ok = await shouldSendOnce(supabase, {
+      recipientUserId: row.user_id,
+      emailType: "review_invite",
+      dedupKey: "post_verification_v1",
+    });
+    if (!ok) {
+      skipped++;
+      continue;
+    }
+
+    await sendReviewInviteEmail({
+      to: row.users.email,
+      firstName: row.users.first_name ?? undefined,
+      reviewLinkUrl: `https://nursedex.com/reviews/${link.token}`,
+    });
+    sent++;
+  }
+
+  return NextResponse.json({ success: true, sent, skipped });
+}

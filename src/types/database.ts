@@ -59,6 +59,7 @@ export interface NurseProfile {
   tier: NurseTier;
   verification_status: VerificationStatus;
   verification_rejected_reason: string | null;
+  verified_at: string | null;
   is_available: boolean;
   unavailable_visibility: "hidden" | "badge" | null;
   profile_completeness: number;
