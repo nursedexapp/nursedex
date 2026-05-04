@@ -19,6 +19,7 @@ import {
   getApprovedReviews,
 } from "@/lib/reviews/queries";
 import { getFamilyHireForNurse } from "@/lib/hires/queries";
+import { NurseJsonLd } from "@/components/profile/NurseJsonLd";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 import type { Credential } from "@/types/enums";
 import type { Review, Hire } from "@/types/database";
@@ -129,8 +130,21 @@ export default async function NurseProfilePage({
   // Track profile view (fire and forget, don't block rendering)
   trackProfileView(nurse.user_id);
 
+  const credentialLabel =
+    CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
+
   return (
     <div className="bg-warm-white flex min-h-screen flex-col">
+      <NurseJsonLd
+        firstName={nurse.first_name}
+        lastName={nurse.last_name}
+        credentialLabel={credentialLabel}
+        slug={nurse.slug}
+        bio={nurse.bio}
+        photoUrl={photoUrls[0] ?? null}
+        avgRating={nurse.avg_rating}
+        reviewCount={nurse.review_count}
+      />
       <Header />
       <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-8">
         <NurseProfilePublic
