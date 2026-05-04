@@ -461,6 +461,34 @@ export async function sendRateLimitFlaggedAdminEmail(
   }
 }
 
+interface SendContactReceivedArgs {
+  name: string;
+  email: string;
+  message: string;
+}
+/**
+ * Notifies the support inbox that a new contact form submission came in.
+ * Goes to support@nursedex.com (hard-coded recipient — this is an
+ * internal alert, not a per-user transactional email).
+ */
+export async function sendContactReceivedEmail(
+  args: SendContactReceivedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/contact-received`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Contact received email failed:", res.status, body);
+  }
+}
+
 interface SendReviewInviteArgs {
   to: string;
   firstName?: string;
