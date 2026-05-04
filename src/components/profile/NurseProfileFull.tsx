@@ -72,7 +72,7 @@ export function NurseProfileFull({
           {photoUrl ? (
             <Image
               src={photoUrl}
-              alt={`${nurse.first_name} ${nurse.last_name}`}
+              alt={`${nurse.first_name} ${nurse.last_name}, ${credentialLabel}`}
               fill
               sizes="112px"
               className="object-cover"
