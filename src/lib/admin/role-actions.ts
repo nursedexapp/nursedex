@@ -32,9 +32,7 @@ const demoteSchema = z.object({
  * doubles as "promote a regular user" and "promote an admin to super
  * admin." Self-promotion of an already-super-admin is a no-op.
  */
-export async function promoteToAdmin(
-  raw: unknown,
-): Promise<RoleActionResult> {
+export async function promoteToAdmin(raw: unknown): Promise<RoleActionResult> {
   const parsed = promoteSchema.safeParse(raw);
   if (!parsed.success) return { success: false, error: "invalid" };
 
@@ -73,9 +71,7 @@ export async function promoteToAdmin(
  * they can navigate the app with; a true demotion to "no role" would
  * lock them out of the dashboard.
  */
-export async function demoteAdmin(
-  raw: unknown,
-): Promise<RoleActionResult> {
+export async function demoteAdmin(raw: unknown): Promise<RoleActionResult> {
   const parsed = demoteSchema.safeParse(raw);
   if (!parsed.success) return { success: false, error: "invalid" };
 

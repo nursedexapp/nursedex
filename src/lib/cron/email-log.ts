@@ -37,7 +37,7 @@ export async function shouldSendOnce(
   });
   if (error) {
     console.error("[cron] email_log insert failed:", error.message);
-    // Don't send on a failed log write — risk of duplicate sends if
+    // Don't send on a failed log write, risk of duplicate sends if
     // the log is broken is worse than skipping a single notification.
     return false;
   }

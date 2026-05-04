@@ -72,9 +72,7 @@ export async function getApprovedReviews(
  * The current nurse's own reviews. Includes pending so the dashboard
  * can show "X reviews waiting on moderation". Newest first.
  */
-export async function getNurseReviews(
-  nurseUserId: string,
-): Promise<Review[]> {
+export async function getNurseReviews(nurseUserId: string): Promise<Review[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("reviews")

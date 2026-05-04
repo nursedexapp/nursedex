@@ -43,7 +43,10 @@ export function ReviewStateAction({
   if (review.status === "pending") {
     return (
       <div className="flex items-center justify-between gap-2">
-        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-900">
+        <Badge
+          variant="outline"
+          className="border-amber-200 bg-amber-50 text-amber-900"
+        >
           Pending approval
         </Badge>
         <ReviewFormDialog
@@ -68,14 +71,20 @@ export function ReviewStateAction({
   if (review.status === "approved") {
     if (review.removal_requested) {
       return (
-        <Badge variant="outline" className="border-sage/40 bg-sage/10 text-sage-dark">
+        <Badge
+          variant="outline"
+          className="border-sage/40 bg-sage/10 text-sage-dark"
+        >
           Removal requested
         </Badge>
       );
     }
     return (
       <div className="flex items-center justify-between gap-2">
-        <Badge variant="outline" className="border-teal/30 bg-teal/5 text-teal-dark">
+        <Badge
+          variant="outline"
+          className="border-teal/30 bg-teal/5 text-teal-dark"
+        >
           Published
         </Badge>
         <RemovalRequestDialog
@@ -90,7 +99,10 @@ export function ReviewStateAction({
 
   if (review.status === "rejected") {
     return (
-      <Badge variant="outline" className="border-muted bg-muted/30 text-muted-foreground">
+      <Badge
+        variant="outline"
+        className="border-muted bg-muted/30 text-muted-foreground"
+      >
         Not approved
       </Badge>
     );
@@ -98,7 +110,10 @@ export function ReviewStateAction({
 
   // disputed
   return (
-    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-900">
+    <Badge
+      variant="outline"
+      className="border-amber-200 bg-amber-50 text-amber-900"
+    >
       Under review
     </Badge>
   );

@@ -29,8 +29,7 @@ export default async function AnalyticsPage() {
           Analytics
         </h1>
         <p className="text-soft-black-light mt-1 text-sm">
-          Super admin only. Counts live, MRR computed at published prices
-          ($
+          Super admin only. Counts live, MRR computed at published prices ($
           {PRICING.NURSE_FEATURED_MONTHLY} Featured, $
           {PRICING.FAMILY_ACCESS_MONTHLY} Family Access).
         </p>

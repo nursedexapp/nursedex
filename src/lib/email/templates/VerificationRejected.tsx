@@ -14,7 +14,8 @@ export function VerificationRejected({
     <EmailLayout preview="We couldn't verify your NurseDex license.">
       <Section>
         <Text style={heading}>
-          We couldn&apos;t verify your license{firstName ? `, ${firstName}` : ""}
+          We couldn&apos;t verify your license
+          {firstName ? `, ${firstName}` : ""}
         </Text>
         <Text style={paragraph}>
           Our team checked your license against the NY State database and ran
@@ -30,8 +31,8 @@ export function VerificationRejected({
           Update your profile
         </Link>
         <Text style={footer}>
-          If you think this was a mistake or need help interpreting the
-          reason, reply to this email or reach{" "}
+          If you think this was a mistake or need help interpreting the reason,
+          reply to this email or reach{" "}
           <Link href="mailto:support@nursedex.com" style={link}>
             support@nursedex.com
           </Link>

@@ -28,20 +28,17 @@ export function AccessExpiryReminder({
         </Text>
         <Text style={paragraph}>
           {lead} Your subscription is cancelled, so on{" "}
-          <strong>{expiryDateLabel}</strong> you&apos;ll lose the contact
-          info for nurses you previously revealed.
+          <strong>{expiryDateLabel}</strong> you&apos;ll lose the contact info
+          for nurses you previously revealed.
         </Text>
         <Link href="https://nursedex.com/dashboard" style={button}>
           Resubscribe
         </Link>
         <Text style={paragraph}>
           Resubscribing keeps your existing reveals and lets you reveal new
-          nurses. If you&apos;d rather just download the contact info you
-          have today, you can export it from{" "}
-          <Link
-            href="https://nursedex.com/dashboard/revealed"
-            style={link}
-          >
+          nurses. If you&apos;d rather just download the contact info you have
+          today, you can export it from{" "}
+          <Link href="https://nursedex.com/dashboard/revealed" style={link}>
             your revealed list
           </Link>
           .

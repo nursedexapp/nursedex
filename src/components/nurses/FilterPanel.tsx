@@ -57,7 +57,7 @@ export function FilterPanel({
   const [isPending, startTransition] = useTransition();
 
   const apply = (next: Partial<SearchFilters>) => {
-    // Always reset page to 1 on filter change — the new result set likely
+    // Always reset page to 1 on filter change, the new result set likely
     // has a different size than the previous one.
     const merged: Partial<SearchFilters> = {
       ...initialFilters,

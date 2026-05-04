@@ -4,10 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  confirmHireFromToken,
-  rejectHireFromToken,
-} from "@/lib/hires/actions";
+import { confirmHireFromToken, rejectHireFromToken } from "@/lib/hires/actions";
 
 interface HireDecisionButtonsProps {
   token: string;

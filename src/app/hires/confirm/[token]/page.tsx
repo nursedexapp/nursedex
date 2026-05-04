@@ -55,8 +55,8 @@ export default async function ConfirmHirePage({
               Link not valid
             </h1>
             <p className="text-soft-black-light text-sm">
-              This confirmation link doesn&apos;t match your account, or it
-              has already been used. If you think this is wrong, reach{" "}
+              This confirmation link doesn&apos;t match your account, or it has
+              already been used. If you think this is wrong, reach{" "}
               <Link
                 href="mailto:support@nursedex.com"
                 className="text-teal hover:underline"
@@ -83,8 +83,8 @@ export default async function ConfirmHirePage({
             </h1>
             <p className="text-soft-black-light text-sm">
               You already{" "}
-              {row.status === "confirmed" ? "confirmed" : "rejected"} this
-              hire request.
+              {row.status === "confirmed" ? "confirmed" : "rejected"} this hire
+              request.
             </p>
             <p>
               <Link

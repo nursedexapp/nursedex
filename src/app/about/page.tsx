@@ -9,8 +9,7 @@ export const metadata: Metadata = {
     "NurseDex is a hyper local directory of verified nurses on Long Island, built to make finding (and being found by) trusted care simpler.",
   openGraph: {
     title: "About NurseDex",
-    description:
-      "Hyper local directory of verified nurses on Long Island.",
+    description: "Hyper local directory of verified nurses on Long Island.",
     type: "website",
     url: "https://nursedex.com/about",
   },
@@ -34,10 +33,10 @@ export default function AboutPage() {
           <p>
             Finding good nursing care for someone you love is hard. National
             care marketplaces give you thousands of profiles you can&apos;t
-            verify, and word-of-mouth referrals only help if you happen to
-            know the right people. We built NurseDex to fill the gap on
-            Long Island specifically: a directory of nurses we&apos;ve
-            license-checked, with real reviews from real local families.
+            verify, and word-of-mouth referrals only help if you happen to know
+            the right people. We built NurseDex to fill the gap on Long Island
+            specifically: a directory of nurses we&apos;ve license-checked, with
+            real reviews from real local families.
           </p>
 
           <h2 className="font-heading text-soft-black pt-2 text-xl font-semibold">
@@ -45,33 +44,33 @@ export default function AboutPage() {
           </h2>
           <p>
             We verify every nurse&apos;s license against the New York State
-            database before their profile becomes visible to families. We
-            keep the directory limited to Suffolk, Nassau, and Queens so
-            search results stay relevant. We make reviews come from
-            email-verified families and run them through moderation, so
-            what you read is something an actual person stood behind.
+            database before their profile becomes visible to families. We keep
+            the directory limited to Suffolk, Nassau, and Queens so search
+            results stay relevant. We make reviews come from email-verified
+            families and run them through moderation, so what you read is
+            something an actual person stood behind.
           </p>
 
           <h2 className="font-heading text-soft-black pt-2 text-xl font-semibold">
             How we make money
           </h2>
           <p>
-            We charge families $19.99 a month for Family Access, which lets
-            them reveal nurse contact info and reach out directly. We charge
-            nurses $29 a month for an optional Featured tier that includes
-            top placement in search, longer bios, more photos, and
-            analytics. Free profiles for nurses are always available; the
-            only thing we don&apos;t do is run ads on the site.
+            We charge families $19.99 a month for Family Access, which lets them
+            reveal nurse contact info and reach out directly. We charge nurses
+            $29 a month for an optional Featured tier that includes top
+            placement in search, longer bios, more photos, and analytics. Free
+            profiles for nurses are always available; the only thing we
+            don&apos;t do is run ads on the site.
           </p>
 
           <h2 className="font-heading text-soft-black pt-2 text-xl font-semibold">
             Who we are
           </h2>
           <p>
-            NurseDex LLC is based in Ronkonkoma, NY. We&apos;re a small
-            team and read every contact form submission. If something on
-            the site doesn&apos;t sit right with you, or there&apos;s a
-            feature you wish existed, we&apos;d genuinely like to know.
+            NurseDex LLC is based in Ronkonkoma, NY. We&apos;re a small team and
+            read every contact form submission. If something on the site
+            doesn&apos;t sit right with you, or there&apos;s a feature you wish
+            existed, we&apos;d genuinely like to know.
           </p>
 
           <h2 className="font-heading text-soft-black pt-2 text-xl font-semibold">

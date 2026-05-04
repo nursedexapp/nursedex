@@ -6,13 +6,16 @@ export const UPSELL_COOLDOWN_DAYS = 14;
 
 type UpsellGateInput = Pick<
   NurseProfile,
-  "tier" | "verification_status" | "save_count_for_upsell" | "last_upsell_shown_at"
+  | "tier"
+  | "verification_status"
+  | "save_count_for_upsell"
+  | "last_upsell_shown_at"
 >;
 
 /**
  * Decide whether to surface the Featured upsell toast after a profile save.
  *
- * Pure function — easy to unit test. Caller passes `now` for determinism.
+ * Pure function, easy to unit test. Caller passes `now` for determinism.
  */
 export function shouldShowFeaturedUpsell(
   profile: UpsellGateInput,

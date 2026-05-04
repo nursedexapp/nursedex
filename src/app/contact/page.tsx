@@ -12,8 +12,7 @@ export const metadata: Metadata = {
     "Get in touch with the NurseDex team. We typically reply within one business day.",
   openGraph: {
     title: "Contact NurseDex",
-    description:
-      "Get in touch with the NurseDex team.",
+    description: "Get in touch with the NurseDex team.",
     type: "website",
     url: "https://nursedex.com/contact",
   },
@@ -29,8 +28,8 @@ export default function ContactPage() {
             Contact us
           </h1>
           <p className="text-soft-black-light mt-2 text-base">
-            Questions, feedback, or something specific to flag? Drop a
-            message below or email{" "}
+            Questions, feedback, or something specific to flag? Drop a message
+            below or email{" "}
             <a
               href="mailto:support@nursedex.com"
               className="text-teal hover:underline"
@@ -54,10 +53,7 @@ export default function ContactPage() {
           <ul className="text-soft-black-light mt-3 space-y-2 text-sm">
             <li className="flex items-center gap-2">
               <Mail className="text-teal size-4" />
-              <a
-                href="mailto:support@nursedex.com"
-                className="hover:underline"
-              >
+              <a href="mailto:support@nursedex.com" className="hover:underline">
                 support@nursedex.com
               </a>
             </li>

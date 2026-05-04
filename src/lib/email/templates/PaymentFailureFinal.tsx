@@ -22,9 +22,8 @@ export function PaymentFailureFinal({
         </Text>
         <Text style={paragraph}>{consequenceSummary}</Text>
         <Text style={paragraph}>
-          You can resubscribe at any time. Updating your payment method
-          and retrying through Stripe will reactivate your access right
-          away.
+          You can resubscribe at any time. Updating your payment method and
+          retrying through Stripe will reactivate your access right away.
         </Text>
         <Link href={portalUrl} style={button}>
           Update payment method

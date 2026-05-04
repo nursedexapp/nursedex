@@ -32,7 +32,7 @@ export function HeroSection({
 }: HeroSectionProps) {
   return (
     <section className="bg-teal-dark relative flex flex-col overflow-hidden px-6 text-center">
-      {/* Decorative outline rings — no fills, clipped by section edges */}
+      {/* Decorative outline rings, no fills, clipped by section edges */}
       <div
         className="pointer-events-none absolute inset-0 overflow-hidden"
         aria-hidden="true"

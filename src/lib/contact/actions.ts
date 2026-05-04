@@ -6,10 +6,7 @@ import { verifyTurnstileToken } from "@/lib/turnstile/verify";
 import { contactSchema, type ContactInput } from "@/lib/schemas/contact";
 import { sendContactReceivedEmail } from "@/lib/email/send";
 
-export type ContactActionError =
-  | "invalid"
-  | "captcha_failed"
-  | "unknown";
+export type ContactActionError = "invalid" | "captcha_failed" | "unknown";
 
 export interface ContactActionResult {
   success: boolean;

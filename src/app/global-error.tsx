@@ -9,7 +9,7 @@ interface GlobalErrorProps {
 
 /**
  * Replaces the root layout when an error is thrown inside it. Has to
- * own the <html> and <body> tags itself. Kept intentionally minimal —
+ * own the <html> and <body> tags itself. Kept intentionally minimal:
  * we don't have access to fonts/styles here, so this is a
  * pure-inline-styles fallback.
  */

@@ -72,9 +72,7 @@ export function NurseClaimHireCard() {
               {pending ? "Sending..." : "Submit"}
             </Button>
           </div>
-          {error && (
-            <p className="text-destructive mt-1 text-xs">{error}</p>
-          )}
+          {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
         </form>
       </CardContent>
     </Card>

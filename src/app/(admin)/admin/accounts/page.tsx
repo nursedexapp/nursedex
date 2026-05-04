@@ -46,9 +46,7 @@ export default async function AdminAccountsPage({
                     <p className="font-medium">
                       {row.first_name} {row.last_name}
                     </p>
-                    <p className="text-muted-foreground text-xs">
-                      {row.email}
-                    </p>
+                    <p className="text-muted-foreground text-xs">{row.email}</p>
                     <p className="text-muted-foreground text-xs">
                       Last flagged{" "}
                       {new Date(row.date).toLocaleDateString("en-US", {
@@ -72,7 +70,8 @@ export default async function AdminAccountsPage({
     );
   }
 
-  const role = tab === "nurses" ? "nurse" : tab === "families" ? "family" : undefined;
+  const role =
+    tab === "nurses" ? "nurse" : tab === "families" ? "family" : undefined;
   const accounts = await getAccounts({ query: params.q, role });
 
   return (
@@ -174,15 +173,24 @@ function Tabs({ active, q }: { active: string; q: string }) {
   const tabs: Array<{ key: string; label: string; href: string }> = [
     { key: "all", label: "All", href: "/admin/accounts" },
     { key: "nurses", label: "Nurses", href: "/admin/accounts?tab=nurses" },
-    { key: "families", label: "Families", href: "/admin/accounts?tab=families" },
-    { key: "flagged", label: "Rate limit flagged", href: "/admin/accounts?tab=flagged" },
+    {
+      key: "families",
+      label: "Families",
+      href: "/admin/accounts?tab=families",
+    },
+    {
+      key: "flagged",
+      label: "Rate limit flagged",
+      href: "/admin/accounts?tab=flagged",
+    },
   ];
   return (
     <nav className="border-sage/20 mb-6 flex flex-wrap items-center gap-1 border-b text-sm">
       {tabs.map((t) => {
-        const href = q && t.key !== "flagged"
-          ? `${t.href}${t.href.includes("?") ? "&" : "?"}q=${encodeURIComponent(q)}`
-          : t.href;
+        const href =
+          q && t.key !== "flagged"
+            ? `${t.href}${t.href.includes("?") ? "&" : "?"}q=${encodeURIComponent(q)}`
+            : t.href;
         return (
           <Link
             key={t.key}

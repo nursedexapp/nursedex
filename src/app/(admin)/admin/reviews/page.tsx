@@ -98,9 +98,7 @@ export default async function AdminReviewsPage({
         />
       )}
 
-      {active === "flagged" && (
-        <FlaggedNurses rows={flagged} />
-      )}
+      {active === "flagged" && <FlaggedNurses rows={flagged} />}
     </div>
   );
 }
@@ -133,13 +131,7 @@ function Tab({
   );
 }
 
-function Section({
-  rows,
-  empty,
-}: {
-  rows: React.ReactNode[];
-  empty: string;
-}) {
+function Section({ rows, empty }: { rows: React.ReactNode[]; empty: string }) {
   if (rows.length === 0) {
     return (
       <Card className="border-sage/20">
@@ -182,9 +174,7 @@ function FlaggedNurses({
               </Link>
               <p className="text-muted-foreground text-xs">
                 {nurse.bad_review_count} low rated reviews
-                {nurse.avg_rating !== null
-                  ? ` · ${nurse.avg_rating} avg`
-                  : ""}
+                {nurse.avg_rating !== null ? ` · ${nurse.avg_rating} avg` : ""}
               </p>
             </div>
             <Badge

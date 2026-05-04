@@ -168,7 +168,7 @@ export async function GET(request: NextRequest) {
       });
       finalAndDowngrade++;
     } else {
-      // 0 days past — Stripe is still queuing the first retry. Nothing to do.
+      // 0 days past, Stripe is still queuing the first retry. Nothing to do.
       skipped++;
     }
   }

@@ -25,16 +25,15 @@ export function UpgradeNudge({ firstName, saveCount }: UpgradeNudgeProps) {
           - A Featured badge on every profile view
           <br />
           - Priority verification (24 hour SLA versus 72)
-          <br />
-          - A longer bio and up to three photos
+          <br />- A longer bio and up to three photos
         </Text>
         <Link href="https://nursedex.com/dashboard" style={button}>
           Upgrade to Featured
         </Link>
         <Text style={footer}>
           You&apos;re getting this because at least one family saved you and
-          you&apos;re still on the free plan. We send these no more than
-          once every 14 days. Reply or reach{" "}
+          you&apos;re still on the free plan. We send these no more than once
+          every 14 days. Reply or reach{" "}
           <Link href="mailto:support@nursedex.com" style={link}>
             support@nursedex.com
           </Link>{" "}

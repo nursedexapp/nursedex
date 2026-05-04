@@ -17,9 +17,7 @@ interface ReviewLinkPageProps {
   params: Promise<{ token: string }>;
 }
 
-export default async function ReviewLinkPage({
-  params,
-}: ReviewLinkPageProps) {
+export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
   const { token } = await params;
 
   const service = createServiceRoleClient();
@@ -45,8 +43,9 @@ export default async function ReviewLinkPage({
     .single();
 
   const credentialLabel = profile?.credential
-    ? (CREDENTIAL_LABELS[profile.credential as keyof typeof CREDENTIAL_LABELS] ??
-      profile.credential)
+    ? (CREDENTIAL_LABELS[
+        profile.credential as keyof typeof CREDENTIAL_LABELS
+      ] ?? profile.credential)
     : null;
 
   return (
@@ -67,9 +66,9 @@ export default async function ReviewLinkPage({
             {credentialLabel ? `, ${credentialLabel}` : ""}
           </h1>
           <p className="text-soft-black-light mt-2 text-sm">
-            Your honest experience helps other Long Island families decide
-            who to hire. We&apos;ll email you to confirm your review before it
-            shows up on {nurse.first_name}&apos;s profile.
+            Your honest experience helps other Long Island families decide who
+            to hire. We&apos;ll email you to confirm your review before it shows
+            up on {nurse.first_name}&apos;s profile.
           </p>
         </header>
 

@@ -69,7 +69,7 @@ export default function FoundationSection() {
   return (
     <section id="foundation">
       {/* -------------------------------------------------- */}
-      {/* Brand Story — Pull quote IS the section intro */}
+      {/* Brand Story, Pull quote IS the section intro */}
       {/* -------------------------------------------------- */}
       <div className="bg-cream px-6 pt-32 pb-32 sm:px-12 lg:px-24">
         <div className="mx-auto grid max-w-6xl grid-cols-1 items-end gap-16 lg:grid-cols-[2fr_1fr] lg:gap-24">
@@ -96,7 +96,7 @@ export default function FoundationSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Mission & Vision — Full-bleed teal-dark */}
+      {/* Mission & Vision, Full-bleed teal-dark */}
       {/* -------------------------------------------------- */}
       <div className="bg-teal-dark px-6 py-24 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-6xl">
@@ -135,7 +135,7 @@ export default function FoundationSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Brand Values — Alternating card backgrounds */}
+      {/* Brand Values, Alternating card backgrounds */}
       {/* -------------------------------------------------- */}
       <div className="bg-warm-white px-6 py-24 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-6xl">
@@ -190,10 +190,10 @@ export default function FoundationSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Brand Personality — Dramatic 50/50 Split */}
+      {/* Brand Personality, Dramatic 50/50 Split */}
       {/* -------------------------------------------------- */}
       <div className="grid md:grid-cols-2">
-        {/* Left half — We Are (dark) */}
+        {/* Left half, We Are (dark) */}
         <div className="bg-teal-dark px-8 py-24 sm:px-12 lg:px-16">
           <p className="font-body text-sage mb-4 text-xs tracking-[0.25em] uppercase">
             Brand Personality
@@ -213,7 +213,7 @@ export default function FoundationSection() {
           </ul>
         </div>
 
-        {/* Right half — We Are Not (light) */}
+        {/* Right half, We Are Not (light) */}
         <div className="bg-warm-white px-8 py-24 sm:px-12 lg:px-16">
           <p className="font-body text-sage-dark mb-4 text-xs tracking-[0.25em] uppercase">
             &nbsp;
@@ -235,7 +235,7 @@ export default function FoundationSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Target Audiences — Sage background */}
+      {/* Target Audiences, Sage background */}
       {/* -------------------------------------------------- */}
       <div className="bg-sage/10 px-6 py-24 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-6xl">

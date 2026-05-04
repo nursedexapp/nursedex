@@ -50,9 +50,8 @@ function Hero() {
           Long Island&apos;s trusted nurse directory
         </h1>
         <p className="text-soft-black-light mx-auto mt-4 max-w-2xl text-center text-base sm:text-lg">
-          Verified nurses, real reviews, direct contact. Built for families
-          on Long Island looking for care, and for nurses who deserve to be
-          found.
+          Verified nurses, real reviews, direct contact. Built for families on
+          Long Island looking for care, and for nurses who deserve to be found.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -65,8 +64,8 @@ function Hero() {
                 Find a verified nurse near you
               </h2>
               <p className="text-soft-black-light text-sm">
-                Search by credential, care type, language, and availability.
-                See real reviews from other Long Island families.
+                Search by credential, care type, language, and availability. See
+                real reviews from other Long Island families.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
@@ -94,9 +93,9 @@ function Hero() {
                 Build a profile that families call
               </h2>
               <p className="text-soft-black-light text-sm">
-                Post your credentials, your bio, your availability. Get
-                verified and start getting found by families looking for
-                exactly what you offer.
+                Post your credentials, your bio, your availability. Get verified
+                and start getting found by families looking for exactly what you
+                offer.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
@@ -294,8 +293,8 @@ function FinalCTAs() {
                 Ready to be found?
               </h3>
               <p className="text-soft-black-light text-sm">
-                Free to join. Build a profile, get verified, and let
-                families come to you.
+                Free to join. Build a profile, get verified, and let families
+                come to you.
               </p>
               <Link
                 href="/signup"

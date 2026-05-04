@@ -131,7 +131,7 @@ export default function VoiceSection() {
   return (
     <section id="voice">
       {/* -------------------------------------------------- */}
-      {/* Section Header + Brand Voice — editorial dark block */}
+      {/* Section Header + Brand Voice, editorial dark block */}
       {/* -------------------------------------------------- */}
       <div className="bg-soft-black px-6 pt-32 pb-32 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-6xl">
@@ -152,7 +152,7 @@ export default function VoiceSection() {
       {/* Voice Attributes */}
       {/* -------------------------------------------------- */}
       <div className="bg-warm-white mx-auto max-w-6xl px-6 py-24 sm:px-12 lg:px-24">
-        {/* Voice Attributes — stacked list with sage rules */}
+        {/* Voice Attributes, stacked list with sage rules */}
         <div className="divide-sage/30 divide-y">
           {voiceAttributes.map((item) => (
             <div key={item.attribute} className="py-6 first:pt-0 last:pb-0">
@@ -168,7 +168,7 @@ export default function VoiceSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Tone Spectrum — full-bleed colored bands */}
+      {/* Tone Spectrum, full-bleed colored bands */}
       {/* -------------------------------------------------- */}
       <div className="mx-auto max-w-6xl px-6 py-16 sm:px-12 lg:px-24">
         <h3 className="font-heading text-teal-dark mb-4 text-3xl sm:text-4xl lg:text-5xl">
@@ -179,7 +179,7 @@ export default function VoiceSection() {
           Here&apos;s how we shift across different touchpoints.
         </p>
 
-        {/* Spectrum Bar — taller */}
+        {/* Spectrum Bar, taller */}
         <div className="mb-10 flex h-4 overflow-hidden rounded-xl">
           {toneSpectrum.map((item) => (
             <div key={item.context} className={`flex-1 ${item.color}`} />
@@ -207,7 +207,7 @@ export default function VoiceSection() {
       ))}
 
       {/* -------------------------------------------------- */}
-      {/* Writing Do's and Don'ts — full-bleed */}
+      {/* Writing Do's and Don'ts, full-bleed */}
       {/* -------------------------------------------------- */}
       <div className="px-6 py-16 sm:px-12 lg:px-24">
         <div className="mx-auto mb-10 max-w-6xl">
@@ -288,7 +288,7 @@ export default function VoiceSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Before / After Samples — white bg, no cream-dark borders */}
+      {/* Before / After Samples, white bg, no cream-dark borders */}
       {/* -------------------------------------------------- */}
       {beforeAfter.map((item, i) => (
         <div
@@ -329,7 +329,7 @@ export default function VoiceSection() {
       ))}
 
       {/* -------------------------------------------------- */}
-      {/* Naming Conventions — simple two-column text list */}
+      {/* Naming Conventions, simple two-column text list */}
       {/* -------------------------------------------------- */}
       <div className="bg-white">
         <div className="mx-auto max-w-6xl px-6 pt-16 pb-24 sm:px-12 lg:px-24">

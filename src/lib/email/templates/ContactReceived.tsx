@@ -17,8 +17,8 @@ export function ContactReceived({
       <Section>
         <Text style={heading}>New contact submission</Text>
         <Text style={paragraph}>
-          <strong>{name}</strong> just sent a message via the NurseDex
-          contact form.
+          <strong>{name}</strong> just sent a message via the NurseDex contact
+          form.
         </Text>
         <Text style={kv}>
           <strong>Reply to:</strong>{" "}
@@ -28,8 +28,8 @@ export function ContactReceived({
         </Text>
         <Text style={messageBox}>{message}</Text>
         <Text style={footer}>
-          This was filed in the contact_submissions table; admins can mark
-          it read or add notes from the admin panel.
+          This was filed in the contact_submissions table; admins can mark it
+          read or add notes from the admin panel.
         </Text>
       </Section>
     </EmailLayout>

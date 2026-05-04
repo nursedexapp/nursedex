@@ -28,11 +28,7 @@ export function FeaturedAnalytics({
           current={thisWeek.profileViews}
           prior={lastWeek.profileViews}
         />
-        <Row
-          label="Saves"
-          current={thisWeek.saves}
-          prior={lastWeek.saves}
-        />
+        <Row label="Saves" current={thisWeek.saves} prior={lastWeek.saves} />
         <Row
           label="Reveals (families who unlocked your contact info)"
           current={thisWeek.reveals}
@@ -43,8 +39,8 @@ export function FeaturedAnalytics({
           Go to dashboard
         </Link>
         <Text style={footer}>
-          You&apos;re receiving this because you&apos;re a Featured nurse.
-          Reply to this email or reach{" "}
+          You&apos;re receiving this because you&apos;re a Featured nurse. Reply
+          to this email or reach{" "}
           <Link href="mailto:support@nursedex.com" style={link}>
             support@nursedex.com
           </Link>

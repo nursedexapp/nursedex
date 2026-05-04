@@ -30,7 +30,10 @@ export const verifyRejectSchema = z
       .or(z.literal("")),
   })
   .superRefine((data, ctx) => {
-    if (data.reason === "Other" && (!data.details || data.details.length === 0)) {
+    if (
+      data.reason === "Other" &&
+      (!data.details || data.details.length === 0)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["details"],

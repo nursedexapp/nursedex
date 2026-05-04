@@ -22,7 +22,7 @@ const reviewIdSchema = z.object({ review_id: z.string().uuid() });
 
 /**
  * Approve a pending review. Triggers the recalc trigger which updates
- * avg_rating + review_count. No emails — the nurse already got the
+ * avg_rating + review_count. No emails, the nurse already got the
  * "new review received" email when the review was first submitted.
  */
 export async function adminApproveReview(
@@ -241,7 +241,7 @@ export async function adminResolveDispute(
     action_type: "resolve_dispute",
     target_review_id: parsed.data.review_id,
     target_user_id: r.nurse_user_id,
-    details: `dispute:${parsed.data.decision}${notes ? ` — ${notes}` : ""}`,
+    details: `dispute:${parsed.data.decision}${notes ? `, ${notes}` : ""}`,
   });
 
   // Notify the nurse.

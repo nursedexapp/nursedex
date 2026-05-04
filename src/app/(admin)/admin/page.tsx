@@ -1,11 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ShieldCheck,
-  MessageSquare,
-  Flag,
-  Trash2,
-} from "lucide-react";
+import { ShieldCheck, MessageSquare, Flag, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAdminCounts } from "@/lib/admin/queries";
 

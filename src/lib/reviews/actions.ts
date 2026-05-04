@@ -104,9 +104,7 @@ export async function submitFamilyReview(
     nurseUserId: input.nurse_user_id,
     rating: input.rating,
     reviewerName: input.reviewer_name,
-  }).catch((err) =>
-    console.error("[reviews] new-review email failed:", err),
-  );
+  }).catch((err) => console.error("[reviews] new-review email failed:", err));
 
   revalidatePath("/dashboard/revealed");
   revalidatePath("/dashboard");

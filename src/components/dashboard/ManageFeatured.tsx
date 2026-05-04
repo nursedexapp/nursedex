@@ -14,7 +14,7 @@ import {
 interface ManageFeaturedProps {
   // Period end timestamp (ISO string from subscriptions.current_period_end).
   renewsOn: string;
-  // True when the sub is set to cancel at period end — we soften the copy
+  // True when the sub is set to cancel at period end, we soften the copy
   // since "renews" is misleading.
   cancelAtPeriodEnd: boolean;
   // True when the latest webhook flagged the sub as past_due. Surface this

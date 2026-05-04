@@ -140,7 +140,7 @@ export function SurveyWizard({
       {initialStep === 2 && (
         <Step
           heading="Which skills matter most?"
-          subheading="Optional. Pick any that apply — we'll prioritize nurses who have them."
+          subheading="Optional. Pick any that apply, we'll prioritize nurses who have them."
         >
           <div className="grid gap-1.5 sm:grid-cols-2">
             {Object.values(Skill).map((s) => {

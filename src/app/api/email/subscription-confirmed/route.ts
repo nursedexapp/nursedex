@@ -11,8 +11,7 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   if (
-    request.headers.get("authorization") !==
-    `Bearer ${process.env.CRON_SECRET}`
+    request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`
   ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -29,10 +28,12 @@ export async function POST(request: NextRequest) {
       ? await import("@/lib/email/templates/SubscriptionConfirmedFamily")
       : await import("@/lib/email/templates/SubscriptionConfirmedNurse");
     const Template = isFamily
-      ? (TemplateModule as typeof import("@/lib/email/templates/SubscriptionConfirmedFamily"))
-          .SubscriptionConfirmedFamily
-      : (TemplateModule as typeof import("@/lib/email/templates/SubscriptionConfirmedNurse"))
-          .SubscriptionConfirmedNurse;
+      ? (
+          TemplateModule as typeof import("@/lib/email/templates/SubscriptionConfirmedFamily")
+        ).SubscriptionConfirmedFamily
+      : (
+          TemplateModule as typeof import("@/lib/email/templates/SubscriptionConfirmedNurse")
+        ).SubscriptionConfirmedNurse;
 
     const { error } = await resend.emails.send({
       from: "NurseDex Team <noreply@nursedex.com>",

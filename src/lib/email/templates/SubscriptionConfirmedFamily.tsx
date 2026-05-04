@@ -19,23 +19,23 @@ export function SubscriptionConfirmedFamily({
           Family Access is active{firstName ? `, ${firstName}` : ""}
         </Text>
         <Text style={paragraph}>
-          You&apos;re subscribed at <strong>{amount} per month</strong>, and
-          the subscription <strong>renews automatically</strong> on{" "}
-          {nextRenewalLabel}. You can cancel anytime through the Stripe
-          billing portal, accessible from your dashboard.
+          You&apos;re subscribed at <strong>{amount} per month</strong>, and the
+          subscription <strong>renews automatically</strong> on{" "}
+          {nextRenewalLabel}. You can cancel anytime through the Stripe billing
+          portal, accessible from your dashboard.
         </Text>
         <Text style={paragraph}>
-          You can now reveal contact info for any verified nurse on
-          NurseDex. If you cancel later, you&apos;ll keep access to nurses
-          you already revealed for 60 days.
+          You can now reveal contact info for any verified nurse on NurseDex. If
+          you cancel later, you&apos;ll keep access to nurses you already
+          revealed for 60 days.
         </Text>
         <Link href="https://nursedex.com/nurses" style={button}>
           Find a nurse
         </Link>
         <Text style={footer}>
-          Refunds: NurseDex doesn&apos;t issue refunds, but you can cancel
-          at any time and access ends at the end of the billing period.
-          Questions? Reply or reach{" "}
+          Refunds: NurseDex doesn&apos;t issue refunds, but you can cancel at
+          any time and access ends at the end of the billing period. Questions?
+          Reply or reach{" "}
           <Link href="mailto:support@nursedex.com" style={link}>
             support@nursedex.com
           </Link>

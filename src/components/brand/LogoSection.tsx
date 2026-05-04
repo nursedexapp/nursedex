@@ -2,7 +2,7 @@ export default function LogoSection() {
   return (
     <section id="logo">
       {/* ────────────────────────────────────────────────── */}
-      {/* HERO MONOGRAM — near full-screen, the mark alone  */}
+      {/* HERO MONOGRAM, near full-screen, the mark alone  */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-teal flex min-h-[70vh] flex-col items-center justify-center px-6 py-24 md:px-16 lg:px-24">
         <div className="bg-teal-dark flex h-56 w-56 items-center justify-center rounded-[2rem] sm:h-72 sm:w-72 sm:rounded-[2.5rem] lg:h-96 lg:w-96 lg:rounded-[3rem]">
@@ -44,7 +44,7 @@ export default function LogoSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* VARIATIONS — quiet label, clean grid               */}
+      {/* VARIATIONS, quiet label, clean grid               */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-warm-white px-6 pb-24 md:px-16 lg:px-24">
         <div className="mx-auto max-w-5xl">
@@ -113,7 +113,7 @@ export default function LogoSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* COLOR VERSIONS — full-bleed dark gallery           */}
+      {/* COLOR VERSIONS, full-bleed dark gallery           */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-soft-black px-6 py-32 md:px-16 lg:px-24">
         <div className="mx-auto max-w-5xl">
@@ -177,7 +177,7 @@ export default function LogoSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* CLEAR SPACE — clean technical diagram              */}
+      {/* CLEAR SPACE, clean technical diagram              */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-white px-6 py-32 md:px-16 lg:px-24">
         <div className="mx-auto max-w-5xl">
@@ -263,7 +263,7 @@ export default function LogoSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* DON'TS — more breathing room between examples      */}
+      {/* DON'TS, more breathing room between examples      */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-warm-white px-6 py-32 md:px-16 lg:px-24">
         <div className="mx-auto max-w-5xl">
@@ -369,7 +369,7 @@ export default function LogoSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* TAGLINE — dark editorial moment                    */}
+      {/* TAGLINE, dark editorial moment                    */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-teal-dark px-6 py-32 md:px-16 lg:px-24">
         <div className="mx-auto max-w-5xl">
@@ -410,7 +410,7 @@ export default function LogoSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* FAVICON & APP ICON — simple row                    */}
+      {/* FAVICON & APP ICON, simple row                    */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-white px-6 py-24 md:px-16 lg:px-24">
         <div className="mx-auto max-w-5xl">

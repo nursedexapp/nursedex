@@ -7,11 +7,7 @@ interface NewReviewProps {
   reviewerName: string;
 }
 
-export function NewReview({
-  firstName,
-  rating,
-  reviewerName,
-}: NewReviewProps) {
+export function NewReview({ firstName, rating, reviewerName }: NewReviewProps) {
   const stars = "★".repeat(rating) + "☆".repeat(5 - rating);
 
   return (
@@ -25,9 +21,9 @@ export function NewReview({
         </Text>
         <Text style={stars_}>{stars}</Text>
         <Text style={paragraph}>
-          Reviews go through a quick moderation step before they appear on
-          your public profile. We will email you again when this one is
-          live, and you can respond to it from your dashboard at any time.
+          Reviews go through a quick moderation step before they appear on your
+          public profile. We will email you again when this one is live, and you
+          can respond to it from your dashboard at any time.
         </Text>
         <Link href="https://nursedex.com/dashboard" style={button}>
           Go to your dashboard

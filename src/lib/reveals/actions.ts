@@ -16,7 +16,7 @@ export interface RevealResult {
     | "captcha_failed"
     | "rate_limited"
     | "unknown";
-  // The contact fields are only returned on success — same shape as the
+  // The contact fields are only returned on success, same shape as the
   // public profile so the page can re-render with them.
   contact?: {
     email: string | null;
@@ -50,7 +50,7 @@ export async function revealNurse(
 
   const supabase = await createClient();
 
-  // Already revealed? Idempotent — return contact without rate-limit bump.
+  // Already revealed? Idempotent, return contact without rate-limit bump.
   const { data: existing } = await supabase
     .from("reveals")
     .select("id")
@@ -182,7 +182,7 @@ async function bumpRateLimit(
     return;
   }
 
-  // No row for today — first reveal of the day.
+  // No row for today, first reveal of the day.
   let consecutive = 0;
   if (triggeredCaptcha) {
     // Look at yesterday's row. If it had a captcha trigger, carry the

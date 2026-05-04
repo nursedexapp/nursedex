@@ -34,9 +34,9 @@ export function PromoteForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-wrap items-end gap-2 rounded-lg border border-sage/20 bg-white p-4"
+      className="border-sage/20 flex flex-wrap items-end gap-2 rounded-lg border bg-white p-4"
     >
-      <div className="flex-1 min-w-[220px]">
+      <div className="min-w-[220px] flex-1">
         <Label htmlFor="promote_email" className="mb-1.5 block">
           User email
         </Label>
@@ -57,9 +57,7 @@ export function PromoteForm() {
         <select
           id="promote_role"
           value={role}
-          onChange={(e) =>
-            setRole(e.target.value as "admin" | "super_admin")
-          }
+          onChange={(e) => setRole(e.target.value as "admin" | "super_admin")}
           disabled={pending}
           className="border-input bg-background flex h-9 rounded-lg border px-3 text-sm"
         >
@@ -84,9 +82,7 @@ export function DemoteButton({ userId, email, isSelf }: DemoteButtonProps) {
   const [pending, startTransition] = useTransition();
 
   if (isSelf) {
-    return (
-      <span className="text-muted-foreground text-xs">You</span>
-    );
+    return <span className="text-muted-foreground text-xs">You</span>;
   }
 
   const handleDemote = () => {

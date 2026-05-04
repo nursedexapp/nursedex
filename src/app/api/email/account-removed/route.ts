@@ -18,9 +18,8 @@ export async function POST(request: NextRequest) {
   }
   try {
     const { Resend } = await import("resend");
-    const { AccountRemoved } = await import(
-      "@/lib/email/templates/AccountRemoved"
-    );
+    const { AccountRemoved } =
+      await import("@/lib/email/templates/AccountRemoved");
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.emails.send({
       from: "NurseDex Team <noreply@nursedex.com>",

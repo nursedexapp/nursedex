@@ -34,9 +34,7 @@ export function AccountRowActions({
   const [pending, startTransition] = useTransition();
 
   if (isDeleted) {
-    return (
-      <span className="text-muted-foreground text-xs">Removed</span>
-    );
+    return <span className="text-muted-foreground text-xs">Removed</span>;
   }
 
   const handleSuspend = () => {
@@ -126,10 +124,10 @@ function RemoveDialog({ userId, email }: { userId: string; email: string }) {
           Remove {email}
         </DialogTitle>
         <DialogDescription className="text-soft-black-light text-sm">
-          This soft-deletes the user, cancels any active Stripe
-          subscriptions, and adds the email to the blocked list so they
-          can&apos;t sign up again. The user gets an email with the reason.
-          This is reversible only by manual DB intervention.
+          This soft-deletes the user, cancels any active Stripe subscriptions,
+          and adds the email to the blocked list so they can&apos;t sign up
+          again. The user gets an email with the reason. This is reversible only
+          by manual DB intervention.
         </DialogDescription>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">

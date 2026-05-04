@@ -16,16 +16,13 @@ export function HireFollowup({ firstName }: HireFollowupProps) {
           It&apos;s been about a month since you revealed contact info for a
           nurse on NurseDex. Did you end up hiring anyone?
         </Text>
-        <Link
-          href="https://nursedex.com/dashboard/revealed"
-          style={button}
-        >
+        <Link href="https://nursedex.com/dashboard/revealed" style={button}>
           Mark a hire
         </Link>
         <Text style={paragraph}>
-          Recording a hire helps the nurse&apos;s profile and other Long
-          Island families see who&apos;s been trusted before. If you&apos;re
-          still looking, you can also{" "}
+          Recording a hire helps the nurse&apos;s profile and other Long Island
+          families see who&apos;s been trusted before. If you&apos;re still
+          looking, you can also{" "}
           <Link href="https://nursedex.com/nurses" style={link}>
             browse more nurses
           </Link>

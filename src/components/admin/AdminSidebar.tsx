@@ -79,7 +79,7 @@ export function AdminSidebar({ isSuperAdmin }: AdminSidebarProps) {
         })}
       </nav>
 
-      <form action={signOut} className="mt-6 border-t border-sage/20 pt-4">
+      <form action={signOut} className="border-sage/20 mt-6 border-t pt-4">
         <button
           type="submit"
           className="text-soft-black-light hover:text-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"

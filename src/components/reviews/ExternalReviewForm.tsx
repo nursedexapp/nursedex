@@ -74,17 +74,15 @@ export function ExternalReviewForm({
   if (submitted) {
     return (
       <div className="space-y-3 py-2 text-sm">
-        <h2 className="font-heading text-lg font-semibold">
-          Check your inbox
-        </h2>
+        <h2 className="font-heading text-lg font-semibold">Check your inbox</h2>
         <p className="text-soft-black-light">
           We sent a confirmation email to{" "}
-          <span className="font-medium">{submittedEmail}</span>. Click the
-          link inside to confirm your review. The link expires in 7 days.
+          <span className="font-medium">{submittedEmail}</span>. Click the link
+          inside to confirm your review. The link expires in 7 days.
         </p>
         <p className="text-soft-black-light">
-          After you confirm, a moderator will take a quick look before it
-          shows up on {nurseFirstName}&apos;s profile.
+          After you confirm, a moderator will take a quick look before it shows
+          up on {nurseFirstName}&apos;s profile.
         </p>
       </div>
     );
@@ -94,7 +92,11 @@ export function ExternalReviewForm({
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
         <Label className="mb-1.5 block">How was your experience?</Label>
-        <StarRatingInput value={rating} onChange={setRating} disabled={pending} />
+        <StarRatingInput
+          value={rating}
+          onChange={setRating}
+          disabled={pending}
+        />
         {errors.rating && (
           <p className="text-destructive mt-1 text-xs">{errors.rating}</p>
         )}
@@ -146,8 +148,7 @@ export function ExternalReviewForm({
 
       <div>
         <Label htmlFor="ext_text" className="mb-1.5 block">
-          Your review{" "}
-          <span className="text-muted-foreground">(optional)</span>
+          Your review <span className="text-muted-foreground">(optional)</span>
         </Label>
         <Textarea
           id="ext_text"

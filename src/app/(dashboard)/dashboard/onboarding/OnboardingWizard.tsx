@@ -290,7 +290,7 @@ export function OnboardingWizard({
     }
 
     setIsSubmitting(false);
-    toast.success("Profile setup complete!");
+    toast.success("Profile saved. Verification next.");
     router.push("/dashboard?onboarding=complete");
   };
 

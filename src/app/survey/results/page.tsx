@@ -30,7 +30,7 @@ export default async function SurveyResultsPage({
   const raw = await searchParams;
   const filters = parseSearchParams(raw);
 
-  // First pass — strict filters
+  // First pass, strict filters
   const result = await searchNurses({
     filters,
     viewerZip: filters.zip ?? null,
@@ -69,7 +69,7 @@ export default async function SurveyResultsPage({
 
   // For signup we hand back the filters so the post-signup flow can pick
   // them up (used by Phase 3 Batch 3's "We applied your preferences" prompt
-  // — for now, the params just round-trip through signup).
+  //, for now, the params just round-trip through signup).
   const signupHref = (() => {
     const params = toURLSearchParams({ ...filters, page: 1 });
     const q = params.toString();

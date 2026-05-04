@@ -24,9 +24,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const { Resend } = await import("resend");
-    const { DisputeDecision } = await import(
-      "@/lib/email/templates/DisputeDecision"
-    );
+    const { DisputeDecision } =
+      await import("@/lib/email/templates/DisputeDecision");
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const subject =

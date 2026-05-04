@@ -39,7 +39,7 @@ export async function getActiveSubscription(
 /**
  * Convenience: a family is considered to have access if they have an active
  * (or past_due grace) Family Access subscription. Cancelled subs in the
- * 60-day window do NOT grant new reveals — they only preserve access to
+ * 60-day window do NOT grant new reveals, they only preserve access to
  * already-revealed nurses (handled per-row via reveals.access_expires_at).
  */
 export async function hasActiveFamilyAccess(userId: string): Promise<boolean> {

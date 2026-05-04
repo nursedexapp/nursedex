@@ -16,8 +16,7 @@ describe("familyRecordHireSchema", () => {
 
   it("rejects a non-UUID nurse_user_id", () => {
     expect(
-      familyRecordHireSchema.safeParse({ nurse_user_id: "not-a-uuid" })
-        .success,
+      familyRecordHireSchema.safeParse({ nurse_user_id: "not-a-uuid" }).success,
     ).toBe(false);
   });
 });
@@ -41,9 +40,9 @@ describe("claimHireByEmailSchema", () => {
 
 describe("confirmHireSchema", () => {
   it("accepts a valid v4 token", () => {
-    expect(
-      confirmHireSchema.safeParse({ token: VALID_UUID }).success,
-    ).toBe(true);
+    expect(confirmHireSchema.safeParse({ token: VALID_UUID }).success).toBe(
+      true,
+    );
   });
 
   it("rejects a non-UUID token", () => {

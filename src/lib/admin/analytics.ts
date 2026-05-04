@@ -75,9 +75,7 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
       .from("reveals")
       .select("id", { count: "exact", head: true })
       .gte("revealed_at", thirtyDaysAgo),
-    supabase
-      .from("saved_nurses")
-      .select("id", { count: "exact", head: true }),
+    supabase.from("saved_nurses").select("id", { count: "exact", head: true }),
     supabase
       .from("reviews")
       .select("id", { count: "exact", head: true })
@@ -132,13 +130,15 @@ export async function getAdminUsers(): Promise<AdminUserRow[]> {
     .eq("is_deleted", false)
     .order("created_at", { ascending: true });
 
-  return ((data ?? []) as Array<{
-    id: string;
-    email: string;
-    first_name: string | null;
-    last_name: string | null;
-    role: "admin" | "super_admin";
-  }>).map((u) => ({
+  return (
+    (data ?? []) as Array<{
+      id: string;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      role: "admin" | "super_admin";
+    }>
+  ).map((u) => ({
     user_id: u.id,
     email: u.email,
     first_name: u.first_name,

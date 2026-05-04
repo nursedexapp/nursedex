@@ -83,7 +83,7 @@ const typeDonts = [
 export default function TypographySection() {
   return (
     <section id="typography" className="bg-warm-white">
-      {/* Hero Specimen — section header IS the specimen */}
+      {/* Hero Specimen, section header IS the specimen */}
       <div className="bg-teal-dark px-6 pt-32 pb-32 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-7xl">
           <p className="font-heading text-warm-white text-[clamp(3rem,10vw,8rem)] leading-[0.95] font-semibold tracking-tight">
@@ -161,7 +161,7 @@ export default function TypographySection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Type Scale — Each level gets room to breathe       */}
+      {/* Type Scale, Each level gets room to breathe       */}
       {/* -------------------------------------------------- */}
       <div className="border-sage/20 border-t">
         <div className="mx-auto max-w-7xl px-6 py-32 sm:px-12 lg:px-24">
@@ -196,7 +196,7 @@ export default function TypographySection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Dark Background — Type on teal                     */}
+      {/* Dark Background, Type on teal                     */}
       {/* -------------------------------------------------- */}
       <div className="bg-teal-dark">
         <div className="mx-auto max-w-7xl px-6 py-32 sm:px-12 lg:px-24">
@@ -255,7 +255,7 @@ export default function TypographySection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Font Pairing — Asymmetric editorial layout         */}
+      {/* Font Pairing, Asymmetric editorial layout         */}
       {/* -------------------------------------------------- */}
       <div className="mx-auto max-w-7xl px-6 py-32 sm:px-12 lg:px-24">
         <p className="font-body text-sage-dark mb-20 text-xs tracking-[0.4em] uppercase">

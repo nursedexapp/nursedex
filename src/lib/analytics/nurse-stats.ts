@@ -27,9 +27,7 @@ export interface NurseStats {
  * smooth line even on quiet days), plus aggregate totals for "this 30
  * days" vs "prior 30 days" so the page can show percent change.
  */
-export async function getNurseStats(
-  nurseUserId: string,
-): Promise<NurseStats> {
+export async function getNurseStats(nurseUserId: string): Promise<NurseStats> {
   const supabase = await createClient();
   const now = Date.now();
   const priorStart = new Date(now - 60 * DAY_MS);
@@ -158,7 +156,10 @@ export async function getCohortComparison(
   type AnalyticsRow = { nurse_user_id: string; profile_views: number };
   const sums = new Map<string, number>();
   for (const r of (rows ?? []) as AnalyticsRow[]) {
-    sums.set(r.nurse_user_id, (sums.get(r.nurse_user_id) ?? 0) + r.profile_views);
+    sums.set(
+      r.nurse_user_id,
+      (sums.get(r.nurse_user_id) ?? 0) + r.profile_views,
+    );
   }
   // Include zero-activity nurses so the median doesn't skew toward
   // active ones; every cohort member contributes a number.
@@ -183,10 +184,7 @@ function medianOf(sorted: number[]): number {
   return Math.round(((sorted[n / 2 - 1] + sorted[n / 2]) / 2) * 10) / 10;
 }
 
-export function percentChange(
-  current: number,
-  prior: number,
-): number | null {
+export function percentChange(current: number, prior: number): number | null {
   if (prior === 0) return current === 0 ? 0 : null;
   return Math.round(((current - prior) / prior) * 100);
 }

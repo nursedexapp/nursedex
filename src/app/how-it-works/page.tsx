@@ -19,8 +19,7 @@ export const metadata: Metadata = {
     "How families and nurses use NurseDex on Long Island. Step by step from finding a nurse to confirming a hire, plus how nurses build a profile and get verified.",
   openGraph: {
     title: "How NurseDex works",
-    description:
-      "Step by step for families and nurses on Long Island.",
+    description: "Step by step for families and nurses on Long Island.",
     type: "website",
     url: "https://nursedex.com/how-it-works",
   },
@@ -168,7 +167,7 @@ function Section({
           {steps.map((step, idx) => (
             <li key={step.title} className="flex gap-4">
               <div className="flex flex-col items-center">
-                <div className="bg-teal text-white flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold">
+                <div className="bg-teal flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white">
                   {idx + 1}
                 </div>
                 {idx < steps.length - 1 && (

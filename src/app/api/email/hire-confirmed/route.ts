@@ -18,9 +18,8 @@ export async function POST(request: NextRequest) {
   }
   try {
     const { Resend } = await import("resend");
-    const { HireConfirmed } = await import(
-      "@/lib/email/templates/HireConfirmed"
-    );
+    const { HireConfirmed } =
+      await import("@/lib/email/templates/HireConfirmed");
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.emails.send({
       from: "NurseDex Team <noreply@nursedex.com>",

@@ -75,8 +75,8 @@ export function RemovalRequestDialog({
           Request review removal
         </DialogTitle>
         <DialogDescription className="text-soft-black-light text-sm">
-          Tell us briefly why you&apos;d like this review removed. A
-          moderator will review your request and follow up by email.
+          Tell us briefly why you&apos;d like this review removed. A moderator
+          will review your request and follow up by email.
         </DialogDescription>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">

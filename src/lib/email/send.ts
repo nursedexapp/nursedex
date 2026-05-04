@@ -338,17 +338,14 @@ export async function sendCancellationConfirmationEmail(
   args: SendCancellationConfirmationArgs,
 ): Promise<void> {
   const baseUrl = await getBaseUrl();
-  const res = await fetch(
-    `${baseUrl}/api/email/cancellation-confirmation`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.CRON_SECRET}`,
-      },
-      body: JSON.stringify(args),
+  const res = await fetch(`${baseUrl}/api/email/cancellation-confirmation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
     },
-  );
+    body: JSON.stringify(args),
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     console.error(
@@ -404,11 +401,7 @@ export async function sendFeaturedAnalyticsEmail(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Featured analytics email failed:",
-      res.status,
-      body,
-    );
+    console.error("[email] Featured analytics email failed:", res.status, body);
   }
 }
 
@@ -468,7 +461,7 @@ interface SendContactReceivedArgs {
 }
 /**
  * Notifies the support inbox that a new contact form submission came in.
- * Goes to support@nursedex.com (hard-coded recipient — this is an
+ * Goes to support@nursedex.com (hard-coded recipient, this is an
  * internal alert, not a per-user transactional email).
  */
 export async function sendContactReceivedEmail(

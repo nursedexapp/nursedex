@@ -11,7 +11,7 @@ import {
   DISPUTE_TEXT_MAX,
 } from "@/lib/schemas/review";
 
-// Valid RFC v4 UUID — Zod 4's .uuid() enforces variant bits.
+// Valid RFC v4 UUID, Zod 4's .uuid() enforces variant bits.
 const NURSE_ID = "11111111-1111-4111-8111-111111111111";
 const REVIEW_ID = "22222222-2222-4222-8222-222222222222";
 

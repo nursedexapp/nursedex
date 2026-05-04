@@ -9,10 +9,7 @@ import {
   externalReviewSchema,
   type ExternalReviewInput,
 } from "@/lib/schemas/review";
-import {
-  sendVerifyReviewEmail,
-  sendNewReviewEmail,
-} from "@/lib/email/send";
+import { sendVerifyReviewEmail, sendNewReviewEmail } from "@/lib/email/send";
 
 const VERIFICATION_TTL_DAYS = 7;
 
@@ -81,7 +78,7 @@ export async function regenerateReviewLink(): Promise<{
     return { error: "Could not regenerate your link. Please try again." };
   }
   if (!data) {
-    // Nothing to rotate yet — fall back to a fresh creation.
+    // Nothing to rotate yet, fall back to a fresh creation.
     return getOrCreateReviewLink();
   }
 
@@ -157,9 +154,7 @@ export async function submitExternalReview(
     to: input.reviewer_email,
     reviewerName: input.reviewer_name,
     verificationToken: row.verification_token,
-  }).catch((err) =>
-    console.error("[reviews] verify email failed:", err),
-  );
+  }).catch((err) => console.error("[reviews] verify email failed:", err));
 
   return { success: true, reviewId: row.review_id };
 }

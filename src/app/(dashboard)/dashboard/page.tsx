@@ -205,16 +205,14 @@ export default async function DashboardPage() {
           ) : (
             <Card className="border-sage/20">
               <CardContent className="text-muted-foreground py-8 text-center text-sm">
-                Once your license is verified, you&apos;ll get a shareable
-                link here for collecting reviews from past clients.
+                Once your license is verified, you&apos;ll get a shareable link
+                here for collecting reviews from past clients.
               </CardContent>
             </Card>
           )}
 
-          {/* Claim a hire (verified nurses only — RLS blocks reveal lookups otherwise) */}
-          {profile.verification_status === "verified" && (
-            <NurseClaimHireCard />
-          )}
+          {/* Claim a hire (verified nurses only, RLS blocks reveal lookups otherwise) */}
+          {profile.verification_status === "verified" && <NurseClaimHireCard />}
         </div>
 
         {/* Sidebar column */}

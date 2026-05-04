@@ -12,7 +12,7 @@ import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 interface SaveHeartButtonProps {
   nurseUserId: string;
   initialIsSaved: boolean;
-  // When provided, treats the viewer as anonymous — clicking redirects to
+  // When provided, treats the viewer as anonymous, clicking redirects to
   // signup instead of calling the action.
   anonRedirectTo?: string;
   className?: string;

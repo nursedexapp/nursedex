@@ -27,12 +27,12 @@ import type { CommunicationPreference } from "@/types/enums";
 interface RevealCTAProps {
   nurseUserId: string;
   nurseFirstName: string;
-  // Where to come back to after subscribing — usually the current profile.
+  // Where to come back to after subscribing, usually the current profile.
   returnTo: string;
   // Render mode:
-  //   "anon"       — show "Sign up to reveal" link to /signup
-  //   "no_sub"     — show "Reveal contact" button → opens paywall modal
-  //   "subscribed" — show "Reveal contact" button → fires action immediately
+  //   "anon"      , show "Sign up to reveal" link to /signup
+  //   "no_sub"    , show "Reveal contact" button → opens paywall modal
+  //   "subscribed", show "Reveal contact" button → fires action immediately
   mode: "anon" | "no_sub" | "subscribed";
 }
 
@@ -146,7 +146,7 @@ export function RevealCTA({
     );
   }
 
-  // mode === "no_sub" — show paywall modal
+  // mode === "no_sub", show paywall modal
   return <PaywallTrigger returnTo={returnTo} />;
 }
 
@@ -194,7 +194,7 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
           </li>
           <li>
             <span className="text-teal mr-2">•</span>
-            Cancel anytime — keep access to nurses you&apos;ve already revealed
+            Cancel anytime, keep access to nurses you&apos;ve already revealed
             for {GRACE_PERIODS.CANCELLED_ACCESS_DAYS} days
           </li>
         </ul>

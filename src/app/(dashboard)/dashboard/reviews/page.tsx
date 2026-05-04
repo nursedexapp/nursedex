@@ -105,12 +105,12 @@ function EmptyState() {
           No reviews yet
         </h2>
         <p className="text-soft-black-light mx-auto max-w-sm text-sm">
-          Share your review link with past clients to start collecting
-          reviews. You can find it on your dashboard.
+          Share your review link with past clients to start collecting reviews.
+          You can find it on your dashboard.
         </p>
         <Link
           href="/dashboard"
-          className="text-teal hover:underline text-sm font-medium"
+          className="text-teal text-sm font-medium hover:underline"
         >
           Go to dashboard
         </Link>
@@ -179,9 +179,7 @@ function ReviewRow({
                 existingResponse={review.nurse_response}
               />
             )}
-            {showDisputeButton && (
-              <DisputeReviewDialog reviewId={review.id} />
-            )}
+            {showDisputeButton && <DisputeReviewDialog reviewId={review.id} />}
           </div>
         )}
       </CardContent>

@@ -26,13 +26,20 @@ export const familyReviewSchema = z
     text: z
       .string()
       .trim()
-      .max(REVIEW_TEXT_MAX, `Keep your review under ${REVIEW_TEXT_MAX} characters`)
+      .max(
+        REVIEW_TEXT_MAX,
+        `Keep your review under ${REVIEW_TEXT_MAX} characters`,
+      )
       .optional()
       .or(z.literal("")),
     testimonial_opt_in: z.boolean().default(false),
   })
   .superRefine((data, ctx) => {
-    if (data.text && data.text.length > 0 && data.text.length < REVIEW_TEXT_MIN) {
+    if (
+      data.text &&
+      data.text.length > 0 &&
+      data.text.length < REVIEW_TEXT_MIN
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["text"],
@@ -83,13 +90,20 @@ export const externalReviewSchema = z
     text: z
       .string()
       .trim()
-      .max(REVIEW_TEXT_MAX, `Keep your review under ${REVIEW_TEXT_MAX} characters`)
+      .max(
+        REVIEW_TEXT_MAX,
+        `Keep your review under ${REVIEW_TEXT_MAX} characters`,
+      )
       .optional()
       .or(z.literal("")),
     testimonial_opt_in: z.boolean().default(false),
   })
   .superRefine((data, ctx) => {
-    if (data.text && data.text.length > 0 && data.text.length < REVIEW_TEXT_MIN) {
+    if (
+      data.text &&
+      data.text.length > 0 &&
+      data.text.length < REVIEW_TEXT_MIN
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["text"],

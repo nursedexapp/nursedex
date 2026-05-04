@@ -30,7 +30,7 @@ export function HireButton({
 
   if (hire && hire.status === "confirmed") {
     return (
-      <div className="text-muted-foreground inline-flex items-center gap-1.5 rounded-md border border-teal/30 bg-teal/5 px-2.5 py-1 text-xs">
+      <div className="text-muted-foreground border-teal/30 bg-teal/5 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs">
         <Check className="size-3.5" aria-hidden="true" />
         Hired{" "}
         {hire.confirmed_at
@@ -57,9 +57,7 @@ export function HireButton({
       const result = await recordFamilyHire({ nurse_user_id: nurseUserId });
       if (!result.success) {
         if (result.error === "not_revealed") {
-          toast.error(
-            "You can only record a hire after revealing this nurse.",
-          );
+          toast.error("You can only record a hire after revealing this nurse.");
         } else if (result.error === "already_recorded") {
           toast.error("You've already recorded a hire with this nurse.");
         } else {
@@ -77,7 +75,8 @@ export function HireButton({
       <DialogTrigger
         className={buttonVariants({ variant: "outline", size: "sm" })}
       >
-        <Briefcase className="mr-1.5 size-3.5" aria-hidden="true" />I hired {nurseFirstName}
+        <Briefcase className="mr-1.5 size-3.5" aria-hidden="true" />I hired{" "}
+        {nurseFirstName}
       </DialogTrigger>
       <DialogContent>
         <DialogTitle className="font-heading text-lg font-semibold">

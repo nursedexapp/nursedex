@@ -10,10 +10,7 @@ export const SLA_HOURS = { featured: 24, free: 72 } as const;
  *   threshold from the PRD).
  * - "overdue" trips at the SLA itself.
  */
-export function getSlaState(
-  hoursElapsed: number,
-  slaHours: number,
-): SlaState {
+export function getSlaState(hoursElapsed: number, slaHours: number): SlaState {
   if (hoursElapsed >= slaHours) return "overdue";
   if (hoursElapsed >= slaHours * 0.75) return "approaching";
   return "ok";

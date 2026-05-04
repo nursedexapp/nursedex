@@ -72,7 +72,7 @@ export async function getSavedNurses(
 
   if (error || !data) return [];
 
-  // The foreign-key selector ergonomics are awkward — Supabase returns
+  // The foreign-key selector ergonomics are awkward, Supabase returns
   // a single joined object per row.
   type Row = {
     saved_at: string;

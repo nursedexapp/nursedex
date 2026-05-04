@@ -21,10 +21,10 @@ export function RenewalReminder({
           Your {planLabel} renews soon{firstName ? `, ${firstName}` : ""}
         </Text>
         <Text style={paragraph}>
-          We&apos;ll charge {amount} on <strong>{renewalDateLabel}</strong>.
-          No action needed if you want to keep your subscription. Want to
-          cancel before then? You can manage everything in the Stripe
-          billing portal from your dashboard.
+          We&apos;ll charge {amount} on <strong>{renewalDateLabel}</strong>. No
+          action needed if you want to keep your subscription. Want to cancel
+          before then? You can manage everything in the Stripe billing portal
+          from your dashboard.
         </Text>
         <Link href="https://nursedex.com/dashboard" style={button}>
           Go to dashboard

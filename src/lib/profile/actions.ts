@@ -235,7 +235,7 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
     (err) => console.error("[email] Profile setup email error:", err),
   );
 
-  return { success: "Profile setup complete!" };
+  return { success: "Profile saved. Verification next." };
 }
 
 // ── Update profile (edit page, saves all fields at once) ────

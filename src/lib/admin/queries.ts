@@ -59,13 +59,11 @@ export interface VerificationQueueItem {
  *   1. Featured tier first (priority lane, 24hr SLA)
  *   2. Oldest submission first (FIFO within tier)
  *
- * "submitted_at" is the profile's updated_at — the cleanest proxy for
+ * "submitted_at" is the profile's updated_at, the cleanest proxy for
  * "when did this last enter the queue" without a dedicated audit
  * column. Resubmissions naturally bump it as the nurse changes data.
  */
-export async function getVerificationQueue(): Promise<
-  VerificationQueueItem[]
-> {
+export async function getVerificationQueue(): Promise<VerificationQueueItem[]> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("nurse_profiles")
@@ -243,7 +241,7 @@ export interface FlaggedNurseRow {
 
 /**
  * Nurses with 2+ approved 1-3 star reviews. Computed on the fly from
- * the reviews table — there's no persisted "flagged" flag, the count
+ * the reviews table, there's no persisted "flagged" flag, the count
  * is the gate.
  */
 export async function getFlaggedNurses(): Promise<FlaggedNurseRow[]> {
@@ -335,16 +333,18 @@ export async function getAccounts(args: {
 
   const { data } = await q;
 
-  return ((data ?? []) as Array<{
-    id: string;
-    email: string;
-    first_name: string | null;
-    last_name: string | null;
-    role: "nurse" | "family" | "admin" | "super_admin" | null;
-    is_suspended: boolean;
-    is_deleted: boolean;
-    created_at: string;
-  }>).map((u) => ({
+  return (
+    (data ?? []) as Array<{
+      id: string;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      role: "nurse" | "family" | "admin" | "super_admin" | null;
+      is_suspended: boolean;
+      is_deleted: boolean;
+      created_at: string;
+    }>
+  ).map((u) => ({
     user_id: u.id,
     email: u.email,
     first_name: u.first_name,

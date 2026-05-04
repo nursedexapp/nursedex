@@ -16,10 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StarRatingInput } from "./StarRatingInput";
 import { REVIEW_TEXT_MAX, REVIEW_TEXT_MIN } from "@/lib/schemas/review";
-import {
-  submitFamilyReview,
-  updateFamilyReview,
-} from "@/lib/reviews/actions";
+import { submitFamilyReview, updateFamilyReview } from "@/lib/reviews/actions";
 
 type TriggerVariant = "default" | "outline" | "ghost" | "secondary" | "link";
 
@@ -125,8 +122,8 @@ export function ReviewFormDialog({
           {isEdit ? "Edit your review" : `Review ${nurseFirstName}`}
         </DialogTitle>
         <DialogDescription className="text-soft-black-light text-sm">
-          Reviews go through a quick moderator approval before appearing on
-          the nurse&apos;s public profile. You can edit while pending.
+          Reviews go through a quick moderator approval before appearing on the
+          nurse&apos;s public profile. You can edit while pending.
         </DialogDescription>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-5">
@@ -166,7 +163,8 @@ export function ReviewFormDialog({
 
           <div>
             <Label htmlFor="review_text" className="mb-1.5 block">
-              Your review <span className="text-muted-foreground">(optional)</span>
+              Your review{" "}
+              <span className="text-muted-foreground">(optional)</span>
             </Label>
             <Textarea
               id="review_text"
@@ -179,7 +177,8 @@ export function ReviewFormDialog({
             />
             <div className="text-muted-foreground mt-1 flex items-center justify-between text-xs">
               <span>
-                {errors.text ?? `Min ${REVIEW_TEXT_MIN} characters if you write a review`}
+                {errors.text ??
+                  `Min ${REVIEW_TEXT_MIN} characters if you write a review`}
               </span>
               <span>
                 {text.length}/{REVIEW_TEXT_MAX}
@@ -214,7 +213,11 @@ export function ReviewFormDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving..." : isEdit ? "Save changes" : "Submit review"}
+              {pending
+                ? "Saving..."
+                : isEdit
+                  ? "Save changes"
+                  : "Submit review"}
             </Button>
           </div>
         </form>

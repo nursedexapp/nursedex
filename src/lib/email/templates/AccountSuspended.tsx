@@ -20,12 +20,11 @@ export function AccountSuspended({ firstName }: AccountSuspendedProps) {
           - Your profile is hidden from families and search results
           <br />
           - You can&apos;t log in
-          <br />
-          - Your data is preserved and nothing is deleted
+          <br />- Your data is preserved and nothing is deleted
         </Text>
         <Text style={paragraph}>
-          We&apos;ll be in touch with next steps. If you have questions or
-          want to discuss this directly, please reach out below.
+          We&apos;ll be in touch with next steps. If you have questions or want
+          to discuss this directly, please reach out below.
         </Text>
         <Text style={footer}>
           <Link href="mailto:support@nursedex.com" style={link}>

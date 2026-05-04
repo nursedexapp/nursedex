@@ -88,10 +88,7 @@ export async function saveNurseResponse(
   return { success: true };
 }
 
-export type DisputeReviewError =
-  | "invalid"
-  | "not_eligible"
-  | "unknown";
+export type DisputeReviewError = "invalid" | "not_eligible" | "unknown";
 
 export interface DisputeReviewResult {
   success: boolean;

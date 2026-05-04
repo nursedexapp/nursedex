@@ -36,7 +36,7 @@ export function QuickActions({
   const handleCopyProfileLink = () => {
     const url = `https://nursedex.com/nurses/${slug}`;
     navigator.clipboard.writeText(url);
-    toast.success("Profile link copied to clipboard");
+    toast.success("Link copied");
   };
 
   return (

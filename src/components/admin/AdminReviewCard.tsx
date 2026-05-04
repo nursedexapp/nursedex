@@ -69,7 +69,7 @@ export function AdminReviewCard({
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900">
             <p className="text-[11px] font-medium">
               Dispute from {row.nurse_first_name}
-              {row.dispute_reason ? ` — ${row.dispute_reason}` : ""}
+              {row.dispute_reason ? `, ${row.dispute_reason}` : ""}
             </p>
             {row.dispute_text && (
               <p className="mt-1 text-sm whitespace-pre-line">

@@ -23,17 +23,16 @@ export function SubscriptionConfirmedNurse({
           month and will renew automatically on {nextRenewalLabel}.
         </Text>
         <Text style={paragraph}>
-          As a Featured nurse you get priority placement in search, your
-          profile gets a Featured badge, you can post a longer bio and up
-          to three photos, and you get priority on license verification
-          (24 hour SLA).
+          As a Featured nurse you get priority placement in search, your profile
+          gets a Featured badge, you can post a longer bio and up to three
+          photos, and you get priority on license verification (24 hour SLA).
         </Text>
         <Link href="https://nursedex.com/dashboard" style={button}>
           Go to dashboard
         </Link>
         <Text style={footer}>
-          Manage or cancel anytime through the Stripe billing portal,
-          accessible from your dashboard. Questions? Reply or reach{" "}
+          Manage or cancel anytime through the Stripe billing portal, accessible
+          from your dashboard. Questions? Reply or reach{" "}
           <Link href="mailto:support@nursedex.com" style={link}>
             support@nursedex.com
           </Link>

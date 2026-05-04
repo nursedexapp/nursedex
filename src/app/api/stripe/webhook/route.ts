@@ -110,7 +110,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   await upsertSubscription({ userId, planType, customerId, subscription: sub });
 
-  // Welcome email — dedup by subscription id so a retried webhook
+  // Welcome email, dedup by subscription id so a retried webhook
   // doesn't fire it twice.
   await maybeNotifyConfirmed({ userId, planType, subscription: sub });
 }
@@ -332,10 +332,11 @@ function planAmount(planType: "nurse_featured" | "family_access"): string {
 
 function nextRenewalLabel(subscription: Stripe.Subscription): string {
   const item = subscription.items.data[0];
-  return new Date(item.current_period_end * 1000).toLocaleDateString(
-    "en-US",
-    { month: "long", day: "numeric", year: "numeric" },
-  );
+  return new Date(item.current_period_end * 1000).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 async function maybeNotifyConfirmed({
@@ -367,7 +368,9 @@ async function maybeNotifyConfirmed({
   });
 }
 
-async function maybeNotifyRenewal(args: NotifyArgs & { invoiceId: string }): Promise<void> {
+async function maybeNotifyRenewal(
+  args: NotifyArgs & { invoiceId: string },
+): Promise<void> {
   const supabase = createServiceRoleClient();
   const ok = await shouldSendOnce(supabase, {
     recipientUserId: args.userId,

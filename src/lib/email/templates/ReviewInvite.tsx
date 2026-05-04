@@ -6,10 +6,7 @@ interface ReviewInviteProps {
   reviewLinkUrl: string;
 }
 
-export function ReviewInvite({
-  firstName,
-  reviewLinkUrl,
-}: ReviewInviteProps) {
+export function ReviewInvite({ firstName, reviewLinkUrl }: ReviewInviteProps) {
   return (
     <EmailLayout preview="Reviews build trust on NurseDex. Here's your share link.">
       <Section>
@@ -17,25 +14,21 @@ export function ReviewInvite({
           Build trust with reviews{firstName ? `, ${firstName}` : ""}
         </Text>
         <Text style={paragraph}>
-          You&apos;ve been verified on NurseDex for a few weeks now. Nurses
-          with reviews show up higher in search and get hired faster, so
-          here&apos;s your share link to invite past clients.
+          You&apos;ve been verified on NurseDex for a few weeks now. Nurses with
+          reviews show up higher in search and get hired faster, so here&apos;s
+          your share link to invite past clients.
         </Text>
         <Link href={reviewLinkUrl} style={button}>
           Open my review link
         </Link>
         <Text style={paragraph}>
-          Send this to families you&apos;ve worked with by text or email.
-          They don&apos;t need a NurseDex account to leave you a review;
-          we just verify the email address before publishing.
+          Send this to families you&apos;ve worked with by text or email. They
+          don&apos;t need a NurseDex account to leave you a review; we just
+          verify the email address before publishing.
         </Text>
         <Text style={footer}>
-          Want to opt out of these nudges? Adjust your notification
-          settings on{" "}
-          <Link
-            href="https://nursedex.com/dashboard/settings"
-            style={link}
-          >
+          Want to opt out of these nudges? Adjust your notification settings on{" "}
+          <Link href="https://nursedex.com/dashboard/settings" style={link}>
             your dashboard
           </Link>
           .

@@ -13,7 +13,7 @@ interface SearchAnalyticsProps {
 /**
  * Fires a PostHog search_performed event once per unique filter-set render.
  * Rendering this in a server page means it captures on every server-rendered
- * load — including initial nav and filter changes that re-fetch the page.
+ * load, including initial nav and filter changes that re-fetch the page.
  */
 export function SearchAnalytics({
   filters,

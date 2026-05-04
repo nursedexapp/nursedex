@@ -25,15 +25,15 @@ export function PaymentFailureWarning({
           We couldn&apos;t charge your card{firstName ? `, ${firstName}` : ""}
         </Text>
         <Text style={paragraph}>
-          Your most recent {planLabel} payment didn&apos;t go through. This
-          is day {dayNumber} of a 3 day grace period. {consequenceLabel}
+          Your most recent {planLabel} payment didn&apos;t go through. This is
+          day {dayNumber} of a 3 day grace period. {consequenceLabel}
         </Text>
         <Link href={portalUrl} style={button}>
           Update payment method
         </Link>
         <Text style={paragraph}>
-          The Stripe billing portal will let you swap cards, retry the
-          payment, or cancel if you no longer want the subscription.
+          The Stripe billing portal will let you swap cards, retry the payment,
+          or cancel if you no longer want the subscription.
         </Text>
         <Text style={footer}>
           Questions? Reply to this email or reach{" "}

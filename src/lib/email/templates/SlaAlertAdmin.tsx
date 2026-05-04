@@ -11,7 +11,9 @@ export function SlaAlertAdmin({
   overdueCount,
 }: SlaAlertAdminProps) {
   return (
-    <EmailLayout preview={`${overdueCount} verifications overdue, ${approachingCount} approaching SLA.`}>
+    <EmailLayout
+      preview={`${overdueCount} verifications overdue, ${approachingCount} approaching SLA.`}
+    >
       <Section>
         <Text style={heading}>Verification queue needs attention</Text>
         <Text style={paragraph}>
@@ -24,15 +26,15 @@ export function SlaAlertAdmin({
             </>
           ) : null}
           {approachingCount} additional verification
-          {approachingCount === 1 ? " is" : "s are"} past 75% of the SLA
-          and approaching the deadline (24h Featured, 72h Free).
+          {approachingCount === 1 ? " is" : "s are"} past 75% of the SLA and
+          approaching the deadline (24h Featured, 72h Free).
         </Text>
         <Link href="https://nursedex.com/admin/verifications" style={button}>
           Open queue
         </Link>
         <Text style={footer}>
-          You&apos;re receiving this because you&apos;re a NurseDex admin.
-          Reply to flag a false positive or to{" "}
+          You&apos;re receiving this because you&apos;re a NurseDex admin. Reply
+          to flag a false positive or to{" "}
           <Link href="mailto:support@nursedex.com" style={link}>
             support@nursedex.com
           </Link>

@@ -7,7 +7,9 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  if (request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (
+    request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`
+  ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const parsed = schema.safeParse(await request.json());
@@ -16,9 +18,7 @@ export async function POST(request: NextRequest) {
   }
   try {
     const { Resend } = await import("resend");
-    const { HireFollowup } = await import(
-      "@/lib/email/templates/HireFollowup"
-    );
+    const { HireFollowup } = await import("@/lib/email/templates/HireFollowup");
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.emails.send({
       from: "NurseDex Team <noreply@nursedex.com>",

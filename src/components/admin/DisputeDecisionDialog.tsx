@@ -62,13 +62,11 @@ export function DisputeDecisionDialog({
       </DialogTrigger>
       <DialogContent>
         <DialogTitle className="font-heading text-lg font-semibold">
-          {decision === "keep"
-            ? "Keep this review"
-            : "Remove this review"}
+          {decision === "keep" ? "Keep this review" : "Remove this review"}
         </DialogTitle>
         <DialogDescription className="text-soft-black-light text-sm">
-          We&apos;ll email both the nurse and the reviewer. Notes are
-          optional and shown verbatim in both emails.
+          We&apos;ll email both the nurse and the reviewer. Notes are optional
+          and shown verbatim in both emails.
         </DialogDescription>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">

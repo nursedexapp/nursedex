@@ -85,7 +85,7 @@ async function createCheckoutSession(
  * Caller is the paywall modal "Subscribe" button.
  */
 export async function createFamilyAccessCheckout(args: {
-  // Where to come back to after success — usually the nurse profile they
+  // Where to come back to after success, usually the nurse profile they
   // were trying to reveal so we can immediately reveal it.
   returnTo?: string;
 }): Promise<CheckoutResult> {

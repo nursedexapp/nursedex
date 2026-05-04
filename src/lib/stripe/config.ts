@@ -1,5 +1,5 @@
 // Centralized Stripe price IDs and plan metadata.
-// Price IDs come from Stripe — see Stripe Dashboard → Products.
+// Price IDs come from Stripe, see Stripe Dashboard → Products.
 
 import { PRICING } from "@/lib/constants";
 

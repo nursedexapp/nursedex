@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  Eye,
-  Heart,
-  Lock,
-  Star,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
+import { Eye, Heart, Lock, Star, TrendingDown, TrendingUp } from "lucide-react";
 import { requireRole } from "@/lib/auth/helpers";
 import { UserRole } from "@/types/enums";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,9 +46,7 @@ export default async function NurseAnalyticsPage() {
           <h1 className="font-heading text-soft-black text-2xl font-semibold sm:text-3xl">
             Analytics
           </h1>
-          {isFeatured && (
-            <Badge className="bg-teal text-white">Featured</Badge>
-          )}
+          {isFeatured && <Badge className="bg-teal text-white">Featured</Badge>}
         </div>
         <p className="text-soft-black-light mt-1 text-sm">
           {isFeatured
@@ -185,8 +176,8 @@ function EmptyState() {
         </h2>
         <p className="text-soft-black-light mx-auto max-w-md text-sm">
           We&apos;ll start showing profile views, saves, and reveals here as
-          soon as families start finding you. Make sure your photo and bio
-          are filled in to give the algorithm something to work with.
+          soon as families start finding you. Make sure your photo and bio are
+          filled in to give the algorithm something to work with.
         </p>
       </CardContent>
     </Card>
@@ -195,7 +186,7 @@ function EmptyState() {
 
 function LockedPreview() {
   return (
-    <Card className="border-teal/30 bg-gradient-to-br from-teal/5 to-sage/10">
+    <Card className="border-teal/30 from-teal/5 to-sage/10 bg-gradient-to-br">
       <CardContent className="space-y-4 pt-6">
         <Lock className="text-teal size-7" />
         <h2 className="font-heading text-soft-black text-xl font-semibold">
@@ -203,8 +194,8 @@ function LockedPreview() {
         </h2>
         <p className="text-soft-black-light text-sm">
           Featured nurses see how many families view, save, and reveal their
-          profile, plus a 30 day chart and a benchmark against the median
-          nurse with their credential and primary care type.
+          profile, plus a 30 day chart and a benchmark against the median nurse
+          with their credential and primary care type.
         </p>
         <div className="space-y-2">
           <Preview label="Profile views" />
@@ -236,6 +227,6 @@ function Preview({ label }: { label: string }) {
   );
 }
 
-// The cohort query reads every cohort member's analytics rows — small
+// The cohort query reads every cohort member's analytics rows, small
 // volume at our population size, but we don't want a stale prerender.
 export const dynamic = "force-dynamic";

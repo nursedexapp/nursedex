@@ -18,17 +18,17 @@ export function VerificationApproved({
           You&apos;re verified{firstName ? `, ${firstName}` : ""}!
         </Text>
         <Text style={paragraph}>
-          We confirmed your license against the NY State database. Your
-          profile is now visible to families on Long Island, and you have a
-          Verified badge on every search result and profile view.
+          We confirmed your license against the NY State database. Your profile
+          is now visible to families on Long Island, and you have a Verified
+          badge on every search result and profile view.
         </Text>
         <Link href={profileUrl} style={button}>
           View your profile
         </Link>
         <Text style={paragraph}>
-          A few things to do next: invite past clients to leave reviews,
-          double check your photo and bio, and toggle availability when
-          you&apos;re open to new clients.
+          A few things to do next: invite past clients to leave reviews, double
+          check your photo and bio, and toggle availability when you&apos;re
+          open to new clients.
         </Text>
         <Text style={footer}>
           Questions? Reply to this email or reach{" "}

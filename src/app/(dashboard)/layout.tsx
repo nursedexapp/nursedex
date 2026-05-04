@@ -13,7 +13,7 @@ export default async function DashboardLayout({
   const role = user?.role ?? null;
 
   // Family-onboarding gate: a family user with no zip on family_profiles
-  // hasn't gone through onboarding yet — send them there before showing
+  // hasn't gone through onboarding yet, send them there before showing
   // any dashboard surface.
   if (user && role === "family") {
     const supabase = await createClient();

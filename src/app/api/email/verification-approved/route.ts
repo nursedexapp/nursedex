@@ -20,9 +20,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const { Resend } = await import("resend");
-    const { VerificationApproved } = await import(
-      "@/lib/email/templates/VerificationApproved"
-    );
+    const { VerificationApproved } =
+      await import("@/lib/email/templates/VerificationApproved");
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.emails.send({

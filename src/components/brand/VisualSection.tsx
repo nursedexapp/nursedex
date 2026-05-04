@@ -247,7 +247,7 @@ export default function VisualSection() {
   return (
     <section id="visual">
       {/* -------------------------------------------------- */}
-      {/* Section Header — sage background from divider */}
+      {/* Section Header, sage background from divider */}
       {/* -------------------------------------------------- */}
       <div className="bg-sage px-6 pt-24 pb-24 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-6xl">
@@ -363,7 +363,7 @@ export default function VisualSection() {
           </div>
         </div>
 
-        {/* Icon Do's and Don'ts — sage strip */}
+        {/* Icon Do's and Don'ts, sage strip */}
         <div className="bg-sage/10">
           <div className="mx-auto max-w-6xl px-6 py-10 sm:px-12 lg:px-24">
             <div className="grid gap-8 md:grid-cols-2">
@@ -469,7 +469,7 @@ export default function VisualSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Photography Direction — full-bleed sage-light */}
+      {/* Photography Direction, full-bleed sage-light */}
       {/* -------------------------------------------------- */}
       <div className="bg-sage-light">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:px-12 lg:px-24">
@@ -482,7 +482,7 @@ export default function VisualSection() {
             Genuine smiles.
           </p>
 
-          {/* Photo Subject Placeholders — white bg cards */}
+          {/* Photo Subject Placeholders, white bg cards */}
           <div className="mb-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {photoSubjects.map((photo) => (
               <div
@@ -534,7 +534,7 @@ export default function VisualSection() {
             </div>
           </div>
 
-          {/* Photography Treatment & Overlays — demonstrated live */}
+          {/* Photography Treatment & Overlays, demonstrated live */}
           <h4 className="font-body text-soft-black mb-6 text-lg font-semibold">
             Photography Treatment &amp; Overlays
           </h4>
@@ -574,7 +574,7 @@ export default function VisualSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Illustration Style — white bg */}
+      {/* Illustration Style, white bg */}
       {/* -------------------------------------------------- */}
       <div className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:px-12 lg:px-24">
@@ -649,7 +649,7 @@ export default function VisualSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Graphic Elements & Patterns — full-bleed teal-dark */}
+      {/* Graphic Elements & Patterns, full-bleed teal-dark */}
       {/* -------------------------------------------------- */}
       <div className="bg-teal-dark">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:px-12 lg:px-24">
@@ -719,7 +719,7 @@ export default function VisualSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Motion & Animation — white bg, timeline rows */}
+      {/* Motion & Animation, white bg, timeline rows */}
       {/* -------------------------------------------------- */}
       <div className="bg-white">
         <div className="mx-auto max-w-6xl px-6 py-16 sm:px-12 lg:px-24">
@@ -764,7 +764,7 @@ export default function VisualSection() {
             </div>
           </div>
 
-          {/* Animation Specs — simple rows */}
+          {/* Animation Specs, simple rows */}
           <div className="divide-sage/20 divide-y">
             {motionSpecs.map((spec) => (
               <div
@@ -826,7 +826,7 @@ export default function VisualSection() {
       </div>
 
       {/* -------------------------------------------------- */}
-      {/* Texture & Depth — white bg, no card wrappers */}
+      {/* Texture & Depth, white bg, no card wrappers */}
       {/* -------------------------------------------------- */}
       <div className="bg-white">
         <div className="mx-auto max-w-6xl px-6 pt-16 pb-24 sm:px-12 lg:px-24">

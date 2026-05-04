@@ -47,7 +47,7 @@ export default function ApplicationSection() {
   return (
     <section id="application">
       {/* ────────────────────────────────────────────────── */}
-      {/* THE BRAND IN ACTION — a full NurseDex search mock */}
+      {/* THE BRAND IN ACTION, a full NurseDex search mock */}
       {/* This replaces "Putting it all together"           */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-warm-white px-6 pt-32 pb-20 sm:px-12 lg:px-24">
@@ -65,7 +65,7 @@ export default function ApplicationSection() {
       {/* Conceptual mockup */}
       <div className="bg-soft-black px-4 py-12 sm:px-8 sm:py-16 lg:px-16">
         <div className="mx-auto max-w-5xl">
-          {/* Browser chrome — hidden on mobile */}
+          {/* Browser chrome, hidden on mobile */}
           <div className="bg-soft-black-light/30 hidden items-center gap-2 rounded-t-xl px-4 py-3 sm:flex">
             <div className="flex gap-1.5">
               <div className="bg-error/60 h-3 w-3 rounded-full" />
@@ -132,9 +132,9 @@ export default function ApplicationSection() {
                 found for Elder Care near Long Island
               </p>
 
-              {/* Nurse cards — the star moment */}
+              {/* Nurse cards, the star moment */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {/* Card 1 — Featured */}
+                {/* Card 1, Featured */}
                 <div className="bg-warm-white border-cream-dark overflow-hidden rounded-2xl border">
                   <div className="bg-sage/20 relative flex h-36 items-center justify-center">
                     <div className="bg-sage/40 flex h-16 w-16 items-center justify-center rounded-full">
@@ -329,7 +329,7 @@ export default function ApplicationSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* DESIGN PRINCIPLES — quiet, editorial               */}
+      {/* DESIGN PRINCIPLES, quiet, editorial               */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-warm-white px-6 py-32 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-5xl">
@@ -349,7 +349,7 @@ export default function ApplicationSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* COMPONENT TOKENS — buttons on a dark stage         */}
+      {/* COMPONENT TOKENS, buttons on a dark stage         */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-teal-dark px-6 py-32 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-5xl">
@@ -357,7 +357,7 @@ export default function ApplicationSection() {
             Component tokens
           </p>
 
-          {/* Buttons — large, centered */}
+          {/* Buttons, large, centered */}
           <div className="mb-8 flex flex-wrap items-center justify-center gap-5">
             <button className="bg-teal text-warm-white font-body rounded-xl px-8 py-4 text-base font-medium">
               Primary Button
@@ -391,7 +391,7 @@ export default function ApplicationSection() {
             </span>
           </div>
 
-          {/* Input states — side by side on dark */}
+          {/* Input states, side by side on dark */}
           <p className="font-body text-sage/40 mb-10 text-xs tracking-[0.4em] uppercase">
             Input states
           </p>
@@ -436,7 +436,7 @@ export default function ApplicationSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* GRID & SPACING — clean, technical                  */}
+      {/* GRID & SPACING, clean, technical                  */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-warm-white px-6 py-32 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-5xl">
@@ -469,7 +469,7 @@ export default function ApplicationSection() {
             ))}
           </div>
 
-          {/* Spacing scale — proportional blocks */}
+          {/* Spacing scale, proportional blocks */}
           <p className="font-body text-soft-black-light mb-6 text-xs">
             Spacing scale (px)
           </p>
@@ -493,7 +493,7 @@ export default function ApplicationSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* EMAIL — full-bleed dark with the mock as star      */}
+      {/* EMAIL, full-bleed dark with the mock as star      */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-soft-black px-6 py-32 sm:px-12 lg:px-24">
         <div className="mx-auto flex max-w-5xl flex-col items-center">
@@ -501,7 +501,7 @@ export default function ApplicationSection() {
             Email template
           </p>
 
-          {/* Email mock — centered, larger */}
+          {/* Email mock, centered, larger */}
           <div className="mb-16 w-full max-w-sm">
             <div className="bg-teal flex items-center justify-center rounded-t-xl px-6 py-5">
               <span className="font-heading text-warm-white text-xl tracking-tight">
@@ -530,7 +530,7 @@ export default function ApplicationSection() {
             </div>
           </div>
 
-          {/* Email rules — minimal */}
+          {/* Email rules, minimal */}
           <div className="grid w-full gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { label: "Header", rule: "Logo on teal bar, centered" },
@@ -555,7 +555,7 @@ export default function ApplicationSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* ACCESSIBILITY + CO-BRANDING — side by side          */}
+      {/* ACCESSIBILITY + CO-BRANDING, side by side          */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-warm-white px-6 py-32 sm:px-12 lg:px-24">
         <div className="mx-auto grid max-w-5xl gap-20 lg:grid-cols-2">

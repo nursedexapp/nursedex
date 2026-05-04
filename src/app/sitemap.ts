@@ -59,9 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
 
     nurseEntries = ((data ?? []) as unknown as Row[])
-      .filter(
-        (r) => r.users && !r.users.is_deleted && !r.users.is_suspended,
-      )
+      .filter((r) => r.users && !r.users.is_deleted && !r.users.is_suspended)
       .map((r) => ({
         url: `${BASE_URL}/nurses/${r.slug}`,
         lastModified: new Date(r.updated_at),

@@ -6,19 +6,15 @@ interface VerifyReviewProps {
   verifyUrl: string;
 }
 
-export function VerifyReview({
-  reviewerName,
-  verifyUrl,
-}: VerifyReviewProps) {
+export function VerifyReview({ reviewerName, verifyUrl }: VerifyReviewProps) {
   return (
     <EmailLayout preview="Confirm your NurseDex review">
       <Section>
         <Text style={heading}>Confirm your review</Text>
         <Text style={paragraph}>Hi {reviewerName},</Text>
         <Text style={paragraph}>
-          Thanks for sharing your experience on NurseDex. Click the button
-          below to confirm your email so a moderator can review and publish
-          your post.
+          Thanks for sharing your experience on NurseDex. Click the button below
+          to confirm your email so a moderator can review and publish your post.
         </Text>
         <Link href={verifyUrl} style={button}>
           Confirm my review

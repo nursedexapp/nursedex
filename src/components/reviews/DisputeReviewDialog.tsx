@@ -78,9 +78,9 @@ export function DisputeReviewDialog({ reviewId }: DisputeReviewDialogProps) {
           Dispute this review
         </DialogTitle>
         <DialogDescription className="text-soft-black-light text-sm">
-          A moderator will look at the review and your explanation, then
-          decide whether to keep it or take it down. The review stays
-          visible on your profile during the investigation.
+          A moderator will look at the review and your explanation, then decide
+          whether to keep it or take it down. The review stays visible on your
+          profile during the investigation.
         </DialogDescription>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">

@@ -143,7 +143,7 @@ export default function ColorSection() {
   return (
     <section id="colors" className="overflow-hidden">
       {/* ────────────────────────────────────────────────── */}
-      {/* PRIMARY — Deep Teal — the wall of teal IS the intro */}
+      {/* PRIMARY, Deep Teal, the wall of teal IS the intro */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-teal flex min-h-[50vh] flex-col justify-end px-6 pt-24 pb-16 sm:px-12 lg:px-24">
         <div className="mx-auto w-full max-w-7xl">
@@ -190,7 +190,7 @@ export default function ColorSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* SECONDARY — Soft Sage — half-viewport band         */}
+      {/* SECONDARY, Soft Sage, half-viewport band         */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-sage flex min-h-[50vh] flex-col justify-end px-6 pt-24 pb-16 sm:px-12 lg:px-24">
         <div className="mx-auto w-full max-w-7xl">
@@ -238,7 +238,7 @@ export default function ColorSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* SUPPORTING — tall edge-to-edge blocks              */}
+      {/* SUPPORTING, tall edge-to-edge blocks              */}
       {/* ────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row">
         {supportingColors.map((c) => (
@@ -300,7 +300,7 @@ export default function ColorSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* EXTENDED PALETTE — real tints/shades, tall bands   */}
+      {/* EXTENDED PALETTE, real tints/shades, tall bands   */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-warm-white px-6 pt-24 pb-8 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-7xl">
@@ -342,7 +342,7 @@ export default function ColorSection() {
       ))}
 
       {/* ────────────────────────────────────────────────── */}
-      {/* SEMANTIC — tall immersive blocks                   */}
+      {/* SEMANTIC, tall immersive blocks                   */}
       {/* ────────────────────────────────────────────────── */}
       <div className="bg-warm-white px-6 py-32 sm:px-12 lg:px-24">
         <div className="mx-auto max-w-7xl">
@@ -376,7 +376,7 @@ export default function ColorSection() {
       </div>
 
       {/* ────────────────────────────────────────────────── */}
-      {/* GRADIENTS — full-bleed live bands                  */}
+      {/* GRADIENTS, full-bleed live bands                  */}
       {/* ────────────────────────────────────────────────── */}
       {gradients.map((g) => (
         <div

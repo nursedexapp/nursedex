@@ -27,15 +27,15 @@ export function CancellationConfirmation({
         </Text>
         {isFamily && (
           <Text style={paragraph}>
-            After that, you&apos;ll keep access to nurses you already
-            revealed for 60 more days, so you don&apos;t lose contact info
-            for anyone you&apos;re already in touch with. New reveals will
-            require resubscribing.
+            After that, you&apos;ll keep access to nurses you already revealed
+            for 60 more days, so you don&apos;t lose contact info for anyone
+            you&apos;re already in touch with. New reveals will require
+            resubscribing.
           </Text>
         )}
         <Text style={paragraph}>
-          Changed your mind? You can reactivate before the period ends from
-          the Stripe billing portal.
+          Changed your mind? You can reactivate before the period ends from the
+          Stripe billing portal.
         </Text>
         <Link href="https://nursedex.com/dashboard" style={button}>
           Go to dashboard
