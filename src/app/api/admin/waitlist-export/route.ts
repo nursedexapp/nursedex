@@ -1,17 +1,22 @@
-import { createClient } from "@supabase/supabase-js";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/helpers";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-export async function GET(request: NextRequest) {
-  const key = request.nextUrl.searchParams.get("key");
-
-  if (!key || key !== process.env.ADMIN_SECRET) {
+/**
+ * Admin-only CSV export of the waitlist. Gated by authenticated session
+ * with role admin or super_admin. The waitlist table itself is read via
+ * the service-role client because RLS blocks anonymous reads.
+ */
+export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (user.role !== "admin" && user.role !== "super_admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!,
-  );
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from("waitlist")
