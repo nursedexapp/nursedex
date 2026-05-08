@@ -85,12 +85,15 @@ export default function FaqPage() {
             Don&apos;t see your question? Email{" "}
             <a
               href="mailto:support@nursedex.com"
-              className="text-teal hover:underline"
+              className="text-teal underline underline-offset-2"
             >
               support@nursedex.com
             </a>{" "}
             or use{" "}
-            <Link href="/contact" className="text-teal hover:underline">
+            <Link
+              href="/contact"
+              className="text-teal underline underline-offset-2"
+            >
               the contact form
             </Link>
             .

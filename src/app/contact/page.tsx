@@ -32,7 +32,7 @@ export default function ContactPage() {
             below or email{" "}
             <a
               href="mailto:support@nursedex.com"
-              className="text-teal hover:underline"
+              className="text-teal underline underline-offset-2"
             >
               support@nursedex.com
             </a>{" "}
@@ -61,7 +61,7 @@ export default function ContactPage() {
               For account-specific questions, sign in and reach out from{" "}
               <Link
                 href="/dashboard/settings"
-                className="text-teal hover:underline"
+                className="text-teal underline underline-offset-2"
               >
                 your dashboard settings
               </Link>{" "}
