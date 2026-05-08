@@ -6,6 +6,7 @@ import { NurseProfilePublic } from "@/components/profile/NurseProfilePublic";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import {
   getNurseBySlug,
+  getNurseContactInfo,
   getSlugRedirect,
   getPublicPhotoUrls,
   getLicenseVerifyUrl,
@@ -126,6 +127,16 @@ export default async function NurseProfilePage({
     getLicenseVerifyUrl(nurse.credential),
     getApprovedReviews(nurse.user_id),
   ]);
+
+  // Contact info is gated server-side by a SECURITY DEFINER RPC.
+  // Only fetch when the page will actually render it: revealed
+  // family viewers, the nurse themselves, or admins.
+  if (viewMode === "subscribed") {
+    const contact = await getNurseContactInfo(nurse.user_id);
+    nurse.contact_email = contact.email;
+    nurse.contact_phone = contact.phone;
+    nurse.communication_preference = contact.communication_preference;
+  }
 
   // Track profile view (fire and forget, don't block rendering)
   trackProfileView(nurse.user_id);

@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getSignedPhotoUrl } from "@/lib/profile/photos";
 import { SEARCH } from "@/lib/constants";
 import { GENDER_FILTER_ANY, type SearchFilters } from "./search-params";
@@ -140,7 +141,13 @@ async function runQuery(
   filters: SearchFilters,
   opts: QueryOptions = {},
 ): Promise<InternalCard[]> {
-  const supabase = await createClient();
+  // Search joins nurse_profiles to users for first_name / last_name /
+  // zip_code on the cards. RLS on users only exposes id = auth.uid()
+  // rows, which would zero out the inner join for anon and family
+  // viewers. We use the service-role client here because the search
+  // result is public-by-design (only verified non-deleted, non-suspended
+  // nurses are returned) and cards never render contact fields.
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from("nurse_profiles")
