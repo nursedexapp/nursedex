@@ -81,7 +81,7 @@ export default function SignUpPage() {
         <h2 className="font-heading text-2xl">Join NurseDex</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Create your free account.{" "}
-          <Link href="/login" className="text-teal font-medium underline">
+          <Link href="/login" className="text-teal-dark font-medium underline">
             Sign in instead
           </Link>
         </p>
@@ -186,11 +186,11 @@ export default function SignUpPage() {
 
         <p className="text-muted-foreground text-center text-xs">
           By clicking Join NurseDex, you agree to our{" "}
-          <Link href="/terms" className="text-teal underline">
+          <Link href="/terms" className="text-teal-dark underline">
             Terms
           </Link>{" "}
           and{" "}
-          <Link href="/privacy" className="text-teal underline">
+          <Link href="/privacy" className="text-teal-dark underline">
             Privacy Policy
           </Link>
           .

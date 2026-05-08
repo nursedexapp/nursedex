@@ -83,7 +83,7 @@ function LoginForm() {
         <h2 className="font-heading text-2xl">Welcome back</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Your Long Island care community is waiting.{" "}
-          <Link href="/signup" className="text-teal font-medium underline">
+          <Link href="/signup" className="text-teal-dark font-medium underline">
             New here? Create an account
           </Link>
         </p>

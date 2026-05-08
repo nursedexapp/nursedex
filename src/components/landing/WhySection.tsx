@@ -103,7 +103,7 @@ export function WhySection({ role }: WhySectionProps) {
             <div className="border-sage-light/60 mx-auto w-56 rounded-2xl border bg-white p-5 shadow-lg sm:w-64 sm:rotate-2">
               {/* Avatar + name row */}
               <div className="flex items-center gap-3">
-                <div className="bg-sage-light/50 font-heading text-teal flex h-12 w-12 items-center justify-center rounded-full text-lg">
+                <div className="bg-sage-light font-heading text-teal-dark flex h-12 w-12 items-center justify-center rounded-full text-lg">
                   MR
                 </div>
                 <div>

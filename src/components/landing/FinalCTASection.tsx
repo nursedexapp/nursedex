@@ -60,7 +60,7 @@ export function FinalCTASection({
             <h2 className="font-heading text-warm-white text-3xl sm:text-4xl">
               You&apos;re on the list.
             </h2>
-            <p className="font-body text-sage-light mx-auto mt-4 max-w-md">
+            <p className="font-body text-warm-white mx-auto mt-4 max-w-md">
               We&apos;ll be in touch when NurseDex launches. Know someone who
               would love NurseDex?
             </p>
@@ -79,7 +79,7 @@ export function FinalCTASection({
             <h2 className="font-heading text-warm-white text-3xl sm:text-4xl">
               Be the first to know when we launch.
             </h2>
-            <p className="font-body text-sage-light mx-auto mt-4 max-w-md">
+            <p className="font-body text-warm-white mx-auto mt-4 max-w-md">
               {role === "family"
                 ? "Join the waitlist and get early access to Long Island's trusted caregiver directory."
                 : "Join the waitlist and be among the first caregivers on the platform."}
