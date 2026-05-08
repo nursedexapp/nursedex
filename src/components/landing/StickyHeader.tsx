@@ -30,7 +30,7 @@ export function StickyHeader({
 
   return (
     <header
-      className={`border-sage-light/50 bg-warm-white/90 fixed inset-x-0 top-0 z-50 border-b backdrop-blur-sm transition-all duration-300 ${
+      className={`border-sage-light/50 bg-warm-white/90 fixed inset-x-0 top-0 z-50 overflow-x-clip border-b backdrop-blur-sm transition-all duration-300 ${
         visible && !hasSignedUp
           ? "translate-y-0 opacity-100"
           : "pointer-events-none -translate-y-full opacity-0"
