@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PHOTO_UPLOAD } from "@/lib/constants";
 
 const BUCKET = "nurse-photos";
@@ -39,12 +40,17 @@ export async function getSignedUploadUrl(
 
 /**
  * Get a signed URL to display a nurse photo.
- * Returns a placeholder path if the photo cannot be loaded.
+ * Returns null if the photo cannot be signed.
+ *
+ * Uses the service-role client because the nurse-photos bucket is
+ * private and anon callers can't sign their own URLs. The resulting
+ * signed URL is short-lived and only ever embedded in server-rendered
+ * markup that already gates which photos to surface.
  */
 export async function getSignedPhotoUrl(path: string): Promise<string | null> {
   if (!path) return null;
 
-  const supabase = await createClient();
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase.storage
     .from(BUCKET)

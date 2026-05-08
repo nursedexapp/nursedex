@@ -14,10 +14,12 @@
  *
  * The seed nurses use noreply+seed-N@nursedex.com style emails so they
  * never collide with real signups, and a fixed throwaway password.
- * They go in as verification_status='verified', tier varies, no photos
- * (has_photo=false renders the avatar placeholder), and varied
- * credentials, care types, and zip codes across Suffolk + Nassau +
- * Queens to make search results feel populated.
+ * They go in as verification_status='verified', tier varies, and each
+ * gets a DiceBear initials PNG uploaded to the nurse-photos bucket so
+ * the directory has visual variety. Credentials, care types, and zip
+ * codes span Suffolk, Nassau, and Queens so search results feel
+ * populated. Re-runs are idempotent (auth user, profile, and avatar
+ * upload all upsert).
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -426,6 +428,40 @@ function slugify(first: string, last: string, credential: string): string {
     .replace(/-+/g, "-");
 }
 
+const PHOTO_BUCKET = "nurse-photos";
+
+// Brand teals for DiceBear background. The seed string deterministically
+// picks one of these per nurse so the directory has visual variety
+// without anyone looking obviously off brand.
+const AVATAR_BG_PALETTE = "2a7b6f,1f5c53,3a9b8d,8baf9d";
+
+async function fetchAvatarPng(first: string, last: string): Promise<Buffer> {
+  const seed = `${first} ${last}`;
+  const url =
+    `https://api.dicebear.com/9.x/initials/png` +
+    `?seed=${encodeURIComponent(seed)}` +
+    `&backgroundColor=${AVATAR_BG_PALETTE}` +
+    `&textColor=ffffff` +
+    `&size=400` +
+    `&fontWeight=600`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`DiceBear fetch failed (${res.status}): ${url}`);
+  }
+  return Buffer.from(await res.arrayBuffer());
+}
+
+async function uploadSeedAvatar(userId: string, png: Buffer): Promise<string> {
+  const path = `${userId}/seed-avatar.png`;
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, png, { contentType: "image/png", upsert: true });
+  if (error) {
+    throw new Error(`storage upload failed: ${error.message}`);
+  }
+  return path;
+}
+
 async function seedOne(nurse: SeedNurse, index: number): Promise<void> {
   const tag = `[seed ${String(index + 1).padStart(2, "0")}]`;
 
@@ -472,6 +508,15 @@ async function seedOne(nurse: SeedNurse, index: number): Promise<void> {
 
   const slug = slugify(nurse.first_name, nurse.last_name, nurse.credential);
 
+  let avatarPath: string | null = null;
+  try {
+    const png = await fetchAvatarPng(nurse.first_name, nurse.last_name);
+    avatarPath = await uploadSeedAvatar(userId, png);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn(tag, "avatar generation skipped:", msg);
+  }
+
   // Upsert nurse_profiles.
   const { error: profileErr } = await supabase.from("nurse_profiles").upsert(
     {
@@ -497,6 +542,8 @@ async function seedOne(nurse: SeedNurse, index: number): Promise<void> {
       verification_status: "verified",
       verified_at: new Date().toISOString(),
       is_seed: true,
+      photos: avatarPath ? [avatarPath] : [],
+      has_photo: avatarPath !== null,
     },
     { onConflict: "user_id" },
   );
