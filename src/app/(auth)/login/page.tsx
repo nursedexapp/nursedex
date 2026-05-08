@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { GoogleSignInButton } from "@/components/ui/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
@@ -92,11 +91,12 @@ function LoginForm() {
 
       <GoogleSignInButton />
 
-      <div className="relative my-6">
-        <Separator className="bg-sage/20" />
-        <span className="bg-background text-muted-foreground absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 px-3 text-xs">
+      <div className="my-6 flex items-center gap-3">
+        <div className="bg-sage/20 h-px flex-1" />
+        <span className="text-muted-foreground text-xs">
           or continue with email
         </span>
+        <div className="bg-sage/20 h-px flex-1" />
       </div>
 
       <form action={handleSubmit} className="space-y-4">
