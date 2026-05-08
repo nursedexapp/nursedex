@@ -190,15 +190,19 @@ export function WaitlistForm({
     return (
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="flex items-center gap-2"
+        className="relative flex items-center gap-2"
       >
-        <input
-          {...register("honeypot")}
-          tabIndex={-1}
-          autoComplete="off"
+        <div
           aria-hidden="true"
-          className="absolute -left-[9999px] h-0 w-0 opacity-0"
-        />
+          className="pointer-events-none absolute top-0 left-0 h-0 w-0 overflow-hidden"
+        >
+          <input
+            {...register("honeypot")}
+            tabIndex={-1}
+            autoComplete="off"
+            style={{ position: "absolute", left: "-9999px" }}
+          />
+        </div>
         <div className="relative">
           <label htmlFor="email-header" className="sr-only">
             Email address
@@ -237,16 +241,20 @@ export function WaitlistForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className={`flex w-full items-stretch justify-center gap-3 sm:items-start ${isFooter ? "mx-auto max-w-md flex-col sm:flex-row" : "mx-auto max-w-lg flex-col sm:flex-row"}`}
+      className={`relative flex w-full items-stretch justify-center gap-3 sm:items-start ${isFooter ? "mx-auto max-w-md flex-col sm:flex-row" : "mx-auto max-w-lg flex-col sm:flex-row"}`}
     >
       {/* Honeypot: hidden from real users, bots will fill it */}
-      <input
-        {...register("honeypot")}
-        tabIndex={-1}
-        autoComplete="off"
+      <div
         aria-hidden="true"
-        className="absolute -left-[9999px] h-0 w-0 opacity-0"
-      />
+        className="pointer-events-none absolute top-0 left-0 h-0 w-0 overflow-hidden"
+      >
+        <input
+          {...register("honeypot")}
+          tabIndex={-1}
+          autoComplete="off"
+          style={{ position: "absolute", left: "-9999px" }}
+        />
+      </div>
 
       <div className="flex-1">
         <label htmlFor={`email-${variant}`} className="sr-only">
