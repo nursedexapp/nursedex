@@ -70,7 +70,7 @@ export function AuthBrandPanel() {
 
   return (
     <div className="mt-12 hidden space-y-6 lg:block">
-      <p className="text-sage-light text-sm leading-relaxed">
+      <p className="text-warm-white text-sm leading-relaxed">
         {panel.description}
       </p>
       {panel.signals && (
@@ -85,9 +85,7 @@ export function AuthBrandPanel() {
                 <span className="text-warm-white text-sm font-medium">
                   {item.text}
                 </span>
-                <span className="text-sage-light/70 text-xs">
-                  {item.detail}
-                </span>
+                <span className="text-warm-white text-xs">{item.detail}</span>
               </div>
             </div>
           ))}

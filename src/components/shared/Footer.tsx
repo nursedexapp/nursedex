@@ -20,7 +20,7 @@ export function Footer() {
           support@nursedex.com
         </a>
 
-        <div className="font-body text-soft-black-light/70 mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
+        <div className="font-body text-soft-black-light mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
           <span>&copy; {year} NurseDex LLC</span>
           <Link
             href="/privacy"

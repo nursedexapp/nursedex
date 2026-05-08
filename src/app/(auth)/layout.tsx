@@ -37,7 +37,7 @@ export default function AuthLayout({
             </Link>
           </div>
           {/* Tagline */}
-          <p className="font-heading text-sage-light/80 mt-0.5 text-xs italic lg:mt-1 lg:text-base">
+          <p className="font-heading text-warm-white mt-0.5 text-xs italic lg:mt-1 lg:text-base">
             Find care that feels like family.
           </p>
 
@@ -46,7 +46,7 @@ export default function AuthLayout({
 
           {/* Vision statement - desktop only */}
           <div className="border-warm-white/10 mt-12 hidden border-t pt-6 lg:block">
-            <p className="text-sage-light/60 text-xs leading-relaxed italic">
+            <p className="text-warm-white text-xs leading-relaxed italic">
               Built for the Long Island care community. Connecting families with
               trusted, verified nurses since 2026.
             </p>

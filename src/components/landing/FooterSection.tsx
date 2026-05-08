@@ -18,7 +18,7 @@ export function FooterSection() {
           support@nursedex.com
         </a>
 
-        <div className="font-body text-soft-black-light/70 mt-6 flex items-center justify-center gap-6 text-xs">
+        <div className="font-body text-soft-black-light mt-6 flex items-center justify-center gap-6 text-xs">
           <span>&copy; {year} NurseDex</span>
           <Link
             href="/privacy"

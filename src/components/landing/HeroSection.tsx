@@ -44,7 +44,7 @@ export function HeroSection({
       {/* Top bar */}
       <div className="relative mx-auto flex w-full max-w-4xl items-center justify-between py-6">
         <p className="font-heading text-warm-white text-2xl">NurseDex</p>
-        <span className="font-body text-warm-white/80 flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
+        <span className="font-body text-warm-white flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
           <span className="bg-sage inline-block h-1.5 w-1.5 rounded-full" />
           Long Island, NY
         </span>
@@ -94,7 +94,7 @@ export function HeroSection({
 
         <p
           key={`sub-${role}`}
-          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 font-body text-warm-white/70 mx-auto mt-6 max-w-xl text-lg motion-safe:duration-300"
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 font-body text-warm-white mx-auto mt-6 max-w-xl text-lg motion-safe:duration-300"
         >
           {copy[role].subheadline}
         </p>
@@ -114,16 +114,16 @@ export function HeroSection({
                 First 100 caregivers get priority placement. No spam, ever.
               </p>
             ) : waitlistCount ? (
-              <p className="font-body text-sage-light/70 text-sm">
+              <p className="font-body text-warm-white text-sm">
                 Join {waitlistCount}+ people already on the waitlist.
               </p>
             ) : (
-              <p className="font-body text-sage-light/60 text-sm">
+              <p className="font-body text-warm-white text-sm">
                 We&apos;ll only email you when we launch. No spam, ever.
               </p>
             )}
             {role === "nurse" && waitlistCount && (
-              <p className="font-body text-sage-light/70 text-sm">
+              <p className="font-body text-warm-white text-sm">
                 Join {waitlistCount}+ people already on the waitlist.
               </p>
             )}
