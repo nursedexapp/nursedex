@@ -39,39 +39,39 @@
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
 
-  --color-background: var(--warm-white);
-  --color-foreground: var(--soft-black);
-  --color-card: var(--warm-white);
-  --color-card-foreground: var(--soft-black);
-  --color-popover: var(--warm-white);
-  --color-popover-foreground: var(--soft-black);
-  --color-primary: var(--teal);
-  --color-primary-foreground: var(--warm-white);
-  --color-secondary: var(--sage-light);
-  --color-secondary-foreground: var(--soft-black);
-  --color-muted: var(--sage-light);
-  --color-muted-foreground: var(--soft-black-light);
-  --color-accent: var(--cream-light);
-  --color-accent-foreground: var(--soft-black);
-  --color-destructive: var(--error);
-  --color-destructive-foreground: var(--warm-white);
+  --color-background: var(--color-warm-white);
+  --color-foreground: var(--color-soft-black);
+  --color-card: var(--color-warm-white);
+  --color-card-foreground: var(--color-soft-black);
+  --color-popover: var(--color-warm-white);
+  --color-popover-foreground: var(--color-soft-black);
+  --color-primary: var(--color-teal);
+  --color-primary-foreground: var(--color-warm-white);
+  --color-secondary: var(--color-sage-light);
+  --color-secondary-foreground: var(--color-soft-black);
+  --color-muted: var(--color-sage-light);
+  --color-muted-foreground: var(--color-soft-black-light);
+  --color-accent: var(--color-cream-light);
+  --color-accent-foreground: var(--color-soft-black);
+  --color-destructive: var(--color-error);
+  --color-destructive-foreground: var(--color-warm-white);
   --color-border: #c8d2d0;
   --color-input: #c8d2d0;
-  --color-ring: var(--teal);
-  --color-chart-1: var(--teal);
-  --color-chart-2: var(--sage);
-  --color-chart-3: var(--cream);
-  --color-chart-4: var(--teal-light);
-  --color-chart-5: var(--sage-dark);
+  --color-ring: var(--color-teal);
+  --color-chart-1: var(--color-teal);
+  --color-chart-2: var(--color-sage);
+  --color-chart-3: var(--color-cream);
+  --color-chart-4: var(--color-teal-light);
+  --color-chart-5: var(--color-sage-dark);
 
-  --color-sidebar: var(--warm-white);
-  --color-sidebar-foreground: var(--soft-black);
-  --color-sidebar-primary: var(--teal);
-  --color-sidebar-primary-foreground: var(--warm-white);
-  --color-sidebar-accent: var(--cream-light);
-  --color-sidebar-accent-foreground: var(--soft-black);
+  --color-sidebar: var(--color-warm-white);
+  --color-sidebar-foreground: var(--color-soft-black);
+  --color-sidebar-primary: var(--color-teal);
+  --color-sidebar-primary-foreground: var(--color-warm-white);
+  --color-sidebar-accent: var(--color-cream-light);
+  --color-sidebar-accent-foreground: var(--color-soft-black);
   --color-sidebar-border: #c8d2d0;
-  --color-sidebar-ring: var(--teal);
+  --color-sidebar-ring: var(--color-teal);
 }
 
 body {
