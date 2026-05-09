@@ -40,9 +40,14 @@ const availabilityOptions = Object.entries(AVAILABILITY_COMMITMENT_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
 
-const timeSlotOptions = Object.entries(TIME_SLOT_LABELS).map(
-  ([value, label]) => ({ value, label }),
-);
+// Flexible is intentionally hidden from the wizard. Selecting all the named
+// slots already communicates "available anytime", and offering both made
+// users wonder what the difference was. The DB enum still has the value so
+// existing rows that contain it keep working; new profiles just can't pick
+// it.
+const timeSlotOptions = Object.entries(TIME_SLOT_LABELS)
+  .filter(([value]) => value !== "flexible")
+  .map(([value, label]) => ({ value, label }));
 
 export function SkillsFields({ values, onChange, errors }: SkillsFieldsProps) {
   const [certInput, setCertInput] = useState("");
@@ -97,36 +102,13 @@ export function SkillsFields({ values, onChange, errors }: SkillsFieldsProps) {
         )}
       </div>
 
-      {/* Time slots. Flexible is mutually exclusive with specific slots,
-          since "I work these specific times" and "my schedule varies, let's
-          talk" are different signals to a family. Without the mutex, it
-          read as redundant: selecting all five named slots looked the same
-          as Flexible. */}
+      {/* Time slots */}
       <div className="space-y-2">
         <Label>Preferred time slots</Label>
-        <p className="text-muted-foreground text-xs">
-          Pick the times you can work, or pick Flexible if your schedule
-          varies week to week.
-        </p>
         <CheckboxGroup
           options={timeSlotOptions}
           selected={values.time_slots}
-          onChange={(selected) => {
-            const FLEXIBLE = "flexible";
-            const wasFlexible = values.time_slots.includes(FLEXIBLE);
-            const nowFlexible = selected.includes(FLEXIBLE);
-
-            let next = selected;
-            if (!wasFlexible && nowFlexible) {
-              // User just turned on Flexible. Clear any specific slots.
-              next = [FLEXIBLE];
-            } else if (nowFlexible && selected.length > 1) {
-              // Flexible was already on and the user added a specific slot.
-              // Honor the new selection; drop Flexible.
-              next = selected.filter((s) => s !== FLEXIBLE);
-            }
-            onChange("time_slots", next);
-          }}
+          onChange={(selected) => onChange("time_slots", selected)}
           columns={3}
         />
         {errors.time_slots && (
