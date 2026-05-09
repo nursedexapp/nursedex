@@ -97,13 +97,36 @@ export function SkillsFields({ values, onChange, errors }: SkillsFieldsProps) {
         )}
       </div>
 
-      {/* Time slots */}
+      {/* Time slots. Flexible is mutually exclusive with specific slots,
+          since "I work these specific times" and "my schedule varies, let's
+          talk" are different signals to a family. Without the mutex, it
+          read as redundant: selecting all five named slots looked the same
+          as Flexible. */}
       <div className="space-y-2">
         <Label>Preferred time slots</Label>
+        <p className="text-muted-foreground text-xs">
+          Pick the times you can work, or pick Flexible if your schedule
+          varies week to week.
+        </p>
         <CheckboxGroup
           options={timeSlotOptions}
           selected={values.time_slots}
-          onChange={(selected) => onChange("time_slots", selected)}
+          onChange={(selected) => {
+            const FLEXIBLE = "flexible";
+            const wasFlexible = values.time_slots.includes(FLEXIBLE);
+            const nowFlexible = selected.includes(FLEXIBLE);
+
+            let next = selected;
+            if (!wasFlexible && nowFlexible) {
+              // User just turned on Flexible. Clear any specific slots.
+              next = [FLEXIBLE];
+            } else if (nowFlexible && selected.length > 1) {
+              // Flexible was already on and the user added a specific slot.
+              // Honor the new selection; drop Flexible.
+              next = selected.filter((s) => s !== FLEXIBLE);
+            }
+            onChange("time_slots", next);
+          }}
           columns={3}
         />
         {errors.time_slots && (
