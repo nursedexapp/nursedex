@@ -1,8 +1,7 @@
 "use client";
 
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { Lock } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 
 interface CheckboxGroupProps {
   options: { value: string; label: string }[];
@@ -47,45 +46,49 @@ export function CheckboxGroup({
           if (!isDisabled || isSelected) toggle(value);
         };
 
-        // Whole card is the interactive surface. base-ui's Checkbox.Root
-        // doesn't get clicks forwarded from a wrapping native <label>
-        // (it's a button-like element, not a labelable form control), so
-        // we drive selection from this outer div via role="checkbox" with
-        // explicit click + keyboard handlers. The inner Checkbox is just
-        // visual feedback.
+        // Each card is a single button-like control. Earlier the inner
+        // checkbox used base-ui's primitive, which renders as a button
+        // and didn't forward clicks from a wrapping <label>. The next
+        // attempt used pointer-events-none on the primitive, but the
+        // primitive's hit-area pseudo-elements still intercepted some
+        // clicks. Easiest reliable fix: render a plain visual indicator
+        // here and let the wrapping button own all interaction.
         return (
-          <div
+          <button
             key={value}
+            type="button"
             role="checkbox"
             aria-checked={isSelected}
             aria-disabled={isDisabled && !isSelected}
-            tabIndex={isDisabled && !isSelected ? -1 : 0}
+            disabled={isDisabled && !isSelected}
             onClick={handleActivate}
-            onKeyDown={(e) => {
-              if (e.key === " " || e.key === "Enter") {
-                e.preventDefault();
-                handleActivate();
-              }
-            }}
             className={cn(
-              "focus-visible:ring-teal flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+              "focus-visible:ring-teal flex w-full cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
               isSelected
                 ? "border-teal bg-teal/5"
                 : "border-input hover:bg-sage/10",
               isDisabled && !isSelected && "cursor-not-allowed opacity-50",
             )}
           >
-            <Checkbox
-              checked={isSelected}
-              tabIndex={-1}
-              aria-hidden={true}
-              className="pointer-events-none"
-            />
+            <span
+              aria-hidden="true"
+              className={cn(
+                "flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors",
+                isSelected
+                  ? "bg-teal border-teal text-warm-white"
+                  : "border-input bg-transparent",
+              )}
+            >
+              {isSelected && <Check className="size-3" strokeWidth={3} />}
+            </span>
             <span className="flex-1">{label}</span>
             {isDisabled && !isSelected && (
-              <Lock className="text-muted-foreground size-3.5" />
+              <Lock
+                aria-hidden="true"
+                className="text-muted-foreground size-3.5"
+              />
             )}
-          </div>
+          </button>
         );
       })}
     </div>
