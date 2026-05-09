@@ -157,13 +157,15 @@ function PricingCard({
       : "bg-soft-black hover:bg-soft-black/90 text-white";
 
   return (
-    <Card className={`${border} relative ${highlight ? "shadow-lg" : ""}`}>
+    <Card
+      className={`${border} relative h-full ${highlight ? "shadow-lg" : ""}`}
+    >
       {highlight && (
         <Badge className="bg-teal absolute top-4 right-4 text-white">
           Most popular
         </Badge>
       )}
-      <CardContent className="space-y-4 pt-6">
+      <CardContent className="flex flex-1 flex-col gap-4 pt-6">
         <div className="flex items-center gap-2">
           <div className="text-teal">{icon}</div>
           <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
@@ -180,7 +182,7 @@ function PricingCard({
           <span className="text-muted-foreground text-sm">{period}</span>
         </div>
         <p className="text-soft-black-light text-sm">{desc}</p>
-        <ul className="space-y-2 text-sm">
+        <ul className="flex-1 space-y-2 text-sm">
           {perks.map((p) => (
             <li key={p} className="flex items-start gap-2">
               <Check className="text-teal mt-0.5 size-4 shrink-0" />
