@@ -29,7 +29,7 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
             id="first_name"
             value={values.first_name}
             onChange={(e) => onChange("first_name", e.target.value)}
-            placeholder="Jane"
+            placeholder="e.g., Jane"
             aria-invalid={errors.first_name ? true : undefined}
           />
           {errors.first_name && (
@@ -42,7 +42,7 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
             id="last_name"
             value={values.last_name}
             onChange={(e) => onChange("last_name", e.target.value)}
-            placeholder="Doe"
+            placeholder="e.g., Doe"
             aria-invalid={errors.last_name ? true : undefined}
           />
           {errors.last_name && (
@@ -110,7 +110,7 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
             const val = e.target.value;
             onChange("years_experience", val === "" ? "" : parseInt(val, 10));
           }}
-          placeholder="5"
+          placeholder="e.g., 5"
           className="w-32"
           aria-invalid={errors.years_experience ? true : undefined}
         />

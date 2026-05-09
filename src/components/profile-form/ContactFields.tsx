@@ -108,7 +108,7 @@ export function ContactFields({
             const val = e.target.value.replace(/\D/g, "").slice(0, 5);
             onChange("zip_code", val);
           }}
-          placeholder="11701"
+          placeholder="e.g., 11701"
           className="w-32"
           maxLength={5}
           aria-invalid={errors.zip_code ? true : undefined}
@@ -141,7 +141,7 @@ export function ContactFields({
                 val === "" ? "" : parseInt(val, 10),
               );
             }}
-            placeholder="25"
+            placeholder="e.g., 25"
             className="w-24"
             aria-invalid={errors.travel_radius_miles ? true : undefined}
           />
