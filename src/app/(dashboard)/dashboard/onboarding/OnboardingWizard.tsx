@@ -115,25 +115,37 @@ export function OnboardingWizard({
     setLoaded(true);
   }, [profile, userName, userEmail]);
 
-  // Save draft to localStorage whenever it changes
-  const saveDraft = useCallback((updated: NurseProfileDraft) => {
-    setDraft(updated);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch {
-      // localStorage full or unavailable
-    }
-  }, []);
+  // Save draft to localStorage whenever it changes. Uses the functional
+  // setState form so back-to-back updates compose correctly. The earlier
+  // signature (saveDraft(nextDraft)) closed over `draft` at call time,
+  // so two updateField calls in the same tick (e.g. CheckboxGroup
+  // setting both care_types and primary_care_type when reaching length
+  // 1) would each spread the same stale draft and the second would
+  // clobber the first. Now the updater always sees the freshest state.
+  const saveDraft = useCallback(
+    (updater: (prev: NurseProfileDraft) => NurseProfileDraft) => {
+      setDraft((prev) => {
+        const next = updater(prev);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        } catch {
+          // localStorage full or unavailable
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   const updateField = useCallback(
     (field: string, value: unknown) => {
-      saveDraft({ ...draft, [field]: value });
+      saveDraft((prev) => ({ ...prev, [field]: value }));
       // Clear error for this field when it changes
-      if (errors[field]) {
-        setErrors((prev) => ({ ...prev, [field]: undefined }));
-      }
+      setErrors((prev) =>
+        prev[field] ? { ...prev, [field]: undefined } : prev,
+      );
     },
-    [draft, errors, saveDraft],
+    [saveDraft],
   );
 
   const goToStep = useCallback(
@@ -145,12 +157,12 @@ export function OnboardingWizard({
 
   const markStepComplete = useCallback(
     (step: number) => {
-      saveDraft({
-        ...draft,
-        completed_step: Math.max(draft.completed_step || 0, step),
-      });
+      saveDraft((prev) => ({
+        ...prev,
+        completed_step: Math.max(prev.completed_step || 0, step),
+      }));
     },
-    [draft, saveDraft],
+    [saveDraft],
   );
 
   // ── Generic step submit handler ───────────────────────────
