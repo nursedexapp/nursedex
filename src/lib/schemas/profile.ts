@@ -138,6 +138,7 @@ export function step4Schema(tier: NurseTier) {
       .refine((bio) => !isBioFromPlaceholder(bio), BIO_PLACEHOLDER_ERROR),
     photos: z
       .array(z.string())
+      .min(1, "Please upload at least one photo")
       .max(
         limits.maxPhotos,
         `Your plan allows up to ${limits.maxPhotos} photo${limits.maxPhotos === 1 ? "" : "s"}`,
@@ -229,7 +230,7 @@ export function fullProfileSchema(tier: NurseTier) {
         .min(1)
         .max(limits.bioMaxLength)
         .refine((bio) => !isBioFromPlaceholder(bio), BIO_PLACEHOLDER_ERROR),
-      photos: z.array(z.string()).max(limits.maxPhotos),
+      photos: z.array(z.string()).min(1).max(limits.maxPhotos),
       // Step 5
       contact_email: z.string().email().or(z.literal("")).nullable(),
       contact_phone: z
