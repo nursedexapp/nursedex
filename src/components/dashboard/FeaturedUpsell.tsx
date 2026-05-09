@@ -23,9 +23,9 @@ export function FeaturedUpsell({ isVerified }: FeaturedUpsellProps) {
         Want top placement and analytics?{" "}
         <Link
           href="/pricing"
-          className="text-teal hover:text-teal-dark font-medium underline-offset-4 hover:underline"
+          className="text-teal hover:text-teal-dark font-medium underline underline-offset-4 hover:no-underline"
         >
-          See Featured pricing
+          See Featured Pricing →
         </Link>
       </p>
     </div>
