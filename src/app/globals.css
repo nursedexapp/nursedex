@@ -90,3 +90,24 @@ body {
     transform: translateY(0);
   }
 }
+
+@keyframes mailArrive {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-mail-arrive {
+    animation: mailArrive 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+}

@@ -28,11 +28,27 @@ export default function SignUpPage() {
   }, []);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Joining...");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
   }>({});
+
+  // After 1.5s of loading, swap the button copy to acknowledge the slow
+  // path. Supabase signup + our hook + Resend can take a couple seconds
+  // on a cold path. "Joining..." then "Almost there..." reads as a
+  // single thoughtful experience instead of a stuck spinner.
+  useEffect(() => {
+    if (!loading) {
+      setLoadingMessage("Joining...");
+      return;
+    }
+    const timer = setTimeout(() => {
+      setLoadingMessage("Almost there...");
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [loading]);
   const errorRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -204,7 +220,7 @@ export default function SignUpPage() {
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Joining...
+              {loadingMessage}
             </>
           ) : (
             "Join NurseDex"
