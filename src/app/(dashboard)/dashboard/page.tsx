@@ -2,7 +2,8 @@ import { requireAuth } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { calculateCompleteness } from "@/lib/profile/completeness";
-import { VerificationBanner } from "@/components/dashboard/VerificationBanner";
+import { VerificationStatus } from "@/components/dashboard/VerificationStatus";
+import { Greeting } from "@/components/dashboard/Greeting";
 import { CompletenessCard } from "@/components/dashboard/CompletenessCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { FeaturedUpsell } from "@/components/dashboard/FeaturedUpsell";
@@ -37,9 +38,7 @@ export default async function DashboardPage() {
     return (
       <div className="p-6 sm:p-8">
         <h1 className="font-heading text-2xl font-semibold">Dashboard</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Welcome back, {user.first_name || user.email}
-        </p>
+        <Greeting firstName={user.first_name || user.email} />
 
         {!hasTakenSurvey && (
           <Card className="border-teal/30 bg-teal/5 mt-6">
@@ -167,15 +166,14 @@ export default async function DashboardPage() {
     <div className="p-6 sm:p-8">
       <div className="mb-6">
         <h1 className="font-heading text-2xl font-semibold">Dashboard</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Welcome back, {user.first_name || "there"}
-        </p>
+        <Greeting firstName={user.first_name || "there"} />
       </div>
 
       <div className="mx-auto max-w-3xl space-y-6">
-        <VerificationBanner
+        <VerificationStatus
           status={profile.verification_status}
           rejectedReason={profile.verification_rejected_reason}
+          slug={profile.slug}
         />
 
         <CompletenessCard score={score} missing={missing} />
