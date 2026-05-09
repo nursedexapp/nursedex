@@ -54,7 +54,7 @@ export function QuickActions({
         >
           {isAvailable ? (
             <>
-              <UserCheck className="size-4 text-emerald-500" />
+              <UserCheck className="text-success size-4" />
               <span>Accepting new clients</span>
               <span className="text-muted-foreground ml-auto text-xs">
                 Turn off

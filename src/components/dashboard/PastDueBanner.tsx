@@ -33,18 +33,18 @@ export function PastDueBanner({ planType }: PastDueBannerProps) {
       : "We couldn't charge your card for Featured. Update your payment method to keep your Featured badge and search boost.";
 
   return (
-    <div className="border-b border-amber-200 bg-amber-50 px-6 py-3">
+    <div className="border-warning/30 bg-warning/10 border-b px-6 py-3">
       <div className="mx-auto flex max-w-6xl items-center gap-3">
         <AlertTriangle
-          className="size-4 shrink-0 text-amber-700"
+          className="text-warning size-4 shrink-0"
           aria-hidden="true"
         />
-        <p className="flex-1 text-sm text-amber-900">{message}</p>
+        <p className="text-warning flex-1 text-sm">{message}</p>
         <button
           type="button"
           onClick={handleUpdate}
           disabled={loading}
-          className="inline-flex h-8 cursor-pointer items-center justify-center rounded-md border border-amber-300 bg-white px-3 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-wait"
+          className="border-warning/40 text-warning hover:bg-warning/20 inline-flex h-8 cursor-pointer items-center justify-center rounded-md border bg-white px-3 text-xs font-medium disabled:cursor-wait"
         >
           {loading ? (
             <>

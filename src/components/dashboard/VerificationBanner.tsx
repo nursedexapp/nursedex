@@ -14,27 +14,27 @@ const CONFIG = {
     label: "Reviewing",
     description:
       "We're reviewing your license. Usually 24 to 72 hours. We'll email you the moment your profile is live.",
-    bg: "bg-amber-50 border-amber-200",
-    text: "text-amber-800",
-    badge: "bg-amber-100 text-amber-800",
+    bg: "bg-warning/10 border-warning/30",
+    text: "text-warning",
+    badge: "bg-warning/20 text-warning",
   },
   verified: {
     icon: CheckCircle2,
     label: "Live",
     description:
       "Families on Long Island can now find you. Share your link to start collecting reviews.",
-    bg: "bg-emerald-50 border-emerald-200",
-    text: "text-emerald-800",
-    badge: "bg-emerald-100 text-emerald-800",
+    bg: "bg-success/10 border-success/30",
+    text: "text-success",
+    badge: "bg-success/20 text-success",
   },
   rejected: {
     icon: XCircle,
     label: "Action needed",
     description:
       "Update what we flagged below and resubmit. We'll re-review within 24 hours.",
-    bg: "bg-red-50 border-red-200",
-    text: "text-red-800",
-    badge: "bg-red-100 text-red-800",
+    bg: "bg-error/10 border-error/30",
+    text: "text-error",
+    badge: "bg-error/20 text-error",
   },
 };
 

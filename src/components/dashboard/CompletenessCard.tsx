@@ -45,10 +45,10 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
                 className={cn(
                   "transition-all duration-500",
                   score >= 80
-                    ? "text-emerald-500"
+                    ? "text-success"
                     : score >= 50
                       ? "text-teal"
-                      : "text-amber-500",
+                      : "text-warning",
                 )}
               />
             </svg>
@@ -80,7 +80,7 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
               )}
             </div>
           ) : (
-            <p className="text-sm font-medium text-emerald-600">
+            <p className="text-success text-sm font-medium">
               Looking great. Your profile is fully filled in.
             </p>
           )}
