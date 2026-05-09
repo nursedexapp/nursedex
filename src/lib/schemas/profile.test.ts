@@ -234,12 +234,56 @@ describe("step5Schema", () => {
   it("accepts phone only", () => {
     const result = step5Schema.safeParse({
       contact_email: "",
-      contact_phone: "(631) 555-0123",
+      contact_phone: "(631) 482-7193",
       communication_preference: "phone",
       zip_code: "11701",
       travel_radius_miles: 25,
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects phone with 555 prefix", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "",
+      contact_phone: "(516) 555-1234",
+      communication_preference: "phone",
+      zip_code: "11701",
+      travel_radius_miles: 25,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects phone with sequential digits", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "",
+      contact_phone: "5161234567",
+      communication_preference: "phone",
+      zip_code: "11701",
+      travel_radius_miles: 25,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects phone that is all the same digit", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "",
+      contact_phone: "5555555555",
+      communication_preference: "phone",
+      zip_code: "11701",
+      travel_radius_miles: 25,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects partial phone number", () => {
+    const result = step5Schema.safeParse({
+      contact_email: "",
+      contact_phone: "(631) 23",
+      communication_preference: "phone",
+      zip_code: "11701",
+      travel_radius_miles: 25,
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects invalid zip code", () => {

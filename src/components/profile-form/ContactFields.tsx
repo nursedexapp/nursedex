@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommunicationPreference } from "@/types/enums";
 import { cn } from "@/lib/utils";
+import { formatPhone } from "@/lib/utils/phone";
 
 const COMM_OPTIONS = [
   { value: CommunicationPreference.EMAIL, label: "Email" },
@@ -52,9 +53,12 @@ export function ContactFields({
         <Input
           id="contact_phone"
           type="tel"
+          inputMode="tel"
           value={values.contact_phone}
-          onChange={(e) => onChange("contact_phone", e.target.value)}
-          placeholder="(631) 555-0123"
+          onChange={(e) =>
+            onChange("contact_phone", formatPhone(e.target.value))
+          }
+          placeholder="(631) 482-7193"
           aria-invalid={errors.contact_phone ? true : undefined}
         />
         <p className="text-muted-foreground text-xs">
