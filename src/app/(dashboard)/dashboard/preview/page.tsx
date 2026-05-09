@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { getSignedPhotoUrl } from "@/lib/profile/photos";
+import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
 import { NurseProfileFull } from "@/components/profile/NurseProfileFull";
 
 export default async function PreviewPage() {
@@ -17,6 +18,14 @@ export default async function PreviewPage() {
 
   if (!profile) {
     redirect("/dashboard");
+  }
+
+  // Preview only makes sense once the profile is complete. If the user
+  // gets here mid-wizard (e.g., via the sidebar nav), send them back to
+  // the right step instead of rendering a half-empty preview.
+  const onboardingStatus = getOnboardingStatus(profile, user);
+  if (!onboardingStatus.complete) {
+    redirect(`/dashboard/onboarding?step=${onboardingStatus.nextStep}`);
   }
 
   // Get photo URL for first photo
