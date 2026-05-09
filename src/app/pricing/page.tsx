@@ -5,7 +5,10 @@ import { Header } from "@/components/shared/Header";
 import { Footer } from "@/components/shared/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CheckoutButton } from "@/components/pricing/CheckoutButton";
 import { PRICING } from "@/lib/constants";
+import { getCurrentUser } from "@/lib/auth/helpers";
+import { getActiveSubscription } from "@/lib/subscriptions/queries";
 
 export const metadata: Metadata = {
   title: "Pricing | NurseDex",
@@ -46,7 +49,38 @@ const FEATURED_NURSE_PERKS = [
   "Cohort comparison: see how you stack up",
 ];
 
-export default function PricingPage() {
+type Audience = "families" | "nurses";
+
+interface PricingPageProps {
+  searchParams: Promise<{ audience?: string }>;
+}
+
+export default async function PricingPage({ searchParams }: PricingPageProps) {
+  const user = await getCurrentUser();
+  const params = await searchParams;
+
+  const knownAudience: Audience | null =
+    user?.role === "nurse"
+      ? "nurses"
+      : user?.role === "family"
+        ? "families"
+        : null;
+
+  const toggleAudience: Audience =
+    params.audience === "nurses" ? "nurses" : "families";
+
+  const audience: Audience = knownAudience ?? toggleAudience;
+  const showToggle = knownAudience === null;
+
+  const nurseFeaturedSub =
+    audience === "nurses" && user?.role === "nurse"
+      ? await getActiveSubscription(user.id, "nurse_featured")
+      : null;
+  const familyAccessSub =
+    audience === "families" && user?.role === "family"
+      ? await getActiveSubscription(user.id, "family_access")
+      : null;
+
   return (
     <div className="bg-warm-white flex min-h-screen flex-col">
       <Header />
@@ -57,50 +91,27 @@ export default function PricingPage() {
               Simple pricing
             </h1>
             <p className="text-soft-black-light mx-auto mt-3 max-w-2xl text-center text-base">
-              Browsing is free for everyone. Families pay to reveal contact
-              info, nurses pay only if they want priority placement.
+              {audience === "nurses"
+                ? "Build your profile free, or go Featured for priority placement."
+                : "Browse for free. Pay only when you're ready to reveal contact info."}
             </p>
+            {showToggle && <AudienceToggle current={audience} />}
           </div>
         </section>
 
         <section className="bg-warm-white">
           <div className="mx-auto max-w-6xl px-6 py-12">
-            <div className="grid gap-6 lg:grid-cols-3">
-              <PricingCard
-                icon={<Heart className="size-5" />}
-                eyebrow="For families"
-                title="Family Access"
-                price={`$${PRICING.FAMILY_ACCESS_MONTHLY}`}
-                period="per month"
-                desc="Unlock contact info for any verified nurse on Long Island."
-                perks={FAMILY_PERKS}
-                cta={{ href: "/signup", label: "Get Family Access" }}
-                accent="teal"
+            {audience === "families" ? (
+              <FamilyView
+                isLoggedInFamily={user?.role === "family"}
+                hasActiveSub={!!familyAccessSub}
               />
-              <PricingCard
-                icon={<Star className="size-5" />}
-                eyebrow="For nurses"
-                title="Free"
-                price="$0"
-                period="forever"
-                desc="Build a profile, get verified, and start getting found."
-                perks={FREE_NURSE_PERKS}
-                cta={{ href: "/signup", label: "Join free" }}
-                accent="sage"
+            ) : (
+              <NurseView
+                isLoggedInNurse={user?.role === "nurse"}
+                hasFeatured={!!nurseFeaturedSub}
               />
-              <PricingCard
-                icon={<Star className="size-5" />}
-                eyebrow="For nurses"
-                title="Featured"
-                price={`$${PRICING.NURSE_FEATURED_MONTHLY}`}
-                period="per month"
-                desc="Stand out and get priority verification on top of everything in Free."
-                perks={FEATURED_NURSE_PERKS}
-                cta={{ href: "/signup", label: "Start as Featured" }}
-                accent="featured"
-                highlight
-              />
-            </div>
+            )}
 
             <div className="mt-10 grid gap-6 sm:grid-cols-2">
               <FineprintCard
@@ -109,7 +120,11 @@ export default function PricingPage() {
               />
               <FineprintCard
                 title="Cancellation"
-                body="Family Access has a 60-day grace window after cancellation: you'll keep access to nurses you already revealed, but won't be able to reveal new ones. Featured drops to Free immediately at the end of the billing period."
+                body={
+                  audience === "nurses"
+                    ? "Featured drops to Free immediately at the end of the billing period."
+                    : "Family Access has a 60-day grace window after cancellation: you'll keep access to nurses you already revealed, but won't be able to reveal new ones."
+                }
               />
             </div>
           </div>
@@ -120,6 +135,132 @@ export default function PricingPage() {
   );
 }
 
+function AudienceToggle({ current }: { current: Audience }) {
+  const baseClass =
+    "rounded-full px-4 py-2 text-sm font-medium transition-colors";
+  const activeClass = "bg-teal text-white";
+  const idleClass =
+    "bg-white text-soft-black ring-1 ring-sage/30 hover:bg-sage/10";
+  return (
+    <div className="mx-auto mt-6 flex w-fit gap-1 rounded-full bg-white p-1 ring-1 ring-sage-light/40">
+      <Link
+        href="/pricing?audience=families"
+        className={`${baseClass} ${current === "families" ? activeClass : idleClass}`}
+      >
+        For families
+      </Link>
+      <Link
+        href="/pricing?audience=nurses"
+        className={`${baseClass} ${current === "nurses" ? activeClass : idleClass}`}
+      >
+        For nurses
+      </Link>
+    </div>
+  );
+}
+
+interface FamilyViewProps {
+  isLoggedInFamily: boolean;
+  hasActiveSub: boolean;
+}
+
+function FamilyView({ isLoggedInFamily, hasActiveSub }: FamilyViewProps) {
+  const cta = !isLoggedInFamily
+    ? { kind: "link" as const, href: "/signup", label: "Get Family Access" }
+    : hasActiveSub
+      ? {
+          kind: "action" as const,
+          action: "customer_portal" as const,
+          label: "Manage subscription",
+        }
+      : {
+          kind: "action" as const,
+          action: "family_access_checkout" as const,
+          label: "Get Family Access",
+        };
+
+  return (
+    <div className="mx-auto max-w-md">
+      <PricingCard
+        icon={<Heart className="size-5" />}
+        eyebrow="For families"
+        title="Family Access"
+        price={`$${PRICING.FAMILY_ACCESS_MONTHLY}`}
+        period="per month"
+        desc="Unlock contact info for any verified nurse on Long Island."
+        perks={FAMILY_PERKS}
+        cta={cta}
+        accent="teal"
+      />
+    </div>
+  );
+}
+
+interface NurseViewProps {
+  isLoggedInNurse: boolean;
+  hasFeatured: boolean;
+}
+
+function NurseView({ isLoggedInNurse, hasFeatured }: NurseViewProps) {
+  const freeCta = !isLoggedInNurse
+    ? { kind: "link" as const, href: "/signup", label: "Join free" }
+    : { kind: "currentPlan" as const, label: "Your current plan" };
+
+  const featuredCta = !isLoggedInNurse
+    ? { kind: "link" as const, href: "/signup", label: "Start as Featured" }
+    : hasFeatured
+      ? {
+          kind: "action" as const,
+          action: "customer_portal" as const,
+          label: "Manage subscription",
+        }
+      : {
+          kind: "action" as const,
+          action: "nurse_featured_checkout" as const,
+          label: "Upgrade to Featured",
+        };
+
+  return (
+    <div className="grid gap-6 sm:grid-cols-2">
+      <PricingCard
+        icon={<Star className="size-5" />}
+        eyebrow="For nurses"
+        title="Free"
+        price="$0"
+        period="forever"
+        desc="Build a profile, get verified, and start getting found."
+        perks={FREE_NURSE_PERKS}
+        cta={freeCta}
+        accent="sage"
+      />
+      <PricingCard
+        icon={<Star className="size-5" />}
+        eyebrow="For nurses"
+        title="Featured"
+        price={`$${PRICING.NURSE_FEATURED_MONTHLY}`}
+        period="per month"
+        desc="Stand out and get priority verification on top of everything in Free."
+        perks={FEATURED_NURSE_PERKS}
+        cta={featuredCta}
+        accent="featured"
+        highlight
+      />
+    </div>
+  );
+}
+
+type CtaSpec =
+  | { kind: "link"; href: string; label: string }
+  | {
+      kind: "action";
+      action:
+        | "nurse_featured_checkout"
+        | "family_access_checkout"
+        | "customer_portal";
+      label: string;
+    }
+  | { kind: "currentPlan"; label: string };
+
 interface PricingCardProps {
   icon: React.ReactNode;
   eyebrow: string;
@@ -128,7 +269,7 @@ interface PricingCardProps {
   period: string;
   desc: string;
   perks: string[];
-  cta: { href: string; label: string };
+  cta: CtaSpec;
   accent: "teal" | "sage" | "featured";
   highlight?: boolean;
 }
@@ -155,6 +296,8 @@ function PricingCard({
     accent === "featured" || accent === "teal"
       ? "bg-teal hover:bg-teal-dark text-white"
       : "bg-soft-black hover:bg-soft-black/90 text-white";
+
+  const ctaBaseClass = `inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors ${ctaClass}`;
 
   return (
     <Card
@@ -190,12 +333,21 @@ function PricingCard({
             </li>
           ))}
         </ul>
-        <Link
-          href={cta.href}
-          className={`inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors ${ctaClass}`}
-        >
-          {cta.label}
-        </Link>
+        {cta.kind === "link" ? (
+          <Link href={cta.href} className={ctaBaseClass}>
+            {cta.label}
+          </Link>
+        ) : cta.kind === "action" ? (
+          <CheckoutButton
+            action={cta.action}
+            label={cta.label}
+            className={ctaBaseClass}
+          />
+        ) : (
+          <div className="bg-sage/10 text-soft-black-light inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium">
+            {cta.label}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
