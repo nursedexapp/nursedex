@@ -10,6 +10,7 @@ import {
 } from "@/types/enums";
 import { TIER_LIMITS } from "@/lib/constants";
 import type { NurseTier } from "@/types/enums";
+import { validatePhone } from "@/lib/utils/phone";
 
 // ── Step 1: Basics ──────────────────────────────────────────
 
@@ -159,10 +160,17 @@ export const step5Schema = z
       .default(null),
     contact_phone: z
       .string()
-      .regex(/^[\d\s()+-]*$/, "Please enter a valid phone number")
       .or(z.literal(""))
       .nullable()
-      .default(null),
+      .default(null)
+      .superRefine((val, ctx) => {
+        const err = validatePhone(val);
+        if (err)
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: err,
+          });
+      }),
     communication_preference: z.nativeEnum(
       CommunicationPreference,
       "Select a preferred communication method",
@@ -234,9 +242,16 @@ export function fullProfileSchema(tier: NurseTier) {
       contact_email: z.string().email().or(z.literal("")).nullable(),
       contact_phone: z
         .string()
-        .regex(/^[\d\s()+-]*$/)
         .or(z.literal(""))
-        .nullable(),
+        .nullable()
+        .superRefine((val, ctx) => {
+          const err = validatePhone(val);
+          if (err)
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: err,
+            });
+        }),
       communication_preference: z.nativeEnum(CommunicationPreference),
       zip_code: z.string().regex(/^\d{5}$/),
       travel_radius_miles: z.number().int().min(1).max(100),
