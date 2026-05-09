@@ -79,7 +79,7 @@ export async function getSignedPhotoUrls(
  */
 export async function validateUploadedPhoto(
   path: string,
-): Promise<{ valid: boolean; error?: string }> {
+): Promise<{ valid: boolean; signedUrl?: string; error?: string }> {
   const supabase = await createClient();
 
   const { data, error } = await supabase.storage.from(BUCKET).download(path);
@@ -110,7 +110,12 @@ export async function validateUploadedPhoto(
     };
   }
 
-  return { valid: true };
+  // Sign a short-lived display URL so the client can show the preview
+  // immediately after upload without a second round trip. Falling back
+  // to undefined here just delays the preview until the next render
+  // that re-fetches photoUrls server-side.
+  const signed = await getSignedPhotoUrl(path);
+  return { valid: true, signedUrl: signed ?? undefined };
 }
 
 /**
