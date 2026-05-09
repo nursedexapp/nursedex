@@ -5,6 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { PhotoUpload } from "./PhotoUpload";
 import type { NurseTier } from "@/types/enums";
 import { TIER_LIMITS } from "@/lib/constants";
+import {
+  isBioFromPlaceholder,
+  BIO_PLACEHOLDER_ERROR,
+} from "@/lib/schemas/profile";
 import { cn } from "@/lib/utils";
 
 interface BioFieldsProps {
@@ -28,6 +32,12 @@ export function BioFields({
   const maxBio = TIER_LIMITS[tier].bioMaxLength;
   const bioLength = values.bio.length;
   const bioPercent = bioLength / maxBio;
+  // Surface the "looks like the placeholder" warning as the user types,
+  // not just on submit. Only kick in once they've typed enough to
+  // plausibly contain a flagged phrase, otherwise it fires on every
+  // partial keystroke during normal copying.
+  const looksLikePlaceholder =
+    bioLength >= 30 && isBioFromPlaceholder(values.bio);
 
   return (
     <>
@@ -59,7 +69,11 @@ export function BioFields({
         >
           {bioLength}/{maxBio}
         </p>
-        {errors.bio && <p className="text-destructive text-xs">{errors.bio}</p>}
+        {errors.bio ? (
+          <p className="text-destructive text-xs">{errors.bio}</p>
+        ) : looksLikePlaceholder ? (
+          <p className="text-warning text-xs">{BIO_PLACEHOLDER_ERROR}</p>
+        ) : null}
       </div>
 
       {/* Photos */}

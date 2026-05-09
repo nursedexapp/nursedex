@@ -107,6 +107,23 @@ export type Step3Data = z.infer<typeof step3Schema>;
 
 // ── Step 4: Bio & Photos ────────────────────────────────────
 
+// Phrases lifted from the bio placeholder. If a nurse's bio contains
+// any of these, they almost certainly copied the example and tweaked
+// a word or two. Both phrases are distinctive enough that they
+// wouldn't appear in a genuine bio without copy-pasting.
+const BIO_PLACEHOLDER_PHRASES = [
+  "i have been a dedicated healthcare professional",
+  "i treat every patient like family",
+];
+
+export function isBioFromPlaceholder(bio: string): boolean {
+  const normalized = bio.toLowerCase();
+  return BIO_PLACEHOLDER_PHRASES.some((phrase) => normalized.includes(phrase));
+}
+
+export const BIO_PLACEHOLDER_ERROR =
+  "This looks like our example bio. Please write something in your own words so families get to know the real you.";
+
 export function step4Schema(tier: NurseTier) {
   const limits = TIER_LIMITS[tier];
 
@@ -117,7 +134,8 @@ export function step4Schema(tier: NurseTier) {
       .max(
         limits.bioMaxLength,
         `Bio must be under ${limits.bioMaxLength} characters`,
-      ),
+      )
+      .refine((bio) => !isBioFromPlaceholder(bio), BIO_PLACEHOLDER_ERROR),
     photos: z
       .array(z.string())
       .max(
@@ -206,7 +224,11 @@ export function fullProfileSchema(tier: NurseTier) {
       care_philosophy: z.string().max(500).nullable(),
       additional_certs: z.array(z.string().min(1)).default([]),
       // Step 4
-      bio: z.string().min(1).max(limits.bioMaxLength),
+      bio: z
+        .string()
+        .min(1)
+        .max(limits.bioMaxLength)
+        .refine((bio) => !isBioFromPlaceholder(bio), BIO_PLACEHOLDER_ERROR),
       photos: z.array(z.string()).max(limits.maxPhotos),
       // Step 5
       contact_email: z.string().email().or(z.literal("")).nullable(),
