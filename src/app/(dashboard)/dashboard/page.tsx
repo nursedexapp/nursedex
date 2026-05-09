@@ -15,7 +15,6 @@ import { ReviewLinkCard } from "@/components/dashboard/ReviewLinkCard";
 import { NurseClaimHireCard } from "@/components/hires/NurseClaimHireCard";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { getRevealedNurses } from "@/lib/reveals/queries";
-import { getOrCreateReviewLink } from "@/lib/reviews/external-actions";
 import { NurseCard } from "@/components/nurses/NurseCard";
 import Link from "next/link";
 
@@ -123,11 +122,6 @@ export default async function DashboardPage() {
       ? await getActiveSubscription(user.id, "nurse_featured")
       : null;
 
-  const reviewLink =
-    profile.verification_status === "verified"
-      ? (await getOrCreateReviewLink()).link
-      : null;
-
   const isVerified = profile.verification_status === "verified";
 
   return (
@@ -154,7 +148,7 @@ export default async function DashboardPage() {
               slug={profile.slug}
               isAvailable={profile.is_available}
             />
-            {reviewLink && <ReviewLinkCard initialToken={reviewLink.token} />}
+            <ReviewLinkCard slug={profile.slug} />
             <NurseClaimHireCard />
             {profile.tier === "free" && <FeaturedUpsell isVerified={true} />}
             {profile.tier === "featured" && featuredSub && (
