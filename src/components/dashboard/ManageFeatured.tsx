@@ -57,7 +57,7 @@ export function ManageFeatured({
           {isPastDue && (
             <Badge
               variant="outline"
-              className="gap-1 border-amber-300 bg-amber-50 text-amber-900"
+              className="border-warning/40 bg-warning/10 text-warning gap-1"
             >
               <AlertTriangle className="size-3" aria-hidden="true" />
               Payment failed
