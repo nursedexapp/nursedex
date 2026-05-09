@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
     .select(
       `
       user_id,
+      slug,
       verified_at,
-      users!inner ( email, first_name, is_deleted, is_suspended ),
-      nurse_review_links!nurse_review_links_nurse_user_id_fkey ( token )
+      users!inner ( email, first_name, is_deleted, is_suspended )
     `,
     )
     .eq("verification_status", "verified")
@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
 
   type Row = {
     user_id: string;
+    slug: string;
     verified_at: string;
     users: {
       email: string;
@@ -56,7 +57,6 @@ export async function GET(request: NextRequest) {
       is_deleted: boolean;
       is_suspended: boolean;
     } | null;
-    nurse_review_links: { token: string }[] | { token: string } | null;
   };
 
   let sent = 0;
@@ -64,13 +64,6 @@ export async function GET(request: NextRequest) {
 
   for (const row of (data ?? []) as unknown as Row[]) {
     if (!row.users || row.users.is_deleted || row.users.is_suspended) {
-      skipped++;
-      continue;
-    }
-    const link = Array.isArray(row.nurse_review_links)
-      ? row.nurse_review_links[0]
-      : row.nurse_review_links;
-    if (!link?.token) {
       skipped++;
       continue;
     }
@@ -88,7 +81,7 @@ export async function GET(request: NextRequest) {
     await sendReviewInviteEmail({
       to: row.users.email,
       firstName: row.users.first_name ?? undefined,
-      reviewLinkUrl: `https://nursedex.com/reviews/${link.token}`,
+      reviewLinkUrl: `https://nursedex.com/reviews/${row.slug}`,
     });
     sent++;
   }

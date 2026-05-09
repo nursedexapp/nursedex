@@ -1,26 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { Copy, RefreshCw, Check } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { regenerateReviewLink } from "@/lib/reviews/external-actions";
 
 interface ReviewLinkCardProps {
-  initialToken: string;
+  slug: string;
 }
 
-export function ReviewLinkCard({ initialToken }: ReviewLinkCardProps) {
-  const [token, setToken] = useState(initialToken);
+export function ReviewLinkCard({ slug }: ReviewLinkCardProps) {
   const [copied, setCopied] = useState(false);
-  const [pending, startTransition] = useTransition();
 
   const url =
     typeof window === "undefined"
-      ? `https://nursedex.com/reviews/${token}`
-      : `${window.location.origin}/reviews/${token}`;
+      ? `https://nursedex.com/reviews/${slug}`
+      : `${window.location.origin}/reviews/${slug}`;
 
   const handleCopy = async () => {
     try {
@@ -31,18 +28,6 @@ export function ReviewLinkCard({ initialToken }: ReviewLinkCardProps) {
     } catch {
       toast.error("Could not copy automatically. Select and copy the link.");
     }
-  };
-
-  const handleRegenerate = () => {
-    startTransition(async () => {
-      const result = await regenerateReviewLink();
-      if (result.error || !result.link) {
-        toast.error(result.error ?? "Could not regenerate. Please try again.");
-        return;
-      }
-      setToken(result.link.token);
-      toast.success("New link generated. Old one no longer works.");
-    });
   };
 
   return (
@@ -63,7 +48,7 @@ export function ReviewLinkCard({ initialToken }: ReviewLinkCardProps) {
             value={url}
             readOnly
             onFocus={(e) => e.currentTarget.select()}
-            className="font-mono text-xs"
+            className="text-sm"
           />
           <Button
             type="button"
@@ -79,22 +64,6 @@ export function ReviewLinkCard({ initialToken }: ReviewLinkCardProps) {
             )}
           </Button>
         </div>
-
-        <button
-          type="button"
-          onClick={handleRegenerate}
-          disabled={pending}
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-xs underline-offset-2 hover:underline disabled:opacity-60"
-        >
-          <RefreshCw
-            className={pending ? "size-3 animate-spin" : "size-3"}
-            aria-hidden="true"
-          />
-          {pending ? "Regenerating..." : "Regenerate link"}
-        </button>
-        <p className="text-muted-foreground text-[11px]">
-          Regenerating immediately invalidates the old link.
-        </p>
       </CardContent>
     </Card>
   );
