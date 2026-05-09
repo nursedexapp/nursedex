@@ -40,6 +40,10 @@ function LoginForm() {
   const [showResend, setShowResend] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendEmail, setResendEmail] = useState("");
+  // Track email separately so a failed login (wrong password, unconfirmed
+  // email, etc.) doesn't wipe what the user just typed. Password is left
+  // uncontrolled and resets on submit, which is the right security default.
+  const [email, setEmail] = useState("");
 
   async function handleSubmit(formData: FormData) {
     setError(null);
@@ -148,6 +152,8 @@ function LoginForm() {
             required
             autoFocus
             autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="h-11"
           />
         </div>
