@@ -67,8 +67,11 @@ export function StepLayout({
                   <div
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
-                      isActive && "bg-teal text-white",
-                      isComplete && "bg-teal/20 text-teal",
+                      // Both active and complete use the filled teal so the
+                      // background line behind the circle doesn't bleed
+                      // through. The icon (number vs check) distinguishes
+                      // current from past.
+                      (isActive || isComplete) && "bg-teal text-warm-white",
                       !isActive &&
                         !isComplete &&
                         "bg-sage/20 text-muted-foreground",
