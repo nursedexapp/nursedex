@@ -36,6 +36,24 @@ const skillOptions = Object.entries(SKILL_LABELS).map(([value, label]) => ({
   label,
 }));
 
+/**
+ * Strip everything except digits and at most one decimal point from a
+ * rate input so users can't type "-" or "e" or other characters that
+ * the validator would reject on submit. Returns null for empty input.
+ */
+function parseRateInput(raw: string): number | null {
+  const cleaned = raw.replace(/[^0-9.]/g, "");
+  const firstDot = cleaned.indexOf(".");
+  const final =
+    firstDot === -1
+      ? cleaned
+      : cleaned.slice(0, firstDot + 1) +
+        cleaned.slice(firstDot + 1).replace(/\./g, "");
+  if (final === "" || final === ".") return null;
+  const parsed = parseFloat(final);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 const availabilityOptions = Object.entries(AVAILABILITY_COMMITMENT_LABELS).map(
   ([value, label]) => ({ value, label }),
 );
@@ -125,12 +143,11 @@ export function SkillsFields({ values, onChange, errors }: SkillsFieldsProps) {
               $
             </span>
             <Input
-              type="number"
-              min={0}
+              type="text"
+              inputMode="decimal"
               value={values.rate_min ?? ""}
               onChange={(e) => {
-                const val = e.target.value;
-                onChange("rate_min", val === "" ? null : parseFloat(val));
+                onChange("rate_min", parseRateInput(e.target.value));
               }}
               placeholder="Min"
               className="w-28 pl-6"
@@ -143,12 +160,11 @@ export function SkillsFields({ values, onChange, errors }: SkillsFieldsProps) {
               $
             </span>
             <Input
-              type="number"
-              min={0}
+              type="text"
+              inputMode="decimal"
               value={values.rate_max ?? ""}
               onChange={(e) => {
-                const val = e.target.value;
-                onChange("rate_max", val === "" ? null : parseFloat(val));
+                onChange("rate_max", parseRateInput(e.target.value));
               }}
               placeholder="Max"
               className="w-28 pl-6"

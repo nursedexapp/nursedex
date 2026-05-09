@@ -102,13 +102,18 @@ export function BasicsFields({ values, onChange, errors }: BasicsFieldsProps) {
         <Label htmlFor="years_experience">Years of experience</Label>
         <Input
           id="years_experience"
-          type="number"
-          min={0}
-          max={70}
+          type="text"
+          inputMode="numeric"
           value={values.years_experience}
           onChange={(e) => {
-            const val = e.target.value;
-            onChange("years_experience", val === "" ? "" : parseInt(val, 10));
+            // Strip anything that isn't a digit. Years is a non-negative
+            // integer; HTML's min=0 was advisory only and let users type
+            // negatives, "e" notation, etc.
+            const cleaned = e.target.value.replace(/[^0-9]/g, "");
+            onChange(
+              "years_experience",
+              cleaned === "" ? "" : parseInt(cleaned, 10),
+            );
           }}
           placeholder="e.g., 5"
           className="w-32"
