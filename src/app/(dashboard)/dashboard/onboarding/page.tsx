@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { getSignedPhotoUrls } from "@/lib/profile/photos";
+import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
 import { OnboardingWizard } from "./OnboardingWizard";
 
 export default async function OnboardingPage() {
@@ -22,14 +23,14 @@ export default async function OnboardingPage() {
     redirect("/role-select");
   }
 
-  // If onboarding is already complete (years_experience is set during step 1),
-  // and the profile has moved past the placeholder credential, redirect to dashboard
-  const onboardingComplete =
-    profile.years_experience !== null && profile.credential !== "hha";
-
-  // Allow re-entry if credential is still placeholder even if years_experience is set
-  // (edge case: user completed step 1 but not step 2)
-  if (onboardingComplete && profile.license_number !== null) {
+  // If onboarding is fully complete, send the user to the dashboard. Use
+  // the shared getOnboardingStatus so this page agrees with the
+  // dashboard's redirect rule. Earlier this page used a narrower check
+  // (just years_experience + non-HHA credential + license), which fired
+  // true after Step 2 — and the dashboard then redirected back here,
+  // causing an infinite loop with /dashboard/onboarding?step=3.
+  const onboardingStatus = getOnboardingStatus(profile, user);
+  if (onboardingStatus.complete) {
     redirect("/dashboard");
   }
 
