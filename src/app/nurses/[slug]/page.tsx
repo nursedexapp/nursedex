@@ -34,7 +34,23 @@ export async function generateMetadata({
   params,
 }: NurseProfilePageProps): Promise<Metadata> {
   const { slug } = await params;
-  const nurse = await getNurseBySlug(slug);
+  // Mirror the page's fallback so an admin or the nurse themselves
+  // doesn't see "Nurse Not Found" in the browser tab while previewing
+  // a pending profile.
+  let nurse = await getNurseBySlug(slug);
+  if (!nurse) {
+    const user = await getCurrentUser();
+    const isAdmin =
+      user?.role === "admin" || user?.role === "super_admin";
+    if (isAdmin) {
+      nurse = await getNurseBySlugUnfiltered(slug);
+    } else if (user) {
+      const candidate = await getNurseBySlugUnfiltered(slug);
+      if (candidate && candidate.user_id === user.id) {
+        nurse = candidate;
+      }
+    }
+  }
 
   if (!nurse) {
     return { title: "Nurse Not Found | NurseDex" };
