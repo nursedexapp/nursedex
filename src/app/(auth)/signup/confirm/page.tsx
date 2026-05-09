@@ -80,7 +80,7 @@ function ConfirmContent() {
       className="flex min-h-[40vh] flex-col items-center justify-center py-8 text-center lg:min-h-0"
       style={{ animation: "fadeIn 0.4s ease-out" }}
     >
-      <div className="bg-teal/10 mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full">
+      <div className="bg-teal/10 animate-mail-arrive mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full">
         <Mail className="text-teal h-8 w-8" />
       </div>
       <h2 className="font-heading mb-2 text-2xl">Check your email</h2>

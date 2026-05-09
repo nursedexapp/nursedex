@@ -59,20 +59,9 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     return { error: "Something went wrong. Please try again in a moment." };
   }
 
-  // Update tos_accepted_at via the users table
-  // The trigger will have created the users row by now
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (user) {
-    await supabase
-      .from("users")
-      .update({
-        tos_accepted_at: new Date().toISOString(),
-        tos_version: "1.0",
-      })
-      .eq("id", user.id);
-  }
+  // tos_accepted_at is recorded in /auth/callback once the user clicks the
+  // confirmation link and a session exists. With email confirmation enabled,
+  // there is no session here yet so we can't update the public.users row.
 
   return { success: "Check your email for a confirmation link." };
 }

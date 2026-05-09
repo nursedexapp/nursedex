@@ -37,11 +37,26 @@ export async function GET(request: NextRequest) {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
+      // Record TOS acceptance now that a session exists (signups confirm
+      // here, not at the /signup step where there's no session yet). The
+      // .is filter makes this a no-op if it was already recorded, e.g.
+      // when the user re-clicks the email link.
+      if (tokenType === "signup" || code) {
+        await supabase
+          .from("users")
+          .update({
+            tos_accepted_at: new Date().toISOString(),
+            tos_version: "1.0",
+          })
+          .eq("id", user.id)
+          .is("tos_accepted_at", null);
+      }
+
       const { data: profile } = await supabase
         .from("users")
         .select("role")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
       if (profile?.role) {
         return NextResponse.redirect(`${origin}/dashboard`);
