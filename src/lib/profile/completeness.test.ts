@@ -13,9 +13,7 @@ const EMPTY_PROFILE = {
   rate_max: null,
   has_transportation: false,
   covid_vaccinated: null,
-  additional_certs: [] as string[],
   travel_radius_miles: null,
-  languages: ["English"],
 };
 
 const FULL_PROFILE = {
@@ -29,16 +27,16 @@ const FULL_PROFILE = {
   rate_max: 40,
   has_transportation: true,
   covid_vaccinated: true,
-  additional_certs: ["BLS", "ACLS"],
   travel_radius_miles: 25,
-  languages: ["English", "Spanish"],
 };
 
 describe("calculateCompleteness", () => {
-  it("returns 0% for an empty profile", () => {
+  it("starts at 10% for an empty profile (certs + languages credit automatically)", () => {
     const { score, missing } = calculateCompleteness(EMPTY_PROFILE);
-    expect(score).toBe(0);
-    expect(missing.length).toBe(12);
+    expect(score).toBe(10);
+    expect(missing.length).toBe(10);
+    expect(missing).not.toContain("List any additional certifications");
+    expect(missing).not.toContain("Add additional languages you speak");
   });
 
   it("returns 100% for a fully complete profile", () => {
@@ -47,20 +45,20 @@ describe("calculateCompleteness", () => {
     expect(missing.length).toBe(0);
   });
 
-  it("scores photo at 15 points", () => {
+  it("scores photo at 15 points (on top of 10 baseline)", () => {
     const { score } = calculateCompleteness({
       ...EMPTY_PROFILE,
       photos: ["photo.jpg"],
     });
-    expect(score).toBe(15);
+    expect(score).toBe(25);
   });
 
-  it("scores bio at 15 points", () => {
+  it("scores bio at 15 points (on top of 10 baseline)", () => {
     const { score } = calculateCompleteness({
       ...EMPTY_PROFILE,
       bio: "My bio text",
     });
-    expect(score).toBe(15);
+    expect(score).toBe(25);
   });
 
   it("does not count empty/whitespace bio", () => {
@@ -68,7 +66,7 @@ describe("calculateCompleteness", () => {
       ...EMPTY_PROFILE,
       bio: "   ",
     });
-    expect(score).toBe(0);
+    expect(score).toBe(10);
   });
 
   it("scores has_transportation only when true", () => {
@@ -87,15 +85,6 @@ describe("calculateCompleteness", () => {
       covid_vaccinated: false,
     });
     expect(setFalse - unset).toBe(5);
-  });
-
-  it("scores extra languages only when more than English", () => {
-    const { score: englishOnly } = calculateCompleteness(EMPTY_PROFILE);
-    const { score: bilingual } = calculateCompleteness({
-      ...EMPTY_PROFILE,
-      languages: ["English", "Spanish"],
-    });
-    expect(bilingual - englishOnly).toBe(5);
   });
 
   it("scores rate when either min or max is set", () => {

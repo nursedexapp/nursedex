@@ -24,12 +24,15 @@ export function calculateCompleteness(
     | "rate_max"
     | "has_transportation"
     | "covid_vaccinated"
-    | "additional_certs"
     | "travel_radius_miles"
-    | "languages"
   >,
 ): CompletenessResult {
-  let score = 0;
+  // additional_certs and languages_extra credit automatically: every nurse provides
+  // their credential and at least one language during onboarding, so flagging them
+  // as "missing" on the dashboard nags about choices already made at signup.
+  let score =
+    COMPLETENESS_WEIGHTS.additional_certs +
+    COMPLETENESS_WEIGHTS.languages_extra;
   const missing: string[] = [];
 
   // Photo (15 pts)
@@ -95,25 +98,11 @@ export function calculateCompleteness(
     missing.push("Add your COVID vaccination status");
   }
 
-  // Additional certifications (5 pts)
-  if (profile.additional_certs.length > 0) {
-    score += COMPLETENESS_WEIGHTS.additional_certs;
-  } else {
-    missing.push("List any additional certifications");
-  }
-
   // Travel radius (5 pts)
   if (profile.travel_radius_miles !== null) {
     score += COMPLETENESS_WEIGHTS.travel_radius_miles;
   } else {
     missing.push("Set your travel radius");
-  }
-
-  // Extra languages beyond English (5 pts)
-  if (profile.languages.length > 1) {
-    score += COMPLETENESS_WEIGHTS.languages_extra;
-  } else {
-    missing.push("Add additional languages you speak");
   }
 
   return { score, missing };
