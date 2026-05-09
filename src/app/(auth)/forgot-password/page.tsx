@@ -13,6 +13,7 @@ export default function ForgotPasswordPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
   const errorRef = useRef<HTMLDivElement>(null);
 
   async function handleSubmit(formData: FormData) {
@@ -67,6 +68,8 @@ export default function ForgotPasswordPage() {
             required
             autoFocus
             autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="h-11"
           />
         </div>
