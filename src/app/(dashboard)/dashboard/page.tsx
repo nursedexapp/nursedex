@@ -144,10 +144,7 @@ export default async function DashboardPage() {
             {score < 100 && (
               <CompletenessCard score={score} missing={missing} />
             )}
-            <QuickActions
-              slug={profile.slug}
-              isAvailable={profile.is_available}
-            />
+            <QuickActions isAvailable={profile.is_available} />
             <ReviewLinkCard slug={profile.slug} />
             <NurseClaimHireCard />
             {profile.tier === "free" && <FeaturedUpsell isVerified={true} />}
