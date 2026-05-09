@@ -21,6 +21,15 @@ import Link from "next/link";
 
 export default async function DashboardPage() {
   const user = await requireAuth();
+
+  // Admins live in the /admin route group. If they land here directly
+  // (after sign-in, after clicking a logo link, etc.) send them along
+  // instead of rendering the family/nurse dashboard, which doesn't
+  // apply to them.
+  if (user.role === "admin" || user.role === "super_admin") {
+    redirect("/admin");
+  }
+
   const supabase = await createClient();
 
   const isNurse = user.role === UserRole.NURSE;
