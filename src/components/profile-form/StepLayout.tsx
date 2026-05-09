@@ -36,28 +36,34 @@ export function StepLayout({
 }: StepLayoutProps) {
   return (
     <div className="mx-auto w-full max-w-2xl">
-      {/* Progress indicator */}
+      {/* Progress indicator. Circles are evenly spaced via
+          justify-between (first flush left, last flush right) so the
+          label below each circle stacks directly under it. The line
+          connecting them is absolutely positioned behind, spanning
+          from the center of the first circle (top-4 left-4) to the
+          center of the last (right-4). The teal portion fills the
+          fraction of segments completed up to the current step. */}
       <div className="mb-8">
-        <div className="flex items-center justify-between">
-          {STEP_LABELS.map((label, i) => {
-            const stepNum = i + 1;
-            const isActive = stepNum === step;
-            const isComplete = stepNum < step;
+        <div className="relative">
+          <div className="bg-sage/30 absolute top-4 right-4 left-4 h-0.5 -translate-y-1/2" />
+          <div
+            className="bg-teal absolute top-4 left-4 h-0.5 -translate-y-1/2 transition-all duration-300"
+            style={{
+              width: `calc((100% - 2rem) * ${(step - 1) / (STEP_LABELS.length - 1)})`,
+            }}
+          />
 
-            return (
-              <div
-                key={label}
-                className="flex flex-1 flex-col items-center gap-1.5"
-              >
-                <div className="flex w-full items-center">
-                  {i > 0 && (
-                    <div
-                      className={cn(
-                        "h-0.5 flex-1",
-                        isComplete || isActive ? "bg-teal" : "bg-sage/30",
-                      )}
-                    />
-                  )}
+          <div className="relative flex justify-between">
+            {STEP_LABELS.map((label, i) => {
+              const stepNum = i + 1;
+              const isActive = stepNum === step;
+              const isComplete = stepNum < step;
+
+              return (
+                <div
+                  key={label}
+                  className="flex flex-col items-center gap-1.5"
+                >
                   <div
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
@@ -86,28 +92,20 @@ export function StepLayout({
                       stepNum
                     )}
                   </div>
-                  {i < STEP_LABELS.length - 1 && (
-                    <div
-                      className={cn(
-                        "h-0.5 flex-1",
-                        isComplete ? "bg-teal" : "bg-sage/30",
-                      )}
-                    />
-                  )}
+                  <span
+                    className={cn(
+                      "text-xs",
+                      isActive
+                        ? "text-teal font-medium"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {label}
+                  </span>
                 </div>
-                <span
-                  className={cn(
-                    "text-xs",
-                    isActive
-                      ? "text-teal font-medium"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {label}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
