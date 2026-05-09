@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getSignedPhotoUrl } from "./photos";
 
 /**
@@ -136,6 +137,140 @@ export async function getNurseBySlug(
     has_photo: row.has_photo,
     is_seed: row.is_seed,
     zip_code: row.zip_code,
+    contact_email: null,
+    contact_phone: null,
+    communication_preference: null,
+  };
+}
+
+/**
+ * Privileged variant of getNurseBySlug for callers who need to see a
+ * profile regardless of verification status: admins reviewing the
+ * verification queue, and nurses previewing their own pending profile.
+ *
+ * Uses the service-role client so the verification filter on the
+ * public RPC doesn't apply. The page calling this is responsible for
+ * gating who can request the unfiltered view.
+ */
+export async function getNurseBySlugUnfiltered(
+  slug: string,
+): Promise<PublicNurseProfile | null> {
+  const supabase = createServiceRoleClient();
+
+  const { data, error } = await supabase
+    .from("nurse_profiles")
+    .select(
+      `
+      user_id,
+      slug,
+      credential,
+      license_number,
+      care_types,
+      primary_care_type,
+      skills,
+      gender,
+      years_experience,
+      languages,
+      bio,
+      photos,
+      rate_min,
+      rate_max,
+      has_transportation,
+      covid_vaccinated,
+      care_philosophy,
+      additional_certs,
+      availability_commitment,
+      time_slots,
+      travel_radius_miles,
+      tier,
+      verification_status,
+      is_available,
+      unavailable_visibility,
+      profile_completeness,
+      avg_rating,
+      review_count,
+      has_photo,
+      is_seed,
+      users!inner(first_name, last_name, zip_code)
+    `,
+    )
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const row = data as unknown as {
+    user_id: string;
+    slug: string;
+    credential: string;
+    license_number: string | null;
+    care_types: string[];
+    primary_care_type: string | null;
+    skills: string[];
+    gender: string | null;
+    years_experience: number | null;
+    languages: string[];
+    bio: string | null;
+    photos: string[];
+    rate_min: number | null;
+    rate_max: number | null;
+    has_transportation: boolean;
+    covid_vaccinated: boolean | null;
+    care_philosophy: string | null;
+    additional_certs: string[];
+    availability_commitment: string[];
+    time_slots: string[];
+    travel_radius_miles: number | null;
+    tier: string;
+    verification_status: string;
+    is_available: boolean;
+    unavailable_visibility: string | null;
+    profile_completeness: number;
+    avg_rating: number | null;
+    review_count: number;
+    has_photo: boolean;
+    is_seed: boolean;
+    users: {
+      first_name: string | null;
+      last_name: string | null;
+      zip_code: string | null;
+    };
+  };
+
+  return {
+    user_id: row.user_id,
+    first_name: row.users.first_name ?? "",
+    last_name: row.users.last_name ?? "",
+    slug: row.slug,
+    credential: row.credential,
+    license_number: row.license_number,
+    care_types: row.care_types,
+    primary_care_type: row.primary_care_type,
+    skills: row.skills,
+    gender: row.gender,
+    years_experience: row.years_experience,
+    languages: row.languages,
+    bio: row.bio,
+    photos: row.photos,
+    rate_min: row.rate_min,
+    rate_max: row.rate_max,
+    has_transportation: row.has_transportation,
+    covid_vaccinated: row.covid_vaccinated,
+    care_philosophy: row.care_philosophy,
+    additional_certs: row.additional_certs,
+    availability_commitment: row.availability_commitment,
+    time_slots: row.time_slots,
+    travel_radius_miles: row.travel_radius_miles,
+    tier: row.tier,
+    verification_status: row.verification_status,
+    is_available: row.is_available,
+    unavailable_visibility: row.unavailable_visibility,
+    profile_completeness: row.profile_completeness,
+    avg_rating: row.avg_rating,
+    review_count: row.review_count,
+    has_photo: row.has_photo,
+    is_seed: row.is_seed,
+    zip_code: row.users.zip_code,
     contact_email: null,
     contact_phone: null,
     communication_preference: null,

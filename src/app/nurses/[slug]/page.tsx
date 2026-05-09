@@ -6,6 +6,7 @@ import { NurseProfilePublic } from "@/components/profile/NurseProfilePublic";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import {
   getNurseBySlug,
+  getNurseBySlugUnfiltered,
   getNurseContactInfo,
   getSlugRedirect,
   getPublicPhotoUrls,
@@ -69,14 +70,30 @@ export default async function NurseProfilePage({
     redirect(`/nurses/${redirectSlug}`);
   }
 
-  // Fetch nurse data
-  const nurse = await getNurseBySlug(slug);
+  // Fetch nurse data. The public RPC filters to verified profiles, so a
+  // pending nurse can't see their own preview and an admin can't review
+  // a pending profile. If the verified-only path returns nothing, retry
+  // unfiltered when the caller is an admin or the nurse themselves.
+  const user = await getCurrentUser();
+  let nurse = await getNurseBySlug(slug);
+  if (!nurse) {
+    const isAdmin =
+      user?.role === "admin" || user?.role === "super_admin";
+    if (isAdmin) {
+      nurse = await getNurseBySlugUnfiltered(slug);
+    } else if (user) {
+      // Could be the nurse themselves looking at their own pending profile.
+      const candidate = await getNurseBySlugUnfiltered(slug);
+      if (candidate && candidate.user_id === user.id) {
+        nurse = candidate;
+      }
+    }
+  }
   if (!nurse) {
     notFound();
   }
 
   // Determine view mode based on auth state
-  const user = await getCurrentUser();
   let viewMode: "anon" | "free" | "subscribed" = "anon";
   let revealMode: "anon" | "no_sub" | "subscribed" | null = null;
   let distanceMiles: number | null = null;
