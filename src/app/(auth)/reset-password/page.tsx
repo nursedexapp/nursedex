@@ -1,15 +1,35 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { resetPassword } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
+      disabled={pending}
+    >
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Updating...
+        </>
+      ) : (
+        "Update password"
+      )}
+    </Button>
+  );
+}
+
 export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
@@ -45,14 +65,12 @@ export default function ResetPasswordPage() {
 
     if (!validateFields(formData)) return;
 
-    setLoading(true);
     const result = await resetPassword(formData);
 
     if (result?.error) {
       setError(result.error);
       requestAnimationFrame(() => errorRef.current?.focus());
     }
-    setLoading(false);
   }
 
   return (
@@ -163,20 +181,7 @@ export default function ResetPasswordPage() {
           )}
         </div>
 
-        <Button
-          type="submit"
-          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Updating...
-            </>
-          ) : (
-            "Update password"
-          )}
-        </Button>
+        <SubmitButton />
       </form>
     </div>
   );

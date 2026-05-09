@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn, resendConfirmation } from "@/lib/auth/actions";
@@ -9,6 +10,26 @@ import { GoogleSignInButton } from "@/components/ui/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
+      disabled={pending}
+    >
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Signing in...
+        </>
+      ) : (
+        "Sign in"
+      )}
+    </Button>
+  );
+}
 
 export default function LoginPage() {
   return (
@@ -34,7 +55,6 @@ function LoginForm() {
       ? "Password reset successfully. Sign in with your new password."
       : null,
   );
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
   const [showResend, setShowResend] = useState(false);
@@ -49,7 +69,6 @@ function LoginForm() {
     setError(null);
     setSuccess(null);
     setShowResend(false);
-    setLoading(true);
 
     const email = formData.get("email") as string;
     setResendEmail(email);
@@ -63,7 +82,6 @@ function LoginForm() {
       }
       requestAnimationFrame(() => errorRef.current?.focus());
     }
-    setLoading(false);
   }
 
   async function handleResend() {
@@ -192,20 +210,7 @@ function LoginForm() {
           </div>
         </div>
 
-        <Button
-          type="submit"
-          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Signing in...
-            </>
-          ) : (
-            "Sign in"
-          )}
-        </Button>
+        <SubmitButton />
       </form>
     </div>
   );
