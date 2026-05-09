@@ -69,6 +69,9 @@ export default function SignUpPage() {
     email?: string;
     password?: string;
   }>({});
+  // Controlled so the email survives an action error (already-registered,
+  // network blip, etc.). Password stays uncontrolled and resets on submit.
+  const [email, setEmail] = useState("");
   const errorRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -157,10 +160,13 @@ export default function SignUpPage() {
             aria-invalid={!!fieldErrors.email}
             aria-describedby={fieldErrors.email ? "email-error" : undefined}
             className="h-11"
-            onChange={() =>
-              fieldErrors.email &&
-              setFieldErrors((prev) => ({ ...prev, email: undefined }))
-            }
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (fieldErrors.email) {
+                setFieldErrors((prev) => ({ ...prev, email: undefined }));
+              }
+            }}
           />
           {fieldErrors.email && (
             <p id="email-error" className="text-error text-xs">
