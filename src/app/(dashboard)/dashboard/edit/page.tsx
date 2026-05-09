@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { getSignedPhotoUrls } from "@/lib/profile/photos";
+import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
 import { ProfileEditForm } from "./ProfileEditForm";
 
 export default async function EditProfilePage() {
@@ -19,13 +20,14 @@ export default async function EditProfilePage() {
     redirect("/dashboard");
   }
 
-  // If onboarding isn't complete, redirect to onboarding
-  const needsOnboarding =
-    profile.years_experience === null ||
-    (profile.credential === "hha" && profile.license_number === null);
-
-  if (needsOnboarding) {
-    redirect("/dashboard/onboarding");
+  // If onboarding isn't complete, send the user back to the wizard at the
+  // exact step they're on. Use the shared helper so this page agrees with
+  // /dashboard and /dashboard/onboarding about what counts as complete;
+  // the previous narrow check (years_experience + non-HHA license) let
+  // partially-onboarded nurses through to a half-rendered edit form.
+  const onboardingStatus = getOnboardingStatus(profile, user);
+  if (!onboardingStatus.complete) {
+    redirect(`/dashboard/onboarding?step=${onboardingStatus.nextStep}`);
   }
 
   const photoUrls =
