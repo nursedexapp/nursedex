@@ -89,9 +89,25 @@ function buildConfirmUrl(payload: SupabaseEmailHookPayload): string {
     token_hash: email_data.token_hash,
     type: email_data.email_action_type,
   });
+
+  // Supabase echoes the calling code's emailRedirectTo as redirect_to. Auth
+  // actions point that at our /auth/callback (sometimes with a downstream
+  // ?next=). Pass through ONLY the inner ?next= so /auth/callback knows
+  // where to send the user after verifyOtp succeeds. Forwarding the full
+  // redirect_to as next would loop the user back through /auth/callback.
   if (email_data.redirect_to) {
-    params.set("next", email_data.redirect_to);
+    try {
+      const redirectUrl = new URL(email_data.redirect_to);
+      const nextParam = redirectUrl.searchParams.get("next");
+      if (nextParam) {
+        params.set("next", nextParam);
+      }
+    } catch {
+      // Malformed redirect_to. Leave next unset; /auth/callback defaults to
+      // /role-select.
+    }
   }
+
   return `${base}/auth/callback?${params.toString()}`;
 }
 

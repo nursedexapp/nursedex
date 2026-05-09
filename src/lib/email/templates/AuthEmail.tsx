@@ -101,7 +101,9 @@ export function AuthEmail({
         <Text style={fineprint}>
           Or copy and paste this link into your browser:
         </Text>
-        <Text style={url}>{confirmUrl}</Text>
+        <Link href={confirmUrl} style={url}>
+          {confirmUrl}
+        </Link>
         <Text style={fineprintLast}>{copy.footer}</Text>
         <Text style={support}>
           Questions? Reach us at{" "}
