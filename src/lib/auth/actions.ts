@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PASSWORD } from "@/lib/constants";
 
 export type AuthResult = {
@@ -195,6 +196,24 @@ export async function resendConfirmation(
   }
 
   const supabase = await createClient();
+
+  // Supabase silently no-ops resend for already-confirmed accounts and
+  // still returns success, which would leave the user staring at an
+  // inbox that never gets a new email. Check the auth.users row first
+  // so we can give a useful error.
+  const admin = createServiceRoleClient();
+  const { data: authUser } = await admin
+    .schema("auth")
+    .from("users")
+    .select("email_confirmed_at")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+
+  if (authUser?.email_confirmed_at) {
+    return {
+      error: "This account is already confirmed. Please sign in instead.",
+    };
+  }
 
   const { error } = await supabase.auth.resend({
     type: "signup",
