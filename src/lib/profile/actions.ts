@@ -434,7 +434,7 @@ export async function requestPhotoUploadUrl(
 
 export async function confirmPhotoUpload(
   path: string,
-): Promise<{ valid: boolean; error?: string }> {
+): Promise<{ valid: boolean; signedUrl?: string; error?: string }> {
   await requireRole(UserRole.NURSE);
   return validateUploadedPhoto(path);
 }

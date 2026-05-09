@@ -29,6 +29,11 @@ export function PhotoUpload({
 }: PhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [removingIndex, setRemovingIndex] = useState<number | null>(null);
+  // Signed URLs for photos uploaded during this session, keyed by path.
+  // The photoUrls prop is server-rendered and only includes URLs for
+  // photos that existed at page load, so a freshly-uploaded photo would
+  // otherwise show the placeholder icon until the next full reload.
+  const [sessionUrls, setSessionUrls] = useState<Record<string, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const maxPhotos = TIER_LIMITS[tier].maxPhotos;
   const canUpload = photos.length < maxPhotos;
@@ -89,6 +94,14 @@ export function PhotoUpload({
           return;
         }
 
+        // Store the signed display URL so the preview shows immediately.
+        if (validation.signedUrl) {
+          setSessionUrls((prev) => ({
+            ...prev,
+            [urlResult.path]: validation.signedUrl!,
+          }));
+        }
+
         // Update photos array
         onChange([...photos, urlResult.path]);
         toast.success("Photo uploaded");
@@ -131,7 +144,7 @@ export function PhotoUpload({
       {photos.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {photos.map((path, i) => {
-            const url = photoUrls[i];
+            const url = sessionUrls[path] ?? photoUrls[i];
             return (
               <div
                 key={path}
