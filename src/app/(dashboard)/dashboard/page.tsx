@@ -96,7 +96,17 @@ export default async function DashboardPage() {
   if (!profile) {
     return (
       <div className="p-6 sm:p-8">
-        <p className="text-muted-foreground text-sm">Profile not found.</p>
+        <p className="text-muted-foreground text-sm">
+          We couldn&apos;t load your profile. Try signing out and back in, or
+          reach out to{" "}
+          <a
+            href="mailto:support@nursedex.com"
+            className="text-teal hover:underline"
+          >
+            support@nursedex.com
+          </a>{" "}
+          if this keeps happening.
+        </p>
       </div>
     );
   }

@@ -42,7 +42,7 @@ export function QuickActions({
   return (
     <Card className="border-sage/20">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Quick Actions</CardTitle>
+        <CardTitle className="text-base">What you can do</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {/* Availability toggle */}

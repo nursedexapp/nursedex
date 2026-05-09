@@ -11,26 +11,27 @@ interface VerificationBannerProps {
 const CONFIG = {
   pending: {
     icon: Clock,
-    label: "Pending Verification",
+    label: "Reviewing",
     description:
-      "Our team is reviewing your license. This usually takes 24 to 72 hours.",
+      "We're reviewing your license. Usually 24 to 72 hours. We'll email you the moment your profile is live.",
     bg: "bg-amber-50 border-amber-200",
     text: "text-amber-800",
     badge: "bg-amber-100 text-amber-800",
   },
   verified: {
     icon: CheckCircle2,
-    label: "Verified",
+    label: "Live",
     description:
-      "Your license has been verified. Your profile is visible to families.",
+      "Families on Long Island can now find you. Share your link to start collecting reviews.",
     bg: "bg-emerald-50 border-emerald-200",
     text: "text-emerald-800",
     badge: "bg-emerald-100 text-emerald-800",
   },
   rejected: {
     icon: XCircle,
-    label: "Verification Rejected",
-    description: "Please update your profile and resubmit for verification.",
+    label: "Action needed",
+    description:
+      "Update what we flagged below and resubmit. We'll re-review within 24 hours.",
     bg: "bg-red-50 border-red-200",
     text: "text-red-800",
     badge: "bg-red-100 text-red-800",
@@ -59,7 +60,7 @@ export function VerificationBanner({
           </p>
           {status === "rejected" && rejectedReason && (
             <p className={cn("mt-1 text-sm font-medium", config.text)}>
-              Reason: {rejectedReason}
+              What to fix: {rejectedReason}
             </p>
           )}
         </div>

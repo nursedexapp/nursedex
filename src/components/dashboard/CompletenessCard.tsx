@@ -16,7 +16,7 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
   return (
     <Card className="border-sage/20">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Profile Completeness</CardTitle>
+        <CardTitle className="text-base">How your profile is shaping up</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-6">
@@ -61,7 +61,7 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
           {missing.length > 0 ? (
             <div className="flex-1 space-y-1">
               <p className="text-muted-foreground text-xs font-medium">
-                Boost your visibility:
+                Add these so families can find a fuller picture of you:
               </p>
               {missing.slice(0, 3).map((item) => (
                 <Link
@@ -81,7 +81,7 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
             </div>
           ) : (
             <p className="text-sm font-medium text-emerald-600">
-              Your profile is fully complete!
+              Looking great. Your profile is fully filled in.
             </p>
           )}
         </div>
