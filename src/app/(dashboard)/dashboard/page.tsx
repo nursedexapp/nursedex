@@ -82,25 +82,6 @@ export default async function DashboardPage() {
           </section>
         )}
 
-        {recentReveals.length === 0 && (
-          <Card className="border-sage/20 mt-6">
-            <CardContent className="text-muted-foreground pt-6 text-sm">
-              Saved nurses, recent reveals, and your subscription will appear
-              here as you use NurseDex.{" "}
-              <Link href="/nurses" className="text-teal hover:underline">
-                Browse nurses
-              </Link>{" "}
-              or{" "}
-              <Link
-                href="/dashboard/saved"
-                className="text-teal hover:underline"
-              >
-                see your saved list
-              </Link>
-              .
-            </CardContent>
-          </Card>
-        )}
       </div>
     );
   }
@@ -181,63 +162,32 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Main column */}
-        <div className="space-y-6 lg:col-span-2">
-          {/* Verification status */}
-          <VerificationBanner
-            status={profile.verification_status}
-            rejectedReason={profile.verification_rejected_reason}
+      <div className="mx-auto max-w-3xl space-y-6">
+        <VerificationBanner
+          status={profile.verification_status}
+          rejectedReason={profile.verification_rejected_reason}
+        />
+
+        <CompletenessCard score={score} missing={missing} />
+
+        <QuickActions slug={profile.slug} isAvailable={profile.is_available} />
+
+        {reviewLink && <ReviewLinkCard initialToken={reviewLink.token} />}
+
+        {profile.verification_status === "verified" && <NurseClaimHireCard />}
+
+        {profile.tier === "free" && (
+          <FeaturedUpsell
+            isVerified={profile.verification_status === "verified"}
           />
-
-          {/* Completeness */}
-          <CompletenessCard score={score} missing={missing} />
-
-          {/* Quick actions */}
-          <QuickActions
-            slug={profile.slug}
-            isAvailable={profile.is_available}
+        )}
+        {profile.tier === "featured" && featuredSub && (
+          <ManageFeatured
+            renewsOn={featuredSub.current_period_end}
+            cancelAtPeriodEnd={featuredSub.cancel_at_period_end}
+            isPastDue={featuredSub.status === "past_due"}
           />
-
-          {/* Review link (verified nurses) or pending notice */}
-          {reviewLink ? (
-            <ReviewLinkCard initialToken={reviewLink.token} />
-          ) : (
-            <Card className="border-sage/20">
-              <CardContent className="text-muted-foreground py-8 text-center text-sm">
-                Once your license is verified, you&apos;ll get a shareable link
-                here for collecting reviews from past clients.
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Claim a hire (verified nurses only, RLS blocks reveal lookups otherwise) */}
-          {profile.verification_status === "verified" && <NurseClaimHireCard />}
-        </div>
-
-        {/* Sidebar column */}
-        <div className="space-y-6">
-          {/* Featured upsell (free tier) or Manage card (featured tier) */}
-          {profile.tier === "free" && (
-            <FeaturedUpsell
-              isVerified={profile.verification_status === "verified"}
-            />
-          )}
-          {profile.tier === "featured" && featuredSub && (
-            <ManageFeatured
-              renewsOn={featuredSub.current_period_end}
-              cancelAtPeriodEnd={featuredSub.cancel_at_period_end}
-              isPastDue={featuredSub.status === "past_due"}
-            />
-          )}
-
-          {/* Confirmed hires placeholder */}
-          <Card className="border-sage/20">
-            <CardContent className="text-muted-foreground py-6 text-center text-sm">
-              Confirmed hires will appear here.
-            </CardContent>
-          </Card>
-        </div>
+        )}
       </div>
     </div>
   );
