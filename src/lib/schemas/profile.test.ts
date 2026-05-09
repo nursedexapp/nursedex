@@ -166,7 +166,7 @@ describe("step4Schema", () => {
     const schema = step4Schema(NurseTier.FREE);
     const result = schema.safeParse({
       bio: "x".repeat(151),
-      photos: [],
+      photos: ["photo-1.jpg"],
     });
     expect(result.success).toBe(false);
   });
@@ -175,7 +175,7 @@ describe("step4Schema", () => {
     const schema = step4Schema(NurseTier.FREE);
     const result = schema.safeParse({
       bio: "x".repeat(150),
-      photos: [],
+      photos: ["photo-1.jpg"],
     });
     expect(result.success).toBe(true);
   });
@@ -184,7 +184,7 @@ describe("step4Schema", () => {
     const schema = step4Schema(NurseTier.FEATURED);
     const result = schema.safeParse({
       bio: "x".repeat(500),
-      photos: [],
+      photos: ["photo-1.jpg"],
     });
     expect(result.success).toBe(true);
   });
