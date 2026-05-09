@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth/actions";
@@ -10,6 +11,42 @@ import { GoogleSignInButton } from "@/components/ui/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  const [loadingMessage, setLoadingMessage] = useState("Joining...");
+
+  // After 1.5s of pending, swap the copy to acknowledge the slow path so a
+  // signup that waits on Supabase + email hook + Resend doesn't read as a
+  // stuck spinner.
+  useEffect(() => {
+    if (!pending) {
+      setLoadingMessage("Joining...");
+      return;
+    }
+    const timer = setTimeout(() => {
+      setLoadingMessage("Almost there...");
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [pending]);
+
+  return (
+    <Button
+      type="submit"
+      className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
+      disabled={pending}
+    >
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          {loadingMessage}
+        </>
+      ) : (
+        "Join NurseDex"
+      )}
+    </Button>
+  );
+}
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -27,28 +64,11 @@ export default function SignUpPage() {
     }
   }, []);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("Joining...");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
   }>({});
-
-  // After 1.5s of loading, swap the button copy to acknowledge the slow
-  // path. Supabase signup + our hook + Resend can take a couple seconds
-  // on a cold path. "Joining..." then "Almost there..." reads as a
-  // single thoughtful experience instead of a stuck spinner.
-  useEffect(() => {
-    if (!loading) {
-      setLoadingMessage("Joining...");
-      return;
-    }
-    const timer = setTimeout(() => {
-      setLoadingMessage("Almost there...");
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [loading]);
   const errorRef = useRef<HTMLDivElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -78,14 +98,12 @@ export default function SignUpPage() {
 
     if (!validateFields(formData)) return;
 
-    setLoading(true);
     const email = formData.get("email") as string;
     const result = await signUp(formData);
 
     if (result.error) {
       setError(result.error);
       requestAnimationFrame(() => errorRef.current?.focus());
-      setLoading(false);
     } else if (result.success) {
       router.push(`/signup/confirm?email=${encodeURIComponent(email)}`);
     }
@@ -212,20 +230,7 @@ export default function SignUpPage() {
           .
         </p>
 
-        <Button
-          type="submit"
-          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              {loadingMessage}
-            </>
-          ) : (
-            "Join NurseDex"
-          )}
-        </Button>
+        <SubmitButton />
       </form>
     </div>
   );

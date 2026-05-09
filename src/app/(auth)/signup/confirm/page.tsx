@@ -1,11 +1,13 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { resendConfirmation } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail } from "lucide-react";
+
+const RESEND_COOLDOWN_SECONDS = 60;
 
 export default function ConfirmPage() {
   return (
@@ -27,8 +29,19 @@ function ConfirmContent() {
   const email = searchParams.get("email") ?? "";
 
   const [resendLoading, setResendLoading] = useState(false);
-  const [resendCooldown, setResendCooldown] = useState(0);
+  // Start with the cooldown already running. The original send happened the
+  // moment the user landed here, so we mirror Supabase's per-email cooldown
+  // so an immediate click doesn't get a "no email was sent" surprise.
+  const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SECONDS);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const interval = setInterval(() => {
+      setResendCooldown((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendCooldown]);
 
   async function handleResend() {
     if (!email) return;
@@ -42,16 +55,7 @@ function ConfirmContent() {
       setResendMessage(result.error);
     } else {
       setResendMessage("Sent! Check your inbox.");
-      setResendCooldown(60);
-      const interval = setInterval(() => {
-        setResendCooldown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+      setResendCooldown(RESEND_COOLDOWN_SECONDS);
     }
   }
 
