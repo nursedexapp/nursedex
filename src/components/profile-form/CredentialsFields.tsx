@@ -76,19 +76,28 @@ export function CredentialsFields({
         )}
       </div>
 
-      {/* License number */}
-      <div className="space-y-2">
-        <Label htmlFor="license_number">License number</Label>
+      {/* License number — emphasized because incorrect numbers will fail
+          verification, which is one of the few places this wizard can
+          fail in a way that's annoying to recover from. */}
+      <div className="border-warning/30 bg-warning/5 space-y-2 rounded-lg border-l-4 p-4">
+        <Label htmlFor="license_number" className="text-soft-black text-sm font-semibold">
+          License number
+        </Label>
+        <p className="text-soft-black-light text-xs">
+          Please double check this. We verify your license against the New York
+          State registry. A typo will hold up your profile going live.
+        </p>
         <Input
           id="license_number"
           value={values.license_number}
           onChange={(e) => onChange("license_number", e.target.value)}
-          placeholder="Enter your NY State license number"
+          placeholder="Your NY State license number"
           aria-invalid={errors.license_number ? true : undefined}
+          className="bg-warm-white"
         />
         <p className="text-muted-foreground text-xs">
-          Your license number will be displayed on your profile so families can
-          verify it.
+          Your license number will appear on your profile so families can
+          verify it themselves.
         </p>
         {errors.license_number && (
           <p className="text-destructive text-xs">{errors.license_number}</p>
