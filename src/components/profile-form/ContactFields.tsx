@@ -130,15 +130,14 @@ export function ContactFields({
         <div className="flex items-center gap-2">
           <Input
             id="travel_radius_miles"
-            type="number"
-            min={1}
-            max={100}
+            type="text"
+            inputMode="numeric"
             value={values.travel_radius_miles}
             onChange={(e) => {
-              const val = e.target.value;
+              const cleaned = e.target.value.replace(/[^0-9]/g, "");
               onChange(
                 "travel_radius_miles",
-                val === "" ? "" : parseInt(val, 10),
+                cleaned === "" ? "" : parseInt(cleaned, 10),
               );
             }}
             placeholder="e.g., 25"
