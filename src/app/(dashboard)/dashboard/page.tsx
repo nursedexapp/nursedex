@@ -2,6 +2,8 @@ import { requireAuth } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { calculateCompleteness } from "@/lib/profile/completeness";
+import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
+import { redirect } from "next/navigation";
 import { NurseDashboardHero } from "@/components/dashboard/NurseDashboardHero";
 import { FamilyDashboardHero } from "@/components/dashboard/FamilyDashboardHero";
 import { Greeting } from "@/components/dashboard/Greeting";
@@ -15,7 +17,6 @@ import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { getRevealedNurses } from "@/lib/reveals/queries";
 import { getOrCreateReviewLink } from "@/lib/reviews/external-actions";
 import { NurseCard } from "@/components/nurses/NurseCard";
-import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -96,40 +97,14 @@ export default async function DashboardPage() {
     );
   }
 
-  // Onboarding gate
-  const needsOnboarding =
-    profile.years_experience === null ||
-    (profile.credential === "hha" && profile.license_number === null);
-
-  if (needsOnboarding) {
-    return (
-      <div className="p-6 sm:p-8">
-        <h1 className="font-heading text-2xl font-semibold">
-          Welcome to NurseDex
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Let&apos;s get your profile set up so families on Long Island can find
-          you.
-        </p>
-        <Card className="border-teal/30 bg-teal/5 mt-6">
-          <CardContent className="flex flex-col items-start gap-3 pt-6">
-            <h2 className="font-heading text-lg font-semibold">
-              Finish setting up your profile
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              Complete your profile in just a few minutes. You will need your
-              license number and a professional photo.
-            </p>
-            <Link
-              href="/dashboard/onboarding"
-              className="bg-primary text-primary-foreground hover:bg-primary/80 inline-flex h-8 items-center justify-center rounded-lg px-3 text-sm font-medium transition-all"
-            >
-              Continue Setup
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  // Onboarding gate. If the nurse hasn't finished the wizard, send them
+  // back to the exact step they left off at instead of letting them sit
+  // on a "We're reviewing your license" hero on the dashboard. The
+  // wizard reads ?step= and the saveOnboardingStep action persists each
+  // step's fields to the DB, so we can derive resume state from there.
+  const onboardingStatus = getOnboardingStatus(profile, user);
+  if (!onboardingStatus.complete) {
+    redirect(`/dashboard/onboarding?step=${onboardingStatus.nextStep}`);
   }
 
   const { score, missing } = calculateCompleteness(profile);
