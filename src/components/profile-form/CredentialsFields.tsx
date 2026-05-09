@@ -135,7 +135,7 @@ export function CredentialsFields({
         />
         {atCareTypeLimit && tier === "free" && (
           <TierLimitBanner
-            message={`Free plan allows up to ${maxCareTypes} care types. Upgrade to Featured for unlimited.`}
+            message={`Free plan allows up to ${maxCareTypes} care types.`}
           />
         )}
         {errors.care_types && (
