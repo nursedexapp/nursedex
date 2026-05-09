@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { forgotPassword } from "@/lib/auth/actions";
@@ -9,23 +10,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button
+      type="submit"
+      className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
+      disabled={pending}
+    >
+      {pending ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Sending...
+        </>
+      ) : (
+        "Send reset link"
+      )}
+    </Button>
+  );
+}
+
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const errorRef = useRef<HTMLDivElement>(null);
 
   async function handleSubmit(formData: FormData) {
     setError(null);
-    setLoading(true);
 
     const result = await forgotPassword(formData);
 
     if (result.error) {
       setError(result.error);
       requestAnimationFrame(() => errorRef.current?.focus());
-      setLoading(false);
     } else if (result.success) {
       router.push("/forgot-password/sent");
     }
@@ -74,20 +92,7 @@ export default function ForgotPasswordPage() {
           />
         </div>
 
-        <Button
-          type="submit"
-          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Sending...
-            </>
-          ) : (
-            "Send reset link"
-          )}
-        </Button>
+        <SubmitButton />
       </form>
     </div>
   );
