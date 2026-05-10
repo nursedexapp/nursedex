@@ -204,7 +204,9 @@ interface NurseViewProps {
 function NurseView({ isLoggedInNurse, hasFeatured }: NurseViewProps) {
   const freeCta = !isLoggedInNurse
     ? { kind: "link" as const, href: "/signup", label: "Join free" }
-    : { kind: "currentPlan" as const, label: "Your current plan" };
+    : hasFeatured
+      ? { kind: "currentPlan" as const, label: "Included in Featured" }
+      : { kind: "currentPlan" as const, label: "Your current plan" };
 
   const featuredCta = !isLoggedInNurse
     ? { kind: "link" as const, href: "/signup", label: "Start as Featured" }

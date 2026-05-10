@@ -13,6 +13,8 @@ import { FeaturedUpsell } from "@/components/dashboard/FeaturedUpsell";
 import { ManageFeatured } from "@/components/dashboard/ManageFeatured";
 import { ReviewLinkCard } from "@/components/dashboard/ReviewLinkCard";
 import { NurseClaimHireCard } from "@/components/hires/NurseClaimHireCard";
+import { UpgradeCelebration } from "@/components/dashboard/UpgradeCelebration";
+import { Suspense } from "react";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { getRevealedNurses } from "@/lib/reveals/queries";
 import { NurseCard } from "@/components/nurses/NurseCard";
@@ -126,6 +128,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-6 sm:p-8">
+      <Suspense fallback={null}>
+        <UpgradeCelebration />
+      </Suspense>
       <Greeting firstName={user.first_name || "there"} />
 
       <div className="mx-auto mt-6 max-w-3xl space-y-6">
