@@ -1,19 +1,29 @@
-import { NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
+import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-/**
- * Admin-only CSV export of the waitlist. Gated by authenticated session
- * with role admin or super_admin. The waitlist table itself is read via
- * the service-role client because RLS blocks anonymous reads.
- */
-export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (user.role !== "admin" && user.role !== "super_admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+function keyMatches(provided: string | null): boolean {
+  const expected = process.env.ADMIN_SECRET;
+  if (!expected || !provided) return false;
+  const a = Buffer.from(expected);
+  const b = Buffer.from(provided);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+export async function GET(request: NextRequest) {
+  const providedKey = request.nextUrl.searchParams.get("key");
+  const authorizedByKey = keyMatches(providedKey);
+
+  if (!authorizedByKey) {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (user.role !== "admin" && user.role !== "super_admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const supabase = createServiceRoleClient();
