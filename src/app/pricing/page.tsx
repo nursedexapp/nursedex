@@ -113,7 +113,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
               />
             )}
 
-            <div className="mt-10 grid gap-6 sm:grid-cols-2">
+            <div className="mt-10 grid items-start gap-6 sm:grid-cols-2">
               <FineprintCard
                 title="Refunds"
                 body="NurseDex doesn't issue refunds. You can cancel anytime through the Stripe billing portal; access continues until the end of your current billing period."
@@ -122,7 +122,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
                 title="Cancellation"
                 body={
                   audience === "nurses"
-                    ? "Featured drops to Free immediately at the end of the billing period."
+                    ? "Cancel anytime in the Stripe portal. Featured drops to Free at the end of your current billing period, and your profile stays visible on the free tier."
                     : "Family Access has a 60-day grace window after cancellation: you'll keep access to nurses you already revealed, but won't be able to reveal new ones."
                 }
               />
@@ -355,8 +355,8 @@ function PricingCard({
 
 function FineprintCard({ title, body }: { title: string; body: string }) {
   return (
-    <Card className="border-sage/20">
-      <CardContent className="space-y-1 pt-5">
+    <Card className="border-sage/20 h-full">
+      <CardContent className="flex flex-1 flex-col gap-1 pt-5">
         <h3 className="font-heading text-soft-black text-base font-semibold">
           {title}
         </h3>
