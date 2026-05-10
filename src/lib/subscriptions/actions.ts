@@ -100,11 +100,10 @@ export async function createFamilyAccessCheckout(args: {
  * Nurse Featured: $29/mo, gives nurses priority placement.
  */
 export async function createNurseFeaturedCheckout(): Promise<CheckoutResult> {
-  return createCheckoutSession(
-    "nurse_featured",
-    "/api/stripe/checkout-success",
-    "/dashboard",
-  );
+  const successPath = `/api/stripe/checkout-success?next=${encodeURIComponent(
+    "/dashboard?upgraded=featured",
+  )}`;
+  return createCheckoutSession("nurse_featured", successPath, "/dashboard");
 }
 
 /**
