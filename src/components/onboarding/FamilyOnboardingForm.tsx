@@ -119,8 +119,8 @@ export function FamilyOnboardingForm({
         <p className="text-soft-black-light text-xs">
           {commPref === CommunicationPreference.PHONE ||
           commPref === CommunicationPreference.TEXT
-            ? "Add now or later in settings."
-            : "Useful if you ever pick Phone or Text contact."}
+            ? "This is how nurses will reach you. You can also add it later in settings."
+            : "Add this if you'd like nurses to reach you by phone or text."}
         </p>
         {fieldErr("phone") && (
           <p className="text-destructive text-xs">{fieldErr("phone")}</p>
