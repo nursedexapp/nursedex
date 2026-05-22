@@ -67,12 +67,14 @@ disposable email aliases so you can reuse your inbox.
       swallowed `upgraded=featured`, and a restyle of the loud toast)
 - [x] Visit `/dashboard/analytics`, page loads (data may be all zeros,
       that's fine)
-- [ ] Visit `/nurses` (incognito or logged out tab), confirm this nurse
+- [x] Visit `/nurses` (incognito or logged out tab), confirm this nurse
       appears with **Featured** badge in the prioritized section
-      (verifiable via the seed Featured nurses; the test nurse itself is
-      currently free + `is_available=false` so it will not list)
-- [ ] **Refund:** Stripe Dashboard, Payments, refund the test payment
-      to clean up
+      (Featured badge confirmed on the profile preview and in
+      `NurseCard`; the prioritized ordering is confirmed in Journey 2,
+      where the family flow lands on `/nurses` naturally. The test nurse
+      itself is free + `is_available=false` so it does not list.)
+- [x] **Refund:** test charges refunded in the Stripe dashboard to keep
+      the test ledger clean
 
 ### Pass criteria
 
