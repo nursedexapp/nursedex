@@ -50,7 +50,7 @@ export default async function PreviewPage() {
           See how your profile looks to families.
         </p>
       </div>
-      <div className="max-w-2xl">
+      <div className="max-w-5xl">
         <NurseProfileFull
           nurse={{
             first_name: user.first_name || "",

@@ -190,7 +190,7 @@ export default async function NurseProfilePage({
         reviewCount={nurse.review_count}
       />
       <Header />
-      <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <NurseProfilePublic
           nurse={nurse}
           photoUrl={photoUrls[0] ?? null}
