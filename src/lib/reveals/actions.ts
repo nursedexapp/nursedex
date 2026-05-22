@@ -2,8 +2,10 @@
 
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
+import { getNurseContactInfo } from "@/lib/profile/queries";
 import { verifyTurnstileToken } from "@/lib/turnstile/verify";
 
 export interface RevealResult {
@@ -121,36 +123,14 @@ export async function revealNurse(
 }
 
 async function fetchContactResult(nurseUserId: string): Promise<RevealResult> {
-  const supabase = await createClient();
-  const { data: row } = await supabase
-    .from("nurse_profiles")
-    .select(
-      `
-      user_id,
-      users!inner ( email, phone, communication_preference )
-    `,
-    )
-    .eq("user_id", nurseUserId)
-    .single();
-  if (!row) return { success: false, error: "unknown" };
-
-  type Joined = {
-    user_id: string;
-    users: {
-      email: string;
-      phone: string | null;
-      communication_preference: string | null;
-    } | null;
-  };
-  const u = (row as unknown as Joined).users;
-  return {
-    success: true,
-    contact: {
-      email: u?.email ?? null,
-      phone: u?.phone ?? null,
-      communication_preference: u?.communication_preference ?? null,
-    },
-  };
+  // RLS doesn't grant a family read access to a nurse's users row, so a
+  // direct join returns nothing. Go through the SECURITY DEFINER RPC, the
+  // same gated path the public profile uses, now that the reveal row exists.
+  const contact = await getNurseContactInfo(nurseUserId);
+  if (!contact.email && !contact.phone) {
+    return { success: false, error: "unknown" };
+  }
+  return { success: true, contact };
 }
 
 /**
@@ -162,7 +142,11 @@ async function bumpRateLimit(
   familyUserId: string,
   triggeredCaptcha: boolean,
 ): Promise<void> {
-  const supabase = await createClient();
+  // The daily counter is system-managed: rate_limit_reveals has no INSERT
+  // RLS policy (families must not be able to write their own limit), so use
+  // the service role here. Otherwise the insert is silently blocked and the
+  // cap is never enforced.
+  const supabase = createServiceRoleClient();
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
 
   const { data: existing } = await supabase
