@@ -93,6 +93,9 @@ function ConfirmContent() {
         <strong className="text-soft-black">{email}</strong>. Click the link to
         activate your account.
       </p>
+      <p className="text-muted-foreground/80 mx-auto mt-2 max-w-xs text-xs leading-relaxed">
+        Don&apos;t see it? Check your spam or junk folder.
+      </p>
       <div className="mt-6 flex flex-col items-center gap-2">
         <Button
           type="button"
