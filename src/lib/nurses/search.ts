@@ -35,6 +35,9 @@ export interface NurseSearchCard {
   distance_miles: number | null;
   communication_preference: string | null;
   years_experience: number | null;
+  // True when the viewing family has already revealed this nurse. Set by
+  // searchNurses only when viewerRevealedIds is provided.
+  revealed?: boolean;
 }
 
 // Internal card carries the raw photos array we need to sign URLs.
@@ -56,6 +59,9 @@ export interface SearchOptions {
   filters: SearchFilters;
   viewerZip?: string | null;
   viewerCommPref?: string | null;
+  // Nurse user_ids the viewing family has already revealed. When set, those
+  // cards are marked revealed and sorted below the un-revealed ones.
+  viewerRevealedIds?: Set<string>;
 }
 
 // ── Public entry point ────────────────────────────────────────
@@ -63,12 +69,22 @@ export interface SearchOptions {
 export async function searchNurses(
   options: SearchOptions,
 ): Promise<SearchResult> {
-  const { filters, viewerZip, viewerCommPref } = options;
+  const { filters, viewerZip, viewerCommPref, viewerRevealedIds } = options;
 
   const fullRaw = await runQuery(filters);
   const fullWithDistance = await enrichWithDistance(fullRaw, viewerZip ?? null);
   const fullAfterDistance = applyDistanceFilter(fullWithDistance, filters);
-  const fullRanked = rankCards(fullAfterDistance, viewerCommPref ?? null);
+  let fullRanked = rankCards(fullAfterDistance, viewerCommPref ?? null);
+
+  // Mark nurses the family already revealed and sink them below the rest,
+  // keeping the existing rank order (Featured first, etc.) within each group.
+  if (viewerRevealedIds && viewerRevealedIds.size > 0) {
+    for (const c of fullRanked) c.revealed = viewerRevealedIds.has(c.user_id);
+    fullRanked = [
+      ...fullRanked.filter((c) => !c.revealed),
+      ...fullRanked.filter((c) => c.revealed),
+    ];
+  }
 
   const pageSize = SEARCH.RESULTS_PER_PAGE;
   const page = Math.max(1, filters.page);
@@ -88,6 +104,10 @@ export async function searchNurses(
         limit: slotsToFill,
       });
     }
+  }
+
+  if (viewerRevealedIds && viewerRevealedIds.size > 0) {
+    for (const c of partials) c.revealed = viewerRevealedIds.has(c.user_id);
   }
 
   await Promise.all([attachPhotoUrls(items), attachPhotoUrls(partials)]);

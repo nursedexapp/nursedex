@@ -11,6 +11,7 @@ import { SurveyAppliedBanner } from "@/components/nurses/SurveyAppliedBanner";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { searchNurses } from "@/lib/nurses/search";
 import { getSavedNurseIds } from "@/lib/nurses/saves";
+import { getRevealedNurseIds } from "@/lib/reveals/queries";
 import { logSearchGap } from "@/lib/nurses/search-gap";
 import {
   parseSearchParams,
@@ -43,15 +44,17 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
   const viewerZip = user?.zip_code ?? null;
   const viewerCommPref = user?.communication_preference ?? null;
 
+  // Save/reveal state only applies to family viewers.
+  const showSaves = user?.role === "family";
+  const viewerRevealedIds =
+    showSaves && user ? await getRevealedNurseIds(user.id) : undefined;
+
   const result = await searchNurses({
     filters,
     viewerZip,
     viewerCommPref,
+    viewerRevealedIds,
   });
-
-  // Save state only for family viewers. For nurses/admins/anon, the heart
-  // button is hidden entirely.
-  const showSaves = user?.role === "family";
   const savedIds = showSaves
     ? await getSavedNurseIds([
         ...result.items.map((n) => n.user_id),

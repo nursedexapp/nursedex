@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Star, MapPin, User, Sparkles, Clock } from "lucide-react";
+import { Star, MapPin, User, Sparkles, Clock, CircleCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CREDENTIAL_LABELS, CARE_TYPE_LABELS } from "@/types/enums";
@@ -73,6 +73,15 @@ export function NurseCard({
             >
               <Clock className="size-3" aria-hidden="true" />
               Unavailable
+            </Badge>
+          )}
+          {nurse.revealed && (
+            <Badge
+              variant="outline"
+              className="border-teal/40 text-teal gap-1 bg-white/90"
+            >
+              <CircleCheck className="size-3" aria-hidden="true" />
+              Revealed
             </Badge>
           )}
         </div>
