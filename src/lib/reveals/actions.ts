@@ -67,14 +67,18 @@ export async function revealNurse(
     .rpc("check_reveal_rate_limit", { p_family_user_id: user.id })
     .single();
   type RateRow = {
-    allowed: boolean;
-    current_count: number;
-    needs_captcha: boolean;
+    allowed: boolean | null;
+    current_count: number | null;
+    needs_captcha: boolean | null;
   };
-  const rl = (rate as RateRow | null) ?? {
-    allowed: true,
-    current_count: 0,
-    needs_captcha: false,
+  // Defensive: the RPC can return NULL fields for a family with no reveals
+  // yet today (no rate_limit_reveals row). NULL means zero reveals, which is
+  // allowed, so coerce rather than letting !null read as rate-limited.
+  const raw = rate as RateRow | null;
+  const rl = {
+    allowed: raw?.allowed ?? true,
+    current_count: raw?.current_count ?? 0,
+    needs_captcha: raw?.needs_captcha ?? false,
   };
 
   if (!rl.allowed) {
