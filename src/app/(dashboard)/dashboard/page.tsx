@@ -18,6 +18,8 @@ import { Suspense } from "react";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { getRevealedNurses } from "@/lib/reveals/queries";
 import { NurseCard } from "@/components/nurses/NurseCard";
+import { searchNurses } from "@/lib/nurses/search";
+import { parseSearchParams } from "@/lib/nurses/search-params";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -37,19 +39,29 @@ export default async function DashboardPage() {
 
   // Family dashboard
   if (!isNurse) {
-    const [{ data: familyProfile }, recentReveals] = await Promise.all([
+    const [{ data: familyProfile }, recentReveals, featured] = await Promise.all([
       supabase
         .from("family_profiles")
         .select("survey_completed")
         .eq("user_id", user.id)
         .single(),
       getRevealedNurses(user.id, 3),
+      searchNurses({
+        filters: parseSearchParams(new URLSearchParams()),
+        viewerZip: user.zip_code ?? null,
+        viewerCommPref: user.communication_preference ?? null,
+      }),
     ]);
     const hasTakenSurvey = familyProfile?.survey_completed === true;
+    // Featured nurses to fill the dashboard for families who haven't
+    // revealed anyone yet, so the page isn't a near-empty survey prompt.
+    const featuredNurses = featured.items
+      .filter((n) => n.tier === "featured")
+      .slice(0, 3);
 
     return (
       <div className="p-6 sm:p-8">
-        <Greeting firstName={user.first_name || user.email} />
+        <Greeting firstName={user.first_name || "there"} />
 
         <div className="mx-auto mt-6 max-w-3xl space-y-6">
           <FamilyDashboardHero
@@ -72,6 +84,27 @@ export default async function DashboardPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {recentReveals.map((nurse) => (
+                  <NurseCard key={nurse.user_id} nurse={nurse} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {recentReveals.length === 0 && featuredNurses.length > 0 && (
+            <section>
+              <div className="mb-4 flex items-end justify-between">
+                <h2 className="font-heading text-soft-black text-lg font-medium">
+                  Featured nurses
+                </h2>
+                <Link
+                  href="/nurses"
+                  className="text-soft-black-light hover:text-teal text-sm underline-offset-4 hover:underline"
+                >
+                  Browse all
+                </Link>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {featuredNurses.map((nurse) => (
                   <NurseCard key={nurse.user_id} nurse={nurse} />
                 ))}
               </div>
