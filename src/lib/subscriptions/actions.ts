@@ -61,10 +61,16 @@ async function createCheckoutSession(
 
   const origin = await siteOrigin();
 
+  // successPath may already carry a query string (e.g. the Featured flow
+  // passes ?next=/dashboard?upgraded=featured). Pick the right separator so
+  // we don't produce a second "?", which would fold session_id into the
+  // last param and break the celebration's exact upgraded=featured check.
+  const successSep = successPath.includes("?") ? "&" : "?";
+
   const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: plan.priceId, quantity: 1 }],
-    success_url: `${origin}${successPath}?session_id={CHECKOUT_SESSION_ID}`,
+    success_url: `${origin}${successPath}${successSep}session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}${cancelPath}`,
     customer: customerId,
     customer_email: customerId ? undefined : user.email,
