@@ -61,12 +61,16 @@ disposable email aliases so you can reuse your inbox.
       `subscriptions` row inserted with `plan_type='nurse_featured'`,
       SubscriptionConfirmed email arrived
       (verified via /pricing flipping to "Manage subscription")
-- [ ] Confirm celebration: refund + cancel sub, retry upgrade, watch
+- [x] Confirm celebration: refund + cancel sub, retry upgrade, watch
       for confetti and the "Welcome to Featured" toast on landing
-- [ ] Visit `/dashboard/analytics`, page loads (data may be all zeros,
+      (required two fixes: the checkout success URL double `?` that
+      swallowed `upgraded=featured`, and a restyle of the loud toast)
+- [x] Visit `/dashboard/analytics`, page loads (data may be all zeros,
       that's fine)
 - [ ] Visit `/nurses` (incognito or logged out tab), confirm this nurse
       appears with **Featured** badge in the prioritized section
+      (verifiable via the seed Featured nurses; the test nurse itself is
+      currently free + `is_available=false` so it will not list)
 - [ ] **Refund:** Stripe Dashboard, Payments, refund the test payment
       to clean up
 
@@ -215,6 +219,39 @@ This overlaps with Journeys 1 and 2 above. Items not already covered:
   the profile
 
 ---
+
+## Findings and launch flips (discovered during testing)
+
+Fixed in PRs off `main`:
+
+- Featured celebration never fired: the Stripe `success_url` produced a
+  double `?`, mangling `upgraded=featured`. Fixed (PR #52).
+- Featured celebration toast was loud and jarring; restyled to a calm
+  on-brand card (PR #53).
+- "Upgrade to Featured" CTAs on `/dashboard/analytics` and in the
+  UpgradeNudge email pointed at `/dashboard`, a dead end. Now route to
+  `/pricing` (PR #56).
+- Admins landed on `/dashboard` (empty for them) after login; now go to
+  `/admin` (PR #51).
+- Signup confirm screen now tells users to check spam (PR #54).
+- Dashboard loading skeleton was nearly invisible; bumped contrast
+  (PR #55). Same faint pattern still exists on `/nurses`, nurse profile,
+  onboarding, and the signup confirm fallback (follow up).
+
+Still open, decide before launch:
+
+- Waitlist front door: `/` (the waitlist landing) renders no nav, so a
+  logged out visitor has no path into the product (`/nurses`, `/welcome`,
+  and so on). At launch, repoint `/` to the real home or add nav.
+- Email deliverability: confirmation emails landed in spam. Verify the
+  sending domain SPF, DKIM, and DMARC in Resend.
+- Nurse availability defaults to `false`: a freshly onboarded, verified
+  nurse does not appear on `/nurses` until they toggle "available."
+  Confirm this is intended or set a sensible default.
+- Header "Find a Nurse" shows to logged in nurses too, who have no reason
+  to browse nurses. Consider audience scoping like `/pricing`.
+- `/brand/*` design sandbox routes are publicly reachable with
+  non-functional demo buttons. Add `noindex` or gate them.
 
 ## Final smoke checklist (pre launch)
 
