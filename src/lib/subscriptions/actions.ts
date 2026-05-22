@@ -95,9 +95,13 @@ export async function createFamilyAccessCheckout(args: {
   // were trying to reveal so we can immediately reveal it.
   returnTo?: string;
 }): Promise<CheckoutResult> {
-  const successPath = args.returnTo
-    ? `/api/stripe/checkout-success?next=${encodeURIComponent(args.returnTo)}`
-    : "/api/stripe/checkout-success";
+  // Land back where they were, with a flag so FamilyAccessCelebration fires
+  // the "Welcome to Family Access" confetti + toast once. Pick the right
+  // separator so we never produce a double "?".
+  const base = args.returnTo ?? "/dashboard";
+  const sep = base.includes("?") ? "&" : "?";
+  const next = `${base}${sep}subscribed=family`;
+  const successPath = `/api/stripe/checkout-success?next=${encodeURIComponent(next)}`;
   const cancelPath = args.returnTo ?? "/dashboard";
   return createCheckoutSession("family_access", successPath, cancelPath);
 }
