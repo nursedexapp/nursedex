@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, Phone, MessageSquare, Loader2 } from "lucide-react";
+import { Lock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,8 +21,6 @@ import {
   redirectToCheckout,
 } from "@/lib/subscriptions/actions";
 import { PRICING, GRACE_PERIODS } from "@/lib/constants";
-import { COMMUNICATION_PREFERENCE_LABELS } from "@/types/enums";
-import type { CommunicationPreference } from "@/types/enums";
 
 interface RevealCTAProps {
   nurseUserId: string;
@@ -36,20 +34,8 @@ interface RevealCTAProps {
   mode: "anon" | "no_sub" | "subscribed";
 }
 
-interface RevealedContact {
-  email: string | null;
-  phone: string | null;
-  communication_preference: string | null;
-}
-
-export function RevealCTA({
-  nurseUserId,
-  nurseFirstName,
-  returnTo,
-  mode,
-}: RevealCTAProps) {
+export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
   const router = useRouter();
-  const [revealed, setRevealed] = useState<RevealedContact | null>(null);
   const [captchaOpen, setCaptchaOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -82,7 +68,6 @@ export function RevealCTA({
         return;
       }
       setCaptchaOpen(false);
-      setRevealed(result.contact ?? null);
       if (posthog.__loaded) {
         posthog.capture(ANALYTICS_EVENTS.REVEAL_COMPLETED, {
           nurse_user_id: nurseUserId,
@@ -95,10 +80,6 @@ export function RevealCTA({
   const handleCaptchaSolved = (token: string) => {
     fireReveal(token);
   };
-
-  if (revealed) {
-    return <ContactCard nurseFirstName={nurseFirstName} contact={revealed} />;
-  }
 
   if (mode === "anon") {
     return (
@@ -218,69 +199,5 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
         </p>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function ContactCard({
-  nurseFirstName,
-  contact,
-}: {
-  nurseFirstName: string;
-  contact: RevealedContact;
-}) {
-  const prefLabel = contact.communication_preference
-    ? COMMUNICATION_PREFERENCE_LABELS[
-        contact.communication_preference as CommunicationPreference
-      ]
-    : null;
-
-  const subject = encodeURIComponent("NurseDex Inquiry");
-  const body = encodeURIComponent(
-    `Hi ${nurseFirstName},\n\nI found your profile on NurseDex and would like to talk about possibly working together.\n\n`,
-  );
-
-  return (
-    <div className="border-sage/20 space-y-3 rounded-xl border bg-white p-4">
-      {prefLabel && (
-        <p className="text-soft-black-light text-xs">
-          {nurseFirstName} prefers <strong>{prefLabel}</strong>
-        </p>
-      )}
-      <div className="space-y-2">
-        {contact.email && (
-          <a
-            href={`mailto:${contact.email}?subject=${subject}&body=${body}`}
-            className="hover:text-teal flex items-center gap-2 text-sm"
-          >
-            <Mail className="text-soft-black-light size-4" aria-hidden="true" />
-            {contact.email}
-          </a>
-        )}
-        {contact.phone && (
-          <>
-            <a
-              href={`tel:${contact.phone}`}
-              className="hover:text-teal flex items-center gap-2 text-sm"
-            >
-              <Phone
-                className="text-soft-black-light size-4"
-                aria-hidden="true"
-              />
-              Call {contact.phone}
-            </a>
-            <a
-              href={`sms:${contact.phone}?body=Hi ${nurseFirstName}, I found you on NurseDex and would like to talk.`}
-              className="hover:text-teal flex items-center gap-2 text-sm"
-            >
-              <MessageSquare
-                className="text-soft-black-light size-4"
-                aria-hidden="true"
-              />
-              Text {contact.phone}
-            </a>
-          </>
-        )}
-      </div>
-    </div>
   );
 }
