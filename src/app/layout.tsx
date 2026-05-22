@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { FamilyAccessCelebration } from "@/components/FamilyAccessCelebration";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -60,6 +62,9 @@ export default function RootLayout({
     >
       <body>
         {children}
+        <Suspense fallback={null}>
+          <FamilyAccessCelebration />
+        </Suspense>
         <Toaster richColors position="top-right" />
       </body>
     </html>
