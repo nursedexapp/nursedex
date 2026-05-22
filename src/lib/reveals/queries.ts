@@ -11,6 +11,31 @@ export interface RevealedNurse extends NurseSearchCard {
 }
 
 /**
+ * The set of nurse user_ids the family currently has access to (active
+ * reveals, or cancelled reveals still inside the 60-day window). Lightweight
+ * companion to getRevealedNurses for marking and sorting search results.
+ */
+export async function getRevealedNurseIds(
+  familyUserId: string,
+): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reveals")
+    .select("nurse_user_id, access_expires_at")
+    .eq("family_user_id", familyUserId);
+  const now = Date.now();
+  return new Set(
+    (data ?? [])
+      .filter(
+        (r) =>
+          !r.access_expires_at ||
+          new Date(r.access_expires_at).getTime() > now,
+      )
+      .map((r) => r.nurse_user_id as string),
+  );
+}
+
+/**
  * Fetch the family's revealed nurses, newest first.
  * Drops nurses that are deleted/suspended/unverified out of an abundance
  * of safety, even though the row exists.
