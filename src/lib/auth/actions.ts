@@ -106,6 +106,11 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
     if (!profile?.role) {
       redirect("/role-select");
     }
+
+    // Admins go to the admin home, not the nurse/family dashboard.
+    if (profile.role === "admin" || profile.role === "super_admin") {
+      redirect("/admin");
+    }
   }
 
   redirect("/dashboard");
