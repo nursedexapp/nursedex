@@ -27,7 +27,7 @@ export function UpgradeNudge({ firstName, saveCount }: UpgradeNudgeProps) {
           - Priority verification (24 hour SLA versus 72)
           <br />- A longer bio and up to three photos
         </Text>
-        <Link href="https://nursedex.com/dashboard" style={button}>
+        <Link href="https://nursedex.com/pricing" style={button}>
           Upgrade to Featured
         </Link>
         <Text style={footer}>

@@ -203,7 +203,7 @@ function LockedPreview() {
           <Preview label="Reveals" />
         </div>
         <Link
-          href="/dashboard"
+          href="/pricing"
           className="bg-teal hover:bg-teal-dark inline-block rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
         >
           Upgrade to Featured
