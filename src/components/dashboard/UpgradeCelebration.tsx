@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import confetti from "canvas-confetti";
+import { CircleCheckIcon, XIcon } from "lucide-react";
 
 export function UpgradeCelebration() {
   const router = useRouter();
@@ -33,15 +34,44 @@ export function UpgradeCelebration() {
       fire(0.5, 90);
     }, 250);
 
-    toast.success("Welcome to Featured.", {
-      description:
-        "Your priority placement is live. Check your analytics dashboard to see views and saves over time.",
-      duration: 7000,
-      action: {
-        label: "View analytics",
-        onClick: () => router.push("/dashboard/analytics"),
-      },
-    });
+    // Bespoke, calm celebration toast. We bypass toast.success on purpose:
+    // the global Toaster runs richColors, whose loud filled style reads like
+    // an alert. The confetti carries the celebration, so the toast just needs
+    // to be quiet, readable, and on-brand.
+    toast.custom(
+      (id) => (
+        <div className="border-sage/40 flex w-[356px] max-w-[calc(100vw-2rem)] items-start gap-3 rounded-xl border bg-white p-4 shadow-lg">
+          <CircleCheckIcon className="text-teal mt-0.5 size-5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-soft-black text-sm font-semibold">
+              Welcome to Featured
+            </p>
+            <p className="text-soft-black-light mt-0.5 text-sm">
+              Your priority placement is live.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                toast.dismiss(id);
+                router.push("/dashboard/analytics");
+              }}
+              className="text-teal hover:text-teal-dark mt-2 text-sm font-medium underline-offset-4 hover:underline"
+            >
+              View analytics
+            </button>
+          </div>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => toast.dismiss(id)}
+            className="text-soft-black-light/50 hover:text-soft-black -m-1 shrink-0 p-1 transition-colors"
+          >
+            <XIcon className="size-4" />
+          </button>
+        </div>
+      ),
+      { duration: 7000, unstyled: true },
+    );
 
     // Strip the query param so a refresh doesn't replay the celebration.
     const params = new URLSearchParams(searchParams.toString());
