@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getCurrentUser } from "@/lib/auth/helpers";
@@ -118,6 +119,12 @@ export async function revealNurse(
       () => undefined,
       () => undefined,
     );
+
+  // Invalidate the cached listing and dashboard so the new reveal shows up
+  // (badge + bottom-sort, recent reveals) without a hard refresh when the
+  // family navigates back.
+  revalidatePath("/nurses");
+  revalidatePath("/dashboard");
 
   return await fetchContactResult(nurseUserId);
 }
