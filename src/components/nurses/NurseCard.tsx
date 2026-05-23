@@ -43,7 +43,7 @@ export function NurseCard({
   const inner = (
     <>
       {/* Photo area */}
-      <div className="bg-sage/10 relative aspect-[4/3] w-full overflow-hidden">
+      <div className="bg-sage/10 relative aspect-[16/10] w-full overflow-hidden">
         {nurse.photo_url ? (
           <Image
             src={nurse.photo_url}
