@@ -4,12 +4,13 @@ import { useState, useRef, useCallback } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { PHOTO_UPLOAD, TIER_LIMITS } from "@/lib/constants";
-import { resizeImage } from "@/lib/profile/resize";
+import { getCroppedBlob, type CropArea } from "@/lib/profile/crop";
 import {
   requestPhotoUploadUrl,
   confirmPhotoUpload,
   deletePhoto,
 } from "@/lib/profile/actions";
+import { PhotoCropModal } from "./PhotoCropModal";
 import type { NurseTier } from "@/types/enums";
 import { cn } from "@/lib/utils";
 import { Upload, X, ImageIcon } from "lucide-react";
@@ -34,17 +35,22 @@ export function PhotoUpload({
   // photos that existed at page load, so a freshly-uploaded photo would
   // otherwise show the placeholder icon until the next full reload.
   const [sessionUrls, setSessionUrls] = useState<Record<string, string>>({});
+  // The selected photo waiting to be cropped before upload.
+  const [cropState, setCropState] = useState<{ file: File; src: string } | null>(
+    null,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const maxPhotos = TIER_LIMITS[tier].maxPhotos;
   const canUpload = photos.length < maxPhotos;
 
+  // Validate the chosen file, then open the cropper. Upload happens on
+  // crop confirm so nurses frame exactly what shows on the search card.
   const handleFileSelect = useCallback(
-    async (files: FileList | null) => {
+    (files: FileList | null) => {
       if (!files || files.length === 0 || !canUpload) return;
 
       const file = files[0];
 
-      // Validate type
       if (
         !PHOTO_UPLOAD.ALLOWED_TYPES.includes(
           file.type as (typeof PHOTO_UPLOAD.ALLOWED_TYPES)[number],
@@ -53,48 +59,55 @@ export function PhotoUpload({
         toast.error("Please upload a JPG, PNG, or WebP image");
         return;
       }
-
-      // Validate size (before resize)
       if (file.size > PHOTO_UPLOAD.MAX_SIZE_BYTES * 2) {
         toast.error("Image is too large. Maximum size is 5MB.");
         return;
       }
 
+      const reader = new FileReader();
+      reader.onload = () =>
+        setCropState({ file, src: reader.result as string });
+      reader.onerror = () =>
+        toast.error("Could not read that image. Please try again.");
+      reader.readAsDataURL(file);
+
+      if (inputRef.current) inputRef.current.value = "";
+    },
+    [canUpload],
+  );
+
+  const handleCropConfirm = useCallback(
+    async (area: CropArea) => {
+      if (!cropState) return;
+      const { file, src } = cropState;
       setUploading(true);
 
       try {
-        // Resize client-side
-        const resized = await resizeImage(file, PHOTO_UPLOAD.MAX_DIMENSION_PX);
+        // Crop to the card's 16:10 (also caps dimensions for upload).
+        const cropped = await getCroppedBlob(src, area, file.type);
 
-        // Get signed upload URL
         const urlResult = await requestPhotoUploadUrl(file.name);
-
         if ("error" in urlResult) {
           toast.error(urlResult.error);
           return;
         }
 
-        // Upload directly to Supabase Storage
         const uploadResponse = await fetch(urlResult.signedUrl, {
           method: "PUT",
           headers: { "Content-Type": file.type },
-          body: resized,
+          body: cropped,
         });
-
         if (!uploadResponse.ok) {
           toast.error("Upload failed. Please try again.");
           return;
         }
 
-        // Validate magic bytes server-side
         const validation = await confirmPhotoUpload(urlResult.path);
-
         if (!validation.valid) {
           toast.error(validation.error || "Invalid image file");
           return;
         }
 
-        // Store the signed display URL so the preview shows immediately.
         if (validation.signedUrl) {
           setSessionUrls((prev) => ({
             ...prev,
@@ -102,17 +115,16 @@ export function PhotoUpload({
           }));
         }
 
-        // Update photos array
         onChange([...photos, urlResult.path]);
         toast.success("Photo uploaded");
+        setCropState(null);
       } catch {
         toast.error("Something went wrong. Please try again.");
       } finally {
         setUploading(false);
-        if (inputRef.current) inputRef.current.value = "";
       }
     },
-    [canUpload, photos, onChange],
+    [cropState, photos, onChange],
   );
 
   const handleRemove = async (index: number) => {
@@ -207,9 +219,7 @@ export function PhotoUpload({
           />
           <div>
             <p className="text-sm font-medium">
-              {uploading
-                ? "Uploading..."
-                : "Drop a photo here or click to browse"}
+              Drop a photo here or click to browse
             </p>
             <p className="text-muted-foreground mt-0.5 text-xs">
               JPG, PNG, or WebP. Max 5MB. ({photos.length}/{maxPhotos})
@@ -226,6 +236,17 @@ export function PhotoUpload({
         onChange={(e) => handleFileSelect(e.target.files)}
         disabled={uploading || !canUpload}
       />
+
+      {cropState && (
+        <PhotoCropModal
+          imageSrc={cropState.src}
+          busy={uploading}
+          onCancel={() => {
+            if (!uploading) setCropState(null);
+          }}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
 }
