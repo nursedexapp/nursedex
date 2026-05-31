@@ -16,6 +16,9 @@ interface NurseCardProps {
   dimmed?: boolean;
   // Anon survey-results mode: hide last name, suppress save button, no profile link.
   anonymousMode?: boolean;
+  // In anonymousMode, make the card clickable to this href (e.g. signup)
+  // instead of rendering as a static, non-interactive div.
+  anonymousHref?: string;
 }
 
 export function NurseCard({
@@ -23,6 +26,7 @@ export function NurseCard({
   saveState,
   dimmed,
   anonymousMode,
+  anonymousHref,
 }: NurseCardProps) {
   const credentialLabel =
     CREDENTIAL_LABELS[nurse.credential as Credential] ?? nurse.credential;
@@ -135,12 +139,21 @@ export function NurseCard({
     <article
       className={cn(
         "group border-sage/20 relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-shadow",
-        !anonymousMode && "hover:shadow-md",
+        (!anonymousMode || anonymousHref) && "hover:shadow-md",
         dimmed && "opacity-80",
       )}
     >
       {anonymousMode ? (
-        <div className="flex flex-1 flex-col">{inner}</div>
+        anonymousHref ? (
+          <Link
+            href={anonymousHref}
+            className="focus-visible:ring-teal flex flex-1 flex-col focus:outline-none focus-visible:ring-2"
+          >
+            {inner}
+          </Link>
+        ) : (
+          <div className="flex flex-1 flex-col">{inner}</div>
+        )
       ) : (
         <Link
           href={`/nurses/${nurse.slug}`}

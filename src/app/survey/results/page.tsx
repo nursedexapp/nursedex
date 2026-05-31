@@ -129,6 +129,7 @@ export default async function SurveyResultsPage({
                 key={nurse.user_id}
                 nurse={nurse}
                 anonymousMode
+                anonymousHref={signupHref}
                 dimmed={
                   // Visually mark partial fallbacks
                   result.partials.some((p) => p.user_id === nurse.user_id)
