@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getSignedPhotoUrl } from "@/lib/profile/photos";
 import type { NurseSearchCard } from "@/lib/nurses/search";
 
@@ -44,7 +45,12 @@ export async function getRevealedNurses(
   familyUserId: string,
   limit?: number,
 ): Promise<RevealedNurse[]> {
-  const supabase = await createClient();
+  // RLS on users only exposes id = auth.uid() rows, so the users!inner join
+  // below would zero out for a family viewer (same limitation search.ts
+  // documents). Use the service-role client: the query is still scoped to
+  // this family's own reveals, cards never render contact fields, and we
+  // still drop deleted/suspended/unverified nurses.
+  const supabase = createServiceRoleClient();
 
   let query = supabase
     .from("reveals")
