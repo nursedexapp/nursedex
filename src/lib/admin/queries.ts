@@ -159,10 +159,10 @@ interface ReviewJoinRow {
   dispute_text: string | null;
   created_at: string;
   nurse: {
-    slug: string;
-    users: {
-      first_name: string | null;
-      last_name: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    nurse_profiles: {
+      slug: string;
     } | null;
   } | null;
 }
@@ -171,9 +171,9 @@ function shapeReviewRow(r: ReviewJoinRow): AdminReviewRow {
   return {
     id: r.id,
     nurse_user_id: r.nurse_user_id,
-    nurse_first_name: r.nurse?.users?.first_name ?? null,
-    nurse_last_name: r.nurse?.users?.last_name ?? null,
-    nurse_slug: r.nurse?.slug ?? "",
+    nurse_first_name: r.nurse?.first_name ?? null,
+    nurse_last_name: r.nurse?.last_name ?? null,
+    nurse_slug: r.nurse?.nurse_profiles?.slug ?? "",
     reviewer_name: r.reviewer_name,
     reviewer_email: r.reviewer_email,
     rating: r.rating,
@@ -188,13 +188,18 @@ function shapeReviewRow(r: ReviewJoinRow): AdminReviewRow {
   };
 }
 
+// reviews.nurse_user_id has its foreign key to users, not nurse_profiles,
+// so we embed users via that FK and reach the slug through nurse_profiles
+// off users. Embedding nurse_profiles directly off reviews errors with
+// PGRST200 and silently empties the moderation queues.
 const REVIEW_JOIN_SELECT = `
   id, nurse_user_id, reviewer_name, reviewer_email, rating, text,
   is_external, status, removal_requested, removal_reason,
   dispute_reason, dispute_text, created_at,
-  nurse:nurse_profiles!reviews_nurse_user_id_fkey (
-    slug,
-    users!inner (first_name, last_name)
+  nurse:users!reviews_nurse_user_id_fkey (
+    first_name,
+    last_name,
+    nurse_profiles!inner (slug)
   )
 ` as const;
 
@@ -253,10 +258,10 @@ export async function getFlaggedNurses(): Promise<FlaggedNurseRow[]> {
       nurse_user_id,
       rating,
       status,
-      nurse:nurse_profiles!reviews_nurse_user_id_fkey (
-        slug,
-        avg_rating,
-        users!inner (first_name, last_name)
+      nurse:users!reviews_nurse_user_id_fkey (
+        first_name,
+        last_name,
+        nurse_profiles!inner (slug, avg_rating)
       )
     `,
     )
@@ -268,26 +273,26 @@ export async function getFlaggedNurses(): Promise<FlaggedNurseRow[]> {
     rating: number;
     status: string;
     nurse: {
-      slug: string;
-      avg_rating: number | null;
-      users: { first_name: string | null; last_name: string | null } | null;
+      first_name: string | null;
+      last_name: string | null;
+      nurse_profiles: { slug: string; avg_rating: number | null } | null;
     } | null;
   };
 
   const counts = new Map<string, FlaggedNurseRow>();
   for (const row of (data ?? []) as unknown as Row[]) {
-    if (!row.nurse?.users) continue;
+    if (!row.nurse?.nurse_profiles) continue;
     const existing = counts.get(row.nurse_user_id);
     if (existing) {
       existing.bad_review_count += 1;
     } else {
       counts.set(row.nurse_user_id, {
         user_id: row.nurse_user_id,
-        first_name: row.nurse.users.first_name,
-        last_name: row.nurse.users.last_name,
-        slug: row.nurse.slug,
+        first_name: row.nurse.first_name,
+        last_name: row.nurse.last_name,
+        slug: row.nurse.nurse_profiles.slug,
         bad_review_count: 1,
-        avg_rating: row.nurse.avg_rating,
+        avg_rating: row.nurse.nurse_profiles.avg_rating,
       });
     }
   }
