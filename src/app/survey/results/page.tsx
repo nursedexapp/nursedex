@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/shared/Header";
 import { Footer } from "@/components/shared/Footer";
-import { NurseCard } from "@/components/nurses/NurseCard";
+import { SurveyResultCard } from "@/components/survey/SurveyResultCard";
 import { SurveyResultsAnalytics } from "@/components/survey/SurveyResultsAnalytics";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -125,11 +125,10 @@ export default async function SurveyResultsPage({
         {hasResults ? (
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((nurse) => (
-              <NurseCard
+              <SurveyResultCard
                 key={nurse.user_id}
                 nurse={nurse}
-                anonymousMode
-                anonymousHref={signupHref}
+                signupHref={signupHref}
                 dimmed={
                   // Visually mark partial fallbacks
                   result.partials.some((p) => p.user_id === nurse.user_id)
