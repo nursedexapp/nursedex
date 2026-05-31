@@ -96,6 +96,12 @@ disposable email aliases so you can reuse your inbox.
 
 ### Steps
 
+> Note: the reveal, hire, review, approval, and public display path is
+> verified (2026-05-31). The survey to signup handoff (the first seven
+> steps) is still untested: the test family signed up directly rather
+> than through `/survey`. Run those steps with a fresh alias to close the
+> gap.
+
 - [ ] Open `/survey` (incognito), answer all four steps:
   - Care type, skills, location, availability and budget
   - Submit, land on `/survey/results` with matching nurses
@@ -109,22 +115,27 @@ disposable email aliases so you can reuse your inbox.
       your survey" banner
 - [ ] Click on a nurse, land on `/nurses/[slug]`, contact section shows
       "Sign up free" or "Reveal" CTA depending on subscription state
-- [ ] Click **Reveal contact**, Stripe Checkout opens
-- [ ] Pay with `4242 …`, redirected back to the profile
-- [ ] Verify: contact email and phone now visible, `subscriptions` row
+- [x] Click **Reveal contact**, Stripe Checkout opens
+- [x] Pay with `4242 …`, redirected back to the profile
+- [x] Verify: contact email and phone now visible, `subscriptions` row
       exists, `reveals` row exists with `access_expires_at` about sixty
       days out, SubscriptionConfirmed email (family copy) arrived
-- [ ] Click **I hired this nurse**, fill confirmation modal, submit
-- [ ] Verify `hires` row inserted, hire followup cron will eventually
-      fire (don't wait, just confirm row exists)
-- [ ] Wait for review prompt OR navigate to `/dashboard/reviews`, see
+      (revealed 6 nurses; the `/dashboard/revealed` list was empty until
+      the PostgREST embed FK fix, PR #76)
+- [x] Click **I hired this nurse**, fill confirmation modal, submit
+- [x] Verify `hires` row inserted, hire followup cron will eventually
+      fire (don't wait, just confirm row exists) (confirmed `hires` row
+      for Daniel Kowalski, status `confirmed`)
+- [x] Wait for review prompt OR navigate to `/dashboard/reviews`, see
       prompt for a review
-- [ ] Submit a review (rating, text, opt in to testimonial), submitted
+- [x] Submit a review (rating, text, opt in to testimonial), submitted
       with `status='pending'`
-- [ ] **Switch to admin**, `/admin/reviews`, Pending tab, approve the
-      review
-- [ ] Back to family, review now appears on the nurse's public profile
-- [ ] Verify nurse's `avg_rating` and `review_count` updated
+- [x] **Switch to admin**, `/admin/reviews`, Pending tab, approve the
+      review (admin Pending tab was empty until the same embed FK fix,
+      PR #77; the dashboard count card had shown 1)
+- [x] Back to family, review now appears on the nurse's public profile
+- [x] Verify nurse's `avg_rating` and `review_count` updated (Daniel
+      Kowalski now `avg_rating` 4, `review_count` 1)
 
 ### Pass criteria
 
