@@ -45,93 +45,100 @@ export async function getRevealedNurses(
   familyUserId: string,
   limit?: number,
 ): Promise<RevealedNurse[]> {
-  // RLS on users only exposes id = auth.uid() rows, so the users!inner join
-  // below would zero out for a family viewer (same limitation search.ts
-  // documents). Use the service-role client: the query is still scoped to
-  // this family's own reveals, cards never render contact fields, and we
-  // still drop deleted/suspended/unverified nurses.
+  // reveals.nurse_user_id has its foreign key to users, not nurse_profiles,
+  // so PostgREST can't embed nurse_profiles directly off reveals (it errors
+  // with PGRST200). Fetch the reveal rows first, then load the nurse cards
+  // from nurse_profiles with the users!inner embed, the same shape search.ts
+  // uses. Service role is required because RLS on users hides other people's
+  // rows from the family; the query is still scoped to this family's own
+  // reveals and cards never render contact fields.
   const supabase = createServiceRoleClient();
 
-  let query = supabase
+  let revealQuery = supabase
     .from("reveals")
-    .select(
-      `
-      revealed_at,
-      access_expires_at,
-      nurse_user_id,
-      nurse:nurse_profiles!reveals_nurse_user_id_fkey (
-        user_id,
-        slug,
-        credential,
-        primary_care_type,
-        care_types,
-        tier,
-        has_photo,
-        photos,
-        avg_rating,
-        review_count,
-        is_available,
-        unavailable_visibility,
-        profile_completeness,
-        years_experience,
-        verification_status,
-        users!inner (
-          first_name,
-          last_name,
-          zip_code,
-          communication_preference,
-          is_deleted,
-          is_suspended
-        )
-      )
-    `,
-    )
+    .select("nurse_user_id, revealed_at, access_expires_at")
     .eq("family_user_id", familyUserId)
     .order("revealed_at", { ascending: false });
 
-  if (limit) query = query.limit(limit);
+  if (limit) revealQuery = revealQuery.limit(limit);
 
-  const { data, error } = await query;
+  const { data: revealRows, error: revealError } = await revealQuery;
+  if (revealError || !revealRows || revealRows.length === 0) return [];
+
+  const nurseIds = revealRows.map((r) => r.nurse_user_id);
+
+  const { data, error } = await supabase
+    .from("nurse_profiles")
+    .select(
+      `
+      user_id,
+      slug,
+      credential,
+      primary_care_type,
+      care_types,
+      tier,
+      has_photo,
+      photos,
+      avg_rating,
+      review_count,
+      is_available,
+      unavailable_visibility,
+      profile_completeness,
+      years_experience,
+      verification_status,
+      users!inner (
+        first_name,
+        last_name,
+        zip_code,
+        communication_preference,
+        is_deleted,
+        is_suspended
+      )
+    `,
+    )
+    .in("user_id", nurseIds)
+    .eq("verification_status", "verified")
+    .eq("users.is_deleted", false)
+    .eq("users.is_suspended", false);
+
   if (error || !data) return [];
 
-  type Row = {
-    revealed_at: string;
-    access_expires_at: string | null;
-    nurse_user_id: string;
-    nurse: {
-      user_id: string;
-      slug: string;
-      credential: string;
-      primary_care_type: string | null;
-      care_types: string[];
-      tier: "free" | "featured";
-      has_photo: boolean;
-      photos: string[];
-      avg_rating: number | null;
-      review_count: number;
-      is_available: boolean;
-      unavailable_visibility: string | null;
-      profile_completeness: number;
-      years_experience: number | null;
-      verification_status: string;
-      users: {
-        first_name: string | null;
-        last_name: string | null;
-        zip_code: string | null;
-        communication_preference: string | null;
-        is_deleted: boolean;
-        is_suspended: boolean;
-      } | null;
+  type ProfileRow = {
+    user_id: string;
+    slug: string;
+    credential: string;
+    primary_care_type: string | null;
+    care_types: string[];
+    tier: "free" | "featured";
+    has_photo: boolean;
+    photos: string[];
+    avg_rating: number | null;
+    review_count: number;
+    is_available: boolean;
+    unavailable_visibility: string | null;
+    profile_completeness: number;
+    years_experience: number | null;
+    verification_status: string;
+    users: {
+      first_name: string | null;
+      last_name: string | null;
+      zip_code: string | null;
+      communication_preference: string | null;
+      is_deleted: boolean;
+      is_suspended: boolean;
     } | null;
   };
 
+  const byId = new Map<string, ProfileRow>();
+  for (const p of data as unknown as ProfileRow[]) byId.set(p.user_id, p);
+
+  // Iterate reveals (already newest first) so order and access window come
+  // from the reveal row, while the card fields come from nurse_profiles.
   const out: RevealedNurse[] = [];
-  for (const row of data as unknown as Row[]) {
-    const n = row.nurse;
+  for (const r of revealRows) {
+    const n = byId.get(r.nurse_user_id);
     if (!n || !n.users) continue;
     const u = n.users;
-    if (u.is_deleted || u.is_suspended) continue;
-    if (n.verification_status !== "verified") continue;
 
     let photo_url: string | null = null;
     if (n.photos.length > 0) {
@@ -162,8 +169,8 @@ export async function getRevealedNurses(
       distance_miles: null,
       communication_preference: u.communication_preference,
       years_experience: n.years_experience,
-      access_expires_at: row.access_expires_at,
-      revealed_at: row.revealed_at,
+      access_expires_at: r.access_expires_at,
+      revealed_at: r.revealed_at,
     });
   }
 
