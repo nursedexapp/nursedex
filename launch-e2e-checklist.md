@@ -96,24 +96,25 @@ disposable email aliases so you can reuse your inbox.
 
 ### Steps
 
-> Note: the reveal, hire, review, approval, and public display path is
-> verified (2026-05-31). The survey to signup handoff (the first seven
-> steps) is still untested: the test family signed up directly rather
-> than through `/survey`. Run those steps with a fresh alias to close the
-> gap.
+> Note: full Journey 2 path verified end to end (2026-05-31), including
+> the survey to signup handoff (fresh alias `dan@nycpetphotos.com`:
+> survey filters survived signup confirmation,
+> `family_profiles.survey_completed = true`, landed on `/nurses` with the
+> survey banner). The survey result cards now open a dismissible signup
+> prompt instead of force navigating (PR #81).
 
-- [ ] Open `/survey` (incognito), answer all four steps:
+- [x] Open `/survey` (incognito), answer all four steps:
   - Care type, skills, location, availability and budget
   - Submit, land on `/survey/results` with matching nurses
-- [ ] Click "Sign up to save these matches", `/signup` with `?survey=…`
-      querystring
-- [ ] Confirm a survey handoff cookie was set
-- [ ] Submit signup, confirm email, `/role-select`, choose **I'm a
+- [x] Click "Sign up to save these matches", `/signup` with `?survey=…`
+      querystring (now via a dismissible prompt on the result card)
+- [x] Confirm a survey handoff cookie was set
+- [x] Submit signup, confirm email, `/role-select`, choose **I'm a
       family**
-- [ ] Land on `/onboarding/family`, see survey filters auto applied
-- [ ] Click through to `/nurses?from=survey`, see "Filters applied from
+- [x] Land on `/onboarding/family`, see survey filters auto applied
+- [x] Click through to `/nurses?from=survey`, see "Filters applied from
       your survey" banner
-- [ ] Click on a nurse, land on `/nurses/[slug]`, contact section shows
+- [x] Click on a nurse, land on `/nurses/[slug]`, contact section shows
       "Sign up free" or "Reveal" CTA depending on subscription state
 - [x] Click **Reveal contact**, Stripe Checkout opens
 - [x] Pay with `4242 …`, redirected back to the profile
