@@ -18,15 +18,16 @@ export function PendingReviewActions({ reviewId }: PendingActionsProps) {
 
   const run = (
     fn: typeof adminApproveReview | typeof adminRejectReview,
-    label: string,
+    verb: string,
+    done: string,
   ) => {
     startTransition(async () => {
       const result = await fn({ review_id: reviewId });
       if (!result.success) {
-        toast.error(`Could not ${label.toLowerCase()}. Please try again.`);
+        toast.error(`Could not ${verb}. Please try again.`);
         return;
       }
-      toast.success(`${label}d`);
+      toast.success(done);
     });
   };
 
@@ -34,7 +35,7 @@ export function PendingReviewActions({ reviewId }: PendingActionsProps) {
     <div className="flex items-center gap-2">
       <Button
         size="sm"
-        onClick={() => run(adminApproveReview, "Approve")}
+        onClick={() => run(adminApproveReview, "approve", "Approved")}
         disabled={pending}
       >
         Approve
@@ -42,7 +43,7 @@ export function PendingReviewActions({ reviewId }: PendingActionsProps) {
       <Button
         size="sm"
         variant="outline"
-        onClick={() => run(adminRejectReview, "Reject")}
+        onClick={() => run(adminRejectReview, "reject", "Rejected")}
         disabled={pending}
       >
         Reject
