@@ -45,9 +45,29 @@ const NAV: NavItem[] = [
 
 interface AdminSidebarProps {
   isSuperAdmin: boolean;
+  counts: {
+    pendingVerifications: number;
+    pendingReviews: number;
+    pendingDisputes: number;
+    removalRequests: number;
+  };
 }
 
-export function AdminSidebar({ isSuperAdmin }: AdminSidebarProps) {
+// How many items are waiting for action under each nav destination.
+function badgeFor(href: string, c: AdminSidebarProps["counts"]): number {
+  switch (href) {
+    case "/admin/verifications":
+      return c.pendingVerifications;
+    case "/admin/reviews":
+      return c.pendingReviews + c.removalRequests;
+    case "/admin/disputes":
+      return c.pendingDisputes;
+    default:
+      return 0;
+  }
+}
+
+export function AdminSidebar({ isSuperAdmin, counts }: AdminSidebarProps) {
   const pathname = usePathname();
   const items = NAV.filter((n) => !n.superAdminOnly || isSuperAdmin);
 
@@ -61,6 +81,7 @@ export function AdminSidebar({ isSuperAdmin }: AdminSidebarProps) {
           const active =
             pathname === item.href ||
             (item.href !== "/admin" && pathname.startsWith(item.href));
+          const badge = badgeFor(item.href, counts);
           return (
             <Link
               key={item.href}
@@ -74,6 +95,14 @@ export function AdminSidebar({ isSuperAdmin }: AdminSidebarProps) {
             >
               <NavPendingIcon icon={item.icon} className="size-4" />
               {item.label}
+              {badge > 0 && (
+                <span
+                  className="bg-teal ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold text-white tabular-nums"
+                  aria-label={`${badge} waiting`}
+                >
+                  {badge}
+                </span>
+              )}
             </Link>
           );
         })}
