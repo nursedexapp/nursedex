@@ -23,6 +23,11 @@ export default async function ReviewsPage() {
   const pending = reviews.filter(
     (r) => r.status === "pending" && r.email_verified,
   );
+  // Base the empty state on what we actually render: a nurse whose only
+  // review was rejected (or removed via a dispute) has reviews.length > 0 but
+  // nothing in any section, which would otherwise leave the page blank.
+  const hasDisplayable =
+    pending.length + approved.length + disputed.length > 0;
 
   return (
     <div className="mx-auto w-full max-w-3xl p-6 sm:p-8">
@@ -35,7 +40,7 @@ export default async function ReviewsPage() {
         </p>
       </header>
 
-      {reviews.length === 0 && <EmptyState />}
+      {!hasDisplayable && <EmptyState />}
 
       {pending.length > 0 && (
         <section className="mb-8">
