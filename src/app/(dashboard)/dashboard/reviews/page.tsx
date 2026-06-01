@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Star, MessageSquare } from "lucide-react";
 import { requireRole } from "@/lib/auth/helpers";
+import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getNurseReviews } from "@/lib/reviews/queries";
 import { NurseResponseForm } from "@/components/reviews/NurseResponseForm";
 import { DisputeReviewDialog } from "@/components/reviews/DisputeReviewDialog";
+import { ReviewLinkCard } from "@/components/dashboard/ReviewLinkCard";
 import type { Review } from "@/types/database";
 
 export const metadata: Metadata = {
@@ -16,6 +17,12 @@ export const metadata: Metadata = {
 
 export default async function ReviewsPage() {
   const user = await requireRole(UserRole.NURSE);
+  const supabase = await createClient();
+  const { data: profile } = await supabase
+    .from("nurse_profiles")
+    .select("slug, verification_status")
+    .eq("user_id", user.id)
+    .single();
   const reviews = await getNurseReviews(user.id);
 
   const approved = reviews.filter((r) => r.status === "approved");
@@ -39,6 +46,12 @@ export default async function ReviewsPage() {
           Public reviews on your profile, plus any waiting on moderation.
         </p>
       </header>
+
+      {profile?.verification_status === "verified" && profile.slug && (
+        <div className="mb-8">
+          <ReviewLinkCard slug={profile.slug} />
+        </div>
+      )}
 
       {!hasDisplayable && <EmptyState />}
 
@@ -110,15 +123,8 @@ function EmptyState() {
           No reviews yet
         </h2>
         <p className="text-soft-black-light mx-auto max-w-sm text-sm">
-          Share your review link with past clients to start collecting reviews.
-          You can find it on your dashboard.
+          Reviews from your clients will show up here once they leave one.
         </p>
-        <Link
-          href="/dashboard"
-          className="text-teal text-sm font-medium hover:underline"
-        >
-          Go to dashboard
-        </Link>
       </CardContent>
     </Card>
   );
