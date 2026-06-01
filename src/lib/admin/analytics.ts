@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PRICING } from "@/lib/constants";
 
 export interface AnalyticsTotals {
@@ -21,7 +22,12 @@ export interface AnalyticsTotals {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
-  const supabase = await createClient();
+  // Super-admin-only aggregate dashboard (the page calls requireSuperAdmin).
+  // Use the service-role client so the platform-wide counts don't depend on
+  // every table having an admin RLS policy. The remote DB is missing
+  // subscriptions_select_admin, which silently zeroed MRR and active
+  // subscriptions under the RLS client even though the data exists.
+  const supabase = createServiceRoleClient();
   const now = Date.now();
   const sevenDaysAgo = new Date(now - 7 * DAY_MS).toISOString();
   const thirtyDaysAgo = new Date(now - 30 * DAY_MS).toISOString();
