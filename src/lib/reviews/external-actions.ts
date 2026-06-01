@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -149,12 +150,16 @@ export async function submitExternalReview(
   type Row = { review_id: string; verification_token: string };
   const row = data as unknown as Row;
 
-  // Fire-and-forget verification email.
-  sendVerifyReviewEmail({
-    to: input.reviewer_email,
-    reviewerName: input.reviewer_name,
-    verificationToken: row.verification_token,
-  }).catch((err) => console.error("[reviews] verify email failed:", err));
+  // Send the verification email after the response. after() keeps the
+  // serverless function alive until it completes; a bare fire-and-forget
+  // gets killed when the function freezes, so the email never sends.
+  after(() =>
+    sendVerifyReviewEmail({
+      to: input.reviewer_email,
+      reviewerName: input.reviewer_name,
+      verificationToken: row.verification_token,
+    }).catch((err) => console.error("[reviews] verify email failed:", err)),
+  );
 
   return { success: true, reviewId: row.review_id };
 }
@@ -196,12 +201,15 @@ export async function verifyExternalReview(
   };
   const row = data as unknown as Row;
 
-  // Now that the review is verified, notify the nurse.
-  sendNewReviewEmail({
-    nurseUserId: row.nurse_user_id,
-    rating: row.rating,
-    reviewerName: row.reviewer_name,
-  }).catch((err) => console.error("[reviews] new-review email failed:", err));
+  // Now that the review is verified, notify the nurse (after the response,
+  // so the send isn't killed by the function freezing).
+  after(() =>
+    sendNewReviewEmail({
+      nurseUserId: row.nurse_user_id,
+      rating: row.rating,
+      reviewerName: row.reviewer_name,
+    }).catch((err) => console.error("[reviews] new-review email failed:", err)),
+  );
 
   return {
     success: true,
