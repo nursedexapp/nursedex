@@ -15,6 +15,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { signOut } from "@/lib/auth/actions";
+import { NavPendingIcon } from "@/components/nav/NavPendingIcon";
 
 interface NavItem {
   href: string;
@@ -77,7 +78,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
                       : "text-muted-foreground hover:bg-sage/10 hover:text-foreground",
                   )}
                 >
-                  <Icon className="size-4" />
+                  <NavPendingIcon icon={Icon} className="size-4" />
                   {label}
                 </Link>
               );
@@ -113,7 +114,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
                 isActive ? "text-teal" : "text-muted-foreground",
               )}
             >
-              <Icon className="size-5" />
+              <NavPendingIcon icon={Icon} className="size-5" />
               <span>{label}</span>
             </Link>
           );

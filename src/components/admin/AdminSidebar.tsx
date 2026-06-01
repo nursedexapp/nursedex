@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOut } from "@/lib/auth/actions";
+import { NavPendingIcon } from "@/components/nav/NavPendingIcon";
 
 interface NavItem {
   href: string;
@@ -57,7 +58,6 @@ export function AdminSidebar({ isSuperAdmin }: AdminSidebarProps) {
       </p>
       <nav className="space-y-1">
         {items.map((item) => {
-          const Icon = item.icon;
           const active =
             pathname === item.href ||
             (item.href !== "/admin" && pathname.startsWith(item.href));
@@ -72,7 +72,7 @@ export function AdminSidebar({ isSuperAdmin }: AdminSidebarProps) {
                   : "text-soft-black-light hover:bg-muted hover:text-foreground",
               )}
             >
-              <Icon className="size-4" aria-hidden="true" />
+              <NavPendingIcon icon={item.icon} className="size-4" />
               {item.label}
             </Link>
           );

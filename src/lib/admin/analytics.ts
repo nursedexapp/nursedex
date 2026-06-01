@@ -70,12 +70,12 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
       .from("subscriptions")
       .select("id", { count: "exact", head: true })
       .eq("plan_type", "nurse_featured")
-      .in("status", ["active", "trialing", "past_due"]),
+      .in("status", ["active", "past_due"]),
     supabase
       .from("subscriptions")
       .select("id", { count: "exact", head: true })
       .eq("plan_type", "family_access")
-      .in("status", ["active", "trialing", "past_due"]),
+      .in("status", ["active", "past_due"]),
     supabase.from("reveals").select("id", { count: "exact", head: true }),
     supabase
       .from("reveals")
