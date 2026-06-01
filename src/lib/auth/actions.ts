@@ -89,6 +89,17 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
           "Please confirm your email before signing in. Check your inbox for a confirmation link.",
       };
     }
+    // A suspended/removed account is banned at the auth level, so the login
+    // is rejected. Tell them that instead of the generic credentials error.
+    if (
+      error.code === "user_banned" ||
+      error.message.toLowerCase().includes("banned")
+    ) {
+      return {
+        error:
+          "This account has been suspended. Email support@nursedex.com if you think this is a mistake.",
+      };
+    }
     return { error: "Invalid email or password." };
   }
 
