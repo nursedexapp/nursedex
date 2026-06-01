@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// The copy promises live counts, so never serve a cached render.
+export const dynamic = "force-dynamic";
+
 export default async function AnalyticsPage() {
   await requireSuperAdmin();
   const t = await getAnalyticsTotals();
