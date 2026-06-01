@@ -66,6 +66,15 @@ export async function suspendAccount(
     target_user_id: parsed.data.user_id,
   });
 
+  // Revoke the suspended user's sessions so they're signed out everywhere,
+  // not just when they next hit a requireAuth route. Without this their
+  // existing session keeps working on public pages. Best-effort, mirrors
+  // the remove cascade.
+  const service = createServiceRoleClient();
+  await service.auth.admin.signOut(parsed.data.user_id).catch((err) => {
+    console.error("[admin] auth.signOut on suspend failed:", err);
+  });
+
   sendAccountSuspendedEmail({
     to: target.email,
     firstName: target.first_name ?? undefined,
