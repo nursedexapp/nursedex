@@ -234,6 +234,160 @@ This overlaps with Journeys 1 and 2 above. Items not already covered:
 
 ---
 
+## Journey 5: Nurse profile management (edit, preview, settings)
+
+### Setup
+
+- Logged in as the verified nurse from Journey 1
+
+### Steps
+
+- [ ] `/dashboard/edit`, all five tabs render (Basics, Credentials,
+      Skills, Bio & Photos, Contact)
+- [ ] Edit a Basics field (e.g. languages), **Save changes**, confirm
+      the toast and that the value persists on reload
+- [ ] Change credential or legal name, confirm the re-verification
+      warning and that `verification_status` flips back to `pending`
+- [ ] Trigger a validation error (clear a required field on a non-active
+      tab), confirm the form jumps to the tab with the error and the
+      message is visible
+- [ ] **Mobile (375px):** confirm all five tabs are reachable, the
+      rate-range inputs fit, and Save is reachable. KNOWN ISSUE: tabs
+      overflow/wrap and the layout is cramped, edit-page redesign pending
+- [ ] `/dashboard/preview`, confirm it renders the nurse's public-facing
+      profile as a family would see it and matches the live
+      `/nurses/[slug]`
+- [ ] `/dashboard/settings`: toggle marketing opt-out, Save, confirm it
+      persists
+- [ ] Settings, change password, confirm the flow works and you can sign
+      in with the new password
+- [ ] Settings, **Sign out** (Account card), confirm signed out, on
+      mobile too (PR #83)
+- [ ] Settings, soft-delete account (use an expendable nurse), confirm
+      sign-out plus blocked-email enforcement at re-signup
+
+### Pass criteria
+
+- Edits persist; credential/name change re-triggers verification
+- Validation surfaces the correct tab
+- Preview matches the public profile
+- Marketing, password, sign-out, and delete all work
+
+---
+
+## Journey 6: Nurse hire claim by email link
+
+### Setup
+
+- A nurse who was revealed by a family that has NOT yet recorded a hire
+
+### Steps
+
+- [ ] As the nurse, open the "Claim a hire" entry point, submit a family
+      email
+- [ ] Outcome A (success): email matches a reveal, confirm a `hires` row
+      is created/linked and the HireConfirmed email fires
+- [ ] Outcome B (email_not_found): unknown email shows the explicit
+      "no record" message, not a silent reject
+- [ ] Outcome C (no_reveal_record): known family with no reveal shows its
+      explicit message
+- [ ] Open a `/hires/confirm/[token]` link from the HireConfirmRequest
+      email, confirm the page resolves the token; test an invalid/expired
+      token shows the "link not valid" state
+
+### Pass criteria
+
+- All three claim outcomes show explicit, correct messaging
+- `/hires/confirm/[token]` resolves valid tokens and rejects bad ones
+
+---
+
+## Journey 7: Family saved nurses and contact settings
+
+### Setup
+
+- Logged in as the Journey 2 family (active sub)
+
+### Steps
+
+- [ ] On `/nurses`, save a couple of nurses (heart), confirm the toast
+      and filled heart
+- [ ] `/dashboard/saved`, confirm saved nurses appear, split into
+      "Accepting new clients" vs "Currently unavailable"
+- [ ] Unsave one from the saved list, confirm it drops
+- [ ] Confirm the empty state (fresh account, no saves) shows the
+      Find-a-Nurse CTA
+- [ ] `/dashboard/settings` (family): update zip / communication
+      preference / phone, Save, confirm it persists in both `users` and
+      `family_profiles`
+
+### Pass criteria
+
+- Save/unsave works and reflects on `/dashboard/saved`
+- Availability sections are correct
+- Family contact settings persist to both tables
+
+---
+
+## Journey 8: Account access and recovery
+
+### Setup
+
+- An expendable alias you can lock out and recover
+
+### Steps
+
+- [ ] `/forgot-password`, submit the account email, land on
+      `/forgot-password/sent`
+- [ ] Receive the reset email, click the link, land on `/reset-password`
+      with a valid recovery session
+- [ ] Set a new password, confirm success and redirect, sign in with it
+- [ ] Open `/reset-password` directly (no recovery session), confirm it
+      does NOT let you change a password (the action errors)
+- [ ] Google OAuth: sign in with Google for at least one role, confirm it
+      lands correctly
+- [ ] Mobile sign-out for nurse and family (Settings Account card).
+      KNOWN GAP: admin has no mobile nav or sign-out, see Still open
+
+### Pass criteria
+
+- Forgot, reset, sign-in cycle works end to end
+- The reset page is inert without a recovery session
+- Google OAuth works
+
+---
+
+## Journey 9: Marketing and static pages smoke
+
+### Setup
+
+- Logged out, then optionally logged in
+
+### Steps
+
+- [ ] Load each: `/`, `/welcome`, `/about`, `/how-it-works`, `/pricing`,
+      `/faq`, `/contact`, `/privacy`, `/terms`, confirm each renders with
+      no console or Sentry errors
+- [ ] `/pricing`: confirm the anon audience toggle, nurse sees Free plus
+      Featured, family sees Family Access
+- [ ] `/contact`: submit the Turnstile-gated form, confirm it sends
+      (ContactReceived email to support@nursedex.com) and shows a success
+      state
+- [ ] Confirm header nav and footer links resolve on every marketing
+      page (no dead links)
+- [ ] Confirm `/brand`, `/brand/auth`, `/logo-exploration` are gated by
+      the site password and disallowed in robots (verified in robots.ts)
+- [ ] Mobile: header hamburger nav works and includes Sign out when
+      logged in (PR #83)
+
+### Pass criteria
+
+- All static pages render error-free and responsive
+- The contact form submits and emails support
+- Brand/sandbox routes are gated and noindexed
+
+---
+
 ## Findings and launch flips (discovered during testing)
 
 Fixed in PRs off `main`:
@@ -251,8 +405,25 @@ Fixed in PRs off `main`:
 - Dashboard loading skeleton was nearly invisible; bumped contrast
   (PR #55). Same faint pattern still exists on `/nurses`, nurse profile,
   onboarding, and the signup confirm fallback (follow up).
+- `/dashboard/revealed`, the admin review queues, and `/dashboard/saved`
+  silently returned empty: a PostgREST embed joined `nurse_profiles` off
+  a table whose FK points to `users`. Fixed (PRs #76, #77).
+- Disputed reviews didn't show on public profiles (RLS only exposed
+  `approved`). Fixed (PR #78 + migration 018).
+- Survey result cards force-navigated to signup; now open a dismissible
+  prompt (PR #81).
+- No way to sign out on mobile (sign-out only lived in the desktop
+  sidebars). Added to Settings and the public mobile menu (PR #83).
 
 Still open, decide before launch:
+
+- `/dashboard/edit` (nurse edit profile) is a visual mess, especially on
+  mobile: five tabs overflow/wrap, spacing is cramped and inconsistent,
+  and the rate-range inputs break under ~400px. Redesign pending.
+- Admin panel has no mobile navigation at all: `AdminSidebar` is
+  `hidden md:block`, so below 768px admins get no nav and no sign-out.
+  Add a mobile drawer or top bar (separate from the dashboard sign-out
+  fix in PR #83).
 
 - Waitlist front door: `/` (the waitlist landing) renders no nav, so a
   logged out visitor has no path into the product (`/nurses`, `/welcome`,
