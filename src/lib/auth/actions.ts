@@ -33,12 +33,16 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
 
   const supabase = await createClient();
 
-  // Check blocked emails
-  const { data: blocked } = await supabase
+  // Check blocked emails with the service-role client: blocked_emails is
+  // admin-only under RLS, so the anon signup client reads nothing and the
+  // block silently never fires (a removed user could re-signup, and Supabase
+  // then obfuscates the response since the auth row still exists).
+  const service = createServiceRoleClient();
+  const { data: blocked } = await service
     .from("blocked_emails")
     .select("id")
     .eq("email", email.toLowerCase())
-    .single();
+    .maybeSingle();
 
   if (blocked) {
     return { error: "This email address cannot be used to create an account." };
