@@ -1,7 +1,10 @@
+import { LogOut } from "lucide-react";
 import { requireAuth } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
-import { resetPassword } from "@/lib/auth/actions";
+import { resetPassword, signOut } from "@/lib/auth/actions";
 import { updateFamilyContact } from "@/lib/family/actions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { SettingsForm } from "./SettingsForm";
 
 async function updateMarketing(optOut: boolean) {
@@ -67,7 +70,7 @@ export default async function SettingsPage() {
           Manage your contact info, notifications, password, and account.
         </p>
       </div>
-      <div className="max-w-lg">
+      <div className="max-w-lg space-y-6">
         <SettingsForm
           marketingOptOut={user.marketing_opt_out}
           onUpdateMarketing={updateMarketing}
@@ -75,6 +78,24 @@ export default async function SettingsPage() {
           familyContact={familyContact}
           onSaveContact={isFamily ? saveContact : undefined}
         />
+
+        <Card className="border-sage/20">
+          <CardHeader>
+            <CardTitle className="text-base">Account</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={signOut}>
+              <Button
+                type="submit"
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                <LogOut className="mr-1.5 size-4" aria-hidden="true" />
+                Sign out
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
