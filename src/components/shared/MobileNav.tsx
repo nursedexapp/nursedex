@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { Menu, LogOut } from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { signOut } from "@/lib/auth/actions";
 
 interface MobileNavProps {
   isLoggedIn: boolean;
@@ -40,13 +41,24 @@ export function MobileNav({ isLoggedIn }: MobileNavProps) {
           </Link>
 
           {isLoggedIn ? (
-            <Link
-              href="/dashboard"
-              onClick={() => setOpen(false)}
-              className="bg-teal font-body hover:bg-teal-dark mt-2 rounded-lg px-4 py-3 text-center text-sm font-medium text-white transition-colors"
-            >
-              Dashboard
-            </Link>
+            <>
+              <Link
+                href="/dashboard"
+                onClick={() => setOpen(false)}
+                className="bg-teal font-body hover:bg-teal-dark mt-2 rounded-lg px-4 py-3 text-center text-sm font-medium text-white transition-colors"
+              >
+                Dashboard
+              </Link>
+              <form action={signOut} onSubmit={() => setOpen(false)}>
+                <button
+                  type="submit"
+                  className="font-body text-soft-black hover:bg-sage/10 mt-1 flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left text-sm transition-colors"
+                >
+                  <LogOut className="size-4" aria-hidden="true" />
+                  Sign out
+                </button>
+              </form>
+            </>
           ) : (
             <>
               <Link
