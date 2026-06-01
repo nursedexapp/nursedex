@@ -21,7 +21,15 @@ export async function getCurrentUser(): Promise<User | null> {
     .eq("id", authUser.id)
     .single();
 
-  return data as User | null;
+  const user = data as User | null;
+
+  // Treat suspended or removed users as logged out everywhere, not just on
+  // requireAuth-gated routes. Their Supabase session may still be valid (and
+  // the auth-level ban is best-effort), so this app-layer check is what
+  // actually blocks them from public pages too.
+  if (user && (user.is_suspended || user.is_deleted)) return null;
+
+  return user;
 }
 
 /**
@@ -30,15 +38,11 @@ export async function getCurrentUser(): Promise<User | null> {
  * Returns the user profile.
  */
 export async function requireAuth(): Promise<User> {
+  // getCurrentUser already returns null for suspended/deleted users, so this
+  // also bounces them to /login.
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/login");
-  }
-
-  if (user.is_deleted || user.is_suspended) {
-    const supabase = await createClient();
-    await supabase.auth.signOut();
     redirect("/login");
   }
 

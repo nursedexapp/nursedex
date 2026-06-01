@@ -66,14 +66,14 @@ export async function suspendAccount(
     target_user_id: parsed.data.user_id,
   });
 
-  // Revoke the suspended user's sessions so they're signed out everywhere,
-  // not just when they next hit a requireAuth route. Without this their
-  // existing session keeps working on public pages. Best-effort, mirrors
-  // the remove cascade.
+  // Ban the user at the auth level so their tokens stop validating. Best
+  // effort: the real enforcement is getCurrentUser treating is_suspended as
+  // logged out. (admin.signOut takes a JWT, not a user id, so it can't be
+  // used here.)
   const service = createServiceRoleClient();
-  await service.auth.admin.signOut(parsed.data.user_id).catch((err) => {
-    console.error("[admin] auth.signOut on suspend failed:", err);
-  });
+  await service.auth.admin
+    .updateUserById(parsed.data.user_id, { ban_duration: "876000h" })
+    .catch((err) => console.error("[admin] auth ban on suspend failed:", err));
 
   sendAccountSuspendedEmail({
     to: target.email,
@@ -116,6 +116,12 @@ export async function unsuspendAccount(
     action_type: "unsuspend_user",
     target_user_id: parsed.data.user_id,
   });
+
+  // Lift the auth-level ban applied on suspend.
+  const service = createServiceRoleClient();
+  await service.auth.admin
+    .updateUserById(parsed.data.user_id, { ban_duration: "none" })
+    .catch((err) => console.error("[admin] auth unban failed:", err));
 
   revalidatePath("/admin");
   revalidatePath("/admin/accounts");
@@ -207,10 +213,12 @@ export async function removeAccount(
     details: parsed.data.reason,
   });
 
-  // Sign them out everywhere by revoking auth sessions. Best-effort.
-  await service.auth.admin.signOut(parsed.data.user_id).catch((err) => {
-    console.error("[admin] auth.signOut failed:", err);
-  });
+  // Ban them at the auth level so their tokens stop validating. Best-effort;
+  // getCurrentUser also treats is_deleted as logged out. (admin.signOut takes
+  // a JWT, not a user id, so it can't revoke by id.)
+  await service.auth.admin
+    .updateUserById(parsed.data.user_id, { ban_duration: "876000h" })
+    .catch((err) => console.error("[admin] auth ban on remove failed:", err));
 
   sendAccountRemovedEmail({
     to: target.email,
