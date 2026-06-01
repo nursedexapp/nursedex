@@ -208,41 +208,39 @@ This overlaps with Journeys 1 and 2 above. Items not already covered:
 
 ### Setup
 
-- A nurse with at least one revealed family hire (use the family and
-  nurse from Journey 2)
+- A verified nurse (use `test-tester-cna` or the Journey 1 nurse)
+
+> Implementation note: the share link is the nurse's permanent slug URL
+> `nursedex.com/reviews/{slug}`, NOT a token. There is no "Generate" or
+> "Regenerate" button and the share link has no TTL. On the first visit
+> the page auto-creates a `nurse_review_links` token server-side as the
+> internal trust handle for the submit RPC; the sharer never sees it. The
+> only TTL is the 7-day email-verification window after a stranger submits.
 
 ### Steps
 
-- [ ] **As nurse**, `/dashboard/reviews`, see "Share review link" card,
-      click **Generate link**, copy the URL (format
-      `nursedex.com/reviews/{token}`)
-- [ ] Verify a `review_links` (or equivalent) row exists with the share
-      token and TTL
-- [ ] Open the link in **incognito or a non NurseDex inbox** (treat
-      reviewer as a stranger):
-  - [ ] Land on `/reviews/[token]`, see review form gated by email
-        verification
-  - [ ] Enter an email different from the family's account, submit
-  - [ ] Receive verification email at that inbox, click the verify
-        link, land on `/reviews/verify/[token]`
-  - [ ] Submit rating and text, review created with `status='pending'`
-- [ ] **As admin**, `/admin/reviews, Pending`, approve the external
+- [ ] **As nurse**, the share link shows on `/dashboard/reviews` (and the
+      dashboard): the slug URL `nursedex.com/reviews/{slug}`. Copy it.
+- [ ] Open the link in **incognito with a fresh email** (a stranger with
+      no NurseDex account):
+  - [ ] Land on `/reviews/[slug]`, see the review form (gated by email
+        verification). Confirm the page 404s for an unverified or
+        suspended nurse.
+  - [ ] Enter a fresh email plus name, rating, and text, submit, see the
+        "check your inbox" state
+  - [ ] Receive the VerifyReview email, click the link, land on
+        `/reviews/verify/[token]`
+  - [ ] Review row created with `is_external=true`, `status='pending'`,
+        and `email_verified` flips true after the verify click
+- [ ] **As admin**, `/admin/reviews`, Pending, approve the external
       review
-- [ ] Verify it now appears on the public profile WITHOUT requiring the
-      reviewer to have a NurseDex account
-- [ ] **Edge cases:**
-  - [ ] Try to use the same token a second time, confirm rate limit or
-        single use behavior
-  - [ ] Wait until the share token TTL expires (or manually expire one
-        in DB), confirm the link no longer works
-- [ ] **As nurse**, click **Regenerate link**, confirm a new token is
-      issued and the old one stops working
+- [ ] Verify it now appears on the nurse's public profile WITHOUT the
+      reviewer having a NurseDex account
 
 ### Pass criteria
 
-- Anyone with the link plus email verification can submit
-- Token has a working TTL
-- Regenerate invalidates the old token
+- The slug link works for a verified nurse and 404s otherwise
+- A stranger with the link plus email verification can submit
 - External reviews go through the same moderation queue and surface on
   the profile
 
