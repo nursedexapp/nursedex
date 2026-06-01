@@ -153,32 +153,46 @@ disposable email aliases so you can reuse your inbox.
 
 This overlaps with Journeys 1 and 2 above. Items not already covered:
 
+> Note: Journey 3 fully verified 2026-06-01. Many bugs were found and
+> fixed here: MRR enum filter (PR #88), suspend not revoking sessions
+> (#86), suspended-login message (#87), signup blocked-email check ran as
+> anon so it never blocked (#89), the "Rejectd" toast typo (#90). Also
+> added instant nav loading feedback (#88) and action-count badges on the
+> admin nav (#91).
+
 ### Steps
 
-- [ ] **Login as super admin** at support@nursedex.com, `/admin`
-- [ ] **Verifications**: confirm SLA badges show (Featured first, then
+- [x] **Login as super admin** at support@nursedex.com, `/admin`
+- [x] **Verifications**: confirm SLA badges show (Featured first, then
       FIFO within tier, with 75 percent and 100 percent red and yellow
       indicators if any nurse has been waiting longer than SLA)
-- [ ] Try **Reject** on a pending nurse, confirm rejection reason field
+- [x] Try **Reject** on a pending nurse, confirm rejection reason field
       is required, submit, confirm VerificationRejected email arrived
-- [ ] **Reviews, Pending**: approve and reject one of each. Confirm
-      `nurse_profiles.avg_rating` recalculates after approve
-- [ ] **Reviews, Removal requests**: have the reviewer (Journey 2
+      (reason gating + `admin_actions` reject_nurse confirmed; email to a
+      seed address so not inbox-checked, approval email already proven J1)
+- [x] **Reviews, Pending**: approve and reject one of each. Confirm
+      `nurse_profiles.avg_rating` recalculates after approve (reject left
+      David Chen at 0 reviews; approve recalc confirmed in J2)
+- [x] **Reviews, Removal requests**: have the reviewer (Journey 2
       family) submit a removal request for their own approved review,
       see it in this tab, approve removal
-- [ ] **Disputes**: have the nurse (Journey 1) dispute a review,
+- [x] **Disputes**: have the nurse (Journey 1) dispute a review,
       confirm "Under review" badge appears on the public profile,
       resolve via `/admin/disputes`, confirm adaptive email sent to the
-      right party
-- [ ] **Accounts**: search for the test family, click, **Suspend**,
+      right party (disputed review confirmed anon-readable = #78 fix;
+      Remove dropped the rating back to none)
+- [x] **Accounts**: search for the test family, click, **Suspend**,
       confirm sign out forced and paywall on access. Then
-      **Unsuspend**, access restored
-- [ ] **Accounts, Remove cascade**: pick a fully expendable test
+      **Unsuspend**, access restored (required the suspend-enforcement
+      fixes, #86/#87)
+- [x] **Accounts, Remove cascade**: pick a fully expendable test
       account, confirm cascade: Stripe subscription cancelled, soft
-      delete on user row, blocked_emails entry, force sign out
-- [ ] **Analytics** (super admin only): MRR, Signups, Engagement, Ops
-      tabs all load and show non error states
-- [ ] **Admins**: view the admin role list, confirm only
+      delete on user row, blocked_emails entry, force sign out (all four
+      verified in DB; also surfaced + fixed the signup blocked-email bug)
+- [x] **Analytics** (super admin only): MRR, Signups, Engagement, Ops
+      tabs all load and show non error states (MRR was \$0 due to the
+      enum bug, fixed #88, now \$19.99)
+- [x] **Admins**: view the admin role list, confirm only
       support@nursedex.com is super_admin
 
 ### Pass criteria
