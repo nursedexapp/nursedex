@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Header } from "@/components/shared/Header";
 import { Footer } from "@/components/shared/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase } from "lucide-react";
-import { requireAuth } from "@/lib/auth/helpers";
+import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { HireDecisionButtons } from "@/components/hires/HireDecisionButtons";
@@ -23,10 +22,54 @@ export default async function ConfirmHirePage({
   params,
 }: ConfirmHirePageProps) {
   const { token } = await params;
-  const user = await requireAuth();
+  const user = await getCurrentUser();
 
+  // Not logged in: tell them what to do instead of bouncing to /login (which
+  // wouldn't return them here anyway).
+  if (!user) {
+    return (
+      <Layout>
+        <Card className="border-sage/20">
+          <CardContent className="space-y-3 py-8 text-center">
+            <Briefcase className="text-muted-foreground mx-auto size-10" />
+            <h1 className="font-heading text-soft-black text-xl font-semibold">
+              Log in to confirm
+            </h1>
+            <p className="text-soft-black-light text-sm">
+              Log in with the family account that hired the nurse, then open
+              this link again to confirm.
+            </p>
+            <p>
+              <Link href="/login" className="text-teal text-sm hover:underline">
+                Log in
+              </Link>
+            </p>
+          </CardContent>
+        </Card>
+      </Layout>
+    );
+  }
+
+  // Logged in as the wrong kind of account (e.g. the nurse): say so instead of
+  // silently redirecting home.
   if (user.role !== "family") {
-    redirect("/");
+    return (
+      <Layout>
+        <Card className="border-sage/20">
+          <CardContent className="space-y-3 py-8 text-center">
+            <Briefcase className="text-muted-foreground mx-auto size-10" />
+            <h1 className="font-heading text-soft-black text-xl font-semibold">
+              For the hiring family
+            </h1>
+            <p className="text-soft-black-light text-sm">
+              This confirmation link is for the family who hired the nurse.
+              You&apos;re signed in as a different account, switch to the family
+              account and open the link again.
+            </p>
+          </CardContent>
+        </Card>
+      </Layout>
+    );
   }
 
   const supabase = await createClient();
