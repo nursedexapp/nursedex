@@ -217,25 +217,33 @@ This overlaps with Journeys 1 and 2 above. Items not already covered:
 > internal trust handle for the submit RPC; the sharer never sees it. The
 > only TTL is the 7-day email-verification window after a stranger submits.
 
+> Verified 2026-06-01 with `test-tester-cna`. Two blocking bugs found and
+> fixed: transactional emails were fire-and-forget and got killed when the
+> serverless function froze, so the verify email never sent (now wrapped in
+> after(), PRs #96/#97); and `verify_external_review` threw 42702
+> (ambiguous column) on every call, so verification was 100% broken (fixed
+> in migration 019, PR #98, applied to remote).
+
 ### Steps
 
-- [ ] **As nurse**, the share link shows on `/dashboard/reviews` (and the
+- [x] **As nurse**, the share link shows on `/dashboard/reviews` (and the
       dashboard): the slug URL `nursedex.com/reviews/{slug}`. Copy it.
-- [ ] Open the link in **incognito with a fresh email** (a stranger with
+- [x] Open the link in **incognito with a fresh email** (a stranger with
       no NurseDex account):
-  - [ ] Land on `/reviews/[slug]`, see the review form (gated by email
+  - [x] Land on `/reviews/[slug]`, see the review form (gated by email
         verification). Confirm the page 404s for an unverified or
         suspended nurse.
-  - [ ] Enter a fresh email plus name, rating, and text, submit, see the
+  - [x] Enter a fresh email plus name, rating, and text, submit, see the
         "check your inbox" state
-  - [ ] Receive the VerifyReview email, click the link, land on
+  - [x] Receive the VerifyReview email, click the link, land on
         `/reviews/verify/[token]`
-  - [ ] Review row created with `is_external=true`, `status='pending'`,
+  - [x] Review row created with `is_external=true`, `status='pending'`,
         and `email_verified` flips true after the verify click
-- [ ] **As admin**, `/admin/reviews`, Pending, approve the external
+- [x] **As admin**, `/admin/reviews`, Pending, approve the external
       review
-- [ ] Verify it now appears on the nurse's public profile WITHOUT the
-      reviewer having a NurseDex account
+- [x] Verify it now appears on the nurse's public profile WITHOUT the
+      reviewer having a NurseDex account (anon read confirmed;
+      `test-tester-cna` now `avg_rating` 5, `review_count` 1)
 
 ### Pass criteria
 
