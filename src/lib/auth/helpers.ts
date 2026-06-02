@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { User } from "@/types/database";
@@ -6,8 +7,12 @@ import type { UserRole } from "@/types/enums";
 /**
  * Get the current authenticated user with their profile data.
  * Returns null if not authenticated.
+ *
+ * Wrapped in React cache() so repeated calls within a single request (the
+ * dashboard layout and the page it renders both need the user) reuse one
+ * auth + users round trip instead of refetching.
  */
-export async function getCurrentUser(): Promise<User | null> {
+export const getCurrentUser = cache(async function getCurrentUser(): Promise<User | null> {
   const supabase = await createClient();
   const {
     data: { user: authUser },
@@ -30,7 +35,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (user && (user.is_suspended || user.is_deleted)) return null;
 
   return user;
-}
+});
 
 /**
  * Require the user to be authenticated.
