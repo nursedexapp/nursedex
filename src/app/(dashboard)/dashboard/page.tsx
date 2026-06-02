@@ -184,7 +184,7 @@ export default async function DashboardPage() {
             )}
             <QuickActions isAvailable={profile.is_available} />
             <ReviewLinkCard slug={profile.slug} />
-            <NurseClaimHireCard />
+            <NurseClaimHireCard slug={profile.slug} />
             {profile.tier === "free" && <FeaturedUpsell isVerified={true} />}
             {profile.tier === "featured" && featuredSub && (
               <ManageFeatured
