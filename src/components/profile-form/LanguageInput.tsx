@@ -134,8 +134,10 @@ export function LanguageInput({ value, onChange, error }: LanguageInputProps) {
         )}
       </div>
 
-      {/* Quick add for common languages */}
-      {!showSuggestions && (
+      {/* Quick add for common languages. Gated on an empty input (not
+          focus) so adding one via click keeps the rest visible; the typed
+          suggestions dropdown only appears once there's input text. */}
+      {inputValue.length === 0 && (
         <div className="flex flex-wrap gap-1">
           {COMMON_LANGUAGES.filter((lang) => !value.includes(lang))
             .slice(0, 6)
