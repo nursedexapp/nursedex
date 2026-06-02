@@ -25,13 +25,21 @@ export type HireActionError =
   | "no_reveal_record"
   | "not_found"
   | "wrong_state"
+  | "too_soon"
   | "unknown";
+
+// How long a nurse must wait before re-sending a hire-confirmation email to
+// the same family, so the resend path can't be used to spam someone.
+const HIRE_CONFIRM_COOLDOWN_MS = 60 * 60 * 1000;
 
 export interface HireActionResult {
   success: boolean;
   error?: HireActionError;
   fieldErrors?: Record<string, string>;
   hireId?: string;
+  // True when an existing pending claim's confirmation email was re-sent
+  // rather than a new claim being created.
+  resent?: boolean;
 }
 
 /**
@@ -156,11 +164,54 @@ export async function claimHireByEmail(
 
   const { data: existing } = await service
     .from("hires")
-    .select("id, status")
+    .select("id, status, claimed_by, claim_token")
     .eq("family_user_id", family.id)
     .eq("nurse_user_id", nurse.id)
     .maybeSingle();
   if (existing && existing.status !== "rejected") {
+    // A pending claim the nurse already sent: re-send the confirmation
+    // email (reusing the token) instead of blocking. A confirmed hire, or
+    // one the family recorded, is genuinely already on file.
+    if (existing.status === "claimed" && existing.claimed_by === "nurse") {
+      // Rate limit: don't let the resend path spam the same family. Block if
+      // a hire-confirmation email went to them within the cooldown window.
+      const since = new Date(
+        Date.now() - HIRE_CONFIRM_COOLDOWN_MS,
+      ).toISOString();
+      const { count: recent } = await service
+        .from("email_log")
+        .select("id", { count: "exact", head: true })
+        .eq("recipient_user_id", family.id)
+        .eq("email_type", "hire_confirm_request")
+        .gte("sent_at", since);
+      if ((recent ?? 0) > 0) {
+        return { success: false, error: "too_soon" };
+      }
+
+      const token = existing.claim_token ?? crypto.randomUUID();
+      if (!existing.claim_token) {
+        await service
+          .from("hires")
+          .update({ claim_token: token })
+          .eq("id", existing.id);
+      }
+      await service.from("email_log").insert({
+        recipient_user_id: family.id,
+        email_type: "hire_confirm_request",
+        dedup_key: existing.id,
+      });
+      after(() =>
+        sendHireConfirmRequestEmail({
+          to: family.email,
+          firstName: family.first_name ?? undefined,
+          nurseFirstName: nurse.first_name ?? "Your NurseDex nurse",
+          claimToken: token,
+        }).catch((err) =>
+          console.error("[email] hire confirm request resend failed:", err),
+        ),
+      );
+      return { success: true, hireId: existing.id, resent: true };
+    }
     return { success: false, error: "already_recorded" };
   }
 
@@ -181,6 +232,12 @@ export async function claimHireByEmail(
     return { success: false, error: "unknown" };
   }
 
+  // Log the send so a subsequent resend respects the cooldown window.
+  await service.from("email_log").insert({
+    recipient_user_id: family.id,
+    email_type: "hire_confirm_request",
+    dedup_key: inserted.id,
+  });
   after(() =>
     sendHireConfirmRequestEmail({
       to: family.email,

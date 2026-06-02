@@ -57,12 +57,20 @@ export function NurseClaimHireCard({ slug }: NurseClaimHireCardProps) {
           setShowShareLink(true);
         } else if (result.error === "already_recorded") {
           setError("There's already a hire on file for that family.");
+        } else if (result.error === "too_soon") {
+          setError(
+            "We already emailed that family recently. You can re-send again in a little while.",
+          );
         } else {
           toast.error("Could not submit. Please try again.");
         }
         return;
       }
-      toast.success("Sent. We'll email the family to confirm.");
+      toast.success(
+        result.resent
+          ? "Confirmation email re-sent to that family."
+          : "Sent. We'll email the family to confirm.",
+      );
       setEmail("");
     });
   };
