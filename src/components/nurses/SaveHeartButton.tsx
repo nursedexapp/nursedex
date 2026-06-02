@@ -53,6 +53,9 @@ export function SaveHeartButton({
         return;
       }
       setIsSaved(result.isSaved);
+      toast.success(
+        result.isSaved ? "Saved to your list" : "Removed from your list",
+      );
       if (posthog.__loaded) {
         posthog.capture(
           result.isSaved
