@@ -4,19 +4,18 @@ import { updateSession } from "@/lib/supabase/middleware";
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
 
 export async function proxy(request: NextRequest) {
-  // Password gate: only for /brand pages
-  if (request.nextUrl.pathname.startsWith("/brand")) {
+  // Password gate for the internal design surfaces: /brand* and
+  // /logo-exploration. /brand-login is itself under /brand, so let it
+  // through to avoid a redirect loop.
+  const path = request.nextUrl.pathname;
+  const isGated =
+    path.startsWith("/brand") || path.startsWith("/logo-exploration");
+  if (isGated && path !== "/brand-login") {
     if (SITE_PASSWORD) {
       const authCookie = request.cookies.get("site-auth");
       if (authCookie?.value !== SITE_PASSWORD) {
-        if (
-          request.nextUrl.pathname === "/api/login" ||
-          request.nextUrl.pathname === "/brand-login"
-        ) {
-          return NextResponse.next();
-        }
         const loginUrl = new URL("/brand-login", request.url);
-        loginUrl.searchParams.set("from", request.nextUrl.pathname);
+        loginUrl.searchParams.set("from", path);
         return NextResponse.redirect(loginUrl);
       }
     }
