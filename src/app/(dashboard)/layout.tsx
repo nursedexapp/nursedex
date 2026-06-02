@@ -12,28 +12,28 @@ export default async function DashboardLayout({
   const user = await getCurrentUser();
   const role = user?.role ?? null;
 
-  // Family-onboarding gate: a family user with no zip on family_profiles
-  // hasn't gone through onboarding yet, send them there before showing
-  // any dashboard surface.
-  if (user && role === "family") {
-    const supabase = await createClient();
-    const { data: profile } = await supabase
-      .from("family_profiles")
-      .select("zip_code")
-      .eq("user_id", user.id)
-      .single();
-    if (!profile?.zip_code) {
-      redirect("/onboarding/family");
-    }
-  }
-
   // Surface payment failure across the dashboard. The webhook flips
   // subscriptions.status to past_due on invoice.payment_failed; we read it
   // here and render a banner above content until the user updates payment.
   let pastDueBanner: React.ReactNode = null;
+
   if (user) {
     const supabase = await createClient();
-    const { data: pastDue } = await supabase
+
+    // Two independent reads, so run them together rather than blocking on
+    // one before starting the other:
+    //  - Family-onboarding gate: a family user with no zip on family_profiles
+    //    hasn't onboarded yet, send them there before any dashboard surface.
+    //  - Past-due banner: surface a failed payment until they update it.
+    const profileQuery =
+      role === "family"
+        ? supabase
+            .from("family_profiles")
+            .select("zip_code")
+            .eq("user_id", user.id)
+            .single()
+        : null;
+    const pastDueQuery = supabase
       .from("subscriptions")
       .select("plan_type")
       .eq("user_id", user.id)
@@ -41,10 +41,22 @@ export default async function DashboardLayout({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (pastDue) {
+
+    const [profileResult, pastDueResult] = await Promise.all([
+      profileQuery,
+      pastDueQuery,
+    ]);
+
+    if (role === "family" && !profileResult?.data?.zip_code) {
+      redirect("/onboarding/family");
+    }
+
+    if (pastDueResult.data) {
       pastDueBanner = (
         <PastDueBanner
-          planType={pastDue.plan_type as "nurse_featured" | "family_access"}
+          planType={
+            pastDueResult.data.plan_type as "nurse_featured" | "family_access"
+          }
         />
       );
     }
