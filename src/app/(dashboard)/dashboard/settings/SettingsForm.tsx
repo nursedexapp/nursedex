@@ -269,8 +269,8 @@ export function SettingsForm({
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground mb-4 text-sm">
-            This will hide your profile from search and sign you out. Your data
-            will be retained for 30 days in case you change your mind.
+            This permanently deletes your account, removes your profile from
+            NurseDex, and signs you out. This cannot be undone.
           </p>
           <Dialog>
             <DialogTrigger className="border-destructive/20 bg-destructive/10 text-destructive hover:bg-destructive/20 inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors">
