@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -60,6 +61,14 @@ export function SettingsForm({
     Record<string, string | undefined>
   >({});
   const [savingContact, setSavingContact] = useState(false);
+  const [contactSaved, setContactSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+    };
+  }, []);
 
   const handleMarketingToggle = async (checked: boolean) => {
     setSavingMarketing(true);
@@ -93,6 +102,9 @@ export function SettingsForm({
       setContactErrors(result.fieldErrors);
     } else if (result.success) {
       toast.success("Contact preferences updated");
+      setContactSaved(true);
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setContactSaved(false), 2500);
     }
     setSavingContact(false);
   };
@@ -106,7 +118,11 @@ export function SettingsForm({
             <CardTitle className="text-base">Contact preferences</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={handleSaveContact} className="space-y-5">
+            <form
+              action={handleSaveContact}
+              onChange={() => contactSaved && setContactSaved(false)}
+              className="space-y-5"
+            >
               {/* Zip code */}
               <div className="space-y-2">
                 <Label htmlFor="contact-zip">Your zip code</Label>
@@ -140,7 +156,10 @@ export function SettingsForm({
                         type="button"
                         role="radio"
                         aria-checked={selected}
-                        onClick={() => setCommPref(pref)}
+                        onClick={() => {
+                          setCommPref(pref);
+                          setContactSaved(false);
+                        }}
                         className={cn(
                           "rounded-lg border px-3 py-2.5 text-sm transition-colors",
                           selected
@@ -182,8 +201,25 @@ export function SettingsForm({
                 )}
               </div>
 
-              <Button type="submit" variant="outline" disabled={savingContact}>
-                {savingContact ? "Saving..." : "Save changes"}
+              <Button
+                type="submit"
+                variant="outline"
+                disabled={savingContact}
+                className={cn(
+                  contactSaved &&
+                    "border-teal text-teal hover:text-teal disabled:opacity-100",
+                )}
+              >
+                {savingContact ? (
+                  "Saving..."
+                ) : contactSaved ? (
+                  <>
+                    <Check className="mr-1.5 size-4" aria-hidden="true" />
+                    Saved
+                  </>
+                ) : (
+                  "Save changes"
+                )}
               </Button>
             </form>
           </CardContent>
