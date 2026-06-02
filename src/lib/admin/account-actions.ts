@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -75,10 +76,12 @@ export async function suspendAccount(
     .updateUserById(parsed.data.user_id, { ban_duration: "876000h" })
     .catch((err) => console.error("[admin] auth ban on suspend failed:", err));
 
-  sendAccountSuspendedEmail({
-    to: target.email,
-    firstName: target.first_name ?? undefined,
-  }).catch((err) => console.error("[email] account suspended failed:", err));
+  after(() =>
+    sendAccountSuspendedEmail({
+      to: target.email,
+      firstName: target.first_name ?? undefined,
+    }).catch((err) => console.error("[email] account suspended failed:", err)),
+  );
 
   revalidatePath("/admin");
   revalidatePath("/admin/accounts");
@@ -220,11 +223,13 @@ export async function removeAccount(
     .updateUserById(parsed.data.user_id, { ban_duration: "876000h" })
     .catch((err) => console.error("[admin] auth ban on remove failed:", err));
 
-  sendAccountRemovedEmail({
-    to: target.email,
-    firstName: target.first_name ?? undefined,
-    reason: parsed.data.reason,
-  }).catch((err) => console.error("[email] account removed failed:", err));
+  after(() =>
+    sendAccountRemovedEmail({
+      to: target.email,
+      firstName: target.first_name ?? undefined,
+      reason: parsed.data.reason,
+    }).catch((err) => console.error("[email] account removed failed:", err)),
+  );
 
   revalidatePath("/admin");
   revalidatePath("/admin/accounts");

@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { verifyTurnstileToken } from "@/lib/turnstile/verify";
@@ -53,12 +54,14 @@ export async function submitContact(
   }
 
   // Fire-and-forget notification to the support inbox.
-  sendContactReceivedEmail({
-    name: input.name,
-    email: input.email,
-    message: input.message,
-  }).catch((err) =>
-    console.error("[email] contact received notify failed:", err),
+  after(() =>
+    sendContactReceivedEmail({
+      name: input.name,
+      email: input.email,
+      message: input.message,
+    }).catch((err) =>
+      console.error("[email] contact received notify failed:", err),
+    ),
   );
 
   return { success: true };
