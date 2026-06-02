@@ -184,7 +184,10 @@ export function SettingsForm({
                 <Label htmlFor="contact-phone">
                   Phone number{" "}
                   <span className="text-soft-black-light font-normal">
-                    (optional)
+                    {commPref === CommunicationPreference.PHONE ||
+                    commPref === CommunicationPreference.TEXT
+                      ? "(required for phone or text)"
+                      : "(optional)"}
                   </span>
                 </Label>
                 <Input

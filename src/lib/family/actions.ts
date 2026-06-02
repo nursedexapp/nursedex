@@ -9,22 +9,42 @@ import { CommunicationPreference } from "@/types/enums";
 
 const SURVEY_COOKIE_NAME = "nursedex_survey_params";
 
-const onboardingSchema = z.object({
-  zip_code: z
-    .string()
-    .regex(/^\d{5}$/, "Please enter a valid 5-digit zip code"),
-  communication_preference: z.nativeEnum(
-    CommunicationPreference,
-    "Pick a preferred contact method",
-  ),
-  phone: z
-    .string()
-    .regex(/^[\d\s()+-]*$/, "Please enter a valid phone number")
-    .max(20, "Phone is too long")
-    .optional()
-    .or(z.literal("")),
-  disclaimer_accepted: z.literal("on", "Please acknowledge the disclaimer"),
-});
+// Phone is required when the family wants nurses to reach them by phone or
+// text, otherwise the chosen contact method has nothing to reach.
+const phoneSatisfiesPreference = (data: {
+  communication_preference: CommunicationPreference;
+  phone?: string;
+}) => {
+  const needsPhone =
+    data.communication_preference === CommunicationPreference.PHONE ||
+    data.communication_preference === CommunicationPreference.TEXT;
+  if (!needsPhone) return true;
+  return !!data.phone && data.phone.trim().length > 0;
+};
+
+const phoneRequiredIssue = {
+  message: "Add a phone number to be reached by phone or text",
+  path: ["phone"],
+};
+
+const onboardingSchema = z
+  .object({
+    zip_code: z
+      .string()
+      .regex(/^\d{5}$/, "Please enter a valid 5-digit zip code"),
+    communication_preference: z.nativeEnum(
+      CommunicationPreference,
+      "Pick a preferred contact method",
+    ),
+    phone: z
+      .string()
+      .regex(/^[\d\s()+-]*$/, "Please enter a valid phone number")
+      .max(20, "Phone is too long")
+      .optional()
+      .or(z.literal("")),
+    disclaimer_accepted: z.literal("on", "Please acknowledge the disclaimer"),
+  })
+  .refine(phoneSatisfiesPreference, phoneRequiredIssue);
 
 export interface OnboardingResult {
   fieldErrors?: Record<string, string>;
@@ -124,21 +144,23 @@ export async function setSurveyHandoffCookie(params: string): Promise<void> {
 
 // ── Settings: family contact preferences ─────────────────────
 
-const contactPrefsSchema = z.object({
-  zip_code: z
-    .string()
-    .regex(/^\d{5}$/, "Please enter a valid 5-digit zip code"),
-  communication_preference: z.nativeEnum(
-    CommunicationPreference,
-    "Pick a preferred contact method",
-  ),
-  phone: z
-    .string()
-    .regex(/^[\d\s()+-]*$/, "Please enter a valid phone number")
-    .max(20, "Phone is too long")
-    .optional()
-    .or(z.literal("")),
-});
+const contactPrefsSchema = z
+  .object({
+    zip_code: z
+      .string()
+      .regex(/^\d{5}$/, "Please enter a valid 5-digit zip code"),
+    communication_preference: z.nativeEnum(
+      CommunicationPreference,
+      "Pick a preferred contact method",
+    ),
+    phone: z
+      .string()
+      .regex(/^[\d\s()+-]*$/, "Please enter a valid phone number")
+      .max(20, "Phone is too long")
+      .optional()
+      .or(z.literal("")),
+  })
+  .refine(phoneSatisfiesPreference, phoneRequiredIssue);
 
 export interface UpdateContactResult {
   fieldErrors?: Record<string, string>;
