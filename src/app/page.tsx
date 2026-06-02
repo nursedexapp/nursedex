@@ -1,21 +1,7 @@
-import { LandingPage } from "@/components/landing/LandingPage";
+import { HomeView, homeMetadata } from "@/components/marketing/HomeView";
 
-type PageProps = {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-};
+export const metadata = homeMetadata;
 
-export default async function Home({ searchParams }: PageProps) {
-  const params = await searchParams;
-
-  // Capture UTM parameters for waitlist attribution
-  const utmParts = ["utm_source", "utm_medium", "utm_campaign"]
-    .map((key) => {
-      const val = params[key];
-      return typeof val === "string" ? `${key}=${val}` : null;
-    })
-    .filter(Boolean);
-
-  const referralSource = utmParts.length > 0 ? utmParts.join("&") : undefined;
-
-  return <LandingPage referralSource={referralSource} />;
+export default function Home() {
+  return <HomeView />;
 }

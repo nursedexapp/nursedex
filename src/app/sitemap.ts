@@ -9,7 +9,6 @@ const STATIC_PAGES: Array<{
   priority: number;
 }> = [
   { path: "/", changeFrequency: "weekly", priority: 0.9 },
-  { path: "/welcome", changeFrequency: "monthly", priority: 0.9 },
   { path: "/nurses", changeFrequency: "daily", priority: 0.9 },
   { path: "/how-it-works", changeFrequency: "monthly", priority: 0.7 },
   { path: "/pricing", changeFrequency: "monthly", priority: 0.7 },
