@@ -311,24 +311,34 @@ This overlaps with Journeys 1 and 2 above. Items not already covered:
 
 - A nurse who was revealed by a family that has NOT yet recorded a hire
 
+> Verified 2026-06-02. This flow shook out six fixes: email "Testlet"
+> spacing across 6 templates (PR #105), misleading "subscribe" copy plus a
+> copyable review link in the claim card (#106), re-send on re-claim
+> rate-limited per family via email_log (#107), confirm page showing
+> feedback instead of bouncing to / (#108), inline success after a decision
+> (#109), and keep-token + drop-revalidate so it stops flashing "Link not
+> valid" after a confirm (#110).
+
 ### Steps
 
-- [ ] As the nurse, open the "Claim a hire" entry point, submit a family
+- [x] As the nurse, open the "Claim a hire" entry point, submit a family
       email
-- [ ] Outcome A (success): email matches a reveal, confirm a `hires` row
+- [x] Outcome A (success): email matches a reveal, confirm a `hires` row
       is created/linked and the HireConfirmed email fires
-- [ ] Outcome B (email_not_found): unknown email shows the explicit
+- [x] Outcome B (email_not_found): unknown email shows the explicit
       "no record" message, not a silent reject
-- [ ] Outcome C (no_reveal_record): known family with no reveal shows its
-      explicit message
-- [ ] Open a `/hires/confirm/[token]` link from the HireConfirmRequest
-      email, confirm the page resolves the token; test an invalid/expired
-      token shows the "link not valid" state
+- [x] Outcome C (no_reveal_record): known family with no reveal shows its
+      explicit message (now reworded + offers the share-review link)
+- [x] Open a `/hires/confirm/[token]` link, confirm the page resolves the
+      token and the family can confirm (inline success, no bounce); a bad
+      token shows "Link not valid"; a wrong-role/logged-out viewer gets a
+      clear message instead of a homepage redirect
 
 ### Pass criteria
 
 - All three claim outcomes show explicit, correct messaging
-- `/hires/confirm/[token]` resolves valid tokens and rejects bad ones
+- `/hires/confirm/[token]` resolves valid tokens, the family confirm
+  sticks, and bad/expired tokens show "Link not valid"
 
 ---
 
