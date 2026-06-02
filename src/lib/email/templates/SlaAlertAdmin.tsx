@@ -20,14 +20,11 @@ export function SlaAlertAdmin({
           {overdueCount > 0 ? (
             <>
               <strong>
-                {overdueCount} verification{overdueCount === 1 ? "" : "s"}{" "}
-                {overdueCount === 1 ? "is" : "are"} now overdue.
+                {`${overdueCount} verification${overdueCount === 1 ? "" : "s"} ${overdueCount === 1 ? "is" : "are"} now overdue.`}
               </strong>{" "}
             </>
           ) : null}
-          {approachingCount} additional verification
-          {approachingCount === 1 ? " is" : "s are"} past 75% of the SLA and
-          approaching the deadline (24h Featured, 72h Free).
+          {`${approachingCount} additional verification${approachingCount === 1 ? " is" : "s are"} past 75% of the SLA and approaching the deadline (24h Featured, 72h Free).`}
         </Text>
         <Link href="https://nursedex.com/admin/verifications" style={button}>
           Open queue

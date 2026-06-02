@@ -17,9 +17,7 @@ export function HireConfirmed({
           Congrats{firstName ? `, ${firstName}` : ""}!
         </Text>
         <Text style={paragraph}>
-          {familyFirstName} confirmed they hired you on NurseDex. We&apos;ll
-          start counting this hire toward your stats and follow up with them in
-          a few weeks for a review.
+          {`${familyFirstName} confirmed they hired you on NurseDex. We'll start counting this hire toward your stats and follow up with them in a few weeks for a review.`}
         </Text>
         <Link href="https://nursedex.com/dashboard" style={button}>
           Go to dashboard

@@ -17,7 +17,7 @@ export function NewReview({ firstName, rating, reviewerName }: NewReviewProps) {
           New review{firstName ? `, ${firstName}` : ""}!
         </Text>
         <Text style={paragraph}>
-          {reviewerName} just left you a {rating} star review on NurseDex.
+          {`${reviewerName} just left you a ${rating} star review on NurseDex.`}
         </Text>
         <Text style={stars_}>{stars}</Text>
         <Text style={paragraph}>

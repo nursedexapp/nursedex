@@ -21,8 +21,7 @@ export function HireConfirmRequest({
           {firstName ? `, ${firstName}` : ""}?
         </Text>
         <Text style={paragraph}>
-          {nurseFirstName} let us know they were hired by you on NurseDex.
-          We&apos;d love to confirm before showing it on their profile.
+          {`${nurseFirstName} let us know they were hired by you on NurseDex. We'd love to confirm before showing it on their profile.`}
         </Text>
         <Link href={confirmUrl} style={button}>
           Confirm or reject
