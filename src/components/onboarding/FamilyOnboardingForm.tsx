@@ -106,7 +106,12 @@ export function FamilyOnboardingForm({
       <div className="space-y-2">
         <Label htmlFor="phone">
           Phone number{" "}
-          <span className="text-soft-black-light font-normal">(optional)</span>
+          <span className="text-soft-black-light font-normal">
+            {commPref === CommunicationPreference.PHONE ||
+            commPref === CommunicationPreference.TEXT
+              ? "(required for phone or text)"
+              : "(optional)"}
+          </span>
         </Label>
         <Input
           id="phone"
