@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { PASSWORD_RECOVERY } from "@/lib/constants";
 
 const OTP_TYPES = new Set<EmailOtpType>([
   "signup",
@@ -57,7 +58,22 @@ export async function GET(request: NextRequest) {
     }
 
     if (explicitNext) {
-      return NextResponse.redirect(`${origin}${explicitNext}`);
+      const response = NextResponse.redirect(`${origin}${explicitNext}`);
+      // Only a genuine recovery link (valid code/token just exchanged above)
+      // can reach here with this next target, so mark the session as being in
+      // password-recovery mode. The /reset-password page and action require
+      // this marker, which blocks a plain logged-in user from changing their
+      // password just by visiting /reset-password directly.
+      if (tokenType === "recovery" || explicitNext === "/reset-password") {
+        response.cookies.set(PASSWORD_RECOVERY.COOKIE_NAME, "1", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: PASSWORD_RECOVERY.TTL_SECONDS,
+          path: "/",
+        });
+      }
+      return response;
     }
 
     if (user) {
