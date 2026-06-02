@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -90,11 +91,13 @@ export async function recordFamilyHire(
     .eq("id", parsed.data.nurse_user_id)
     .maybeSingle();
   if (nurseUser?.email) {
-    sendHireConfirmedEmail({
-      to: nurseUser.email,
-      firstName: nurseUser.first_name ?? undefined,
-      familyFirstName: user.first_name ?? "A NurseDex family",
-    }).catch((err) => console.error("[email] hire confirmed failed:", err));
+    after(() =>
+      sendHireConfirmedEmail({
+        to: nurseUser.email,
+        firstName: nurseUser.first_name ?? undefined,
+        familyFirstName: user.first_name ?? "A NurseDex family",
+      }).catch((err) => console.error("[email] hire confirmed failed:", err)),
+    );
   }
 
   revalidatePath("/dashboard/revealed");
@@ -178,12 +181,16 @@ export async function claimHireByEmail(
     return { success: false, error: "unknown" };
   }
 
-  sendHireConfirmRequestEmail({
-    to: family.email,
-    firstName: family.first_name ?? undefined,
-    nurseFirstName: nurse.first_name ?? "Your NurseDex nurse",
-    claimToken,
-  }).catch((err) => console.error("[email] hire confirm request failed:", err));
+  after(() =>
+    sendHireConfirmRequestEmail({
+      to: family.email,
+      firstName: family.first_name ?? undefined,
+      nurseFirstName: nurse.first_name ?? "Your NurseDex nurse",
+      claimToken,
+    }).catch((err) =>
+      console.error("[email] hire confirm request failed:", err),
+    ),
+  );
 
   revalidatePath("/dashboard");
   return { success: true, hireId: inserted.id };
@@ -234,11 +241,13 @@ export async function confirmHireFromToken(
     .eq("id", row.nurse_user_id)
     .maybeSingle();
   if (nurseUser?.email) {
-    sendHireConfirmedEmail({
-      to: nurseUser.email,
-      firstName: nurseUser.first_name ?? undefined,
-      familyFirstName: user.first_name ?? "A NurseDex family",
-    }).catch((err) => console.error("[email] hire confirmed failed:", err));
+    after(() =>
+      sendHireConfirmedEmail({
+        to: nurseUser.email,
+        firstName: nurseUser.first_name ?? undefined,
+        familyFirstName: user.first_name ?? "A NurseDex family",
+      }).catch((err) => console.error("[email] hire confirmed failed:", err)),
+    );
   }
 
   revalidatePath("/dashboard");

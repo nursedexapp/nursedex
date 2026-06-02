@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAuth, requireRole } from "@/lib/auth/helpers";
@@ -231,8 +232,10 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
   }
 
   // Fire-and-forget: don't block onboarding completion on email delivery
-  sendProfileSetupEmail(userData.email, userData.first_name, newSlug).catch(
-    (err) => console.error("[email] Profile setup email error:", err),
+  after(() =>
+    sendProfileSetupEmail(userData.email, userData.first_name, newSlug).catch(
+      (err) => console.error("[email] Profile setup email error:", err),
+    ),
   );
 
   return { success: "Profile saved. Verification next." };

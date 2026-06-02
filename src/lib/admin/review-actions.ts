@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -246,31 +247,37 @@ export async function adminResolveDispute(
 
   // Notify the nurse.
   if (r.users?.email) {
-    sendDisputeDecisionEmail({
-      to: r.users.email,
-      recipientType: "nurse",
-      recipientName: r.users.first_name ?? undefined,
-      decision: parsed.data.decision,
-      rating: r.rating,
-      reviewerName: r.reviewer_name,
-      notes,
-    }).catch((err) =>
-      console.error("[email] dispute decision (nurse) failed:", err),
+    const nurseUser = r.users;
+    after(() =>
+      sendDisputeDecisionEmail({
+        to: nurseUser.email,
+        recipientType: "nurse",
+        recipientName: nurseUser.first_name ?? undefined,
+        decision: parsed.data.decision,
+        rating: r.rating,
+        reviewerName: r.reviewer_name,
+        notes,
+      }).catch((err) =>
+        console.error("[email] dispute decision (nurse) failed:", err),
+      ),
     );
   }
 
   // Notify the reviewer if we have an email on file.
   if (r.reviewer_email) {
-    sendDisputeDecisionEmail({
-      to: r.reviewer_email,
-      recipientType: "reviewer",
-      recipientName: r.reviewer_name,
-      decision: parsed.data.decision,
-      rating: r.rating,
-      reviewerName: r.reviewer_name,
-      notes,
-    }).catch((err) =>
-      console.error("[email] dispute decision (reviewer) failed:", err),
+    const reviewerEmail = r.reviewer_email;
+    after(() =>
+      sendDisputeDecisionEmail({
+        to: reviewerEmail,
+        recipientType: "reviewer",
+        recipientName: r.reviewer_name,
+        decision: parsed.data.decision,
+        rating: r.rating,
+        reviewerName: r.reviewer_name,
+        notes,
+      }).catch((err) =>
+        console.error("[email] dispute decision (reviewer) failed:", err),
+      ),
     );
   }
 

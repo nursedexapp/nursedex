@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/helpers";
@@ -100,11 +101,13 @@ export async function submitFamilyReview(
   }
 
   // Best-effort: notify the nurse a new review came in.
-  sendNewReviewEmail({
-    nurseUserId: input.nurse_user_id,
-    rating: input.rating,
-    reviewerName: input.reviewer_name,
-  }).catch((err) => console.error("[reviews] new-review email failed:", err));
+  after(() =>
+    sendNewReviewEmail({
+      nurseUserId: input.nurse_user_id,
+      rating: input.rating,
+      reviewerName: input.reviewer_name,
+    }).catch((err) => console.error("[reviews] new-review email failed:", err)),
+  );
 
   revalidatePath("/dashboard/revealed");
   revalidatePath("/dashboard");

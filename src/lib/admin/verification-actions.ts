@@ -1,5 +1,6 @@
 "use server";
 
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/helpers";
@@ -79,12 +80,15 @@ export async function approveVerification(
     target_user_id: input.user_id,
   });
 
-  sendVerificationApprovedEmail({
-    to: row.users.email,
-    firstName: row.users.first_name ?? undefined,
-    slug: row.slug,
-  }).catch((err) =>
-    console.error("[email] verification approved failed:", err),
+  const approvedUser = row.users;
+  after(() =>
+    sendVerificationApprovedEmail({
+      to: approvedUser.email,
+      firstName: approvedUser.first_name ?? undefined,
+      slug: row.slug,
+    }).catch((err) =>
+      console.error("[email] verification approved failed:", err),
+    ),
   );
 
   revalidatePath("/admin");
@@ -149,12 +153,15 @@ export async function rejectVerification(
     details: reasonText,
   });
 
-  sendVerificationRejectedEmail({
-    to: row.users.email,
-    firstName: row.users.first_name ?? undefined,
-    reason: reasonText,
-  }).catch((err) =>
-    console.error("[email] verification rejected failed:", err),
+  const rejectedUser = row.users;
+  after(() =>
+    sendVerificationRejectedEmail({
+      to: rejectedUser.email,
+      firstName: rejectedUser.first_name ?? undefined,
+      reason: reasonText,
+    }).catch((err) =>
+      console.error("[email] verification rejected failed:", err),
+    ),
   );
 
   revalidatePath("/admin");
