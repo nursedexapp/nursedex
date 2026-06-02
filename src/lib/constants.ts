@@ -91,6 +91,15 @@ export const PASSWORD = {
   MIN_LENGTH: 8,
 } as const;
 
+// Password recovery: a short-lived marker cookie set by /auth/callback only
+// when arriving via a valid password-reset link. The /reset-password page and
+// its action require it, so a plain authenticated session (e.g. navigating
+// there directly while logged in) cannot change the password.
+export const PASSWORD_RECOVERY = {
+  COOKIE_NAME: "nursedex_pw_recovery",
+  TTL_SECONDS: 15 * 60, // 15 minutes
+} as const;
+
 // Physical address (CAN-SPAM)
 export const BUSINESS_ADDRESS = {
   line1: "2197 Louis Kossuth Avenue",

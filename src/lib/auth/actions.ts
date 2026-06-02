@@ -1,9 +1,10 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { PASSWORD } from "@/lib/constants";
+import { PASSWORD, PASSWORD_RECOVERY } from "@/lib/constants";
 
 export type AuthResult = {
   error?: string;
@@ -202,6 +203,68 @@ export async function resetPassword(formData: FormData): Promise<AuthResult> {
   if (error) {
     return { error: error.message };
   }
+
+  redirect("/login?message=password_reset");
+}
+
+/**
+ * Reset a password from the email recovery flow. Unlike resetPassword (used
+ * by the authenticated settings page), this requires the recovery marker
+ * cookie set by /auth/callback, so a plain logged-in session visiting
+ * /reset-password directly cannot change the password.
+ */
+export async function resetPasswordRecovery(
+  formData: FormData,
+): Promise<AuthResult> {
+  const cookieStore = await cookies();
+  const inRecovery =
+    cookieStore.get(PASSWORD_RECOVERY.COOKIE_NAME)?.value === "1";
+  if (!inRecovery) {
+    return {
+      error:
+        "This password reset link is invalid or has expired. Please request a new one.",
+    };
+  }
+
+  const password = formData.get("password") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+
+  if (!password || !confirmPassword) {
+    return { error: "Both fields are required." };
+  }
+
+  if (password !== confirmPassword) {
+    return { error: "Passwords do not match." };
+  }
+
+  if (password.length < PASSWORD.MIN_LENGTH) {
+    return {
+      error: `Password must be at least ${PASSWORD.MIN_LENGTH} characters.`,
+    };
+  }
+
+  const supabase = await createClient();
+
+  // updateUser still needs the recovery session that /auth/callback
+  // established; if it somehow lapsed, surface a clear error.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      error:
+        "This password reset link is invalid or has expired. Please request a new one.",
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  // One-time use: drop the marker so the link can't be reused.
+  cookieStore.delete(PASSWORD_RECOVERY.COOKIE_NAME);
 
   redirect("/login?message=password_reset");
 }
