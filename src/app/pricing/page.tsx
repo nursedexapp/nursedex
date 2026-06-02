@@ -137,24 +137,38 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
 function AudienceToggle({ current }: { current: Audience }) {
   const baseClass =
-    "rounded-full px-4 py-2 text-sm font-medium transition-colors";
-  const activeClass = "bg-teal text-white";
-  const idleClass =
-    "bg-white text-soft-black ring-1 ring-sage/30 hover:bg-sage/10";
+    "flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold transition-colors sm:px-7";
+  const activeClass = "bg-teal text-white shadow-sm";
+  const idleClass = "text-soft-black-light hover:bg-sage/10";
   return (
-    <div className="mx-auto mt-6 flex w-fit gap-1 rounded-full bg-white p-1 ring-1 ring-sage-light/40">
-      <Link
-        href="/pricing?audience=families"
-        className={`${baseClass} ${current === "families" ? activeClass : idleClass}`}
+    <div className="mt-8 flex flex-col items-center">
+      <p className="text-soft-black-light mb-3 text-sm font-medium">
+        I&apos;m here to...
+      </p>
+      <div
+        role="tablist"
+        aria-label="Choose your pricing"
+        className="border-sage/30 inline-flex gap-1 rounded-xl border bg-white p-1 shadow-sm"
       >
-        For families
-      </Link>
-      <Link
-        href="/pricing?audience=nurses"
-        className={`${baseClass} ${current === "nurses" ? activeClass : idleClass}`}
-      >
-        For nurses
-      </Link>
+        <Link
+          href="/pricing?audience=families"
+          role="tab"
+          aria-selected={current === "families"}
+          className={`${baseClass} ${current === "families" ? activeClass : idleClass}`}
+        >
+          <Heart className="size-4" aria-hidden="true" />
+          Hire a nurse
+        </Link>
+        <Link
+          href="/pricing?audience=nurses"
+          role="tab"
+          aria-selected={current === "nurses"}
+          className={`${baseClass} ${current === "nurses" ? activeClass : idleClass}`}
+        >
+          <Star className="size-4" aria-hidden="true" />
+          Join as a nurse
+        </Link>
+      </div>
     </div>
   );
 }
