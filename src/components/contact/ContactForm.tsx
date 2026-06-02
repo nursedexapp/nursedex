@@ -19,6 +19,14 @@ export function ContactForm() {
   const [submitted, setSubmitted] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  const clearError = (field: string) =>
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -81,10 +89,14 @@ export function ContactForm() {
         <Input
           id="contact_name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            clearError("name");
+          }}
           maxLength={80}
           required
           disabled={pending}
+          aria-invalid={!!errors.name}
         />
         {errors.name && (
           <p className="text-destructive mt-1 text-xs">{errors.name}</p>
@@ -99,9 +111,13 @@ export function ContactForm() {
           id="contact_email"
           type="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            clearError("email");
+          }}
           required
           disabled={pending}
+          aria-invalid={!!errors.email}
         />
         {errors.email && (
           <p className="text-destructive mt-1 text-xs">{errors.email}</p>
@@ -115,15 +131,25 @@ export function ContactForm() {
         <Textarea
           id="contact_message"
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => {
+            setMessage(e.target.value);
+            clearError("message");
+          }}
           maxLength={CONTACT_MESSAGE_MAX}
           rows={6}
           required
           disabled={pending}
+          aria-invalid={!!errors.message}
         />
-        <div className="text-muted-foreground mt-1 flex items-center justify-between text-xs">
-          <span>{errors.message ?? "Tell us what's going on."}</span>
-          <span>
+        <div className="mt-1 flex items-center justify-between text-xs">
+          <span
+            className={
+              errors.message ? "text-destructive" : "text-muted-foreground"
+            }
+          >
+            {errors.message ?? "Tell us what's going on."}
+          </span>
+          <span className="text-muted-foreground">
             {message.length}/{CONTACT_MESSAGE_MAX}
           </span>
         </div>
