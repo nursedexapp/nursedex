@@ -432,19 +432,19 @@ All six steps pass. Two fixes shipped during this journey:
 
 ### Steps
 
-- [ ] Load each: `/`, `/welcome`, `/about`, `/how-it-works`, `/pricing`,
+- [x] Load each: `/`, `/welcome`, `/about`, `/how-it-works`, `/pricing`,
       `/faq`, `/contact`, `/privacy`, `/terms`, confirm each renders with
       no console or Sentry errors
-- [ ] `/pricing`: confirm the anon audience toggle, nurse sees Free plus
+- [x] `/pricing`: confirm the anon audience toggle, nurse sees Free plus
       Featured, family sees Family Access
-- [ ] `/contact`: submit the Turnstile-gated form, confirm it sends
+- [x] `/contact`: submit the Turnstile-gated form, confirm it sends
       (ContactReceived email to support@nursedex.com) and shows a success
       state
-- [ ] Confirm header nav and footer links resolve on every marketing
+- [x] Confirm header nav and footer links resolve on every marketing
       page (no dead links)
-- [ ] Confirm `/brand`, `/brand/auth`, `/logo-exploration` are gated by
+- [x] Confirm `/brand`, `/brand/auth`, `/logo-exploration` are gated by
       the site password and disallowed in robots (verified in robots.ts)
-- [ ] Mobile: header hamburger nav works and includes Sign out when
+- [x] Mobile: header hamburger nav works and includes Sign out when
       logged in (PR #83)
 
 ### Pass criteria
@@ -452,6 +452,27 @@ All six steps pass. Two fixes shipped during this journey:
 - All static pages render error-free and responsive
 - The contact form submits and emails support
 - Brand/sandbox routes are gated and noindexed
+
+### Verified 2026-06-02
+
+All steps pass. Fixes shipped during this journey:
+
+- `/logo-exploration` was not password-gated (the proxy only matched
+  `/brand*`), so it was publicly reachable. Now gated alongside `/brand`
+  (PR #120).
+- The pricing audience toggle read like a label; redesigned as a clear
+  "I'm here to..." segmented control so anonymous nurses can find nurse
+  pricing (PR #121).
+- The contact form silently ignored a too-short message; the validation
+  error now shows in red with aria-invalid, and clears as you type
+  (PR #122).
+- Added a required Subject field to the contact form (new
+  `contact_submissions.subject` column, migration 020) and removed the
+  redundant "or email support directly" line; the support email subject
+  is now `[Contact form] <subject>` (PR #123).
+
+**Full E2E pass (Journeys 1 through 9) complete.** Remaining before
+launch is the decisions/TODOs below, not test coverage.
 
 ---
 
