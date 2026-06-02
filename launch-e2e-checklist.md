@@ -391,23 +391,36 @@ All five steps pass. Fixes shipped during this journey:
 
 ### Steps
 
-- [ ] `/forgot-password`, submit the account email, land on
+- [x] `/forgot-password`, submit the account email, land on
       `/forgot-password/sent`
-- [ ] Receive the reset email, click the link, land on `/reset-password`
+- [x] Receive the reset email, click the link, land on `/reset-password`
       with a valid recovery session
-- [ ] Set a new password, confirm success and redirect, sign in with it
-- [ ] Open `/reset-password` directly (no recovery session), confirm it
+- [x] Set a new password, confirm success and redirect, sign in with it
+- [x] Open `/reset-password` directly (no recovery session), confirm it
       does NOT let you change a password (the action errors)
-- [ ] Google OAuth: sign in with Google for at least one role, confirm it
+- [x] Google OAuth: sign in with Google for at least one role, confirm it
       lands correctly
-- [ ] Mobile sign-out for nurse and family (Settings Account card).
-      KNOWN GAP: admin has no mobile nav or sign-out, see Still open
+- [x] Mobile sign-out for nurse and family (Settings Account card), and
+      admin (new mobile nav)
 
 ### Pass criteria
 
 - Forgot, reset, sign-in cycle works end to end
 - The reset page is inert without a recovery session
 - Google OAuth works
+
+### Verified 2026-06-02
+
+All six steps pass. Two fixes shipped during this journey:
+
+- The admin panel had no nav or sign-out below 768px (`AdminSidebar` was
+  `hidden md:block`). Added a mobile top bar with a hamburger drawer
+  (PR #117).
+- `/reset-password` let any logged-in session change the password by
+  navigating there directly. It now requires a short-lived recovery
+  marker cookie set only by a valid reset link (one-time use); without it
+  the page shows an invalid-link state. The settings change-password path
+  is unchanged (PR #118).
 
 ---
 
