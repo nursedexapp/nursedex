@@ -15,10 +15,7 @@ export function RateLimitFlaggedAdmin({
       <Section>
         <Text style={heading}>Rate limit flagged accounts</Text>
         <Text style={paragraph}>
-          {flaggedCount} family account{flaggedCount === 1 ? "" : "s"}{" "}
-          {flaggedCount === 1 ? "has" : "have"} hit 3 or more consecutive
-          captcha trigger days on the reveal flow. Worth a manual look in case
-          any are scraping.
+          {`${flaggedCount} family account${flaggedCount === 1 ? "" : "s"} ${flaggedCount === 1 ? "has" : "have"} hit 3 or more consecutive captcha trigger days on the reveal flow. Worth a manual look in case any are scraping.`}
         </Text>
         <Link
           href="https://nursedex.com/admin/accounts?tab=flagged"
