@@ -260,31 +260,41 @@ This overlaps with Journeys 1 and 2 above. Items not already covered:
 
 - Logged in as the verified nurse from Journey 1
 
+> Verified 2026-06-01. The edit page was actually broken, not just messy:
+> three bugs fixed during this run, a Base UI data-attribute mismatch that
+> collapsed the Tabs layout (PR #100) and made Separators invisible app
+> wide (#101), and the language quick-add chips vanishing after one click
+> (#102). After those, desktop + mobile render fine, no redesign needed.
+
 ### Steps
 
-- [ ] `/dashboard/edit`, all five tabs render (Basics, Credentials,
-      Skills, Bio & Photos, Contact)
-- [ ] Edit a Basics field (e.g. languages), **Save changes**, confirm
+- [x] `/dashboard/edit`, all five tabs render (Basics, Credentials,
+      Skills, Bio & Photos, Contact) (was visually broken until the Tabs
+      fix, PR #100)
+- [x] Edit a Basics field (e.g. languages), **Save changes**, confirm
       the toast and that the value persists on reload
 - [ ] Change credential or legal name, confirm the re-verification
       warning and that `verification_status` flips back to `pending`
-- [ ] Trigger a validation error (clear a required field on a non-active
+      (deferred: would un-verify the only controllable nurse; run with a
+      throwaway when convenient)
+- [x] Trigger a validation error (clear a required field on a non-active
       tab), confirm the form jumps to the tab with the error and the
       message is visible
-- [ ] **Mobile (375px):** confirm all five tabs are reachable, the
-      rate-range inputs fit, and Save is reachable. KNOWN ISSUE: tabs
-      overflow/wrap and the layout is cramped, edit-page redesign pending
-- [ ] `/dashboard/preview`, confirm it renders the nurse's public-facing
+- [x] **Mobile (375px):** confirm all five tabs are reachable, the
+      rate-range inputs fit, and Save is reachable
+- [x] `/dashboard/preview`, confirm it renders the nurse's public-facing
       profile as a family would see it and matches the live
       `/nurses/[slug]`
-- [ ] `/dashboard/settings`: toggle marketing opt-out, Save, confirm it
+- [x] `/dashboard/settings`: toggle marketing opt-out, Save, confirm it
       persists
 - [ ] Settings, change password, confirm the flow works and you can sign
-      in with the new password
-- [ ] Settings, **Sign out** (Account card), confirm signed out, on
+      in with the new password (covered by Journey 8)
+- [x] Settings, **Sign out** (Account card), confirm signed out, on
       mobile too (PR #83)
 - [ ] Settings, soft-delete account (use an expendable nurse), confirm
-      sign-out plus blocked-email enforcement at re-signup
+      sign-out plus blocked-email enforcement at re-signup (deferred: the
+      remove/cascade + blocked-email enforcement were proven admin-side in
+      Journey 3, PR #89)
 
 ### Pass criteria
 
