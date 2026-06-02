@@ -277,12 +277,13 @@ export async function confirmHireFromToken(
     return { success: false, error: "wrong_state" };
   }
 
+  // Keep claim_token so re-opening the link shows "Already handled" rather
+  // than "Link not valid"; the status guard above prevents re-confirmation.
   const { error } = await supabase
     .from("hires")
     .update({
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
-      claim_token: null,
     })
     .eq("id", row.id);
   if (error) {
@@ -307,14 +308,16 @@ export async function confirmHireFromToken(
     );
   }
 
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/revealed");
+  // Note: no revalidatePath here. Revalidating from this server action would
+  // refetch the confirm page and re-query the (now resolved) hire, fighting
+  // the inline success state. The nurse's dashboard is dynamic and shows the
+  // updated count on its next load.
   return { success: true, hireId: row.id };
 }
 
 /**
  * Family rejects a nurse-claimed hire from the email link. Status
- * flips to rejected and the token is cleared.
+ * flips to rejected.
  */
 export async function rejectHireFromToken(
   raw: unknown,
@@ -337,15 +340,16 @@ export async function rejectHireFromToken(
     return { success: false, error: "wrong_state" };
   }
 
+  // Keep claim_token (re-opening shows "Already handled", not "Link not
+  // valid"), and skip revalidatePath so it doesn't fight the inline result.
   const { error } = await supabase
     .from("hires")
-    .update({ status: "rejected", claim_token: null })
+    .update({ status: "rejected" })
     .eq("id", row.id);
   if (error) {
     console.error("[hires] reject failed:", error.message);
     return { success: false, error: "unknown" };
   }
 
-  revalidatePath("/dashboard");
   return { success: true, hireId: row.id };
 }
