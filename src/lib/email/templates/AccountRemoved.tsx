@@ -21,8 +21,8 @@ export function AccountRemoved({ firstName, reason }: AccountRemovedProps) {
         <Text style={reasonBox}>{reason}</Text>
         <Text style={paragraph}>
           You can no longer log in, and this email address can&apos;t be used to
-          sign up again. If you believe this was a mistake or want to appeal the
-          decision, please reach out below within 30 days.
+          sign up again. If you believe this was a mistake, you can reach out
+          below.
         </Text>
         <Text style={footer}>
           <Link href="mailto:support@nursedex.com" style={link}>
