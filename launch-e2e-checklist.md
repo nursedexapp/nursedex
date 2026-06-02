@@ -350,14 +350,14 @@ This overlaps with Journeys 1 and 2 above. Items not already covered:
 
 ### Steps
 
-- [ ] On `/nurses`, save a couple of nurses (heart), confirm the toast
+- [x] On `/nurses`, save a couple of nurses (heart), confirm the toast
       and filled heart
-- [ ] `/dashboard/saved`, confirm saved nurses appear, split into
+- [x] `/dashboard/saved`, confirm saved nurses appear, split into
       "Accepting new clients" vs "Currently unavailable"
-- [ ] Unsave one from the saved list, confirm it drops
-- [ ] Confirm the empty state (fresh account, no saves) shows the
+- [x] Unsave one from the saved list, confirm it drops
+- [x] Confirm the empty state (fresh account, no saves) shows the
       Find-a-Nurse CTA
-- [ ] `/dashboard/settings` (family): update zip / communication
+- [x] `/dashboard/settings` (family): update zip / communication
       preference / phone, Save, confirm it persists in both `users` and
       `family_profiles`
 
@@ -366,6 +366,20 @@ This overlaps with Journeys 1 and 2 above. Items not already covered:
 - Save/unsave works and reflects on `/dashboard/saved`
 - Availability sections are correct
 - Family contact settings persist to both tables
+
+### Verified 2026-06-02
+
+All five steps pass. Fixes shipped during this journey:
+
+- The save heart had no success toast (only errors toasted); added "Saved
+  to your list" / "Removed from your list" (PR #112).
+- The family settings save only fired a toast that was easy to miss; the
+  button now confirms inline ("Saved" check for 2.5s) (PR #113).
+- A family could choose Phone or Text contact preference without entering
+  a phone number; now required in both onboarding and settings, with the
+  label switching to "(required for phone or text)" (PR #114).
+- Dashboard navigation made redundant Supabase round trips; memoized
+  `getCurrentUser` and parallelized the layout reads (PR #115).
 
 ---
 
