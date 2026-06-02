@@ -7,12 +7,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { TurnstileWidget } from "@/components/reveals/TurnstileWidget";
-import { CONTACT_MESSAGE_MAX } from "@/lib/schemas/contact";
+import {
+  CONTACT_MESSAGE_MAX,
+  CONTACT_SUBJECT_MAX,
+} from "@/lib/schemas/contact";
 import { submitContact } from "@/lib/contact/actions";
 
 export function ContactForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -40,6 +44,7 @@ export function ContactForm() {
       const result = await submitContact({
         name,
         email,
+        subject,
         message,
         turnstile_token: token,
       });
@@ -125,6 +130,27 @@ export function ContactForm() {
       </div>
 
       <div>
+        <Label htmlFor="contact_subject" className="mb-1.5 block">
+          Subject
+        </Label>
+        <Input
+          id="contact_subject"
+          value={subject}
+          onChange={(e) => {
+            setSubject(e.target.value);
+            clearError("subject");
+          }}
+          maxLength={CONTACT_SUBJECT_MAX}
+          required
+          disabled={pending}
+          aria-invalid={!!errors.subject}
+        />
+        {errors.subject && (
+          <p className="text-destructive mt-1 text-xs">{errors.subject}</p>
+        )}
+      </div>
+
+      <div>
         <Label htmlFor="contact_message" className="mb-1.5 block">
           Message
         </Label>
@@ -164,7 +190,10 @@ export function ContactForm() {
         )}
       </div>
 
-      <Button type="submit" disabled={pending || !name || !email || !message}>
+      <Button
+        type="submit"
+        disabled={pending || !name || !email || !subject || !message}
+      >
         {pending ? "Sending..." : "Send message"}
       </Button>
     </form>

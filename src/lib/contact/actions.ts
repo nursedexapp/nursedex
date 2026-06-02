@@ -46,6 +46,7 @@ export async function submitContact(
   const { error } = await supabase.from("contact_submissions").insert({
     name: input.name,
     email: input.email,
+    subject: input.subject,
     message: input.message,
   });
   if (error) {
@@ -58,6 +59,7 @@ export async function submitContact(
     sendContactReceivedEmail({
       name: input.name,
       email: input.email,
+      subject: input.subject,
       message: input.message,
     }).catch((err) =>
       console.error("[email] contact received notify failed:", err),

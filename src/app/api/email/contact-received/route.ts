@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 const schema = z.object({
   name: z.string().min(1).max(80),
   email: z.email(),
+  subject: z.string().min(1).max(120),
   message: z.string().min(1).max(2000),
 });
 
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
       from: "NurseDex Contact <noreply@nursedex.com>",
       to: "support@nursedex.com",
       replyTo: parsed.data.email,
-      subject: `[Contact form] ${parsed.data.name}`,
+      subject: `[Contact form] ${parsed.data.subject}`,
       react: ContactReceived(parsed.data),
     });
     if (error) {
