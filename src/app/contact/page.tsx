@@ -29,14 +29,7 @@ export default function ContactPage() {
           </h1>
           <p className="text-soft-black-light mt-2 text-base">
             Questions, feedback, or something specific to flag? Drop a message
-            below or email{" "}
-            <a
-              href="mailto:support@nursedex.com"
-              className="text-teal underline underline-offset-2"
-            >
-              support@nursedex.com
-            </a>{" "}
-            directly. We typically reply within one business day.
+            below. We typically reply within one business day.
           </p>
         </header>
 

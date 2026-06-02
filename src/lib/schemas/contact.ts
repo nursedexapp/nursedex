@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const CONTACT_NAME_MAX = 80;
+export const CONTACT_SUBJECT_MAX = 120;
 export const CONTACT_MESSAGE_MIN = 10;
 export const CONTACT_MESSAGE_MAX = 2000;
 
@@ -11,6 +12,14 @@ export const contactSchema = z.object({
     .min(1, "Name is required")
     .max(CONTACT_NAME_MAX, `Keep name under ${CONTACT_NAME_MAX} characters`),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
+  subject: z
+    .string()
+    .trim()
+    .min(1, "Subject is required")
+    .max(
+      CONTACT_SUBJECT_MAX,
+      `Keep subject under ${CONTACT_SUBJECT_MAX} characters`,
+    ),
   message: z
     .string()
     .trim()

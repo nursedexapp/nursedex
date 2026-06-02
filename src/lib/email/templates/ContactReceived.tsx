@@ -4,21 +4,27 @@ import { EmailLayout } from "./EmailLayout";
 interface ContactReceivedProps {
   name: string;
   email: string;
+  subject: string;
   message: string;
 }
 
 export function ContactReceived({
   name,
   email,
+  subject,
   message,
 }: ContactReceivedProps) {
   return (
-    <EmailLayout preview={`Contact form: ${name}`}>
+    <EmailLayout preview={`Contact form: ${subject}`}>
       <Section>
         <Text style={heading}>New contact submission</Text>
         <Text style={paragraph}>
           <strong>{name}</strong> just sent a message via the NurseDex contact
           form.
+        </Text>
+        <Text style={kv}>
+          <strong>Subject:</strong>{" "}
+          {subject}
         </Text>
         <Text style={kv}>
           <strong>Reply to:</strong>{" "}
