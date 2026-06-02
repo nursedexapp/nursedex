@@ -32,6 +32,9 @@ export interface HireActionResult {
   error?: HireActionError;
   fieldErrors?: Record<string, string>;
   hireId?: string;
+  // True when an existing pending claim's confirmation email was re-sent
+  // rather than a new claim being created.
+  resent?: boolean;
 }
 
 /**
@@ -156,11 +159,34 @@ export async function claimHireByEmail(
 
   const { data: existing } = await service
     .from("hires")
-    .select("id, status")
+    .select("id, status, claimed_by, claim_token")
     .eq("family_user_id", family.id)
     .eq("nurse_user_id", nurse.id)
     .maybeSingle();
   if (existing && existing.status !== "rejected") {
+    // A pending claim the nurse already sent: re-send the confirmation
+    // email (reusing the token) instead of blocking. A confirmed hire, or
+    // one the family recorded, is genuinely already on file.
+    if (existing.status === "claimed" && existing.claimed_by === "nurse") {
+      const token = existing.claim_token ?? crypto.randomUUID();
+      if (!existing.claim_token) {
+        await service
+          .from("hires")
+          .update({ claim_token: token })
+          .eq("id", existing.id);
+      }
+      after(() =>
+        sendHireConfirmRequestEmail({
+          to: family.email,
+          firstName: family.first_name ?? undefined,
+          nurseFirstName: nurse.first_name ?? "Your NurseDex nurse",
+          claimToken: token,
+        }).catch((err) =>
+          console.error("[email] hire confirm request resend failed:", err),
+        ),
+      );
+      return { success: true, hireId: existing.id, resent: true };
+    }
     return { success: false, error: "already_recorded" };
   }
 

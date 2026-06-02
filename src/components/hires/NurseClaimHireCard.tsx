@@ -62,7 +62,11 @@ export function NurseClaimHireCard({ slug }: NurseClaimHireCardProps) {
         }
         return;
       }
-      toast.success("Sent. We'll email the family to confirm.");
+      toast.success(
+        result.resent
+          ? "Confirmation email re-sent to that family."
+          : "Sent. We'll email the family to confirm.",
+      );
       setEmail("");
     });
   };
