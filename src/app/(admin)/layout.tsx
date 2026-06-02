@@ -14,7 +14,7 @@ export default async function AdminLayout({
   return (
     <div className="bg-warm-white flex min-h-screen">
       <AdminSidebar isSuperAdmin={isSuperAdmin} counts={counts} />
-      <main className="flex-1">{children}</main>
+      <main className="min-w-0 flex-1 pt-14 md:pt-0">{children}</main>
     </div>
   );
 }
