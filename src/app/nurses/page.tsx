@@ -21,11 +21,11 @@ import {
 export const metadata: Metadata = {
   title: "Find a Nurse | NurseDex",
   description:
-    "Search verified home care nurses on Long Island. Filter by credential, specialty, availability, and more.",
+    "Search verified home care nurses across New York. Filter by credential, specialty, availability, and more.",
   openGraph: {
     title: "Find a Nurse on NurseDex",
     description:
-      "Search verified home care nurses on Long Island. Filter by credential, specialty, availability, and more.",
+      "Search verified home care nurses across New York. Filter by credential, specialty, availability, and more.",
     url: "https://nursedex.com/nurses",
   },
 };
@@ -209,7 +209,7 @@ function EmptyState({ hasFilters }: { hasFilters: boolean }) {
         No verified nurses yet
       </h2>
       <p className="text-soft-black-light mt-2 text-sm">
-        We&apos;re onboarding nurses across Long Island. Check back soon.
+        We&apos;re onboarding nurses across New York. Check back soon.
       </p>
     </div>
   );

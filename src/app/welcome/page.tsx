@@ -15,13 +15,13 @@ import { Footer } from "@/components/shared/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "NurseDex | Long Island's trusted nurse directory",
+  title: "NurseDex | New York's trusted nurse directory",
   description:
-    "Find trusted nurses on Long Island, or build a profile that gets families to call. NurseDex connects verified nurses with the families that need them.",
+    "Find trusted nurses across New York, or build a profile that gets families to call. NurseDex connects verified nurses with the families that need them.",
   openGraph: {
-    title: "NurseDex | Long Island's trusted nurse directory",
+    title: "NurseDex | New York's trusted nurse directory",
     description:
-      "Find trusted nurses on Long Island, or build a profile that gets families to call.",
+      "Find trusted nurses across New York, or build a profile that gets families to call.",
     type: "website",
     url: "https://nursedex.com/welcome",
   },
@@ -47,11 +47,12 @@ function Hero() {
     <section className="border-sage-light/40 bg-warm-white border-b">
       <div className="mx-auto max-w-6xl px-6 py-14 sm:py-20">
         <h1 className="font-heading text-soft-black mx-auto max-w-3xl text-center text-3xl font-semibold sm:text-5xl">
-          Long Island&apos;s trusted nurse directory
+          New York&apos;s trusted nurse directory
         </h1>
         <p className="text-soft-black-light mx-auto mt-4 max-w-2xl text-center text-base sm:text-lg">
-          Verified nurses, real reviews, direct contact. Built for families on
-          Long Island looking for care, and for nurses who deserve to be found.
+          Verified nurses, real reviews, direct contact. Built for families
+          across New York looking for care, and for nurses who deserve to be
+          found.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -65,7 +66,7 @@ function Hero() {
               </h2>
               <p className="text-soft-black-light text-sm">
                 Search by credential, care type, language, and availability. See
-                real reviews from other Long Island families.
+                real reviews from other New York families.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
@@ -87,7 +88,7 @@ function Hero() {
           <Card className="border-sage/30 from-sage/10 to-warm-white bg-gradient-to-b">
             <CardContent className="space-y-3 pt-6">
               <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                Nurse on Long Island
+                Nurse in New York
               </p>
               <h2 className="font-heading text-soft-black text-xl font-semibold">
                 Build a profile that families call
@@ -128,8 +129,8 @@ function TrustSignals() {
     },
     {
       icon: <Heart className="size-5" />,
-      title: "Long Island only",
-      desc: "Suffolk, Nassau, and Queens. Hyper-local, not a national directory.",
+      title: "New York focused",
+      desc: "Local nurses across New York, not a faceless national directory.",
     },
     {
       icon: <Star className="size-5" />,

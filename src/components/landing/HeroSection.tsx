@@ -13,10 +13,10 @@ const copy = {
   family: {
     headline: "Find care that feels like family.",
     subheadline:
-      "NurseDex connects Long Island families with verified, trusted caregivers. Browse real profiles, read honest reviews, and hire with confidence.",
+      "NurseDex connects New York families with verified, trusted caregivers. Browse real profiles, read honest reviews, and hire with confidence.",
   },
   nurse: {
-    headline: "Grow your care practice on Long Island.",
+    headline: "Grow your care practice across New York.",
     subheadline:
       "NurseDex puts you in front of families actively looking for care. Build your profile, showcase your skills, and connect directly with clients.",
   },
@@ -46,7 +46,7 @@ export function HeroSection({
         <p className="font-heading text-warm-white text-2xl">NurseDex</p>
         <span className="font-body text-warm-white flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs">
           <span className="bg-sage inline-block h-1.5 w-1.5 rounded-full" />
-          Long Island, NY
+          New York
         </span>
       </div>
 

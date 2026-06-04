@@ -176,7 +176,7 @@ export function WaitlistForm({
         <div className="mt-3 flex items-center justify-center gap-3">
           <CopyLinkButton />
           <a
-            href={`sms:?body=${encodeURIComponent("Check out NurseDex, a new directory for finding trusted caregivers on Long Island: https://nursedex.com")}`}
+            href={`sms:?body=${encodeURIComponent("Check out NurseDex, a new directory for finding trusted caregivers in New York: https://nursedex.com")}`}
             className="font-body text-sage-light hover:text-warm-white inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm transition-colors hover:bg-white/10"
           >
             Text a friend

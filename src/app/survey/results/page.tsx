@@ -17,7 +17,7 @@ const ZERO_RESULTS_THRESHOLD = 3;
 
 export const metadata: Metadata = {
   title: "Your matches | NurseDex",
-  description: "Nurses matching what you're looking for, on Long Island.",
+  description: "Nurses matching what you're looking for, across New York.",
 };
 
 interface ResultsPageProps {

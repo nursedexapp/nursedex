@@ -16,10 +16,10 @@ import { Footer } from "@/components/shared/Footer";
 export const metadata: Metadata = {
   title: "How NurseDex works | NurseDex",
   description:
-    "How families and nurses use NurseDex on Long Island. Step by step from finding a nurse to confirming a hire, plus how nurses build a profile and get verified.",
+    "How families and nurses use NurseDex across New York. Step by step from finding a nurse to confirming a hire, plus how nurses build a profile and get verified.",
   openGraph: {
     title: "How NurseDex works",
-    description: "Step by step for families and nurses on Long Island.",
+    description: "Step by step for families and nurses across New York.",
     type: "website",
     url: "https://nursedex.com/how-it-works",
   },

@@ -67,7 +67,7 @@ export function FinalCTASection({
             <div className="mt-5 flex items-center justify-center gap-3">
               <CopyLinkButton />
               <a
-                href={`sms:?body=${encodeURIComponent("Check out NurseDex, a new directory for finding trusted caregivers on Long Island: https://nursedex.com")}`}
+                href={`sms:?body=${encodeURIComponent("Check out NurseDex, a new directory for finding trusted caregivers in New York: https://nursedex.com")}`}
                 className="font-body text-sage-light hover:text-warm-white inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-sm transition-colors hover:bg-white/10"
               >
                 Text a friend
@@ -81,7 +81,7 @@ export function FinalCTASection({
             </h2>
             <p className="font-body text-warm-white mx-auto mt-4 max-w-md">
               {role === "family"
-                ? "Join the waitlist and get early access to Long Island's trusted caregiver directory."
+                ? "Join the waitlist and get early access to New York's trusted caregiver directory."
                 : "Join the waitlist and be among the first caregivers on the platform."}
             </p>
             <div className="mt-10">

@@ -8,7 +8,7 @@ export function FooterSection() {
       <div className="mx-auto max-w-4xl text-center">
         <p className="font-heading text-teal text-2xl">NurseDex</p>
         <p className="font-body text-soft-black-light mt-1 text-sm">
-          Long Island&apos;s trusted nurse directory.
+          New York&apos;s trusted nurse directory.
         </p>
 
         <a

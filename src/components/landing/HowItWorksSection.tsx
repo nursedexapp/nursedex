@@ -43,7 +43,7 @@ const steps = {
       icon: Eye,
       title: "Get discovered",
       description:
-        "Families on Long Island search NurseDex to find caregivers like you. Featured profiles get top placement.",
+        "Families across New York search NurseDex to find caregivers like you. Featured profiles get top placement.",
     },
     {
       icon: Users,

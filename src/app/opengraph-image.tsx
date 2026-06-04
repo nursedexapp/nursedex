@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
 
-export const alt = "NurseDex: Long Island's Trusted Nurse Directory";
+export const alt = "NurseDex: New York's Trusted Nurse Directory";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -83,7 +83,7 @@ export default async function Image() {
           lineHeight: 1.5,
         }}
       >
-        Long Island&apos;s trusted directory for verified nurses and caregivers.
+        New York&apos;s trusted directory for verified nurses and caregivers.
       </div>
 
       {/* Badge */}

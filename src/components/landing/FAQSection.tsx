@@ -7,7 +7,7 @@ const faqs = {
     {
       question: "What areas does NurseDex cover?",
       answer:
-        "NurseDex is focused on Long Island, serving Nassau County, Suffolk County, and Queens. We are built specifically for this community.",
+        "NurseDex serves families and caregivers across New York. We are built specifically for this community.",
     },
     {
       question: "How is NurseDex different from an agency?",

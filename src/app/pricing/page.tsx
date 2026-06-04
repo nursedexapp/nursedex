@@ -28,7 +28,7 @@ const FAMILY_PERKS = [
   "Save and shortlist as many nurses as you want",
   "Leave reviews after hiring",
   "60-day grace window if you cancel",
-  "Long Island specific (Suffolk, Nassau, Queens)",
+  "New York nurses",
 ];
 
 const FREE_NURSE_PERKS = [
@@ -201,7 +201,7 @@ function FamilyView({ isLoggedInFamily, hasActiveSub }: FamilyViewProps) {
         title="Family Access"
         price={`$${PRICING.FAMILY_ACCESS_MONTHLY}`}
         period="per month"
-        desc="Unlock contact info for any verified nurse on Long Island."
+        desc="Unlock contact info for any verified nurse across New York."
         perks={FAMILY_PERKS}
         cta={cta}
         accent="teal"
