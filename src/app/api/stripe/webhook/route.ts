@@ -254,6 +254,11 @@ async function upsertSubscription(args: UpsertArgs) {
   const item = subscription.items.data[0];
   const periodStart = new Date(item.current_period_start * 1000).toISOString();
   const periodEnd = new Date(item.current_period_end * 1000).toISOString();
+  // Billing cadence drives renewal-reminder amounts and MRR. Stripe reports
+  // 'month' or 'year' (or 'day'/'week', which we don't sell); anything other
+  // than 'year' is treated as monthly to satisfy the column's check constraint.
+  const billingInterval =
+    item.price?.recurring?.interval === "year" ? "year" : "month";
 
   // Upsert by stripe_subscription_id so retries don't create duplicates.
   await supabase.from("subscriptions").upsert(
@@ -263,6 +268,7 @@ async function upsertSubscription(args: UpsertArgs) {
       stripe_subscription_id: subscription.id,
       plan_type: planType,
       status,
+      billing_interval: billingInterval,
       current_period_start: periodStart,
       current_period_end: periodEnd,
       cancel_at_period_end: subscription.cancel_at_period_end ?? false,

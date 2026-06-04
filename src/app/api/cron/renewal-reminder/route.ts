@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
       id,
       user_id,
       plan_type,
+      billing_interval,
       current_period_end,
       cancel_at_period_end,
       status,
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
     id: string;
     user_id: string;
     plan_type: "nurse_featured" | "family_access";
+    billing_interval: "month" | "year";
     current_period_end: string;
     cancel_at_period_end: boolean;
     status: string;
@@ -86,18 +88,18 @@ export async function GET(request: NextRequest) {
     }
 
     const isNurse = row.plan_type === "nurse_featured";
+    // Show the amount that will actually be charged at renewal: Featured is
+    // monthly, Family Access is $9.99/mo or $99/yr depending on the plan.
+    const renewalDollars = isNurse
+      ? PRICING.NURSE_FEATURED_MONTHLY
+      : row.billing_interval === "year"
+        ? PRICING.FAMILY_ACCESS_ANNUAL
+        : PRICING.FAMILY_ACCESS_MONTHLY;
     await sendRenewalReminderEmail({
       to: row.users.email,
       firstName: row.users.first_name ?? undefined,
       planLabel: isNurse ? "Featured" : "Family Access",
-      // NOTE: shows the monthly Family Access price. Annual subscribers are
-      // approximated here until billing_interval is tracked per subscription;
-      // their reminder understates the $99/yr renewal. See PR follow-up.
-      amount: `$${
-        isNurse
-          ? PRICING.NURSE_FEATURED_MONTHLY.toFixed(2)
-          : PRICING.FAMILY_ACCESS_MONTHLY.toFixed(2)
-      }`,
+      amount: `$${renewalDollars.toFixed(2)}`,
       renewalDateLabel: new Date(row.current_period_end).toLocaleDateString(
         "en-US",
         { month: "long", day: "numeric", year: "numeric" },

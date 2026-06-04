@@ -39,6 +39,7 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
     new30d,
     activeFeatured,
     activeFamilyAccess,
+    activeFamilyAccessAnnual,
     totalReveals,
     reveals30d,
     totalSaves,
@@ -76,6 +77,12 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
       .select("id", { count: "exact", head: true })
       .eq("plan_type", "family_access")
       .in("status", ["active", "past_due"]),
+    supabase
+      .from("subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("plan_type", "family_access")
+      .eq("billing_interval", "year")
+      .in("status", ["active", "past_due"]),
     supabase.from("reveals").select("id", { count: "exact", head: true }),
     supabase
       .from("reveals")
@@ -95,13 +102,13 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
 
   const featured = activeFeatured.count ?? 0;
   const familyAccess = activeFamilyAccess.count ?? 0;
-  // NOTE: annual Family Access subscribers are counted at the monthly price
-  // ($9.99) rather than their normalized $99/12. Tracking billing_interval per
-  // subscription would make this exact; until then MRR slightly understates
-  // annual plans. See PR follow-up.
+  const familyAnnual = activeFamilyAccessAnnual.count ?? 0;
+  const familyMonthly = familyAccess - familyAnnual;
+  // Annual Family Access contributes its yearly price normalized to a month.
   const mrr =
     featured * PRICING.NURSE_FEATURED_MONTHLY +
-    familyAccess * PRICING.FAMILY_ACCESS_MONTHLY;
+    familyMonthly * PRICING.FAMILY_ACCESS_MONTHLY +
+    familyAnnual * (PRICING.FAMILY_ACCESS_ANNUAL / 12);
 
   return {
     signups: {
