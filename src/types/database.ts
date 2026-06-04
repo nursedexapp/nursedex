@@ -126,6 +126,7 @@ export interface Subscription {
   stripe_subscription_id: string;
   status: SubscriptionStatus;
   plan_type: "nurse_featured" | "family_access";
+  billing_interval: "month" | "year";
   current_period_start: string;
   current_period_end: string;
   cancel_at_period_end: boolean;
