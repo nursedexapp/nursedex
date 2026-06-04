@@ -101,7 +101,7 @@ const FAMILY_STEPS: Step[] = [
   {
     icon: <MessageSquare className="size-5" />,
     title: "Reveal contact info",
-    body: "Subscribe to Family Access to unlock email, phone, and preferred contact method for any verified nurse. Subscriptions are $19.99 per month and you can cancel anytime through Stripe.",
+    body: "Subscribe to Family Access to unlock email, phone, and preferred contact method for any verified nurse. Subscriptions are $9.99 per month (or $39.99 for your first year on the annual plan) and you can cancel anytime through Stripe.",
   },
   {
     icon: <CalendarCheck className="size-5" />,

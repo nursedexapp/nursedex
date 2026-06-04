@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { GRACE_PERIODS, PRICING } from "@/lib/constants";
+import { GRACE_PERIODS } from "@/lib/constants";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import {
   sendSubscriptionConfirmedEmail,
@@ -322,12 +322,13 @@ function planLabel(planType: "nurse_featured" | "family_access"): string {
   return planType === "nurse_featured" ? "Featured" : "Family Access";
 }
 
-function planAmount(planType: "nurse_featured" | "family_access"): string {
-  const dollars =
-    planType === "nurse_featured"
-      ? PRICING.NURSE_FEATURED_MONTHLY
-      : PRICING.FAMILY_ACCESS_MONTHLY;
-  return `$${dollars.toFixed(2)}`;
+function planAmount(subscription: Stripe.Subscription): string {
+  // Derive from the actual subscription price so monthly ($9.99) and annual
+  // ($99/yr) render correctly. This is the recurring price; a first-year
+  // annual subscriber is charged the promo amount on their first invoice but
+  // the confirmation reflects the standard renewal price.
+  const cents = subscription.items.data[0]?.price?.unit_amount ?? 0;
+  return `$${(cents / 100).toFixed(2)}`;
 }
 
 function nextRenewalLabel(subscription: Stripe.Subscription): string {
@@ -363,7 +364,7 @@ async function maybeNotifyConfirmed({
     to: user.email,
     firstName: user.first_name ?? undefined,
     planType,
-    amount: planAmount(planType),
+    amount: planAmount(subscription),
     nextRenewalLabel: nextRenewalLabel(subscription),
   });
 }
@@ -390,7 +391,7 @@ async function maybeNotifyRenewal(
     to: user.email,
     firstName: user.first_name ?? undefined,
     planLabel: planLabel(args.planType),
-    amount: planAmount(args.planType),
+    amount: planAmount(args.subscription),
     nextRenewalLabel: nextRenewalLabel(args.subscription),
   });
 }

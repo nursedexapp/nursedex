@@ -3,7 +3,13 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { getStripe } from "@/lib/stripe/server";
-import { STRIPE_PLANS, type StripePlanType } from "@/lib/stripe/config";
+import {
+  STRIPE_PLANS,
+  familyAccessPriceId,
+  STRIPE_FAMILY_ACCESS_ANNUAL_COUPON_ID,
+  type StripePlanType,
+  type BillingInterval,
+} from "@/lib/stripe/config";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveSubscription } from "./queries";
@@ -25,12 +31,14 @@ async function createCheckoutSession(
   planType: StripePlanType,
   successPath: string,
   cancelPath: string,
+  opts?: { priceId?: string; couponId?: string },
 ): Promise<CheckoutResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "Not authenticated" };
 
   const plan = STRIPE_PLANS[planType];
-  if (!plan.priceId) {
+  const priceId = opts?.priceId ?? plan.priceId;
+  if (!priceId) {
     return {
       error: `Stripe price ID is not configured for ${planType}.`,
     };
@@ -69,7 +77,7 @@ async function createCheckoutSession(
 
   const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
-    line_items: [{ price: plan.priceId, quantity: 1 }],
+    line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${origin}${successPath}${successSep}session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}${cancelPath}`,
     customer: customerId,
@@ -79,7 +87,12 @@ async function createCheckoutSession(
     subscription_data: {
       metadata: { user_id: user.id, plan_type: planType },
     },
-    allow_promotion_codes: true,
+    // Stripe rejects allow_promotion_codes alongside an explicit discount, so
+    // a fixed coupon (the annual first-year promo) and the open promo-code
+    // field are mutually exclusive.
+    ...(opts?.couponId
+      ? { discounts: [{ coupon: opts.couponId }] }
+      : { allow_promotion_codes: true }),
   });
 
   if (!session.url) return { error: "Stripe didn't return a checkout URL." };
@@ -87,14 +100,19 @@ async function createCheckoutSession(
 }
 
 /**
- * Family Access: $19.99/mo, lets families reveal nurse contact info.
- * Caller is the paywall modal "Subscribe" button.
+ * Family Access: lets families reveal nurse contact info.
+ *   - monthly: $9.99/mo
+ *   - annual:  $39.99 first year (via the promo coupon), then $99/yr
+ * Caller is the paywall modal and the pricing page "Get Family Access" buttons.
  */
 export async function createFamilyAccessCheckout(args: {
   // Where to come back to after success, usually the nurse profile they
   // were trying to reveal so we can immediately reveal it.
   returnTo?: string;
+  // Billing cadence. Defaults to monthly.
+  interval?: BillingInterval;
 }): Promise<CheckoutResult> {
+  const interval = args.interval ?? "month";
   // Land back where they were, with a flag so FamilyAccessCelebration fires
   // the "Welcome to Family Access" confetti + toast once. Pick the right
   // separator so we never produce a double "?".
@@ -103,7 +121,13 @@ export async function createFamilyAccessCheckout(args: {
   const next = `${base}${sep}subscribed=family`;
   const successPath = `/api/stripe/checkout-success?next=${encodeURIComponent(next)}`;
   const cancelPath = args.returnTo ?? "/dashboard";
-  return createCheckoutSession("family_access", successPath, cancelPath);
+  return createCheckoutSession("family_access", successPath, cancelPath, {
+    priceId: familyAccessPriceId(interval),
+    couponId:
+      interval === "year"
+        ? STRIPE_FAMILY_ACCESS_ANNUAL_COUPON_ID || undefined
+        : undefined,
+  });
 }
 
 /**

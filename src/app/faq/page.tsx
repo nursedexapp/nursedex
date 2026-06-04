@@ -29,7 +29,7 @@ const FAMILY_FAQS = [
   },
   {
     q: "Why do I have to pay to see contact info?",
-    a: "Browsing nurse profiles is always free. Family Access ($19.99/month) is what unlocks contact info (email, phone, preferred method). It's how we stay in business without running ads or selling your data, and it deters scrapers and spam.",
+    a: "Browsing nurse profiles is always free. Family Access ($9.99/month, or $39.99 for your first year on the annual plan) is what unlocks contact info (email, phone, preferred method). It's how we stay in business without running ads or selling your data, and it deters scrapers and spam.",
   },
   {
     q: "What happens if I cancel Family Access?",

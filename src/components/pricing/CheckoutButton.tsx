@@ -12,6 +12,7 @@ import {
 type Action =
   | "nurse_featured_checkout"
   | "family_access_checkout"
+  | "family_access_annual_checkout"
   | "customer_portal";
 
 interface CheckoutButtonProps {
@@ -36,7 +37,9 @@ export function CheckoutButton({
           ? await createNurseFeaturedCheckout()
           : action === "family_access_checkout"
             ? await createFamilyAccessCheckout({})
-            : await getCustomerPortalUrl();
+            : action === "family_access_annual_checkout"
+              ? await createFamilyAccessCheckout({ interval: "year" })
+              : await getCustomerPortalUrl();
 
       if (result.error) {
         toast.error(result.error);
