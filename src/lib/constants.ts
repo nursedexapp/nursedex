@@ -1,7 +1,12 @@
 // Pricing
 export const PRICING = {
   NURSE_FEATURED_MONTHLY: 29,
-  FAMILY_ACCESS_MONTHLY: 19.99,
+  FAMILY_ACCESS_MONTHLY: 9.99,
+  // Annual Family Access. Standard renewal price is FAMILY_ACCESS_ANNUAL; the
+  // first year is discounted to FAMILY_ACCESS_ANNUAL_FIRST_YEAR via a Stripe
+  // coupon (see STRIPE_FAMILY_ACCESS_ANNUAL_COUPON_ID).
+  FAMILY_ACCESS_ANNUAL: 99,
+  FAMILY_ACCESS_ANNUAL_FIRST_YEAR: 39.99,
 } as const;
 
 // Tier limits

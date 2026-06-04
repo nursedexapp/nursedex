@@ -90,6 +90,9 @@ export async function GET(request: NextRequest) {
       to: row.users.email,
       firstName: row.users.first_name ?? undefined,
       planLabel: isNurse ? "Featured" : "Family Access",
+      // NOTE: shows the monthly Family Access price. Annual subscribers are
+      // approximated here until billing_interval is tracked per subscription;
+      // their reminder understates the $99/yr renewal. See PR follow-up.
       amount: `$${
         isNurse
           ? PRICING.NURSE_FEATURED_MONTHLY.toFixed(2)

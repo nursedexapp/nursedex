@@ -13,11 +13,11 @@ import { getActiveSubscription } from "@/lib/subscriptions/queries";
 export const metadata: Metadata = {
   title: "Pricing | NurseDex",
   description:
-    "Family Access at $19.99/mo lets families reveal nurse contact info. Featured at $29/mo gives nurses priority placement and analytics. Free tier available for nurses.",
+    "Family Access at $9.99/mo (or $39.99 for your first year) lets families reveal nurse contact info. Featured at $29/mo gives nurses priority placement and analytics. Free tier available for nurses.",
   openGraph: {
     title: "Pricing | NurseDex",
     description:
-      "Family Access at $19.99/mo, Featured at $29/mo. Free tier for nurses.",
+      "Family Access at $9.99/mo or $39.99 first year, Featured at $29/mo. Free tier for nurses.",
     type: "website",
     url: "https://nursedex.com/pricing",
   },
@@ -50,9 +50,10 @@ const FEATURED_NURSE_PERKS = [
 ];
 
 type Audience = "families" | "nurses";
+type FamilyInterval = "monthly" | "annual";
 
 interface PricingPageProps {
-  searchParams: Promise<{ audience?: string }>;
+  searchParams: Promise<{ audience?: string; plan?: string }>;
 }
 
 export default async function PricingPage({ searchParams }: PricingPageProps) {
@@ -71,6 +72,9 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
   const audience: Audience = knownAudience ?? toggleAudience;
   const showToggle = knownAudience === null;
+
+  const familyInterval: FamilyInterval =
+    params.plan === "annual" ? "annual" : "monthly";
 
   const nurseFeaturedSub =
     audience === "nurses" && user?.role === "nurse"
@@ -105,6 +109,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
               <FamilyView
                 isLoggedInFamily={user?.role === "family"}
                 hasActiveSub={!!familyAccessSub}
+                interval={familyInterval}
               />
             ) : (
               <NurseView
@@ -176,9 +181,16 @@ function AudienceToggle({ current }: { current: Audience }) {
 interface FamilyViewProps {
   isLoggedInFamily: boolean;
   hasActiveSub: boolean;
+  interval: FamilyInterval;
 }
 
-function FamilyView({ isLoggedInFamily, hasActiveSub }: FamilyViewProps) {
+function FamilyView({
+  isLoggedInFamily,
+  hasActiveSub,
+  interval,
+}: FamilyViewProps) {
+  const isAnnual = interval === "annual";
+
   const cta = !isLoggedInFamily
     ? { kind: "link" as const, href: "/signup", label: "Get Family Access" }
     : hasActiveSub
@@ -189,23 +201,74 @@ function FamilyView({ isLoggedInFamily, hasActiveSub }: FamilyViewProps) {
         }
       : {
           kind: "action" as const,
-          action: "family_access_checkout" as const,
+          action: isAnnual
+            ? ("family_access_annual_checkout" as const)
+            : ("family_access_checkout" as const),
           label: "Get Family Access",
         };
 
   return (
     <div className="mx-auto max-w-md">
+      <FamilyPlanToggle interval={interval} />
       <PricingCard
         icon={<Heart className="size-5" />}
         eyebrow="For families"
         title="Family Access"
-        price={`$${PRICING.FAMILY_ACCESS_MONTHLY}`}
-        period="per month"
-        desc="Unlock contact info for any verified nurse across New York."
+        price={
+          isAnnual
+            ? `$${PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR}`
+            : `$${PRICING.FAMILY_ACCESS_MONTHLY}`
+        }
+        period={
+          isAnnual
+            ? `first year, then $${PRICING.FAMILY_ACCESS_ANNUAL}/yr`
+            : "per month"
+        }
+        desc={
+          isAnnual
+            ? "Unlock contact info for any verified nurse across New York. Save 67% versus paying monthly your first year."
+            : "Unlock contact info for any verified nurse across New York."
+        }
         perks={FAMILY_PERKS}
         cta={cta}
         accent="teal"
       />
+    </div>
+  );
+}
+
+function FamilyPlanToggle({ interval }: { interval: FamilyInterval }) {
+  const base =
+    "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors";
+  const active = "bg-teal text-white shadow-sm";
+  const idle = "text-soft-black-light hover:bg-sage/10";
+  return (
+    <div className="mb-6 flex justify-center">
+      <div className="border-sage/30 inline-flex gap-1 rounded-xl border bg-white p-1 shadow-sm">
+        <Link
+          href="/pricing?audience=families&plan=monthly"
+          aria-current={interval === "monthly" ? "true" : undefined}
+          className={`${base} ${interval === "monthly" ? active : idle}`}
+        >
+          Monthly
+        </Link>
+        <Link
+          href="/pricing?audience=families&plan=annual"
+          aria-current={interval === "annual" ? "true" : undefined}
+          className={`${base} ${interval === "annual" ? active : idle}`}
+        >
+          Annual
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+              interval === "annual"
+                ? "bg-white/20 text-white"
+                : "bg-teal/10 text-teal-dark"
+            }`}
+          >
+            Save 67%
+          </span>
+        </Link>
+      </div>
     </div>
   );
 }
@@ -272,6 +335,7 @@ type CtaSpec =
       action:
         | "nurse_featured_checkout"
         | "family_access_checkout"
+        | "family_access_annual_checkout"
         | "customer_portal";
       label: string;
     }

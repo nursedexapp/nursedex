@@ -132,19 +132,20 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
 }
 
 function PaywallTrigger({ returnTo }: { returnTo: string }) {
-  const [subscribing, setSubscribing] = useState(false);
+  const [subscribing, setSubscribing] = useState<"month" | "year" | null>(null);
 
-  const handleSubscribe = async () => {
-    setSubscribing(true);
+  const handleSubscribe = async (interval: "month" | "year") => {
+    setSubscribing(interval);
     if (posthog.__loaded) {
       posthog.capture(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
         plan: "family_access",
+        interval,
       });
     }
-    const result = await createFamilyAccessCheckout({ returnTo });
+    const result = await createFamilyAccessCheckout({ returnTo, interval });
     if (result.error) {
       toast.error(result.error);
-      setSubscribing(false);
+      setSubscribing(null);
       return;
     }
     await redirectToCheckout(result);
@@ -180,19 +181,34 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
           </li>
         </ul>
         <Button
-          onClick={handleSubscribe}
-          disabled={subscribing}
+          onClick={() => handleSubscribe("month")}
+          disabled={subscribing !== null}
           className="w-full"
         >
-          {subscribing ? (
+          {subscribing === "month" ? (
             <>
               <Loader2 className="mr-1.5 size-3.5 animate-spin" />
               Redirecting to checkout...
             </>
           ) : (
-            "Subscribe"
+            "Subscribe monthly"
           )}
         </Button>
+        <button
+          type="button"
+          onClick={() => handleSubscribe("year")}
+          disabled={subscribing !== null}
+          className="text-teal-dark hover:text-teal w-full text-center text-sm font-medium underline underline-offset-2 disabled:opacity-50"
+        >
+          {subscribing === "year" ? (
+            "Redirecting to checkout..."
+          ) : (
+            <>
+              Or get your first year for $
+              {PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR}
+            </>
+          )}
+        </button>
         <p className="text-soft-black-light text-center text-xs">
           You&apos;ll be redirected to Stripe to enter payment details securely.
           No charges until you confirm.

@@ -95,6 +95,10 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
 
   const featured = activeFeatured.count ?? 0;
   const familyAccess = activeFamilyAccess.count ?? 0;
+  // NOTE: annual Family Access subscribers are counted at the monthly price
+  // ($9.99) rather than their normalized $99/12. Tracking billing_interval per
+  // subscription would make this exact; until then MRR slightly understates
+  // annual plans. See PR follow-up.
   const mrr =
     featured * PRICING.NURSE_FEATURED_MONTHLY +
     familyAccess * PRICING.FAMILY_ACCESS_MONTHLY;

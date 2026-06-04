@@ -55,8 +55,9 @@ export default function AboutPage() {
             How we make money
           </h2>
           <p>
-            We charge families $19.99 a month for Family Access, which lets them
-            reveal nurse contact info and reach out directly. We charge nurses
+            We charge families $9.99 a month for Family Access (or $39.99 for
+            their first year on the annual plan), which lets them reveal nurse
+            contact info and reach out directly. We charge nurses
             $29 a month for an optional Featured tier that includes top
             placement in search, longer bios, more photos, and analytics. Free
             profiles for nurses are always available; the only thing we
