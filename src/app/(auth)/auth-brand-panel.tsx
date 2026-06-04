@@ -9,7 +9,7 @@ const panels: Record<
 > = {
   "/signup": {
     description:
-      "The nurse directory built for Long Island. Get found by families searching for exactly your skills and availability.",
+      "The nurse directory built for New York. Get found by families searching for exactly your skills and availability.",
     signals: [
       { text: "Free to join", detail: "Create your profile at no cost" },
       {
@@ -28,11 +28,11 @@ const panels: Record<
   },
   "/login": {
     description:
-      "The nurse directory built for Long Island. Connect with families and nurses in your community.",
+      "The nurse directory built for New York. Connect with families and nurses in your community.",
     signals: [
       {
-        text: "Long Island focused",
-        detail: "Nurses and families in Nassau, Suffolk, and Queens",
+        text: "New York focused",
+        detail: "Nurses and families across New York",
       },
       {
         text: "Your data stays private",

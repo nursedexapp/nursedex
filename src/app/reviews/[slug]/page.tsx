@@ -127,7 +127,7 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
             {credentialLabel ? `, ${credentialLabel}` : ""}
           </h1>
           <p className="text-soft-black-light mt-2 text-sm">
-            Your honest experience helps other Long Island families decide who
+            Your honest experience helps other New York families decide who
             to hire. We&apos;ll email you to confirm your review before it shows
             up on {firstName}&apos;s profile.
           </p>

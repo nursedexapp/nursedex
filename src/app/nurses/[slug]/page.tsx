@@ -61,7 +61,7 @@ export async function generateMetadata({
   const title = `${nurse.first_name} ${nurse.last_name}, ${credentialLabel} | NurseDex`;
   const description = nurse.bio
     ? nurse.bio.slice(0, 160)
-    : `${nurse.first_name} ${nurse.last_name} is a ${credentialLabel} on NurseDex, Long Island's trusted nurse directory.`;
+    : `${nurse.first_name} ${nurse.last_name} is a ${credentialLabel} on NurseDex, New York's trusted nurse directory.`;
 
   return {
     title,

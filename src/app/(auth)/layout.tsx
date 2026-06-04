@@ -47,7 +47,7 @@ export default function AuthLayout({
           {/* Vision statement - desktop only */}
           <div className="border-warm-white/10 mt-12 hidden border-t pt-6 lg:block">
             <p className="text-warm-white text-xs leading-relaxed italic">
-              Built for the Long Island care community. Connecting families with
+              Built for the New York care community. Connecting families with
               trusted, verified nurses since 2026.
             </p>
           </div>

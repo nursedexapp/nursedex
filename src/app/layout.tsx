@@ -25,14 +25,14 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://nursedex.com"),
-  title: "NurseDex | Long Island's Trusted Nurse Directory",
+  title: "NurseDex | New York's Trusted Nurse Directory",
   description:
-    "Find verified, trusted caregivers on Long Island. Join the waitlist for early access to NurseDex.",
+    "Find verified, trusted caregivers across New York. Join the waitlist for early access to NurseDex.",
   manifest: "/site.webmanifest",
   openGraph: {
-    title: "NurseDex | Long Island's Trusted Nurse Directory",
+    title: "NurseDex | New York's Trusted Nurse Directory",
     description:
-      "Find verified, trusted caregivers on Long Island. Join the waitlist for early access.",
+      "Find verified, trusted caregivers across New York. Join the waitlist for early access.",
     url: "https://nursedex.com",
     siteName: "NurseDex",
     type: "website",
@@ -40,9 +40,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "NurseDex | Long Island's Trusted Nurse Directory",
+    title: "NurseDex | New York's Trusted Nurse Directory",
     description:
-      "Find verified, trusted caregivers on Long Island. Join the waitlist for early access.",
+      "Find verified, trusted caregivers across New York. Join the waitlist for early access.",
   },
 };
 

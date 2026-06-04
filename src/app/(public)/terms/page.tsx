@@ -44,7 +44,7 @@ export default function TermsOfServicePage() {
               What NurseDex is
             </h2>
             <p className="mt-3">
-              NurseDex is a directory platform that connects Long Island
+              NurseDex is a directory platform that connects New York
               families with caregivers (HHAs, CNAs, LPNs, RNs, and NPs). We
               provide a space for caregivers to create profiles and for families
               to discover, review, and contact them.

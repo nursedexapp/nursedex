@@ -8,7 +8,7 @@ import { parseSearchParams } from "@/lib/nurses/search-params";
 export const metadata: Metadata = {
   title: "Find the right nurse | NurseDex",
   description:
-    "Answer a few quick questions and we'll show you matching nurses on Long Island.",
+    "Answer a few quick questions and we'll show you matching nurses across New York.",
 };
 
 interface SurveyPageProps {

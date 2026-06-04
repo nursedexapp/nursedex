@@ -26,9 +26,9 @@ const content = {
       },
       {
         icon: MapPin,
-        title: "Long Island focused",
+        title: "New York focused",
         description:
-          "Built specifically for Nassau, Suffolk, and Queens. Local caregivers who know your community.",
+          "Built for families across New York. Local caregivers who know your community.",
         featured: false,
       },
       {

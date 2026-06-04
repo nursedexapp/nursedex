@@ -6,10 +6,10 @@ import { Footer } from "@/components/shared/Footer";
 export const metadata: Metadata = {
   title: "About | NurseDex",
   description:
-    "NurseDex is a hyper local directory of verified nurses on Long Island, built to make finding (and being found by) trusted care simpler.",
+    "NurseDex is a hyper local directory of verified nurses across New York, built to make finding (and being found by) trusted care simpler.",
   openGraph: {
     title: "About NurseDex",
-    description: "Hyper local directory of verified nurses on Long Island.",
+    description: "Hyper local directory of verified nurses across New York.",
     type: "website",
     url: "https://nursedex.com/about",
   },
@@ -25,7 +25,7 @@ export default function AboutPage() {
             About NurseDex
           </h1>
           <p className="text-soft-black-light mt-3 text-lg">
-            A hyper local directory of verified nurses on Long Island.
+            A hyper local directory of verified nurses across New York.
           </p>
         </header>
 
@@ -34,7 +34,7 @@ export default function AboutPage() {
             Finding good nursing care for someone you love is hard. National
             care marketplaces give you thousands of profiles you can&apos;t
             verify, and word-of-mouth referrals only help if you happen to know
-            the right people. We built NurseDex to fill the gap on Long Island
+            the right people. We built NurseDex to fill the gap in New York
             specifically: a directory of nurses we&apos;ve license-checked, with
             real reviews from real local families.
           </p>
