@@ -102,8 +102,8 @@ function LoginForm() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="font-heading text-2xl">Welcome back</h2>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <h2 className="font-heading text-3xl">Welcome back</h2>
+        <p className="text-muted-foreground mt-1 text-base">
           Your Long Island care community is waiting.{" "}
           <Link href="/signup" className="text-teal-dark font-medium underline">
             New here? Create an account
@@ -115,7 +115,7 @@ function LoginForm() {
 
       <div className="my-6 flex items-center gap-3">
         <div className="bg-sage/20 h-px flex-1" />
-        <span className="text-muted-foreground text-xs">
+        <span className="text-muted-foreground text-sm">
           or continue with email
         </span>
         <div className="bg-sage/20 h-px flex-1" />
@@ -127,7 +127,7 @@ function LoginForm() {
             ref={errorRef}
             tabIndex={-1}
             role="alert"
-            className="bg-error/10 text-error rounded-lg px-4 py-3 text-sm outline-none"
+            className="bg-error/10 text-error rounded-lg px-4 py-3 text-base outline-none"
           >
             {error}
             {showResend && (
@@ -154,7 +154,7 @@ function LoginForm() {
         {success && (
           <div
             role="status"
-            className="bg-success/10 text-success rounded-lg px-4 py-3 text-sm"
+            className="bg-success/10 text-success rounded-lg px-4 py-3 text-base"
           >
             {success}
           </div>
@@ -172,7 +172,7 @@ function LoginForm() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="h-11"
+            className="h-11 text-base"
           />
         </div>
 
@@ -181,7 +181,7 @@ function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <Link
               href="/forgot-password"
-              className="text-teal hover:text-teal-dark text-sm font-medium underline underline-offset-2 transition-colors"
+              className="text-teal hover:text-teal-dark text-base font-medium underline underline-offset-2 transition-colors"
             >
               Forgot password?
             </Link>
@@ -193,7 +193,7 @@ function LoginForm() {
               type={showPassword ? "text" : "password"}
               required
               autoComplete="current-password"
-              className="h-11 pr-10"
+              className="h-11 pr-10 text-base"
             />
             <button
               type="button"
