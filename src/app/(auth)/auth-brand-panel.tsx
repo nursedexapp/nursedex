@@ -11,6 +11,10 @@ const panels: Record<
     description:
       "The nurse directory built for New York. Get found by families searching for exactly your skills and availability.",
     signals: [
+      {
+        text: "Keep 100% of what you earn",
+        detail: "Families contact you directly. No agency fees or commissions.",
+      },
       { text: "Free to join", detail: "Create your profile at no cost" },
       {
         text: "You control your profile",

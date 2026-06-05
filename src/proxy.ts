@@ -8,6 +8,18 @@ export async function proxy(request: NextRequest) {
   // /logo-exploration. /brand-login is itself under /brand, so let it
   // through to avoid a redirect loop.
   const path = request.nextUrl.pathname;
+
+  // Server-to-server endpoints (Stripe webhook, cron jobs, the Supabase auth
+  // email hook) never carry a browser session, so skip the auth-refresh
+  // round-trip to Supabase on every one of those requests.
+  if (
+    path.startsWith("/api/stripe/webhook") ||
+    path.startsWith("/api/cron") ||
+    path === "/api/auth/send-email"
+  ) {
+    return NextResponse.next();
+  }
+
   const isGated =
     path.startsWith("/brand") || path.startsWith("/logo-exploration");
   if (isGated && path !== "/brand-login") {

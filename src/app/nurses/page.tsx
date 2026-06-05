@@ -46,15 +46,22 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
 
   // Save/reveal state only applies to family viewers.
   const showSaves = user?.role === "family";
-  const viewerRevealedIds =
-    showSaves && user ? await getRevealedNurseIds(user.id) : undefined;
 
-  const result = await searchNurses({
-    filters,
-    viewerZip,
-    viewerCommPref,
-    viewerRevealedIds,
-  });
+  // The reveal lookup only annotates results (it doesn't change the query), so
+  // run it alongside the search instead of waiting for it first.
+  const [viewerRevealedIds, result] = await Promise.all([
+    showSaves && user
+      ? getRevealedNurseIds(user.id)
+      : Promise.resolve(undefined),
+    searchNurses({ filters, viewerZip, viewerCommPref }),
+  ]);
+
+  if (viewerRevealedIds && viewerRevealedIds.size > 0) {
+    for (const c of result.items) c.revealed = viewerRevealedIds.has(c.user_id);
+    for (const c of result.partials)
+      c.revealed = viewerRevealedIds.has(c.user_id);
+  }
+
   const savedIds = showSaves
     ? await getSavedNurseIds([
         ...result.items.map((n) => n.user_id),
