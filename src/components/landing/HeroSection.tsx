@@ -18,7 +18,7 @@ const copy = {
   nurse: {
     headline: "Grow your care practice across New York.",
     subheadline:
-      "NurseDex puts you in front of families actively looking for care. Build your profile, showcase your skills, and connect directly with clients.",
+      "NurseDex puts you in front of families actively looking for care. Connect directly and keep 100% of what you earn, no agency fees or commissions.",
   },
 };
 
