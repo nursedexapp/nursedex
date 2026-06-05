@@ -25,6 +25,7 @@ export const metadata: Metadata = {
 };
 
 const FREE_NURSE_PERKS = [
+  "Keep 100% of what you earn, no agency fees",
   "Profile in search results",
   "Up to 1 photo and 150-character bio",
   "Up to 2 care types",
