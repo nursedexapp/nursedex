@@ -105,10 +105,10 @@ export function NurseProfilePublic({
               <Badge className="bg-teal text-white">Featured</Badge>
             )}
           </div>
-          <p className="text-muted-foreground">{credentialLabel}</p>
+          <p className="text-muted-foreground text-lg">{credentialLabel}</p>
 
           {nurse.years_experience !== null && (
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="text-muted-foreground mt-1 text-base">
               {nurse.years_experience} year
               {nurse.years_experience !== 1 ? "s" : ""} of experience
             </p>
@@ -168,8 +168,8 @@ export function NurseProfilePublic({
           {nurse.bio && (
             <Card className="border-sage/20">
               <CardContent className="pt-4">
-                <h2 className="mb-2 text-sm font-semibold">About</h2>
-                <p className="text-sm leading-relaxed whitespace-pre-line">
+                <h2 className="mb-2 text-base font-semibold">About</h2>
+                <p className="text-base leading-relaxed whitespace-pre-line">
                   {nurse.bio}
                 </p>
               </CardContent>
@@ -180,8 +180,8 @@ export function NurseProfilePublic({
           {nurse.care_philosophy && (
             <Card className="border-sage/20">
               <CardContent className="pt-4">
-                <h2 className="mb-2 text-sm font-semibold">Care Philosophy</h2>
-                <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-line italic">
+                <h2 className="mb-2 text-base font-semibold">Care Philosophy</h2>
+                <p className="text-muted-foreground text-base leading-relaxed whitespace-pre-line italic">
                   &ldquo;{nurse.care_philosophy}&rdquo;
                 </p>
               </CardContent>
@@ -194,10 +194,10 @@ export function NurseProfilePublic({
             {nurse.skills.length > 0 && (
               <Card className="border-sage/20">
                 <CardContent className="pt-4">
-                  <h2 className="mb-2 text-sm font-semibold">Skills</h2>
+                  <h2 className="mb-2 text-base font-semibold">Skills</h2>
                   <div className="flex flex-wrap gap-1">
                     {nurse.skills.map((s) => (
-                      <Badge key={s} variant="secondary" className="text-xs">
+                      <Badge key={s} variant="secondary" className="text-sm">
                         {SKILL_LABELS[s as Skill] || s}
                       </Badge>
                     ))}
@@ -211,8 +211,8 @@ export function NurseProfilePublic({
               nurse.time_slots.length > 0) && (
               <Card className="border-sage/20">
                 <CardContent className="pt-4">
-                  <h2 className="mb-2 text-sm font-semibold">Availability</h2>
-                  <div className="space-y-2 text-sm">
+                  <h2 className="mb-2 text-base font-semibold">Availability</h2>
+                  <div className="space-y-2 text-base">
                     {nurse.availability_commitment.length > 0 && (
                       <div className="flex items-start gap-2">
                         <Clock className="text-muted-foreground mt-0.5 size-4" />
@@ -234,7 +234,7 @@ export function NurseProfilePublic({
                           <Badge
                             key={t}
                             variant="secondary"
-                            className="text-xs"
+                            className="text-sm"
                           >
                             {TIME_SLOT_LABELS[t as TimeSlot] || t}
                           </Badge>
@@ -250,8 +250,8 @@ export function NurseProfilePublic({
             {(nurse.rate_min !== null || nurse.rate_max !== null) && (
               <Card className="border-sage/20">
                 <CardContent className="pt-4">
-                  <h2 className="mb-2 text-sm font-semibold">Hourly Rate</h2>
-                  <p className="text-sm">
+                  <h2 className="mb-2 text-base font-semibold">Hourly Rate</h2>
+                  <p className="text-base">
                     {nurse.rate_min !== null && nurse.rate_max !== null
                       ? `$${nurse.rate_min} - $${nurse.rate_max}/hr`
                       : nurse.rate_min !== null
@@ -265,8 +265,8 @@ export function NurseProfilePublic({
             {/* Quick facts */}
             <Card className="border-sage/20">
               <CardContent className="pt-4">
-                <h2 className="mb-2 text-sm font-semibold">Details</h2>
-                <div className="space-y-2 text-sm">
+                <h2 className="mb-2 text-base font-semibold">Details</h2>
+                <div className="space-y-2 text-base">
                   {nurse.languages.length > 0 && (
                     <div className="flex items-center gap-2">
                       <Languages className="text-muted-foreground size-4" />
@@ -289,7 +289,7 @@ export function NurseProfilePublic({
             <>
               <Separator className="bg-sage/20" />
               <div>
-                <h2 className="mb-2 text-sm font-semibold">
+                <h2 className="mb-2 text-base font-semibold">
                   Additional Certifications
                 </h2>
                 <div className="flex flex-wrap gap-1.5">
@@ -351,7 +351,7 @@ export function NurseProfilePublic({
           {viewMode === "subscribed" && (
             <Card className="border-sage/20">
               <CardContent className="space-y-3 pt-4">
-                <h2 className="text-sm font-semibold">
+                <h2 className="text-base font-semibold">
                   Worked with {nurse.first_name}?
                 </h2>
                 <p className="text-muted-foreground text-xs">
@@ -453,8 +453,8 @@ function ContactSection({
     return (
       <Card className="border-sage/20">
         <CardContent className="pt-4">
-          <h2 className="mb-3 text-sm font-semibold">Contact Information</h2>
-          <div className="space-y-3 text-sm">
+          <h2 className="mb-3 text-base font-semibold">Contact Information</h2>
+          <div className="space-y-3 text-base">
             {nurse.contact_email && (
               <a
                 href={`mailto:${nurse.contact_email}?subject=NurseDex%20Inquiry`}
