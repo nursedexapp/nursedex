@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { GoogleSignInButton } from "@/components/ui/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2 } from "lucide-react";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -50,6 +50,9 @@ function SubmitButton() {
 
 export default function SignUpPage() {
   const router = useRouter();
+  // Hide the nurse-only earnings benefit for visitors who arrived via the
+  // family survey flow.
+  const [fromSurvey, setFromSurvey] = useState(false);
 
   // If the user arrived from /survey/results with their answers, persist
   // them to a cookie so they survive email confirmation + role select and
@@ -61,6 +64,7 @@ export default function SignUpPage() {
     const survey = new URLSearchParams(window.location.search).get("survey");
     if (survey) {
       setSurveyHandoffCookie(survey);
+      setFromSurvey(true);
     }
   }, []);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +127,16 @@ export default function SignUpPage() {
           </Link>
         </p>
       </div>
+
+      {!fromSurvey && (
+        <div className="border-teal/20 bg-teal/5 mb-6 flex items-start gap-2 rounded-lg border px-4 py-3 lg:hidden">
+          <Check className="text-teal mt-0.5 h-4 w-4 shrink-0" />
+          <p className="text-soft-black text-sm">
+            <span className="font-semibold">Keep 100% of what you earn.</span>{" "}
+            Families contact you directly. No agency fees or commissions.
+          </p>
+        </div>
+      )}
 
       <GoogleSignInButton />
 
