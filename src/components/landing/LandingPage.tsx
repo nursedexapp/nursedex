@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { StickyHeader } from "./StickyHeader";
 import { HeroSection } from "./HeroSection";
 import { WhySection } from "./WhySection";
@@ -11,21 +11,17 @@ import { FooterSection } from "./FooterSection";
 
 type LandingPageProps = {
   referralSource?: string;
+  // Server-rendered so the count is present on first paint instead of after a
+  // client-side fetch.
+  waitlistCount?: number | null;
 };
 
-export function LandingPage({ referralSource }: LandingPageProps) {
+export function LandingPage({
+  referralSource,
+  waitlistCount = null,
+}: LandingPageProps) {
   const [role, setRole] = useState<"nurse" | "family">("nurse");
   const [hasSignedUp, setHasSignedUp] = useState(false);
-  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetch("/api/waitlist")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.show) setWaitlistCount(data.count);
-      })
-      .catch(() => {});
-  }, []);
 
   return (
     <main className="bg-warm-white min-h-screen">
