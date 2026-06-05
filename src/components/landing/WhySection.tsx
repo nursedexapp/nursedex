@@ -4,7 +4,6 @@ import {
   Star,
   DollarSign,
   TrendingUp,
-  MessageCircle,
   BadgeCheck,
 } from "lucide-react";
 
@@ -46,23 +45,23 @@ const content = {
     props: [
       {
         icon: DollarSign,
+        title: "Keep 100% of what you earn",
+        description:
+          "Families contact you directly. No agency fees, no middleman, no percentage of your pay.",
+        featured: true,
+      },
+      {
+        icon: BadgeCheck,
         title: "Free to join",
         description:
           "Create your profile at no cost. Want more visibility? Featured listings put you at the top of search results.",
-        featured: true,
+        featured: false,
       },
       {
         icon: TrendingUp,
         title: "Grow your reputation",
         description:
           "Collect reviews, track profile views, and see how families find you with built-in analytics.",
-        featured: false,
-      },
-      {
-        icon: MessageCircle,
-        title: "Direct relationships",
-        description:
-          "Families contact you directly. No agency fees, no middleman, no percentage of your pay.",
         featured: false,
       },
     ],
