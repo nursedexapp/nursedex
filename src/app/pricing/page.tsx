@@ -6,6 +6,7 @@ import { Footer } from "@/components/shared/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckoutButton } from "@/components/pricing/CheckoutButton";
+import { FamilyAccessCard } from "@/components/pricing/FamilyAccessCard";
 import { PRICING } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
@@ -22,14 +23,6 @@ export const metadata: Metadata = {
     url: "https://nursedex.com/pricing",
   },
 };
-
-const FAMILY_PERKS = [
-  "Reveal contact info for any verified nurse",
-  "Save and shortlist as many nurses as you want",
-  "Leave reviews after hiring",
-  "60-day grace window if you cancel",
-  "New York nurses",
-];
 
 const FREE_NURSE_PERKS = [
   "Profile in search results",
@@ -50,10 +43,9 @@ const FEATURED_NURSE_PERKS = [
 ];
 
 type Audience = "families" | "nurses";
-type FamilyInterval = "monthly" | "annual";
 
 interface PricingPageProps {
-  searchParams: Promise<{ audience?: string; plan?: string }>;
+  searchParams: Promise<{ audience?: string }>;
 }
 
 export default async function PricingPage({ searchParams }: PricingPageProps) {
@@ -72,9 +64,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
   const audience: Audience = knownAudience ?? toggleAudience;
   const showToggle = knownAudience === null;
-
-  const familyInterval: FamilyInterval =
-    params.plan === "annual" ? "annual" : "monthly";
 
   const nurseFeaturedSub =
     audience === "nurses" && user?.role === "nurse"
@@ -106,10 +95,9 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
         <section className="bg-warm-white">
           <div className="mx-auto max-w-6xl px-6 py-12">
             {audience === "families" ? (
-              <FamilyView
+              <FamilyAccessCard
                 isLoggedInFamily={user?.role === "family"}
                 hasActiveSub={!!familyAccessSub}
-                interval={familyInterval}
               />
             ) : (
               <NurseView
@@ -172,101 +160,6 @@ function AudienceToggle({ current }: { current: Audience }) {
         >
           <Star className="size-4" aria-hidden="true" />
           Join as a nurse
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-interface FamilyViewProps {
-  isLoggedInFamily: boolean;
-  hasActiveSub: boolean;
-  interval: FamilyInterval;
-}
-
-function FamilyView({
-  isLoggedInFamily,
-  hasActiveSub,
-  interval,
-}: FamilyViewProps) {
-  const isAnnual = interval === "annual";
-
-  const cta = !isLoggedInFamily
-    ? { kind: "link" as const, href: "/signup", label: "Get Family Access" }
-    : hasActiveSub
-      ? {
-          kind: "action" as const,
-          action: "customer_portal" as const,
-          label: "Manage subscription",
-        }
-      : {
-          kind: "action" as const,
-          action: isAnnual
-            ? ("family_access_annual_checkout" as const)
-            : ("family_access_checkout" as const),
-          label: "Get Family Access",
-        };
-
-  return (
-    <div className="mx-auto max-w-md">
-      <FamilyPlanToggle interval={interval} />
-      <PricingCard
-        icon={<Heart className="size-5" />}
-        eyebrow="For families"
-        title="Family Access"
-        price={
-          isAnnual
-            ? `$${PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR}`
-            : `$${PRICING.FAMILY_ACCESS_MONTHLY}`
-        }
-        period={
-          isAnnual
-            ? `first year, then $${PRICING.FAMILY_ACCESS_ANNUAL}/yr`
-            : "per month"
-        }
-        desc={
-          isAnnual
-            ? "Unlock contact info for any verified nurse across New York. Save 67% versus paying monthly your first year."
-            : "Unlock contact info for any verified nurse across New York."
-        }
-        perks={FAMILY_PERKS}
-        cta={cta}
-        accent="teal"
-      />
-    </div>
-  );
-}
-
-function FamilyPlanToggle({ interval }: { interval: FamilyInterval }) {
-  const base =
-    "inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors";
-  const active = "bg-teal text-white shadow-sm";
-  const idle = "text-soft-black-light hover:bg-sage/10";
-  return (
-    <div className="mb-6 flex justify-center">
-      <div className="border-sage/30 inline-flex gap-1 rounded-xl border bg-white p-1 shadow-sm">
-        <Link
-          href="/pricing?audience=families&plan=monthly"
-          aria-current={interval === "monthly" ? "true" : undefined}
-          className={`${base} ${interval === "monthly" ? active : idle}`}
-        >
-          Monthly
-        </Link>
-        <Link
-          href="/pricing?audience=families&plan=annual"
-          aria-current={interval === "annual" ? "true" : undefined}
-          className={`${base} ${interval === "annual" ? active : idle}`}
-        >
-          Annual
-          <span
-            className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-              interval === "annual"
-                ? "bg-white/20 text-white"
-                : "bg-teal/10 text-teal-dark"
-            }`}
-          >
-            Save 67%
-          </span>
         </Link>
       </div>
     </div>
