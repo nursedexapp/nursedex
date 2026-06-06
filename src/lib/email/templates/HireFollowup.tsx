@@ -20,7 +20,7 @@ export function HireFollowup({ firstName }: HireFollowupProps) {
           Mark a hire
         </Link>
         <Text style={paragraph}>
-          Recording a hire helps the nurse&apos;s profile and other Long Island
+          Recording a hire helps the nurse&apos;s profile and other New York
           families see who&apos;s been trusted before. If you&apos;re still
           looking, you can also{" "}
           <Link href="https://nursedex.com/nurses" style={link}>

@@ -20,7 +20,7 @@ export function ProfileSetupComplete({
         </Text>
         <Text style={paragraph}>
           Great work setting up your NurseDex profile. Once our team verifies
-          your license, families on Long Island will be able to find you.
+          your license, families in New York will be able to find you.
         </Text>
         <Text style={paragraph}>
           <strong>Want to stand out?</strong> Nurses with reviews get noticed

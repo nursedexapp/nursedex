@@ -10,7 +10,7 @@ export function Footer() {
           NurseDex
         </Link>
         <p className="font-body text-soft-black-light mt-1 text-sm">
-          Long Island&apos;s trusted nurse directory.
+          New York&apos;s trusted nurse directory.
         </p>
 
         <a

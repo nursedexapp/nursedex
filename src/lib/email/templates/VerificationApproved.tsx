@@ -19,7 +19,7 @@ export function VerificationApproved({
         </Text>
         <Text style={paragraph}>
           We confirmed your license against the NY State database. Your profile
-          is now visible to families on Long Island, and you have a Verified
+          is now visible to families in New York, and you have a Verified
           badge on every search result and profile view.
         </Text>
         <Link href={profileUrl} style={button}>

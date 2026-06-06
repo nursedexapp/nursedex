@@ -26,7 +26,7 @@ function PreSurveyHero() {
         <HeroHeading>Find your match in 4 quick questions</HeroHeading>
         <HeroBody>
           Tell us about the care you&apos;re looking for and we&apos;ll show you
-          nurses on Long Island who fit.
+          nurses in New York who fit.
         </HeroBody>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
