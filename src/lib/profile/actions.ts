@@ -7,7 +7,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requireAuth, requireRole } from "@/lib/auth/helpers";
 import { UserRole } from "@/types/enums";
 import { calculateCompleteness } from "./completeness";
-import { generateSlug, saveSlugRedirect } from "./slug";
+import { claimSlug, saveSlugRedirect } from "./slug";
 import {
   getSignedUploadUrl as _getSignedUploadUrl,
   validateUploadedPhoto,
@@ -244,36 +244,35 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
   // so a colliding slug would slip through and fail the slug UNIQUE constraint
   // on the update below ("Could not finalize profile").
   const slugDb = createServiceRoleClient();
-  const newSlug = await generateSlug(
+  const { score } = calculateCompleteness(profile);
+
+  // Claim a unique slug and write it. claimSlug retries on the rare race where
+  // another profile grabs the same slug between the uniqueness check and the
+  // write (Postgres 23505), regenerating with the next numeric suffix.
+  const { slug: newSlug, error } = await claimSlug(
     slugDb,
     userData.first_name || "",
     userData.last_name || "",
     profile.credential,
     user.id,
+    (candidate) =>
+      supabase
+        .from("nurse_profiles")
+        .update({ slug: candidate, profile_completeness: score })
+        .eq("user_id", user.id)
+        .then((r) => r.error),
   );
 
-  // Save old slug as redirect
-  if (profile.slug !== newSlug) {
-    await saveSlugRedirect(slugDb, profile.slug, newSlug, user.id);
-  }
-
-  // Calculate completeness
-  const { score } = calculateCompleteness(profile);
-
-  // Update profile with final slug and completeness
-  const { error } = await supabase
-    .from("nurse_profiles")
-    .update({
-      slug: newSlug,
-      profile_completeness: score,
-    })
-    .eq("user_id", user.id);
-
-  if (error) {
-    console.error("Complete onboarding error:", error.code, error.message);
+  if (error || !newSlug) {
+    console.error("Complete onboarding error:", error?.code, error?.message);
     return {
       error: `Could not finalize profile: ${describeDbError(error)}. Please try again or contact support@nursedex.com.`,
     };
+  }
+
+  // Save the temp slug as a redirect now that the real slug is committed.
+  if (profile.slug !== newSlug) {
+    await saveSlugRedirect(slugDb, profile.slug, newSlug, user.id);
   }
 
   // Fire-and-forget: don't block onboarding completion on email delivery
@@ -324,7 +323,6 @@ export async function updateNurseProfile(
 
   // Check if slug needs regeneration (name or credential changed)
   const credentialChanged = currentProfile.credential !== data.credential;
-  let newSlug = currentProfile.slug;
 
   // Name change is detected by the users table trigger, but we
   // also need to regenerate the slug
@@ -334,29 +332,15 @@ export async function updateNurseProfile(
     .eq("id", user.id)
     .single();
 
+  let needsNewSlug = false;
   if (freshUser) {
     const expectedSlugBase =
       `${freshUser.first_name}-${freshUser.last_name}-${data.credential as string}`
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, "")
         .replace(/-+/g, "-");
-
-    if (
-      !currentProfile.slug.startsWith(expectedSlugBase) ||
-      credentialChanged
-    ) {
-      // Service-role client: see all profiles (incl. pending) when checking
-      // slug uniqueness, otherwise RLS hides collisions until the update fails.
-      const slugDb = createServiceRoleClient();
-      newSlug = await generateSlug(
-        slugDb,
-        freshUser.first_name || "",
-        freshUser.last_name || "",
-        data.credential as string,
-        user.id,
-      );
-      await saveSlugRedirect(slugDb, currentProfile.slug, newSlug, user.id);
-    }
+    needsNewSlug =
+      !currentProfile.slug.startsWith(expectedSlugBase) || credentialChanged;
   }
 
   // If credential changed, the DB trigger will reset verification_status.
@@ -364,9 +348,8 @@ export async function updateNurseProfile(
 
   const photos = (data.photos as string[]) || [];
 
-  // Build the profile update
+  // Build the profile update; the slug is set per-path below.
   const profileUpdate = {
-    slug: newSlug,
     credential: data.credential,
     license_number: data.license_number,
     care_types: data.care_types,
@@ -389,20 +372,54 @@ export async function updateNurseProfile(
     travel_radius_miles: data.travel_radius_miles ?? null,
   };
 
-  const { error: profileError } = await supabase
-    .from("nurse_profiles")
-    .update(profileUpdate)
-    .eq("user_id", user.id);
-
-  if (profileError) {
-    console.error(
-      "Profile edit update error:",
-      profileError.code,
-      profileError.message,
+  if (needsNewSlug && freshUser) {
+    // Service-role client: see all profiles (incl. pending) for uniqueness;
+    // claimSlug retries on the rare race that still slips through.
+    const slugDb = createServiceRoleClient();
+    const { slug: newSlug, error: claimError } = await claimSlug(
+      slugDb,
+      freshUser.first_name || "",
+      freshUser.last_name || "",
+      data.credential as string,
+      user.id,
+      (candidate) =>
+        supabase
+          .from("nurse_profiles")
+          .update({ ...profileUpdate, slug: candidate })
+          .eq("user_id", user.id)
+          .then((r) => r.error),
     );
-    return {
-      error: `Could not save changes: ${describeDbError(profileError)}. Please try again.`,
-    };
+
+    if (claimError || !newSlug) {
+      console.error(
+        "Profile edit update error:",
+        claimError?.code,
+        claimError?.message,
+      );
+      return {
+        error: `Could not save changes: ${describeDbError(claimError)}. Please try again.`,
+      };
+    }
+
+    if (currentProfile.slug !== newSlug) {
+      await saveSlugRedirect(slugDb, currentProfile.slug, newSlug, user.id);
+    }
+  } else {
+    const { error: profileError } = await supabase
+      .from("nurse_profiles")
+      .update({ ...profileUpdate, slug: currentProfile.slug })
+      .eq("user_id", user.id);
+
+    if (profileError) {
+      console.error(
+        "Profile edit update error:",
+        profileError.code,
+        profileError.message,
+      );
+      return {
+        error: `Could not save changes: ${describeDbError(profileError)}. Please try again.`,
+      };
+    }
   }
 
   // Recalculate completeness + read the upsell-gate fields in one round trip

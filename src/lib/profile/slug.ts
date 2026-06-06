@@ -32,7 +32,9 @@ export async function generateSlug(
       query = query.neq("user_id", excludeUserId);
     }
 
-    const { data } = await query.single();
+    // maybeSingle: the common "slug is available" case returns zero rows, which
+    // .single() reports as a PGRST116 error (noisy in the Supabase logs).
+    const { data } = await query.maybeSingle();
 
     if (!data) {
       // Also check slug_redirects to avoid conflicts with old slugs
@@ -40,7 +42,7 @@ export async function generateSlug(
         .from("slug_redirects")
         .select("id")
         .eq("old_slug", candidate)
-        .single();
+        .maybeSingle();
 
       if (!redirect) break;
     }
@@ -50,6 +52,48 @@ export async function generateSlug(
   }
 
   return candidate;
+}
+
+/**
+ * Generate a unique slug and apply it, retrying on the rare race where another
+ * profile claims the same slug between the uniqueness check and the write.
+ *
+ * `apply` performs the update with the candidate slug and returns the Supabase
+ * error (or null on success). On a unique-violation (Postgres 23505) we
+ * regenerate and retry: generateSlug, run with a service-role client, now sees
+ * the conflicting row and picks the next numeric suffix. Any non-23505 error
+ * stops immediately.
+ *
+ * Pass a service-role client so the uniqueness check sees ALL profiles,
+ * including other nurses' pending (RLS-hidden) ones.
+ */
+export async function claimSlug(
+  supabase: SupabaseClient,
+  firstName: string,
+  lastName: string,
+  credential: string,
+  excludeUserId: string,
+  apply: (slug: string) => Promise<{ code?: string; message?: string } | null>,
+): Promise<{ slug?: string; error?: { code?: string; message?: string } }> {
+  let lastError: { code?: string; message?: string } | null = null;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const slug = await generateSlug(
+      supabase,
+      firstName,
+      lastName,
+      credential,
+      excludeUserId,
+    );
+    const error = await apply(slug);
+    if (!error) return { slug };
+    if (error.code !== "23505") return { error };
+    lastError = error;
+  }
+
+  return {
+    error: lastError ?? { message: "could not assign a unique profile link" },
+  };
 }
 
 /**
