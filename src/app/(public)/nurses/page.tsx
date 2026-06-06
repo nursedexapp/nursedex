@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Header } from "@/components/shared/Header";
 import { NurseCard } from "@/components/nurses/NurseCard";
 import { FilterPanel } from "@/components/nurses/FilterPanel";
 import { FilterSheet } from "@/components/nurses/FilterSheet";
@@ -79,7 +78,6 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         {/* Title + mobile filter trigger */}
         <div className="mb-6 flex items-end justify-between gap-4">

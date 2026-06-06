@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Header } from "@/components/shared/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/helpers";
@@ -176,7 +175,6 @@ export default async function ConfirmHirePage({
 function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-md flex-1 px-6 py-16">
         {children}
       </main>

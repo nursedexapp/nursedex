@@ -10,7 +10,6 @@ import {
   UserCheck,
   Sparkles,
 } from "lucide-react";
-import { Header } from "@/components/shared/Header";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
@@ -29,7 +28,6 @@ export const metadata: Metadata = {
 export default function WelcomePage() {
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="flex-1">
         <Hero />
         <TrustSignals />

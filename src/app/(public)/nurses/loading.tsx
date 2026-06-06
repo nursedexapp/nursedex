@@ -1,9 +1,7 @@
-import { Header } from "@/components/shared/Header";
 
 export default function NursesLoading() {
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
         <div className="bg-sage/15 mb-4 h-8 w-48 animate-pulse rounded" />
         <div className="bg-sage/10 mb-6 h-4 w-72 animate-pulse rounded" />

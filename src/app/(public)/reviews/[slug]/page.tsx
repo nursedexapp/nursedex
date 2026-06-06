@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Header } from "@/components/shared/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { ExternalReviewForm } from "@/components/reviews/ExternalReviewForm";
@@ -109,7 +108,6 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-xl flex-1 px-6 py-10">
         <header className="mb-6">
           <p className="text-muted-foreground text-sm">

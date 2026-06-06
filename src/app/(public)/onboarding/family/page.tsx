@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Header } from "@/components/shared/Header";
 import { FamilyOnboardingForm } from "@/components/onboarding/FamilyOnboardingForm";
 import { requireRole } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -26,7 +25,6 @@ export default async function FamilyOnboardingPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-10 sm:px-6">
         <div className="mb-6 space-y-2">
           <p className="text-soft-black-light text-xs font-medium tracking-wide uppercase">

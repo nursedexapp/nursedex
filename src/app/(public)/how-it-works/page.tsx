@@ -10,7 +10,6 @@ import {
   Sparkles,
   CalendarCheck,
 } from "lucide-react";
-import { Header } from "@/components/shared/Header";
 
 export const metadata: Metadata = {
   title: "How NurseDex works | NurseDex",
@@ -27,7 +26,6 @@ export const metadata: Metadata = {
 export default function HowItWorksPage() {
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="flex-1">
         <section className="border-sage-light/40 border-b">
           <div className="mx-auto max-w-4xl px-6 py-12 sm:py-16">

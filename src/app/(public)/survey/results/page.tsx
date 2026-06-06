@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Header } from "@/components/shared/Header";
 import { SurveyResultCard } from "@/components/survey/SurveyResultCard";
 import { SurveyResultsAnalytics } from "@/components/survey/SurveyResultsAnalytics";
 import { getCurrentUser } from "@/lib/auth/helpers";
@@ -82,7 +81,6 @@ export default async function SurveyResultsPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-10 sm:px-6">
         <div className="mb-8 space-y-2 text-center">
           <p className="text-soft-black-light text-xs font-medium tracking-wide uppercase">
