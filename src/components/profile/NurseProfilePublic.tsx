@@ -356,7 +356,7 @@ export function NurseProfilePublic({
                 </h2>
                 <p className="text-muted-foreground text-xs">
                   Track your hire and share your experience to help other
-                  families on Long Island decide.
+                  families in New York decide.
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <HireButton

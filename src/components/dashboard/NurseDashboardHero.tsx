@@ -145,7 +145,7 @@ function CelebrationHero({
         <div className="flex-1 pr-6">
           <HeroHeading>Welcome to NurseDex. Your profile is live.</HeroHeading>
           <HeroBody>
-            Families on Long Island can now find you. Share your link with
+            Families in New York can now find you. Share your link with
             people who&apos;ve worked with you and reviews can roll in.
           </HeroBody>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -213,7 +213,7 @@ function LiveHero({ slug }: { slug: string }) {
       <div className="flex-1">
         <HeroHeading>Your profile is live</HeroHeading>
         <HeroBody>
-          Families on Long Island can find you. Share your link to start
+          Families in New York can find you. Share your link to start
           collecting reviews from past clients.
         </HeroBody>
         <div className="mt-3 flex flex-wrap gap-2">

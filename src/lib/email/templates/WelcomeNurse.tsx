@@ -14,7 +14,7 @@ export function WelcomeNurse({ firstName }: WelcomeNurseProps) {
         </Text>
         <Text style={paragraph}>
           We are excited to have you join our community of healthcare
-          professionals on Long Island.
+          professionals in New York.
         </Text>
         <Text style={paragraph}>Here is what to do next:</Text>
         <Text style={listItem}>

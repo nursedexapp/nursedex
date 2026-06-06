@@ -14,7 +14,7 @@ export function WelcomeFamily({ firstName }: WelcomeFamilyProps) {
         </Text>
         <Text style={paragraph}>
           You have taken the first step toward finding quality care for your
-          family on Long Island.
+          family in New York.
         </Text>
         <Text style={paragraph}>Here is how NurseDex works:</Text>
         <Text style={listItem}>

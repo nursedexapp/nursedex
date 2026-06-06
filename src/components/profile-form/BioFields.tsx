@@ -52,7 +52,7 @@ export function BioFields({
           id="bio"
           value={values.bio}
           onChange={(e) => onChange("bio", e.target.value)}
-          placeholder="I have been a dedicated healthcare professional for over 10 years, specializing in elder care across Long Island. I treat every patient like family..."
+          placeholder="I have been a dedicated healthcare professional for over 10 years, specializing in elder care across New York. I treat every patient like family..."
           rows={5}
           maxLength={maxBio}
           aria-invalid={errors.bio ? true : undefined}

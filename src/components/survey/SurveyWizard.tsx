@@ -240,7 +240,7 @@ export function SurveyWizard({
 
       {initialStep === 4 && (
         <Step
-          heading="Where on Long Island?"
+          heading="Where in New York?"
           subheading="Your zip helps us show nurses within reach. Languages are optional."
         >
           <div className="space-y-6">
