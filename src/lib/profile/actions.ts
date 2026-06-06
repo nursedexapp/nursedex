@@ -255,12 +255,13 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
     userData.last_name || "",
     profile.credential,
     user.id,
-    (candidate) =>
-      supabase
+    async (candidate) => {
+      const { error: updateError } = await supabase
         .from("nurse_profiles")
         .update({ slug: candidate, profile_completeness: score })
-        .eq("user_id", user.id)
-        .then((r) => r.error),
+        .eq("user_id", user.id);
+      return updateError;
+    },
   );
 
   if (error || !newSlug) {
@@ -382,12 +383,13 @@ export async function updateNurseProfile(
       freshUser.last_name || "",
       data.credential as string,
       user.id,
-      (candidate) =>
-        supabase
+      async (candidate) => {
+        const { error: updateError } = await supabase
           .from("nurse_profiles")
           .update({ ...profileUpdate, slug: candidate })
-          .eq("user_id", user.id)
-          .then((r) => r.error),
+          .eq("user_id", user.id);
+        return updateError;
+      },
     );
 
     if (claimError || !newSlug) {
