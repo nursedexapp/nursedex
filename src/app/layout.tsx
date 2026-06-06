@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Fraunces, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { FamilyAccessCelebration } from "@/components/FamilyAccessCelebration";
+import { OrganizationJsonLd } from "@/components/shared/OrganizationJsonLd";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -61,6 +62,7 @@ export default function RootLayout({
       className={`${fraunces.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}
     >
       <body>
+        <OrganizationJsonLd />
         {children}
         <Suspense fallback={null}>
           <FamilyAccessCelebration />
