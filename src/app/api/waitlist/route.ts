@@ -50,8 +50,16 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
+    // The waitlist SELECT policy is service_role-only, so the rate-limit count
+    // must use a service-role client. Under the anon client it always returns 0
+    // and the limit never triggers.
+    const admin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SECRET_KEY!,
+    );
+
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabase
+    const { count } = await admin
       .from("waitlist")
       .select("*", { count: "exact", head: true })
       .eq("ip_hash", ipHash)
