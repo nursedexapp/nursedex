@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { PastDueBanner } from "@/components/dashboard/PastDueBanner";
+import { AppFooter } from "@/components/shared/AppFooter";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -69,6 +70,8 @@ export default async function DashboardLayout({
         <DashboardSidebar role={role} />
         <main className="flex-1 pb-16 lg:pb-0">{children}</main>
       </div>
+      {/* mb clears the fixed mobile bottom nav so the footer stays visible */}
+      <AppFooter className="mb-16 lg:mb-0" />
     </div>
   );
 }

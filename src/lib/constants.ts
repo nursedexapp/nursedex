@@ -112,3 +112,10 @@ export const BUSINESS_ADDRESS = {
   state: "NY",
   zip: "11779",
 } as const;
+
+// Public social profiles. Canonical URLs only (no share/QR tracking params).
+// Update the Facebook URL to the vanity handle once a username is set on the Page.
+export const SOCIAL_LINKS = {
+  facebook: "https://www.facebook.com/profile.php?id=61575387869793",
+  instagram: "https://www.instagram.com/nursedexcommunity",
+} as const;

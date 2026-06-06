@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SocialLinks } from "@/components/shared/SocialLinks";
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -19,6 +20,8 @@ export function Footer() {
         >
           support@nursedex.com
         </a>
+
+        <SocialLinks className="mt-6 justify-center" />
 
         <div className="font-body text-soft-black-light mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
           <span>&copy; {year} NurseDex LLC</span>
