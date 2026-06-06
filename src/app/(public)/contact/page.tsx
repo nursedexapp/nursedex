@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail } from "lucide-react";
-import { Header } from "@/components/shared/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { ContactForm } from "@/components/contact/ContactForm";
 
@@ -20,7 +19,6 @@ export const metadata: Metadata = {
 export default function ContactPage() {
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
         <header className="mb-8">
           <h1 className="font-heading text-soft-black text-3xl font-semibold">

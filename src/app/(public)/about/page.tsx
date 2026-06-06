@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Header } from "@/components/shared/Header";
 
 export const metadata: Metadata = {
   title: "About | NurseDex",
@@ -17,7 +16,6 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
         <header className="mb-8">
           <h1 className="font-heading text-soft-black text-3xl font-semibold sm:text-4xl">

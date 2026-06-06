@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { Header } from "@/components/shared/Header";
 import { NurseProfilePublic } from "@/components/profile/NurseProfilePublic";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import {
@@ -186,7 +185,6 @@ export default async function NurseProfilePage({
         avgRating={nurse.avg_rating}
         reviewCount={nurse.review_count}
       />
-      <Header />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <NurseProfilePublic
           nurse={nurse}

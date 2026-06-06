@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Header } from "@/components/shared/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { verifyExternalReview } from "@/lib/reviews/external-actions";
@@ -20,7 +19,6 @@ export default async function VerifyReviewPage({ params }: VerifyPageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto w-full max-w-md flex-1 px-6 py-16">
         <Card className="border-sage/20">
           <CardContent className="space-y-3 py-8 text-center">

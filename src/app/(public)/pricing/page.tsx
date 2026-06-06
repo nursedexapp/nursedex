@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Star, Heart } from "lucide-react";
-import { Header } from "@/components/shared/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckoutButton } from "@/components/pricing/CheckoutButton";
@@ -76,7 +75,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="flex-1">
         <section className="border-sage-light/40 border-b">
           <div className="mx-auto max-w-6xl px-6 py-12 sm:py-16">

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Header } from "@/components/shared/Header";
 import { SurveyWizard } from "@/components/survey/SurveyWizard";
 import { parseSearchParams } from "@/lib/nurses/search-params";
 
@@ -22,7 +21,6 @@ export default async function SurveyPage({ searchParams }: SurveyPageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Header />
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10 sm:px-6">
         <Suspense fallback={null}>
           <SurveyWizard initialFilters={filters} initialStep={step} />
