@@ -3,6 +3,7 @@
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requireAuth, requireRole } from "@/lib/auth/helpers";
 import { UserRole } from "@/types/enums";
 import { calculateCompleteness } from "./completeness";
@@ -20,6 +21,31 @@ export type ProfileActionResult = {
   success?: string;
   upsellHint?: boolean;
 };
+
+/**
+ * Turn a Postgres/Supabase error into a plain-language reason so the user
+ * sees something actionable instead of a generic "try again". Codes:
+ * https://www.postgresql.org/docs/current/errcodes-appendix.html
+ */
+function describeDbError(
+  error: { code?: string; message?: string } | null | undefined,
+): string {
+  if (!error) return "an unexpected error occurred";
+  switch (error.code) {
+    case "23505":
+      return "that conflicts with an existing profile (duplicate value)";
+    case "23514":
+      return "a value was outside the allowed range";
+    case "23502":
+      return "a required field was missing";
+    case "23503":
+      return "a related record could not be found";
+    case "42501":
+      return "you do not have permission to make this change";
+    default:
+      return error.message || "an unexpected database error occurred";
+  }
+}
 
 // ── Fetch nurse profile for the current user ────────────────
 
@@ -155,8 +181,14 @@ export async function saveOnboardingStep(
       .eq("id", user.id);
 
     if (userError) {
-      console.error("Step 5 user update error:", userError.message);
-      return { error: "Could not save contact info. Please try again." };
+      console.error(
+        "Step 5 user update error:",
+        userError.code,
+        userError.message,
+      );
+      return {
+        error: `Could not save contact info: ${describeDbError(userError)}. Please try again.`,
+      };
     }
 
     const { error: profileError } = await supabase
@@ -167,8 +199,14 @@ export async function saveOnboardingStep(
       .eq("user_id", user.id);
 
     if (profileError) {
-      console.error("Step 5 profile update error:", profileError.message);
-      return { error: "Could not save travel radius. Please try again." };
+      console.error(
+        "Step 5 profile update error:",
+        profileError.code,
+        profileError.message,
+      );
+      return {
+        error: `Could not save travel radius: ${describeDbError(profileError)}. Please try again.`,
+      };
     }
 
     return { success: "Contact info saved" };
@@ -200,9 +238,14 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
     return { error: "Profile not found" };
   }
 
-  // Generate the real slug (replacing temp slug from role-select)
+  // Generate the real slug (replacing temp slug from role-select).
+  // Slug uniqueness must be checked with the service-role client: under the
+  // nurse's own RLS, pending (unverified) profiles of other nurses are hidden,
+  // so a colliding slug would slip through and fail the slug UNIQUE constraint
+  // on the update below ("Could not finalize profile").
+  const slugDb = createServiceRoleClient();
   const newSlug = await generateSlug(
-    supabase,
+    slugDb,
     userData.first_name || "",
     userData.last_name || "",
     profile.credential,
@@ -211,7 +254,7 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
 
   // Save old slug as redirect
   if (profile.slug !== newSlug) {
-    await saveSlugRedirect(supabase, profile.slug, newSlug, user.id);
+    await saveSlugRedirect(slugDb, profile.slug, newSlug, user.id);
   }
 
   // Calculate completeness
@@ -227,8 +270,10 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
     .eq("user_id", user.id);
 
   if (error) {
-    console.error("Complete onboarding error:", error.message);
-    return { error: "Could not finalize profile. Please try again." };
+    console.error("Complete onboarding error:", error.code, error.message);
+    return {
+      error: `Could not finalize profile: ${describeDbError(error)}. Please try again or contact support@nursedex.com.`,
+    };
   }
 
   // Fire-and-forget: don't block onboarding completion on email delivery
@@ -300,14 +345,17 @@ export async function updateNurseProfile(
       !currentProfile.slug.startsWith(expectedSlugBase) ||
       credentialChanged
     ) {
+      // Service-role client: see all profiles (incl. pending) when checking
+      // slug uniqueness, otherwise RLS hides collisions until the update fails.
+      const slugDb = createServiceRoleClient();
       newSlug = await generateSlug(
-        supabase,
+        slugDb,
         freshUser.first_name || "",
         freshUser.last_name || "",
         data.credential as string,
         user.id,
       );
-      await saveSlugRedirect(supabase, currentProfile.slug, newSlug, user.id);
+      await saveSlugRedirect(slugDb, currentProfile.slug, newSlug, user.id);
     }
   }
 
@@ -347,8 +395,14 @@ export async function updateNurseProfile(
     .eq("user_id", user.id);
 
   if (profileError) {
-    console.error("Profile edit update error:", profileError.message);
-    return { error: "Could not save changes. Please try again." };
+    console.error(
+      "Profile edit update error:",
+      profileError.code,
+      profileError.message,
+    );
+    return {
+      error: `Could not save changes: ${describeDbError(profileError)}. Please try again.`,
+    };
   }
 
   // Recalculate completeness + read the upsell-gate fields in one round trip
