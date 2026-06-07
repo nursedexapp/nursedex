@@ -21,8 +21,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const h = vi.hoisted(() => ({
   scenario: {
     blocked: null as { id: string } | null,
-    authUser: null as { id: string; email_confirmed_at: string | null } | null,
-    profile: null as { first_name: string | null } | null,
+    // public.users mirror row (exists for any signed-up user, confirmed or not)
+    profile: null as { id: string; first_name: string | null } | null,
+    // what the GoTrue admin API (getUserById) returns as the auth user
+    authUser: null as { email_confirmed_at: string | null } | null,
   },
   signUpResult: { error: null as { message: string } | null },
   resendResult: { error: null as { message: string } | null },
@@ -42,11 +44,13 @@ type Builder = {
 };
 
 // Mock service-role so importing auth/actions doesn't pull in `server-only`
-// (not resolvable under vitest), and route each chained lookup to the right
-// scenario slot by schema + table.
+// (not resolvable under vitest). Routes the public-schema lookups by table and
+// serves the auth user through the GoTrue admin API (getUserById), mirroring
+// how the action actually reads confirmation status. The auth schema is not
+// exposed to PostgREST, so there is deliberately no .schema("auth") here.
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: vi.fn(() => {
-    const makeBuilder = (schemaName: string | null): Builder => {
+    const makeBuilder = (): Builder => {
       let table: string | null = null;
       const b: Builder = {
         from: (t: string) => {
@@ -57,8 +61,6 @@ vi.mock("@/lib/supabase/service-role", () => ({
         eq: () => b,
         maybeSingle: async () => {
           if (table === "blocked_emails") return { data: h.scenario.blocked };
-          if (schemaName === "auth" && table === "users")
-            return { data: h.scenario.authUser };
           if (table === "users") return { data: h.scenario.profile };
           return { data: null };
         },
@@ -66,8 +68,12 @@ vi.mock("@/lib/supabase/service-role", () => ({
       return b;
     };
     return {
-      from: (t: string) => makeBuilder(null).from(t),
-      schema: (s: string) => makeBuilder(s),
+      from: (t: string) => makeBuilder().from(t),
+      auth: {
+        admin: {
+          getUserById: async () => ({ data: { user: h.scenario.authUser } }),
+        },
+      },
     };
   }),
 }));
@@ -153,7 +159,8 @@ describe("signUp duplicate-email handling", () => {
   });
 
   it("existing unconfirmed email still flows through signUp (resends), no notice", async () => {
-    h.scenario.authUser = { id: "u1", email_confirmed_at: null };
+    h.scenario.profile = { id: "u1", first_name: "Dana" };
+    h.scenario.authUser = { email_confirmed_at: null };
 
     const result = await signUp(signupForm("pending@example.com"));
     await flushAfter();
@@ -164,8 +171,8 @@ describe("signUp duplicate-email handling", () => {
   });
 
   it("confirmed duplicate skips signUp, emails the owner, and returns the SAME generic success", async () => {
-    h.scenario.authUser = { id: "u1", email_confirmed_at: "2026-01-01T00:00:00Z" };
-    h.scenario.profile = { first_name: "Dana" };
+    h.scenario.profile = { id: "u1", first_name: "Dana" };
+    h.scenario.authUser = { email_confirmed_at: "2026-01-01T00:00:00Z" };
 
     const result = await signUp(signupForm("Owner@Example.com"));
     await flushAfter();
@@ -181,8 +188,8 @@ describe("signUp duplicate-email handling", () => {
   });
 
   it("confirmed duplicate with no profile name sends notice with firstName undefined", async () => {
-    h.scenario.authUser = { id: "u1", email_confirmed_at: "2026-01-01T00:00:00Z" };
-    h.scenario.profile = null;
+    h.scenario.profile = { id: "u1", first_name: null };
+    h.scenario.authUser = { email_confirmed_at: "2026-01-01T00:00:00Z" };
 
     await signUp(signupForm("owner2@example.com"));
     await flushAfter();
@@ -209,7 +216,8 @@ describe("signUp duplicate-email handling", () => {
 
 describe("resendConfirmation hardening", () => {
   it("already-confirmed account sends notice and returns generic success (no leak)", async () => {
-    h.scenario.authUser = { id: "u1", email_confirmed_at: "2026-01-01T00:00:00Z" };
+    h.scenario.profile = { id: "u1", first_name: null };
+    h.scenario.authUser = { email_confirmed_at: "2026-01-01T00:00:00Z" };
 
     const fd = new FormData();
     fd.set("email", "Owner@Example.com");
@@ -224,7 +232,8 @@ describe("resendConfirmation hardening", () => {
   });
 
   it("unconfirmed account calls resend and sends no notice", async () => {
-    h.scenario.authUser = { id: "u1", email_confirmed_at: null };
+    h.scenario.profile = { id: "u1", first_name: null };
+    h.scenario.authUser = { email_confirmed_at: null };
 
     const fd = new FormData();
     fd.set("email", "pending@example.com");
