@@ -125,6 +125,12 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
   });
 
   if (error) {
+    // The two specific messages below reveal that an account exists for this
+    // email (unconfirmed, or suspended). This is an intentional tradeoff: both
+    // are needed UX (the confirm/resend flow and the suspension support path),
+    // and GoTrue only returns these after the password is verified, so they
+    // are not a free enumeration oracle. Every other failure, including an
+    // unknown email, returns the generic message at the end.
     if (error.message.includes("Email not confirmed")) {
       return {
         error:
@@ -205,8 +211,13 @@ export async function forgotPassword(formData: FormData): Promise<AuthResult> {
     redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://nursedex.com"}/auth/callback?next=/reset-password`,
   });
 
+  // resetPasswordForEmail never errors for an unknown email (Supabase
+  // obfuscates that case to prevent enumeration), so any error here is an
+  // internal condition such as a rate limit. Returning its raw message would
+  // both leak internals and make the response differ from the generic success
+  // below. Log it server-side and always return the same neutral message.
   if (error) {
-    return { error: error.message };
+    console.error("Forgot password error:", error.message);
   }
 
   return {
