@@ -31,6 +31,8 @@ export interface RequestView {
   estimate_hours?: number | null;
   status: string;
   approved_by?: string | null;
+  github_issue_number?: number | null;
+  github_issue_url?: string | null;
 }
 
 /**
@@ -236,6 +238,15 @@ export function requestRootBlocks(req: RequestView): Json[] {
   if (req.approved_by) {
     const verb = req.status === "rejected" ? "Rejected by" : "Approved by";
     fields.push({ type: "mrkdwn", text: `*${verb}:*\n<@${req.approved_by}>` });
+  }
+  if (req.github_issue_url) {
+    const label = req.github_issue_number
+      ? `#${req.github_issue_number}`
+      : "view";
+    fields.push({
+      type: "mrkdwn",
+      text: `*Issue:*\n<${req.github_issue_url}|${label}>`,
+    });
   }
 
   const blocks: Json[] = [

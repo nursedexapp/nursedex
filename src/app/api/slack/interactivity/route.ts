@@ -15,7 +15,7 @@ import {
   triageModalView,
   type RequestType,
 } from "@/lib/slack/views";
-import { getRequest, postReply, refreshRoot } from "@/lib/slack/requests";
+import { ensureIssue, getRequest, postReply, refreshRoot } from "@/lib/slack/requests";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -249,6 +249,8 @@ async function handleTriage(
           ? `🟠 Triaged as *Ad Hoc* at $75/hr, estimate ${estimate} hrs (~${cost}). Awaiting approval before work starts.`
           : `🟢 Triaged as *Maintenance* at $25/hr, estimate ${estimate} hrs (~${cost}). Cleared to start.`,
       );
+      // Maintenance is cleared on triage, so open its GitHub issue now.
+      if (req.status === "approved") await ensureIssue(req);
     }
     return ACK;
   } catch (err) {
@@ -288,5 +290,7 @@ async function handleDecision(
         ? `✅ Approved by <@${userId}>. Cleared to start.`
         : `⛔ Rejected by <@${userId}>.`,
     );
+    // Open the GitHub issue once an ad hoc request is approved.
+    if (approve) await ensureIssue(req);
   }
 }
