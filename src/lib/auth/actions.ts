@@ -55,32 +55,36 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
   // When a confirmed account already exists for this email, Supabase silently
   // obfuscates the signUp response (no error, an empty-identities fake user, no
   // email sent) to prevent enumeration. That left real owners stranded on the
-  // "check your email" page forever. Detect the duplicate authoritatively
-  // against auth.users, then email the owner a login/reset link instead of
-  // revealing account existence on screen. The on-screen result below stays
-  // byte-for-byte identical to the new-user path, so nothing leaks.
+  // "check your email" page forever. Detect the duplicate, then email the owner
+  // a login/reset link instead of revealing account existence on screen. The
+  // on-screen result below stays byte-for-byte identical to the new-user path,
+  // so nothing leaks.
+  //
+  // The auth schema is NOT exposed to PostgREST, so it cannot be read with
+  // service.schema("auth").from("users"). Instead read the public.users mirror
+  // (created at signup by the on_auth_user_created trigger) for the id, then
+  // ask the GoTrue admin API whether the email is confirmed.
   const { data: existing } = await service
-    .schema("auth")
     .from("users")
-    .select("id, email_confirmed_at")
+    .select("id, first_name")
     .eq("email", email.toLowerCase())
     .maybeSingle();
 
-  if (existing?.email_confirmed_at) {
-    after(async () => {
-      const { data: profile } = await service
-        .from("users")
-        .select("first_name")
-        .eq("id", existing.id)
-        .maybeSingle();
-      await sendAccountExistsNoticeEmail({
-        to: email.toLowerCase(),
-        firstName: profile?.first_name ?? undefined,
-      }).catch((err) =>
-        console.error("[email] Account exists notice error:", err),
+  if (existing) {
+    const { data: authData } = await service.auth.admin.getUserById(
+      existing.id,
+    );
+    if (authData?.user?.email_confirmed_at) {
+      after(() =>
+        sendAccountExistsNoticeEmail({
+          to: email.toLowerCase(),
+          firstName: existing.first_name ?? undefined,
+        }).catch((err) =>
+          console.error("[email] Account exists notice error:", err),
+        ),
       );
-    });
-    return { success: "Check your email for a confirmation link." };
+      return { success: "Check your email for a confirmation link." };
+    }
   }
 
   // No confirmed account exists: the email is either brand new or an existing
@@ -332,19 +336,25 @@ export async function resendConfirmation(
 
   // Supabase silently no-ops resend for already-confirmed accounts and still
   // returns success, which would leave the user staring at an inbox that never
-  // gets a new email. Check the auth.users row first. If the account is already
-  // confirmed, email the owner a login/reset link instead of returning a
-  // distinct "already confirmed" message: a distinct message would let this
+  // gets a new email. Check confirmation status first. If the account is
+  // already confirmed, email the owner a login/reset link instead of returning
+  // a distinct "already confirmed" message: a distinct message would let this
   // endpoint be used to enumerate which emails have confirmed accounts.
+  //
+  // The auth schema is NOT exposed to PostgREST, so read the public.users
+  // mirror for the id, then ask the GoTrue admin API for confirmation status.
   const admin = createServiceRoleClient();
-  const { data: authUser } = await admin
-    .schema("auth")
+  const { data: existing } = await admin
     .from("users")
-    .select("email_confirmed_at")
+    .select("id")
     .eq("email", email.toLowerCase())
     .maybeSingle();
 
-  if (authUser?.email_confirmed_at) {
+  const { data: authData } = existing
+    ? await admin.auth.admin.getUserById(existing.id)
+    : { data: { user: null } };
+
+  if (authData?.user?.email_confirmed_at) {
     after(() =>
       sendAccountExistsNoticeEmail({ to: email.toLowerCase() }).catch((err) =>
         console.error("[email] Account exists notice error:", err),
