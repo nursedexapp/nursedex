@@ -36,6 +36,41 @@ export async function sendProfileSetupEmail(
   }
 }
 
+interface SendAccountExistsNoticeArgs {
+  to: string;
+  firstName?: string;
+}
+
+/**
+ * Notifies the owner of an existing account that someone tried to sign up
+ * again with their email. Sent instead of revealing account existence on the
+ * signup screen, so the response stays identical to the new-user path and the
+ * email cannot be used to enumerate registered addresses.
+ */
+export async function sendAccountExistsNoticeEmail(
+  args: SendAccountExistsNoticeArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+
+  const res = await fetch(`${baseUrl}/api/email/account-exists-notice`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify(args),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(
+      "[email] Account exists notice email failed:",
+      res.status,
+      body,
+    );
+  }
+}
+
 interface SendNewReviewArgs {
   nurseUserId: string;
   rating: number;
