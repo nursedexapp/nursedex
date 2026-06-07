@@ -33,7 +33,10 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
-        run: npx tsc --noEmit
+        # npm run typecheck = `next typegen && tsc --noEmit`. typegen regenerates
+        # route types so this also catches route-type errors that previously only
+        # surfaced in `next build`.
+        run: npm run typecheck
 
       - name: Run tests
         run: npm test
