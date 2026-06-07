@@ -1,10 +1,12 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { sendAccountExistsNoticeEmail } from "@/lib/email/send";
 import { PASSWORD, PASSWORD_RECOVERY } from "@/lib/constants";
 
 export type AuthResult = {
@@ -50,6 +52,40 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     return { error: "This email address cannot be used to create an account." };
   }
 
+  // When a confirmed account already exists for this email, Supabase silently
+  // obfuscates the signUp response (no error, an empty-identities fake user, no
+  // email sent) to prevent enumeration. That left real owners stranded on the
+  // "check your email" page forever. Detect the duplicate authoritatively
+  // against auth.users, then email the owner a login/reset link instead of
+  // revealing account existence on screen. The on-screen result below stays
+  // byte-for-byte identical to the new-user path, so nothing leaks.
+  const { data: existing } = await service
+    .schema("auth")
+    .from("users")
+    .select("id, email_confirmed_at")
+    .eq("email", email.toLowerCase())
+    .maybeSingle();
+
+  if (existing?.email_confirmed_at) {
+    after(async () => {
+      const { data: profile } = await service
+        .from("users")
+        .select("first_name")
+        .eq("id", existing.id)
+        .maybeSingle();
+      await sendAccountExistsNoticeEmail({
+        to: email.toLowerCase(),
+        firstName: profile?.first_name ?? undefined,
+      }).catch((err) =>
+        console.error("[email] Account exists notice error:", err),
+      );
+    });
+    return { success: "Check your email for a confirmation link." };
+  }
+
+  // No confirmed account exists: the email is either brand new or an existing
+  // unconfirmed signup. signUp does the right thing in both cases (creates the
+  // user, or resends the confirmation email), so let it proceed.
   const { error } = await supabase.auth.signUp({
     email,
     password,
@@ -281,10 +317,12 @@ export async function resendConfirmation(
 
   const supabase = await createClient();
 
-  // Supabase silently no-ops resend for already-confirmed accounts and
-  // still returns success, which would leave the user staring at an
-  // inbox that never gets a new email. Check the auth.users row first
-  // so we can give a useful error.
+  // Supabase silently no-ops resend for already-confirmed accounts and still
+  // returns success, which would leave the user staring at an inbox that never
+  // gets a new email. Check the auth.users row first. If the account is already
+  // confirmed, email the owner a login/reset link instead of returning a
+  // distinct "already confirmed" message: a distinct message would let this
+  // endpoint be used to enumerate which emails have confirmed accounts.
   const admin = createServiceRoleClient();
   const { data: authUser } = await admin
     .schema("auth")
@@ -294,9 +332,12 @@ export async function resendConfirmation(
     .maybeSingle();
 
   if (authUser?.email_confirmed_at) {
-    return {
-      error: "This account is already confirmed. Please sign in instead.",
-    };
+    after(() =>
+      sendAccountExistsNoticeEmail({ to: email.toLowerCase() }).catch((err) =>
+        console.error("[email] Account exists notice error:", err),
+      ),
+    );
+    return { success: "Confirmation email sent. Check your inbox." };
   }
 
   const { error } = await supabase.auth.resend({
