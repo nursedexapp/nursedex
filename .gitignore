@@ -41,3 +41,6 @@ Legal/
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# Vercel plugin agent guidance (generated, local-only)
+AGENTS.md
