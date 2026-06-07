@@ -33,6 +33,9 @@ export interface RequestView {
   approved_by?: string | null;
   github_issue_number?: number | null;
   github_issue_url?: string | null;
+  suggested_estimate_hours?: number | null;
+  suggested_type?: string | null;
+  suggested_rationale?: string | null;
 }
 
 /**
@@ -359,9 +362,80 @@ export function completionBlocks(opts: {
 /**
  * The triage modal Dan fills in: billing type (which sets the rate) and an
  * hour estimate. The request id rides in private_metadata so the submit
- * handler knows which request to update.
+ * handler knows which request to update. When Claude has pre-computed a
+ * suggestion at intake, the type is pre-selected and the hours pre-filled
+ * (both still editable), with the rationale shown as context.
  */
-export function triageModalView(req: { id: number; title: string }): Json {
+export function triageModalView(req: {
+  id: number;
+  title: string;
+  suggested_type?: string | null;
+  suggested_estimate_hours?: number | null;
+  suggested_rationale?: string | null;
+}): Json {
+  const typeOptions = [
+    {
+      text: { type: "plain_text", text: "Maintenance ($25/hr)" },
+      value: "maintenance",
+    },
+    {
+      text: { type: "plain_text", text: "Ad Hoc ($75/hr)" },
+      value: "ad_hoc",
+    },
+  ];
+
+  const typeElement: Json = {
+    type: "static_select",
+    action_id: "value",
+    placeholder: { type: "plain_text", text: "Select billing type" },
+    options: typeOptions,
+  };
+  const suggestedOption = typeOptions.find(
+    (o) => o.value === req.suggested_type,
+  );
+  if (suggestedOption) typeElement.initial_option = suggestedOption;
+
+  const estimateElement: Json = {
+    type: "plain_text_input",
+    action_id: "value",
+    placeholder: { type: "plain_text", text: "e.g. 3.5" },
+  };
+  if (req.suggested_estimate_hours != null) {
+    estimateElement.initial_value = String(req.suggested_estimate_hours);
+  }
+
+  const blocks: Json[] = [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: `*Request #${req.id}:* ${req.title}` },
+    },
+  ];
+  if (req.suggested_rationale) {
+    blocks.push({
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `✨ *Suggested by Claude:* ${req.suggested_rationale}`,
+        },
+      ],
+    });
+  }
+  blocks.push(
+    {
+      type: "input",
+      block_id: "type",
+      label: { type: "plain_text", text: "Billing type" },
+      element: typeElement,
+    },
+    {
+      type: "input",
+      block_id: "estimate",
+      label: { type: "plain_text", text: "Estimated hours" },
+      element: estimateElement,
+    },
+  );
+
   return {
     type: "modal",
     callback_id: TRIAGE_CALLBACK,
@@ -369,41 +443,6 @@ export function triageModalView(req: { id: number; title: string }): Json {
     title: { type: "plain_text", text: "Triage" },
     submit: { type: "plain_text", text: "Save" },
     close: { type: "plain_text", text: "Cancel" },
-    blocks: [
-      {
-        type: "section",
-        text: { type: "mrkdwn", text: `*Request #${req.id}:* ${req.title}` },
-      },
-      {
-        type: "input",
-        block_id: "type",
-        label: { type: "plain_text", text: "Billing type" },
-        element: {
-          type: "static_select",
-          action_id: "value",
-          placeholder: { type: "plain_text", text: "Select billing type" },
-          options: [
-            {
-              text: { type: "plain_text", text: "Maintenance ($25/hr)" },
-              value: "maintenance",
-            },
-            {
-              text: { type: "plain_text", text: "Ad Hoc ($75/hr)" },
-              value: "ad_hoc",
-            },
-          ],
-        },
-      },
-      {
-        type: "input",
-        block_id: "estimate",
-        label: { type: "plain_text", text: "Estimated hours" },
-        element: {
-          type: "plain_text_input",
-          action_id: "value",
-          placeholder: { type: "plain_text", text: "e.g. 3.5" },
-        },
-      },
-    ],
+    blocks,
   };
 }

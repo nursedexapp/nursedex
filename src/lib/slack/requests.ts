@@ -5,7 +5,7 @@ import { slackPost } from "./client";
 import { RATES, requestRootBlocks, type RequestType, type RequestView } from "./views";
 
 const ROW_FIELDS =
-  "id,title,description,urgency,deadline,links,requested_by,type,rate,estimate_hours,status,approved_by,github_issue_number,github_issue_url,slack_channel,slack_thread_ts";
+  "id,title,description,urgency,deadline,links,requested_by,type,rate,estimate_hours,status,approved_by,github_issue_number,github_issue_url,suggested_estimate_hours,suggested_type,suggested_rationale,slack_channel,slack_thread_ts";
 
 export interface RequestRow extends RequestView {
   slack_channel: string;
