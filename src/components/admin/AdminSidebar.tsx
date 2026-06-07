@@ -11,6 +11,7 @@ import {
   Users,
   BarChart3,
   KeyRound,
+  FileText,
   LogOut,
   Menu,
 } from "lucide-react";
@@ -37,6 +38,7 @@ const NAV: NavItem[] = [
   { href: "/admin/reviews", label: "Reviews", icon: MessageSquare },
   { href: "/admin/disputes", label: "Disputes", icon: Flag },
   { href: "/admin/accounts", label: "Accounts", icon: Users },
+  { href: "/admin/blog", label: "Blog", icon: FileText },
   {
     href: "/admin/analytics",
     label: "Analytics",

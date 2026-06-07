@@ -1,0 +1,39 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+import { PostEditorForm } from "@/components/blog/PostEditorForm";
+import { getPostById } from "@/lib/blog/queries";
+
+export const metadata: Metadata = {
+  title: "Edit post | NurseDex Admin",
+  robots: { index: false, follow: false },
+};
+
+interface EditBlogPostPageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function EditBlogPostPage({
+  params,
+}: EditBlogPostPageProps) {
+  const { id } = await params;
+  const post = await getPostById(id);
+  if (!post) notFound();
+
+  return (
+    <div className="mx-auto w-full max-w-3xl p-6 sm:p-8">
+      <Link
+        href="/admin/blog"
+        className="text-soft-black-light hover:text-foreground mb-4 inline-flex items-center gap-1 text-sm"
+      >
+        <ArrowLeft className="size-4" />
+        Back to posts
+      </Link>
+      <h1 className="font-heading text-soft-black mb-6 text-2xl font-semibold">
+        Edit post
+      </h1>
+      <PostEditorForm post={post} />
+    </div>
+  );
+}

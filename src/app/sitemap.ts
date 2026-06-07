@@ -11,6 +11,7 @@ const STATIC_PAGES: Array<{
   { path: "/", changeFrequency: "weekly", priority: 0.9 },
   { path: "/welcome", changeFrequency: "monthly", priority: 0.9 },
   { path: "/nurses", changeFrequency: "daily", priority: 0.9 },
+  { path: "/blog", changeFrequency: "weekly", priority: 0.7 },
   { path: "/how-it-works", changeFrequency: "monthly", priority: 0.7 },
   { path: "/pricing", changeFrequency: "monthly", priority: 0.7 },
   { path: "/about", changeFrequency: "monthly", priority: 0.5 },
@@ -72,5 +73,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] failed to fetch nurse profiles:", err);
   }
 
-  return [...staticEntries, ...nurseEntries];
+  let blogEntries: MetadataRoute.Sitemap = [];
+  try {
+    const supabase = createServiceRoleClient();
+    const { data } = await supabase
+      .from("blog_posts")
+      .select("slug, updated_at")
+      .eq("status", "published");
+
+    type BlogRow = { slug: string; updated_at: string };
+    blogEntries = ((data ?? []) as BlogRow[]).map((r) => ({
+      url: `${BASE_URL}/blog/${r.slug}`,
+      lastModified: new Date(r.updated_at),
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
+    }));
+  } catch (err) {
+    console.error("[sitemap] failed to fetch blog posts:", err);
+  }
+
+  return [...staticEntries, ...nurseEntries, ...blogEntries];
 }

@@ -13,6 +13,7 @@ import type {
   ReviewStatus,
   HireStatus,
   AdminActionType,
+  BlogPostStatus,
 } from "./enums";
 
 export interface User {
@@ -265,4 +266,37 @@ export interface SlugRedirect {
   new_slug: string;
   nurse_user_id: string;
   created_at: string;
+}
+
+/**
+ * A Tiptap / ProseMirror document node. Stored as JSON in
+ * blog_posts.content and rendered to React by src/lib/blog/render.tsx.
+ */
+export interface TiptapNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TiptapNode[];
+  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
+  text?: string;
+}
+
+export interface TiptapDoc {
+  type: "doc";
+  content?: TiptapNode[];
+}
+
+export interface BlogPost {
+  id: string;
+  author_id: string | null;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: TiptapDoc;
+  cover_image_url: string | null;
+  status: BlogPostStatus;
+  publish_at: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+  created_at: string;
+  updated_at: string;
 }
