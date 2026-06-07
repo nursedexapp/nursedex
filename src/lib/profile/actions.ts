@@ -2,6 +2,7 @@
 
 import { after } from "next/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requireAuth, requireRole } from "@/lib/auth/helpers";
@@ -496,6 +497,9 @@ export async function softDeleteAccount(): Promise<void> {
   await supabase.from("users").update({ is_deleted: true }).eq("id", user.id);
 
   await supabase.auth.signOut();
+  // Bust the client Router Cache so no stale authed pages (rendered before the
+  // account was deleted) linger after the redirect.
+  revalidatePath("/", "layout");
   redirect("/");
 }
 
