@@ -31,6 +31,11 @@ export interface RequestView {
   estimate_hours?: number | null;
   status: string;
   approved_by?: string | null;
+  github_issue_number?: number | null;
+  github_issue_url?: string | null;
+  suggested_estimate_hours?: number | null;
+  suggested_type?: string | null;
+  suggested_rationale?: string | null;
 }
 
 /**
@@ -237,6 +242,15 @@ export function requestRootBlocks(req: RequestView): Json[] {
     const verb = req.status === "rejected" ? "Rejected by" : "Approved by";
     fields.push({ type: "mrkdwn", text: `*${verb}:*\n<@${req.approved_by}>` });
   }
+  if (req.github_issue_url) {
+    const label = req.github_issue_number
+      ? `#${req.github_issue_number}`
+      : "view";
+    fields.push({
+      type: "mrkdwn",
+      text: `*Issue:*\n<${req.github_issue_url}|${label}>`,
+    });
+  }
 
   const blocks: Json[] = [
     { type: "header", text: { type: "plain_text", text: heading.slice(0, 150) } },
@@ -290,11 +304,138 @@ export function requestRootBlocks(req: RequestView): Json[] {
 }
 
 /**
+ * The completion report posted in the thread when a request is marked done:
+ * a summary of the work, links to the merged PRs, the hours (billed on
+ * active time, with wall clock and commit span shown for transparency), and
+ * the computed cost.
+ */
+export function completionBlocks(opts: {
+  id: number;
+  title: string;
+  summary: string;
+  prs: { url: string; title?: string }[];
+  rate: number;
+  billedMin: number;
+  wallMin?: number | null;
+  commitMin?: number | null;
+}): Json[] {
+  const billedHrs = opts.billedMin / 60;
+  const cost = opts.rate * billedHrs;
+
+  const blocks: Json[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: `✅ Request #${opts.id} done: ${opts.title}`.slice(0, 150),
+      },
+    },
+    { type: "section", text: { type: "mrkdwn", text: opts.summary } },
+  ];
+
+  if (opts.prs.length) {
+    const list = opts.prs
+      .map((p) => `• <${p.url}|${p.title ?? p.url}>`)
+      .join("\n");
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Merged PRs*\n${list}` },
+    });
+  }
+
+  const signals: string[] = [`${billedHrs.toFixed(2)} hrs billed (active)`];
+  if (opts.wallMin != null) signals.push(`wall ${(opts.wallMin / 60).toFixed(2)}`);
+  if (opts.commitMin != null)
+    signals.push(`commits ${(opts.commitMin / 60).toFixed(2)}`);
+
+  blocks.push({
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `*Hours:* ${signals.join(" · ")}\n*Cost:* ${money(cost)} at ${money(opts.rate)}/hr`,
+    },
+  });
+
+  return blocks;
+}
+
+/**
  * The triage modal Dan fills in: billing type (which sets the rate) and an
  * hour estimate. The request id rides in private_metadata so the submit
- * handler knows which request to update.
+ * handler knows which request to update. When Claude has pre-computed a
+ * suggestion at intake, the type is pre-selected and the hours pre-filled
+ * (both still editable), with the rationale shown as context.
  */
-export function triageModalView(req: { id: number; title: string }): Json {
+export function triageModalView(req: {
+  id: number;
+  title: string;
+  suggested_type?: string | null;
+  suggested_estimate_hours?: number | null;
+  suggested_rationale?: string | null;
+}): Json {
+  const typeOptions = [
+    {
+      text: { type: "plain_text", text: "Maintenance ($25/hr)" },
+      value: "maintenance",
+    },
+    {
+      text: { type: "plain_text", text: "Ad Hoc ($75/hr)" },
+      value: "ad_hoc",
+    },
+  ];
+
+  const typeElement: Json = {
+    type: "static_select",
+    action_id: "value",
+    placeholder: { type: "plain_text", text: "Select billing type" },
+    options: typeOptions,
+  };
+  const suggestedOption = typeOptions.find(
+    (o) => o.value === req.suggested_type,
+  );
+  if (suggestedOption) typeElement.initial_option = suggestedOption;
+
+  const estimateElement: Json = {
+    type: "plain_text_input",
+    action_id: "value",
+    placeholder: { type: "plain_text", text: "e.g. 3.5" },
+  };
+  if (req.suggested_estimate_hours != null) {
+    estimateElement.initial_value = String(req.suggested_estimate_hours);
+  }
+
+  const blocks: Json[] = [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: `*Request #${req.id}:* ${req.title}` },
+    },
+  ];
+  if (req.suggested_rationale) {
+    blocks.push({
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `✨ *Suggested by Claude:* ${req.suggested_rationale}`,
+        },
+      ],
+    });
+  }
+  blocks.push(
+    {
+      type: "input",
+      block_id: "type",
+      label: { type: "plain_text", text: "Billing type" },
+      element: typeElement,
+    },
+    {
+      type: "input",
+      block_id: "estimate",
+      label: { type: "plain_text", text: "Estimated hours" },
+      element: estimateElement,
+    },
+  );
+
   return {
     type: "modal",
     callback_id: TRIAGE_CALLBACK,
@@ -302,41 +443,6 @@ export function triageModalView(req: { id: number; title: string }): Json {
     title: { type: "plain_text", text: "Triage" },
     submit: { type: "plain_text", text: "Save" },
     close: { type: "plain_text", text: "Cancel" },
-    blocks: [
-      {
-        type: "section",
-        text: { type: "mrkdwn", text: `*Request #${req.id}:* ${req.title}` },
-      },
-      {
-        type: "input",
-        block_id: "type",
-        label: { type: "plain_text", text: "Billing type" },
-        element: {
-          type: "static_select",
-          action_id: "value",
-          placeholder: { type: "plain_text", text: "Select billing type" },
-          options: [
-            {
-              text: { type: "plain_text", text: "Maintenance ($25/hr)" },
-              value: "maintenance",
-            },
-            {
-              text: { type: "plain_text", text: "Ad Hoc ($75/hr)" },
-              value: "ad_hoc",
-            },
-          ],
-        },
-      },
-      {
-        type: "input",
-        block_id: "estimate",
-        label: { type: "plain_text", text: "Estimated hours" },
-        element: {
-          type: "plain_text_input",
-          action_id: "value",
-          placeholder: { type: "plain_text", text: "e.g. 3.5" },
-        },
-      },
-    ],
+    blocks,
   };
 }

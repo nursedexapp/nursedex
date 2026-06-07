@@ -1,10 +1,11 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createIssue } from "@/lib/github";
 import { slackPost } from "./client";
-import { requestRootBlocks, type RequestView } from "./views";
+import { RATES, requestRootBlocks, type RequestType, type RequestView } from "./views";
 
 const ROW_FIELDS =
-  "id,title,description,urgency,deadline,links,requested_by,type,rate,estimate_hours,status,approved_by,slack_channel,slack_thread_ts";
+  "id,title,description,urgency,deadline,links,requested_by,type,rate,estimate_hours,status,approved_by,github_issue_number,github_issue_url,suggested_estimate_hours,suggested_type,suggested_rationale,slack_channel,slack_thread_ts";
 
 export interface RequestRow extends RequestView {
   slack_channel: string;
@@ -43,4 +44,67 @@ export async function postReply(req: RequestRow, text: string): Promise<void> {
     thread_ts: req.slack_thread_ts,
     text,
   });
+}
+
+/**
+ * Open a GitHub issue for a request the first time it becomes workable, store
+ * the issue on the row, surface it on the card, and note it in the thread.
+ * Idempotent: a request that already has an issue is left untouched.
+ */
+export async function ensureIssue(req: RequestRow): Promise<void> {
+  if (req.github_issue_url) return;
+
+  // Best-effort permalink so the issue points back at the Slack thread.
+  let permalink = "";
+  try {
+    const r = await slackPost("chat.getPermalink", {
+      channel: req.slack_channel,
+      message_ts: req.slack_thread_ts,
+    });
+    permalink = (r.permalink as string) ?? "";
+  } catch (err) {
+    console.error("getPermalink failed:", err);
+  }
+
+  const rate = req.rate ?? (req.type ? RATES[req.type as RequestType] : 0) ?? 0;
+  const lines = [
+    req.description ? `${req.description}\n` : "",
+    `**Billing:** ${req.type === "ad_hoc" ? "Ad Hoc" : "Maintenance"} ($${rate}/hr)`,
+    req.estimate_hours != null ? `**Estimate:** ${req.estimate_hours} hrs` : "",
+    req.urgency ? `**Urgency:** ${req.urgency}` : "",
+    req.deadline ? `**Desired by:** ${req.deadline}` : "",
+    req.links ? `**Links:** ${req.links}` : "",
+    permalink ? `\n[Slack thread](${permalink})` : "",
+    `\n_NurseDex consulting request #${req.id}._`,
+  ].filter(Boolean);
+
+  let issue;
+  try {
+    issue = await createIssue({
+      title: `Request #${req.id}: ${req.title}`.slice(0, 256),
+      body: lines.join("\n"),
+      labels: ["consulting"],
+    });
+  } catch (err) {
+    console.error(`createIssue for request ${req.id} failed:`, err);
+    return;
+  }
+
+  const supabase = createServiceRoleClient();
+  await supabase
+    .from("consulting_requests")
+    .update({
+      github_issue_number: issue.number,
+      github_issue_url: issue.html_url,
+    })
+    .eq("id", req.id);
+
+  const fresh = await getRequest(req.id);
+  if (fresh) {
+    await refreshRoot(fresh);
+    await postReply(
+      fresh,
+      `📌 GitHub issue created: <${issue.html_url}|#${issue.number}>`,
+    );
+  }
 }

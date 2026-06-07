@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { estimateRequest } from "@/lib/ai/estimate";
 import { OPS_CHANNEL_ID, slackPost, verifySlackRequest } from "@/lib/slack/client";
 import {
   APPROVE_ACTION,
@@ -15,7 +16,7 @@ import {
   triageModalView,
   type RequestType,
 } from "@/lib/slack/views";
-import { getRequest, postReply, refreshRoot } from "@/lib/slack/requests";
+import { ensureIssue, getRequest, postReply, refreshRoot } from "@/lib/slack/requests";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -90,13 +91,20 @@ export async function POST(request: NextRequest) {
       return ACK;
     }
 
-    // Open the triage modal for a specific request.
+    // Open the triage modal for a specific request, pre-filled with
+    // Claude's suggestion if it was computed at intake.
     if (action.action_id === TRIAGE_ACTION && payload.trigger_id) {
       const id = Number(action.value);
       const req = await getRequest(id);
       await slackPost("views.open", {
         trigger_id: payload.trigger_id,
-        view: triageModalView({ id, title: req?.title ?? `Request #${id}` }),
+        view: triageModalView({
+          id,
+          title: req?.title ?? `Request #${id}`,
+          suggested_type: req?.suggested_type,
+          suggested_estimate_hours: req?.suggested_estimate_hours,
+          suggested_rationale: req?.suggested_rationale,
+        }),
       });
       return ACK;
     }
@@ -195,6 +203,27 @@ async function handleNewRequest(
       blocks: requestRootBlocks({ id: data.id, ...fields }),
     });
 
+    // Pre-compute Claude's triage suggestion in the background so the
+    // triage modal can pre-fill it. Never blocks the modal close.
+    const requestId = data.id;
+    after(async () => {
+      const est = await estimateRequest({
+        title: fields.title,
+        description: fields.description,
+        links: fields.links,
+      });
+      if (!est) return;
+      const svc = createServiceRoleClient();
+      await svc
+        .from("consulting_requests")
+        .update({
+          suggested_estimate_hours: est.hours,
+          suggested_type: est.type,
+          suggested_rationale: est.rationale,
+        })
+        .eq("id", requestId);
+    });
+
     return ACK;
   } catch (err) {
     console.error("New request submit failed:", err);
@@ -249,6 +278,8 @@ async function handleTriage(
           ? `🟠 Triaged as *Ad Hoc* at $75/hr, estimate ${estimate} hrs (~${cost}). Awaiting approval before work starts.`
           : `🟢 Triaged as *Maintenance* at $25/hr, estimate ${estimate} hrs (~${cost}). Cleared to start.`,
       );
+      // Maintenance is cleared on triage, so open its GitHub issue now.
+      if (req.status === "approved") await ensureIssue(req);
     }
     return ACK;
   } catch (err) {
@@ -288,5 +319,7 @@ async function handleDecision(
         ? `✅ Approved by <@${userId}>. Cleared to start.`
         : `⛔ Rejected by <@${userId}>.`,
     );
+    // Open the GitHub issue once an ad hoc request is approved.
+    if (approve) await ensureIssue(req);
   }
 }
