@@ -8,6 +8,30 @@ type Json = Record<string, unknown>;
 export const NEW_REQUEST_ACTION = "open_new_request";
 export const NEW_REQUEST_CALLBACK = "new_request_submit";
 export const NEW_REQUEST_SHORTCUT = "new_request_shortcut";
+export const TRIAGE_ACTION = "triage_request";
+export const TRIAGE_CALLBACK = "triage_submit";
+export const APPROVE_ACTION = "approve_request";
+export const REJECT_ACTION = "reject_request";
+
+// Contractual hourly rates by billing type.
+export const RATES = { maintenance: 25, ad_hoc: 75 } as const;
+export type RequestType = keyof typeof RATES;
+
+// The fields needed to render a request thread root, matching the DB row.
+export interface RequestView {
+  id: number;
+  title: string;
+  description?: string | null;
+  urgency?: string | null;
+  deadline?: string | null;
+  links?: string | null;
+  requested_by: string;
+  type?: string | null;
+  rate?: number | null;
+  estimate_hours?: number | null;
+  status: string;
+  approved_by?: string | null;
+}
 
 /**
  * The persistent "New Request" button the bot posts (and we pin) so Tiana
@@ -148,36 +172,70 @@ const URGENCY_LABEL: Record<string, string> = {
   urgent: "🔴 Urgent",
 };
 
+const STATUS_LABEL: Record<string, string> = {
+  submitted: "🟡 Awaiting triage",
+  triaged: "🟠 Awaiting approval",
+  approved: "🟢 Approved, cleared to start",
+  rejected: "⛔ Rejected",
+  in_progress: "🔵 In progress",
+  done: "✅ Done",
+  invoiced: "💵 Invoiced",
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  maintenance: "Maintenance",
+  ad_hoc: "Ad Hoc",
+};
+
+function money(n: number): string {
+  return `$${n.toFixed(2)}`;
+}
+
 /**
- * The formatted request message posted as the thread root. Called once
- * without an id to create the thread, then again with the id to fill in
- * the request number after the row is inserted.
+ * The formatted request message posted as the thread root. Re-rendered via
+ * chat.update on every state change, so the buttons shown follow the
+ * request's status: Triage when awaiting triage, Approve/Reject when an ad
+ * hoc request is awaiting approval, none otherwise. An id of 0 renders the
+ * pre-insert placeholder.
  */
-export function requestRootBlocks(opts: {
-  id?: number;
-  title: string;
-  description?: string | null;
-  urgency?: string | null;
-  deadline?: string | null;
-  links?: string | null;
-  requestedBy: string;
-}): Json[] {
-  const heading = opts.id
-    ? `:new: Request #${opts.id}: ${opts.title}`
-    : `:new: New request: ${opts.title}`;
+export function requestRootBlocks(req: RequestView): Json[] {
+  const heading = req.id
+    ? `:clipboard: Request #${req.id}: ${req.title}`
+    : `:new: New request: ${req.title}`;
 
   const fields: Json[] = [
-    { type: "mrkdwn", text: `*Submitted by:*\n<@${opts.requestedBy}>` },
-    { type: "mrkdwn", text: `*Status:*\n🟡 Awaiting triage` },
+    { type: "mrkdwn", text: `*Submitted by:*\n<@${req.requested_by}>` },
+    {
+      type: "mrkdwn",
+      text: `*Status:*\n${STATUS_LABEL[req.status] ?? req.status}`,
+    },
   ];
-  if (opts.urgency) {
+  if (req.type) {
+    const rate = req.rate ?? RATES[req.type as RequestType] ?? 0;
     fields.push({
       type: "mrkdwn",
-      text: `*Urgency:*\n${URGENCY_LABEL[opts.urgency] ?? opts.urgency}`,
+      text: `*Billing:*\n${TYPE_LABEL[req.type] ?? req.type} (${money(rate)}/hr)`,
     });
   }
-  if (opts.deadline) {
-    fields.push({ type: "mrkdwn", text: `*Desired by:*\n${opts.deadline}` });
+  if (req.estimate_hours != null) {
+    const rate = req.rate ?? 0;
+    fields.push({
+      type: "mrkdwn",
+      text: `*Estimate:*\n${req.estimate_hours} hrs (~${money(rate * req.estimate_hours)})`,
+    });
+  }
+  if (req.urgency) {
+    fields.push({
+      type: "mrkdwn",
+      text: `*Urgency:*\n${URGENCY_LABEL[req.urgency] ?? req.urgency}`,
+    });
+  }
+  if (req.deadline) {
+    fields.push({ type: "mrkdwn", text: `*Desired by:*\n${req.deadline}` });
+  }
+  if (req.approved_by) {
+    const verb = req.status === "rejected" ? "Rejected by" : "Approved by";
+    fields.push({ type: "mrkdwn", text: `*${verb}:*\n<@${req.approved_by}>` });
   }
 
   const blocks: Json[] = [
@@ -185,18 +243,100 @@ export function requestRootBlocks(opts: {
     { type: "section", fields },
   ];
 
-  if (opts.description) {
+  if (req.description) {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `*Details*\n${opts.description}` },
+      text: { type: "mrkdwn", text: `*Details*\n${req.description}` },
     });
   }
-  if (opts.links) {
+  if (req.links) {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `*Links*\n${opts.links}` },
+      text: { type: "mrkdwn", text: `*Links*\n${req.links}` },
     });
   }
 
+  const elements: Json[] = [];
+  if (req.id && req.status === "submitted") {
+    elements.push({
+      type: "button",
+      style: "primary",
+      text: { type: "plain_text", text: "Triage" },
+      action_id: TRIAGE_ACTION,
+      value: String(req.id),
+    });
+  }
+  if (req.id && req.status === "triaged") {
+    elements.push(
+      {
+        type: "button",
+        style: "primary",
+        text: { type: "plain_text", text: "Approve" },
+        action_id: APPROVE_ACTION,
+        value: String(req.id),
+      },
+      {
+        type: "button",
+        style: "danger",
+        text: { type: "plain_text", text: "Reject" },
+        action_id: REJECT_ACTION,
+        value: String(req.id),
+      },
+    );
+  }
+  if (elements.length) blocks.push({ type: "actions", elements });
+
   return blocks;
+}
+
+/**
+ * The triage modal Dan fills in: billing type (which sets the rate) and an
+ * hour estimate. The request id rides in private_metadata so the submit
+ * handler knows which request to update.
+ */
+export function triageModalView(req: { id: number; title: string }): Json {
+  return {
+    type: "modal",
+    callback_id: TRIAGE_CALLBACK,
+    private_metadata: String(req.id),
+    title: { type: "plain_text", text: "Triage" },
+    submit: { type: "plain_text", text: "Save" },
+    close: { type: "plain_text", text: "Cancel" },
+    blocks: [
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: `*Request #${req.id}:* ${req.title}` },
+      },
+      {
+        type: "input",
+        block_id: "type",
+        label: { type: "plain_text", text: "Billing type" },
+        element: {
+          type: "static_select",
+          action_id: "value",
+          placeholder: { type: "plain_text", text: "Select billing type" },
+          options: [
+            {
+              text: { type: "plain_text", text: "Maintenance ($25/hr)" },
+              value: "maintenance",
+            },
+            {
+              text: { type: "plain_text", text: "Ad Hoc ($75/hr)" },
+              value: "ad_hoc",
+            },
+          ],
+        },
+      },
+      {
+        type: "input",
+        block_id: "estimate",
+        label: { type: "plain_text", text: "Estimated hours" },
+        element: {
+          type: "plain_text_input",
+          action_id: "value",
+          placeholder: { type: "plain_text", text: "e.g. 3.5" },
+        },
+      },
+    ],
+  };
 }
