@@ -11,29 +11,60 @@ const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
 
 // Pull recent triaged requests as few-shot calibration so the model
-// matches the team's actual pace (the model itself does not learn; these
-// corrected examples are how its estimates improve over time).
+// matches the team's real pace. Two signals: the hours Dan triaged
+// (his estimate) and, where the work is finished, the ACTUAL billed
+// hours from /done. Actuals are weighted as the stronger signal. The
+// model itself does not learn; these examples are fed fresh each call.
 async function calibrationExamples(): Promise<string> {
   try {
     const supabase = createServiceRoleClient();
-    const { data } = await supabase
+    const { data: reqs } = await supabase
       .from("consulting_requests")
-      .select("title,type,estimate_hours")
+      .select("id,title,type,estimate_hours")
       .not("estimate_hours", "is", null)
       .not("type", "is", null)
       .order("id", { ascending: false })
-      .limit(8);
-    if (!data?.length) return "";
-    const lines = data
-      .map(
-        (r) =>
-          `- "${r.title}" -> ${r.type === "ad_hoc" ? "Ad Hoc" : "Maintenance"}, ${r.estimate_hours} hrs`,
-      )
-      .join("\n");
+      .limit(10);
+    const reqRows = (reqs ?? []) as Array<{
+      id: number;
+      title: string;
+      type: string | null;
+      estimate_hours: number | null;
+    }>;
+    if (!reqRows.length) return "";
+
+    const { data: entries } = await supabase
+      .from("consulting_time_entries")
+      .select("request_id,billed_min")
+      .in(
+        "request_id",
+        reqRows.map((r) => r.id),
+      );
+    const actualByReq = new Map<number, number>();
+    for (const e of (entries ?? []) as Array<{
+      request_id: number;
+      billed_min: number | null;
+    }>) {
+      actualByReq.set(
+        e.request_id,
+        (actualByReq.get(e.request_id) ?? 0) + (e.billed_min ?? 0),
+      );
+    }
+
+    const lines = reqRows.map((r) => {
+      const label = r.type === "ad_hoc" ? "Ad Hoc" : "Maintenance";
+      const actualMin = actualByReq.get(r.id);
+      return actualMin
+        ? `- "${r.title}" -> ${label}, estimated ${r.estimate_hours} hrs, ACTUAL ${(actualMin / 60).toFixed(1)} hrs`
+        : `- "${r.title}" -> ${label}, estimated ${r.estimate_hours} hrs`;
+    });
+
     return (
-      "\n\nFor calibration, here are recent requests and the hours the team " +
-      "actually assigned. Match this pace and do not over-estimate:\n" +
-      lines
+      "\n\nFor calibration, here are recent requests with the team's estimated " +
+      "hours and, where the work is finished, the ACTUAL hours it took. Weight " +
+      "ACTUAL hours most heavily (strongest signal); fall back to the estimate " +
+      "when there is no actual yet. Match this pace and do not over-estimate:\n" +
+      lines.join("\n")
     );
   } catch (err) {
     console.error("calibrationExamples failed:", err);
