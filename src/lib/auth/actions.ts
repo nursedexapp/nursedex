@@ -95,9 +95,11 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
   });
 
   if (error) {
-    if (error.message.includes("already registered")) {
-      return { error: "An account with this email already exists." };
-    }
+    // Duplicate emails are handled upstream by the auth.users pre-check above,
+    // and with email confirmation enabled Supabase obfuscates the existing
+    // account case (returns no error) rather than reporting "already
+    // registered". So any error reaching here is an unexpected failure, not a
+    // known duplicate, and gets the generic message.
     console.error("Signup error:", error.message);
     return { error: "Something went wrong. Please try again in a moment." };
   }
