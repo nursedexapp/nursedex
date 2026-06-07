@@ -36,6 +36,7 @@ export interface RequestView {
   suggested_estimate_hours?: number | null;
   suggested_type?: string | null;
   suggested_rationale?: string | null;
+  suggested_labels?: string[] | null;
 }
 
 /**

@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/consulting-invoice",
+      "schedule": "0 13 1 * *"
+    },
+    {
       "path": "/api/cron/review-invite",
       "schedule": "0 13 * * *"
     },

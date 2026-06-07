@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateRequest } from "@/lib/ai/estimate";
 import { OPS_CHANNEL_ID, slackPost, verifySlackRequest } from "@/lib/slack/client";
+import { OPS_NOTIFY_USER_ID } from "@/lib/slack/constants";
 import {
   APPROVE_ACTION,
   NEW_REQUEST_ACTION,
@@ -203,6 +204,15 @@ async function handleNewRequest(
       blocks: requestRootBlocks({ id: data.id, ...fields }),
     });
 
+    // Ping Dan in the thread so a new request does not get missed.
+    if (OPS_NOTIFY_USER_ID) {
+      await slackPost("chat.postMessage", {
+        channel: OPS_CHANNEL_ID,
+        thread_ts: ts,
+        text: `🔔 <@${OPS_NOTIFY_USER_ID}> new request #${data.id} ready to triage.`,
+      });
+    }
+
     // Pre-compute Claude's triage suggestion in the background so the
     // triage modal can pre-fill it. Never blocks the modal close.
     const requestId = data.id;
@@ -220,6 +230,7 @@ async function handleNewRequest(
           suggested_estimate_hours: est.hours,
           suggested_type: est.type,
           suggested_rationale: est.rationale,
+          suggested_labels: est.labels,
         })
         .eq("id", requestId);
     });

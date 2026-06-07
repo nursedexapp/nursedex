@@ -1,11 +1,11 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { createIssue } from "@/lib/github";
+import { createIssue, ISSUE_LABELS } from "@/lib/github";
 import { slackPost } from "./client";
 import { RATES, requestRootBlocks, type RequestType, type RequestView } from "./views";
 
 const ROW_FIELDS =
-  "id,title,description,urgency,deadline,links,requested_by,type,rate,estimate_hours,status,approved_by,github_issue_number,github_issue_url,suggested_estimate_hours,suggested_type,suggested_rationale,slack_channel,slack_thread_ts";
+  "id,title,description,urgency,deadline,links,requested_by,type,rate,estimate_hours,status,approved_by,github_issue_number,github_issue_url,suggested_estimate_hours,suggested_type,suggested_rationale,suggested_labels,slack_channel,slack_thread_ts";
 
 export interface RequestRow extends RequestView {
   slack_channel: string;
@@ -78,12 +78,22 @@ export async function ensureIssue(req: RequestRow): Promise<void> {
     `\n_NurseDex consulting request #${req.id}._`,
   ].filter(Boolean);
 
+  // Always-on `consulting` label plus Claude's suggested labels (filtered
+  // to known repo labels), deduped.
+  const allowed = new Set<string>(ISSUE_LABELS);
+  const labels = Array.from(
+    new Set([
+      "consulting",
+      ...(req.suggested_labels ?? []).filter((l) => allowed.has(l)),
+    ]),
+  );
+
   let issue;
   try {
     issue = await createIssue({
       title: `Request #${req.id}: ${req.title}`.slice(0, 256),
       body: lines.join("\n"),
-      labels: ["consulting"],
+      labels,
     });
   } catch (err) {
     console.error(`createIssue for request ${req.id} failed:`, err);
