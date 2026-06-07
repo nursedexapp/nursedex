@@ -4,6 +4,7 @@ import { OPS_CHANNEL_ID, slackPost, verifySlackRequest } from "@/lib/slack/clien
 import {
   NEW_REQUEST_ACTION,
   NEW_REQUEST_CALLBACK,
+  NEW_REQUEST_SHORTCUT,
   newRequestModalView,
   requestRootBlocks,
 } from "@/lib/slack/views";
@@ -15,6 +16,7 @@ export const runtime = "nodejs";
 interface InteractionPayload {
   type: string;
   trigger_id?: string;
+  callback_id?: string;
   user: { id: string };
   actions?: { action_id: string }[];
   view?: {
@@ -56,12 +58,14 @@ export async function POST(request: NextRequest) {
   if (!encoded) return new NextResponse(null, { status: 200 });
   const payload = JSON.parse(encoded) as InteractionPayload;
 
-  // 1. Tiana clicked the "New Request" button -> open the intake modal.
-  if (
+  // 1. Open the intake modal, triggered by either the New Request button
+  // (block_actions), the App Home button, or the global shortcut.
+  const fromButton =
     payload.type === "block_actions" &&
-    payload.actions?.some((a) => a.action_id === NEW_REQUEST_ACTION) &&
-    payload.trigger_id
-  ) {
+    payload.actions?.some((a) => a.action_id === NEW_REQUEST_ACTION);
+  const fromShortcut =
+    payload.type === "shortcut" && payload.callback_id === NEW_REQUEST_SHORTCUT;
+  if ((fromButton || fromShortcut) && payload.trigger_id) {
     await slackPost("views.open", {
       trigger_id: payload.trigger_id,
       view: newRequestModalView(),

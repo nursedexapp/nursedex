@@ -1,9 +1,8 @@
 import "server-only";
 import crypto from "node:crypto";
 
-// The #projects-and-maintenance channel where all consulting requests live.
-// Not secret, so kept in code rather than an env var.
-export const OPS_CHANNEL_ID = "C0B8VPN6DMG";
+// Re-exported for existing imports from "@/lib/slack/client".
+export { OPS_CHANNEL_ID } from "./constants";
 
 const SLACK_API = "https://slack.com/api";
 

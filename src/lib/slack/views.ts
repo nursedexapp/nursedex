@@ -1,11 +1,13 @@
 // Block Kit builders for the consulting request flow. Kept as plain
 // objects (no SDK) and typed loosely as JSON since Slack accepts any
 // valid Block Kit shape.
+import { OPS_CHANNEL_ID } from "./constants";
 
 type Json = Record<string, unknown>;
 
 export const NEW_REQUEST_ACTION = "open_new_request";
 export const NEW_REQUEST_CALLBACK = "new_request_submit";
+export const NEW_REQUEST_SHORTCUT = "new_request_shortcut";
 
 /**
  * The persistent "New Request" button the bot posts (and we pin) so Tiana
@@ -32,6 +34,31 @@ export function newRequestButtonBlocks(): Json[] {
       ],
     },
   ];
+}
+
+/**
+ * The App Home tab: a permanent New Request entry point that never
+ * scrolls away, shown when someone opens the NurseDex Ops app.
+ */
+export function homeView(): Json {
+  return {
+    type: "home",
+    blocks: [
+      {
+        type: "header",
+        text: { type: "plain_text", text: "NurseDex Ops", emoji: true },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: "Submit and track post-build consulting work. New requests are triaged, estimated, and billed in <#" + OPS_CHANNEL_ID + ">.",
+        },
+      },
+      { type: "divider" },
+      ...newRequestButtonBlocks(),
+    ],
+  };
 }
 
 /**
