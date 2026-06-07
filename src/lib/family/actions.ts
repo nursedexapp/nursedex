@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/helpers";
@@ -119,6 +120,13 @@ export async function completeFamilyOnboarding(
   if (familyErr) {
     return { formError: "Couldn't save your preferences. Please try again." };
   }
+
+  // Bust the client Router Cache so the (dashboard) layout's onboarding gate
+  // re-evaluates with the just-saved zip. Without this the client replays its
+  // cached "/dashboard -> /onboarding/family" redirect, and since onboarding
+  // now redirects back to /dashboard (zip is set) the two ping-pong forever
+  // until a hard refresh.
+  revalidatePath("/", "layout");
 
   if (surveyParams) {
     cookieStore.delete(SURVEY_COOKIE_NAME);

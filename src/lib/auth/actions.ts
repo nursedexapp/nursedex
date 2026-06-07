@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PASSWORD, PASSWORD_RECOVERY } from "@/lib/constants";
@@ -359,6 +360,11 @@ export async function selectRole(formData: FormData): Promise<void> {
       user_id: user.id,
     });
   }
+
+  // Role just changed (null -> nurse/family), which flips layout gating and
+  // the sidebar. Bust the client Router Cache so freshly-gated routes aren't
+  // served from a stale (pre-role) cache after the redirect.
+  revalidatePath("/", "layout");
 
   if (role === "family") {
     redirect("/onboarding/family");
