@@ -1,4 +1,6 @@
 import "server-only";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { ISSUE_LABELS } from "@/lib/github";
 
 // Ask Claude for a rough billing type + hour estimate from a request
 // description, used to pre-fill the triage modal. Raw fetch (matching the
@@ -8,10 +10,42 @@ import "server-only";
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
 
+// Pull recent triaged requests as few-shot calibration so the model
+// matches the team's actual pace (the model itself does not learn; these
+// corrected examples are how its estimates improve over time).
+async function calibrationExamples(): Promise<string> {
+  try {
+    const supabase = createServiceRoleClient();
+    const { data } = await supabase
+      .from("consulting_requests")
+      .select("title,type,estimate_hours")
+      .not("estimate_hours", "is", null)
+      .not("type", "is", null)
+      .order("id", { ascending: false })
+      .limit(8);
+    if (!data?.length) return "";
+    const lines = data
+      .map(
+        (r) =>
+          `- "${r.title}" -> ${r.type === "ad_hoc" ? "Ad Hoc" : "Maintenance"}, ${r.estimate_hours} hrs`,
+      )
+      .join("\n");
+    return (
+      "\n\nFor calibration, here are recent requests and the hours the team " +
+      "actually assigned. Match this pace and do not over-estimate:\n" +
+      lines
+    );
+  } catch (err) {
+    console.error("calibrationExamples failed:", err);
+    return "";
+  }
+}
+
 export interface Estimate {
   hours: number;
   type: "maintenance" | "ad_hoc";
   rationale: string;
+  labels: string[];
 }
 
 const SYSTEM = [
@@ -22,6 +56,7 @@ const SYSTEM = [
   "Estimate the total hours a competent developer needs end to end (build,",
   "test, deploy). Be realistic. If the request is vague, estimate",
   "conservatively and say so. Keep the rationale to one sentence.",
+  `Also pick any relevant GitHub labels for this work from exactly this set (or an empty list): ${ISSUE_LABELS.join(", ")}.`,
 ].join(" ");
 
 export async function estimateRequest(input: {
@@ -43,10 +78,11 @@ export async function estimateRequest(input: {
     .filter(Boolean)
     .join("\n");
 
+  const system = SYSTEM + (await calibrationExamples());
   const body = {
     model: MODEL,
     max_tokens: 1024,
-    system: SYSTEM,
+    system,
     messages: [{ role: "user", content: userText }],
     output_config: {
       format: {
@@ -57,8 +93,12 @@ export async function estimateRequest(input: {
             hours: { type: "number" },
             type: { type: "string", enum: ["maintenance", "ad_hoc"] },
             rationale: { type: "string" },
+            labels: {
+              type: "array",
+              items: { type: "string", enum: [...ISSUE_LABELS] },
+            },
           },
-          required: ["hours", "type", "rationale"],
+          required: ["hours", "type", "rationale", "labels"],
           additionalProperties: false,
         },
       },
@@ -93,6 +133,11 @@ export async function estimateRequest(input: {
     ) {
       return null;
     }
+    // Keep only known repo labels, deduped.
+    const allowed = new Set<string>(ISSUE_LABELS);
+    parsed.labels = Array.from(
+      new Set((parsed.labels ?? []).filter((l) => allowed.has(l))),
+    );
     return parsed;
   } catch (err) {
     console.error("estimateRequest error:", err);

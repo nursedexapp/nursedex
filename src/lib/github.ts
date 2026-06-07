@@ -7,6 +7,16 @@ import "server-only";
 const GITHUB_REPO = "nursedexapp/nursedex";
 const API = "https://api.github.com";
 
+// Repo labels Claude may apply to a consulting issue (alongside the
+// always-on `consulting` label). Restricted to existing repo labels so
+// we never create stray ones.
+export const ISSUE_LABELS = [
+  "enhancement",
+  "bug",
+  "documentation",
+  "security",
+] as const;
+
 function headers(): Record<string, string> {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw new Error("Missing GITHUB_TOKEN");
