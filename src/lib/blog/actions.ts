@@ -1,0 +1,146 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth/helpers";
+import { blogPostSchema } from "@/lib/schemas/blog";
+import { ensureUniqueSlug } from "./slug";
+import { toDraft, toPublished, toArchived, toScheduled } from "./transitions";
+import type { StatusPatch } from "./transitions";
+
+export interface BlogActionResult {
+  success: boolean;
+  error?: string;
+  slug?: string;
+  id?: string;
+  fieldErrors?: Record<string, string>;
+}
+
+/** Revalidate every surface a post can appear on. */
+function revalidateBlog(slug?: string) {
+  revalidatePath("/blog");
+  if (slug) revalidatePath(`/blog/${slug}`);
+  revalidatePath("/admin/blog");
+}
+
+/**
+ * Create or update a post. The `intent` field (draft, publish, schedule)
+ * decides the status + publish_at via the pure transition helpers. Writes
+ * go through the user client so RLS enforces admin-only access; the route
+ * is already gated by requireAdmin(), and we re-check here so the action
+ * is safe to call on its own.
+ */
+export async function savePost(raw: unknown): Promise<BlogActionResult> {
+  const user = await requireAdmin();
+
+  const parsed = blogPostSchema.safeParse(raw);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const f = String(issue.path[0]);
+      if (!fieldErrors[f]) fieldErrors[f] = issue.message;
+    }
+    return { success: false, error: "invalid", fieldErrors };
+  }
+  const input = parsed.data;
+
+  let patch: StatusPatch;
+  if (input.intent === "publish") {
+    patch = toPublished(new Date());
+  } else if (input.intent === "schedule") {
+    const result = toScheduled(input.publish_at || null, new Date());
+    if (!result.ok) {
+      return {
+        success: false,
+        error: "invalid",
+        fieldErrors: { publish_at: result.error },
+      };
+    }
+    patch = result.patch;
+  } else {
+    patch = toDraft();
+  }
+
+  const slug = await ensureUniqueSlug(input.slug || input.title, input.id);
+
+  const supabase = await createClient();
+  const fields = {
+    title: input.title,
+    slug,
+    excerpt: input.excerpt || null,
+    content: input.content,
+    cover_image_url: input.cover_image_url || null,
+    seo_title: input.seo_title || null,
+    seo_description: input.seo_description || null,
+    status: patch.status,
+    publish_at: patch.publish_at,
+  };
+
+  if (input.id) {
+    const { error } = await supabase
+      .from("blog_posts")
+      .update(fields)
+      .eq("id", input.id);
+    if (error) {
+      console.error("[blog] update failed:", error.message);
+      return { success: false, error: "unknown" };
+    }
+    revalidateBlog(slug);
+    return { success: true, slug, id: input.id };
+  }
+
+  const { data, error } = await supabase
+    .from("blog_posts")
+    .insert({ ...fields, author_id: user.id })
+    .select("id")
+    .single();
+  if (error || !data) {
+    console.error("[blog] insert failed:", error?.message);
+    return { success: false, error: "unknown" };
+  }
+  revalidateBlog(slug);
+  return { success: true, slug, id: data.id as string };
+}
+
+async function patchStatus(
+  id: string,
+  patch: StatusPatch,
+): Promise<BlogActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("blog_posts")
+    .update(patch)
+    .eq("id", id)
+    .select("slug")
+    .single();
+  if (error || !data) {
+    console.error("[blog] status change failed:", error?.message);
+    return { success: false, error: "unknown" };
+  }
+  revalidateBlog(data.slug as string);
+  return { success: true, id, slug: data.slug as string };
+}
+
+/** Pull a published post back to draft. */
+export async function unpublishPost(id: string): Promise<BlogActionResult> {
+  return patchStatus(id, toDraft());
+}
+
+/** Archive a post (hidden from the public index, kept in the admin list). */
+export async function archivePost(id: string): Promise<BlogActionResult> {
+  return patchStatus(id, toArchived());
+}
+
+/** Permanently delete a post. */
+export async function deletePost(id: string): Promise<BlogActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { error } = await supabase.from("blog_posts").delete().eq("id", id);
+  if (error) {
+    console.error("[blog] delete failed:", error.message);
+    return { success: false, error: "unknown" };
+  }
+  revalidateBlog();
+  return { success: true, id };
+}

@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/rate-limit-flag-check",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/publish-scheduled-posts",
+      "schedule": "0 * * * *"
     }
   ]
 }

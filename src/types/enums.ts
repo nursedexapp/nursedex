@@ -182,6 +182,20 @@ export enum HireStatus {
   REJECTED = "rejected",
 }
 
+export enum BlogPostStatus {
+  DRAFT = "draft",
+  SCHEDULED = "scheduled",
+  PUBLISHED = "published",
+  ARCHIVED = "archived",
+}
+
+export const BLOG_POST_STATUS_LABELS: Record<BlogPostStatus, string> = {
+  [BlogPostStatus.DRAFT]: "Draft",
+  [BlogPostStatus.SCHEDULED]: "Scheduled",
+  [BlogPostStatus.PUBLISHED]: "Published",
+  [BlogPostStatus.ARCHIVED]: "Archived",
+};
+
 export enum AdminActionType {
   VERIFY_NURSE = "verify_nurse",
   REJECT_NURSE = "reject_nurse",
