@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { closeIssue } from "@/lib/github";
 import { slackPost } from "@/lib/slack/client";
 import { completionBlocks, RATES, type RequestType } from "@/lib/slack/views";
 import { getRequest, refreshRoot } from "@/lib/slack/requests";
@@ -131,6 +132,15 @@ export async function POST(request: NextRequest) {
   });
   const fresh = await getRequest(id);
   if (fresh) await refreshRoot(fresh);
+
+  // Close the linked GitHub issue, if one was opened on approval.
+  if (req.github_issue_number) {
+    try {
+      await closeIssue(req.github_issue_number);
+    } catch (err) {
+      console.error(`Closing issue #${req.github_issue_number} failed:`, err);
+    }
+  }
 
   const billedHrs = billedMin / 60;
   return NextResponse.json({
