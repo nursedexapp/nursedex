@@ -301,6 +301,62 @@ export function requestRootBlocks(req: RequestView): Json[] {
 }
 
 /**
+ * The completion report posted in the thread when a request is marked done:
+ * a summary of the work, links to the merged PRs, the hours (billed on
+ * active time, with wall clock and commit span shown for transparency), and
+ * the computed cost.
+ */
+export function completionBlocks(opts: {
+  id: number;
+  title: string;
+  summary: string;
+  prs: { url: string; title?: string }[];
+  rate: number;
+  billedMin: number;
+  wallMin?: number | null;
+  commitMin?: number | null;
+}): Json[] {
+  const billedHrs = opts.billedMin / 60;
+  const cost = opts.rate * billedHrs;
+
+  const blocks: Json[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: `✅ Request #${opts.id} done: ${opts.title}`.slice(0, 150),
+      },
+    },
+    { type: "section", text: { type: "mrkdwn", text: opts.summary } },
+  ];
+
+  if (opts.prs.length) {
+    const list = opts.prs
+      .map((p) => `• <${p.url}|${p.title ?? p.url}>`)
+      .join("\n");
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Merged PRs*\n${list}` },
+    });
+  }
+
+  const signals: string[] = [`${billedHrs.toFixed(2)} hrs billed (active)`];
+  if (opts.wallMin != null) signals.push(`wall ${(opts.wallMin / 60).toFixed(2)}`);
+  if (opts.commitMin != null)
+    signals.push(`commits ${(opts.commitMin / 60).toFixed(2)}`);
+
+  blocks.push({
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `*Hours:* ${signals.join(" · ")}\n*Cost:* ${money(cost)} at ${money(opts.rate)}/hr`,
+    },
+  });
+
+  return blocks;
+}
+
+/**
  * The triage modal Dan fills in: billing type (which sets the rate) and an
  * hour estimate. The request id rides in private_metadata so the submit
  * handler knows which request to update.
