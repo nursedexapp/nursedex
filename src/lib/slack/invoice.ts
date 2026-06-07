@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { OPS_CHANNEL_ID } from "./constants";
+import { INVOICE_NOTIFY_USER_IDS, OPS_CHANNEL_ID } from "./constants";
 import { slackPost } from "./client";
 
 // Monthly invoice rollup: total each month's billed hours per request and
@@ -26,7 +26,7 @@ interface EntryRow {
  */
 export async function generateAndPostInvoice(
   month: string,
-): Promise<{ total: number; lines: number }> {
+): Promise<{ total: number; lines: number; posted: boolean }> {
   const [y, m] = month.split("-").map(Number);
   if (!y || !m || m < 1 || m > 12) {
     throw new Error(`Invalid month: ${month}`);
@@ -83,26 +83,30 @@ export async function generateAndPostInvoice(
     });
   }
 
+  // No billable hours: post nothing.
   if (!fields.length) {
+    return { total: 0, lines: 0, posted: false };
+  }
+
+  // Slack allows at most 10 fields per section.
+  for (let i = 0; i < fields.length; i += 10) {
+    blocks.push({ type: "section", fields: fields.slice(i, i + 10) });
+  }
+  blocks.push({ type: "divider" });
+  blocks.push({
+    type: "section",
+    text: {
+      type: "mrkdwn",
+      text: `*Total for ${monthLabel}: ${money(total)}*`,
+    },
+  });
+
+  // Tag the invoice recipients so they get pinged.
+  const mentions = INVOICE_NOTIFY_USER_IDS.map((id) => `<@${id}>`).join(" ");
+  if (mentions) {
     blocks.push({
       type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `No billable hours logged in ${monthLabel}.`,
-      },
-    });
-  } else {
-    // Slack allows at most 10 fields per section.
-    for (let i = 0; i < fields.length; i += 10) {
-      blocks.push({ type: "section", fields: fields.slice(i, i + 10) });
-    }
-    blocks.push({ type: "divider" });
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*Total for ${monthLabel}: ${money(total)}*`,
-      },
+      text: { type: "mrkdwn", text: `${mentions} — invoice ready to send.` },
     });
   }
 
@@ -112,5 +116,5 @@ export async function generateAndPostInvoice(
     blocks,
   });
 
-  return { total: Number(total.toFixed(2)), lines: fields.length };
+  return { total: Number(total.toFixed(2)), lines: fields.length, posted: true };
 }
