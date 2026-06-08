@@ -22,10 +22,20 @@ const h = vi.hoisted(() => {
     b.single = () => Promise.resolve(state.single);
     return b;
   }
-  return { state, calls, builder, revalidatePath: vi.fn() };
+  return {
+    state,
+    calls,
+    builder,
+    revalidatePath: vi.fn(),
+    sendComment: vi.fn(),
+  };
 });
 
 vi.mock("next/cache", () => ({ revalidatePath: h.revalidatePath }));
+vi.mock("next/server", () => ({ after: (fn: () => unknown) => fn() }));
+vi.mock("@/lib/email/send", () => ({
+  sendCommentSubmittedEmail: h.sendComment,
+}));
 vi.mock("@/lib/auth/helpers", () => ({
   requireAdmin: async () => ({ id: "admin-1" }),
 }));
@@ -49,18 +59,26 @@ const valid = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.state.maybeSingle = { data: { status: "published" }, error: null };
+  h.state.maybeSingle = {
+    data: { status: "published", title: "My Post" },
+    error: null,
+  };
   h.state.single = { data: { post_id: "post-1" }, error: null };
   h.state.insertError = null;
   h.calls.insert = [];
 });
 
 describe("submitComment", () => {
-  it("stores a valid comment as pending on a published post", async () => {
+  it("stores a valid comment as pending and notifies admins", async () => {
     const res = await submitComment(valid);
     expect(res.success).toBe(true);
     expect(h.calls.insert).toHaveLength(1);
     expect(h.calls.insert[0]).toMatchObject({ status: "pending", post_id: POST_ID });
+    expect(h.sendComment).toHaveBeenCalledWith({
+      postTitle: "My Post",
+      authorName: "Reader",
+      body: "Great post, thanks!",
+    });
   });
 
   it("rejects an invalid email with field errors and stores nothing", async () => {

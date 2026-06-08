@@ -36,6 +36,37 @@ export async function sendProfileSetupEmail(
   }
 }
 
+interface SendCommentSubmittedArgs {
+  postTitle: string;
+  authorName: string;
+  body: string;
+}
+
+/**
+ * Notifies admins (support inbox) that a blog comment was submitted and is
+ * awaiting moderation.
+ */
+export async function sendCommentSubmittedEmail(
+  args: SendCommentSubmittedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const moderateUrl = `${baseUrl}/admin/blog/comments`;
+
+  const res = await fetch(`${baseUrl}/api/email/comment-submitted`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify({ ...args, moderateUrl }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Comment submitted email failed:", res.status, body);
+  }
+}
+
 /**
  * Sends the double opt-in confirmation email for the blog newsletter. The
  * confirm link carries the subscriber's token; clicking it confirms them.
