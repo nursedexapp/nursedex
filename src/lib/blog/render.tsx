@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
+import { headingId, nodeText } from "./toc";
 
 /**
  * Render a stored Tiptap (ProseMirror) document to React elements.
@@ -102,32 +103,42 @@ function applyMarks(text: ReactNode, node: TiptapNode, key: string): ReactNode {
   return el;
 }
 
-function renderNode(node: TiptapNode, key: string): ReactNode {
+function renderNode(
+  node: TiptapNode,
+  key: string,
+  seen: Map<string, number>,
+): ReactNode {
   switch (node.type) {
     case "text":
       return (
         <Fragment key={key}>{applyMarks(node.text ?? "", node, key)}</Fragment>
       );
     case "paragraph":
-      return <p key={key}>{renderChildren(node, key)}</p>;
+      return <p key={key}>{renderChildren(node, key, seen)}</p>;
     case "heading": {
       const raw = Number(node.attrs?.level) || 2;
       const level = Math.min(Math.max(raw, 2), 6);
       const Tag = `h${level}` as "h2" | "h3" | "h4" | "h5" | "h6";
-      return <Tag key={key}>{renderChildren(node, key)}</Tag>;
+      // The id matches the table of contents: same generator, same order.
+      const id = headingId(nodeText(node), seen);
+      return (
+        <Tag key={key} id={id} className="scroll-mt-24">
+          {renderChildren(node, key, seen)}
+        </Tag>
+      );
     }
     case "bulletList":
-      return <ul key={key}>{renderChildren(node, key)}</ul>;
+      return <ul key={key}>{renderChildren(node, key, seen)}</ul>;
     case "orderedList":
-      return <ol key={key}>{renderChildren(node, key)}</ol>;
+      return <ol key={key}>{renderChildren(node, key, seen)}</ol>;
     case "listItem":
-      return <li key={key}>{renderChildren(node, key)}</li>;
+      return <li key={key}>{renderChildren(node, key, seen)}</li>;
     case "blockquote":
-      return <blockquote key={key}>{renderChildren(node, key)}</blockquote>;
+      return <blockquote key={key}>{renderChildren(node, key, seen)}</blockquote>;
     case "codeBlock":
       return (
         <pre key={key}>
-          <code>{renderChildren(node, key)}</code>
+          <code>{renderChildren(node, key, seen)}</code>
         </pre>
       );
     case "hardBreak":
@@ -147,13 +158,20 @@ function renderNode(node: TiptapNode, key: string): ReactNode {
   }
 }
 
-function renderChildren(node: TiptapNode, key: string): ReactNode {
+function renderChildren(
+  node: TiptapNode,
+  key: string,
+  seen: Map<string, number>,
+): ReactNode {
   return (node.content ?? []).map((child, i) =>
-    renderNode(child, `${key}-${i}`),
+    renderNode(child, `${key}-${i}`, seen),
   );
 }
 
 export function PostContent({ doc }: { doc: TiptapDoc | null | undefined }) {
   if (!doc || doc.type !== "doc" || !doc.content) return null;
-  return <>{doc.content.map((node, i) => renderNode(node, `n-${i}`))}</>;
+  // Shared across the render pass so heading ids de-dupe in document order,
+  // matching extractHeadings used by the table of contents.
+  const seen = new Map<string, number>();
+  return <>{doc.content.map((node, i) => renderNode(node, `n-${i}`, seen))}</>;
 }

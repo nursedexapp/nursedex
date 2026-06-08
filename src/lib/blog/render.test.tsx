@@ -1,12 +1,17 @@
 // @vitest-environment node
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
+
+// render -> toc -> slug -> service-role imports "server-only"; stub it.
+vi.mock("server-only", () => ({}));
+
 import {
   PostContent,
   safeHref,
   isAllowedImageSrc,
 } from "./render";
+import { extractHeadings } from "./toc";
 
 const IMAGE_HOST = "abcdefgh.supabase.co";
 
@@ -76,7 +81,7 @@ describe("PostContent renderer", () => {
         { type: "blockquote", content: [{ type: "paragraph", content: [{ type: "text", text: "q" }] }] },
       ),
     );
-    expect(out).toContain("<h2>Title</h2>");
+    expect(out).toContain(">Title</h2>");
     expect(out).toContain("<strong>bold</strong>");
     expect(out).toContain("<em>italic</em>");
     expect(out).toContain("<code>code</code>");
@@ -84,11 +89,22 @@ describe("PostContent renderer", () => {
     expect(out).toContain("<blockquote><p>q</p></blockquote>");
   });
 
+  it("gives headings ids that match the table of contents", () => {
+    const d = doc(
+      { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Intro" }] },
+      { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Intro" }] },
+    );
+    const out = html(d);
+    expect(out).toContain('id="intro"');
+    expect(out).toContain('id="intro-1"');
+    expect(extractHeadings(d).map((h) => h.id)).toEqual(["intro", "intro-1"]);
+  });
+
   it("clamps heading levels into h2..h6 so post body never emits an h1", () => {
     const out = html(
       doc({ type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "x" }] }),
     );
-    expect(out).toContain("<h2>x</h2>");
+    expect(out).toContain(">x</h2>");
     expect(out).not.toContain("<h1");
   });
 
