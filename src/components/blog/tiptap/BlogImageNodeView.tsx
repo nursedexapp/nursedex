@@ -68,6 +68,7 @@ export function BlogImageNodeView({
               <button
                 key={value}
                 type="button"
+                title={label}
                 aria-label={label}
                 aria-pressed={align === value}
                 onClick={() =>
@@ -81,17 +82,19 @@ export function BlogImageNodeView({
             <span className="mx-0.5 h-5 w-px bg-white/30" />
             <button
               type="button"
+              title={alt ? "Edit alt text" : "Add alt text (accessibility)"}
               aria-label="Edit alt text"
               onClick={() => {
                 const v = window.prompt("Alt text (for accessibility)", alt);
                 if (v !== null) updateAttributes({ alt: v });
               }}
-              className={ctrl}
+              className={cn(ctrl, !alt && "text-cream")}
             >
               <Pencil className="size-4" />
             </button>
             <button
               type="button"
+              title={caption ? "Edit caption" : "Add caption"}
               aria-label="Edit caption"
               onClick={() => {
                 const v = window.prompt("Caption (optional)", caption);
@@ -103,6 +106,7 @@ export function BlogImageNodeView({
             </button>
             <button
               type="button"
+              title="Remove image"
               aria-label="Remove image"
               onClick={() => deleteNode()}
               className={ctrl}
