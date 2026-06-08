@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, GitCompare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { getPostById } from "@/lib/blog/queries";
 import { getRevisions } from "@/lib/blog/revisions";
 import { extractPlainText } from "@/lib/blog/text";
@@ -81,9 +82,23 @@ export default async function RevisionsPage({ params }: RevisionsPageProps) {
                       {snippet ? ` — ${snippet}` : ""}
                     </p>
                   </div>
-                  {i !== 0 && (
-                    <RestoreRevisionButton revisionId={rev.id} postId={id} />
-                  )}
+                  <div className="flex items-center gap-2">
+                    {i < revisions.length - 1 && (
+                      <Link
+                        href={`/admin/blog/${id}/revisions/compare?from=${revisions[i + 1].id}&to=${rev.id}`}
+                        className={buttonVariants({
+                          variant: "outline",
+                          size: "sm",
+                        })}
+                      >
+                        <GitCompare className="size-4" />
+                        Compare
+                      </Link>
+                    )}
+                    {i !== 0 && (
+                      <RestoreRevisionButton revisionId={rev.id} postId={id} />
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
