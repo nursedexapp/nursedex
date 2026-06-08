@@ -8,7 +8,13 @@ const BASE_URL = "https://nursedex.com";
  * publisher) and is eligible for richer results. All values come from the
  * post record, which we control, so inlining the JSON is safe.
  */
-export function ArticleJsonLd({ post }: { post: BlogPost }) {
+export function ArticleJsonLd({
+  post,
+  authorName,
+}: {
+  post: BlogPost;
+  authorName?: string | null;
+}) {
   const url = `${BASE_URL}/blog/${post.slug}`;
   const data = {
     "@context": "https://schema.org",
@@ -19,7 +25,9 @@ export function ArticleJsonLd({ post }: { post: BlogPost }) {
     image: post.cover_image_url || `${BASE_URL}/icon-512.png`,
     datePublished: post.publish_at || post.created_at,
     dateModified: post.updated_at,
-    author: { "@type": "Organization", name: "NurseDex", url: BASE_URL },
+    author: authorName
+      ? { "@type": "Person", name: authorName }
+      : { "@type": "Organization", name: "NurseDex", url: BASE_URL },
     publisher: {
       "@type": "Organization",
       name: "NurseDex",

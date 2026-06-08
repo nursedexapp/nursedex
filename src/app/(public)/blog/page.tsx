@@ -25,7 +25,10 @@ export async function generateMetadata({
   return {
     title: page > 1 ? `Blog (Page ${page}) | NurseDex` : "Blog | NurseDex",
     description: DESCRIPTION,
-    alternates: { canonical },
+    alternates: {
+      canonical,
+      types: { "application/rss+xml": `${BASE}/feed.xml` },
+    },
     openGraph: {
       title: "NurseDex Blog",
       description: DESCRIPTION,

@@ -7,6 +7,7 @@ import {
   getPublishedPostBySlug,
   getCategoryById,
   getTagsForPost,
+  getAuthorName,
 } from "@/lib/blog/queries";
 import { PostContent } from "@/lib/blog/render";
 import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
@@ -29,7 +30,10 @@ export async function generateMetadata({
   return {
     title: `${post.seo_title || post.title} | NurseDex`,
     description,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      types: { "application/rss+xml": "https://nursedex.com/blog/feed.xml" },
+    },
     openGraph: {
       title: post.seo_title || post.title,
       description,
@@ -55,15 +59,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const post = await getPublishedPostBySlug(slug);
   if (!post) notFound();
 
-  const [category, tags] = await Promise.all([
+  const [category, tags, authorName] = await Promise.all([
     getCategoryById(post.category_id),
     getTagsForPost(post.id),
+    getAuthorName(post.author_id),
   ]);
 
   return (
     <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
-        <ArticleJsonLd post={post} />
+        <ArticleJsonLd post={post} authorName={authorName} />
 
         <Link
           href="/blog"
@@ -75,7 +80,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
 
         <header className="mb-8">
           <div className="text-soft-black-light flex items-center gap-2 text-sm">
-            <span>{formatDate(post.publish_at)}</span>
+            <span>
+              {formatDate(post.publish_at)}
+              {authorName ? <> · By {authorName}</> : null}
+            </span>
             {category && (
               <Link
                 href={`/blog/category/${category.slug}`}
