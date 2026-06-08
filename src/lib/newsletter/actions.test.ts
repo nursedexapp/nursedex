@@ -29,21 +29,37 @@ const h = vi.hoisted(() => {
       resolve({ count: state.count, error: state.updateError });
     return b;
   }
-  return { state, calls, builder, sendConfirm: vi.fn(), sendWelcome: vi.fn() };
+  return {
+    state,
+    calls,
+    builder,
+    sendConfirm: vi.fn(),
+    sendWelcome: vi.fn(),
+    sendBatch: vi.fn(),
+    getConfirmed: vi.fn(),
+  };
 });
 
 vi.mock("next/headers", () => ({
   headers: async () => ({ get: () => "1.2.3.4" }),
 }));
+vi.mock("@/lib/auth/helpers", () => ({ requireAdmin: async () => ({ id: "a" }) }));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({ from: () => h.builder() }),
 }));
+vi.mock("./queries", () => ({ getConfirmedSubscribers: h.getConfirmed }));
 vi.mock("@/lib/email/send", () => ({
   sendNewsletterConfirmEmail: h.sendConfirm,
   sendNewsletterWelcomeEmail: h.sendWelcome,
+  sendNewsletterBatch: h.sendBatch,
 }));
 
-import { subscribeNewsletter, confirmNewsletter } from "./actions";
+import {
+  subscribeNewsletter,
+  confirmNewsletter,
+  sendNewsletterIssue,
+  unsubscribeNewsletter,
+} from "./actions";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -53,6 +69,7 @@ beforeEach(() => {
   h.state.updateError = null;
   h.calls.upsert = [];
   h.calls.update = [];
+  h.sendBatch.mockResolvedValue(true);
 });
 
 describe("subscribeNewsletter", () => {
@@ -143,5 +160,57 @@ describe("confirmNewsletter", () => {
     expect(await confirmNewsletter("bad")).toBe("invalid");
     expect(await confirmNewsletter("")).toBe("invalid");
     expect(h.sendWelcome).not.toHaveBeenCalled();
+  });
+});
+
+describe("sendNewsletterIssue", () => {
+  it("sends to every confirmed subscriber and reports the count", async () => {
+    h.getConfirmed.mockResolvedValue([
+      { email: "a@x.com", unsubscribe_token: "t1" },
+      { email: "b@x.com", unsubscribe_token: "t2" },
+    ]);
+    const res = await sendNewsletterIssue({ subject: "Hi", body: "Hello there" });
+    expect(res.success).toBe(true);
+    expect(res.sent).toBe(2);
+    expect(h.sendBatch).toHaveBeenCalledTimes(1);
+    expect(h.sendBatch).toHaveBeenCalledWith("Hi", "Hello there", [
+      { email: "a@x.com", unsubscribe_token: "t1" },
+      { email: "b@x.com", unsubscribe_token: "t2" },
+    ]);
+  });
+
+  it("succeeds with zero sent when there are no subscribers", async () => {
+    h.getConfirmed.mockResolvedValue([]);
+    const res = await sendNewsletterIssue({ subject: "Hi", body: "Body" });
+    expect(res.success).toBe(true);
+    expect(res.sent).toBe(0);
+    expect(h.sendBatch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing subject/body without sending", async () => {
+    const res = await sendNewsletterIssue({ subject: "", body: "" });
+    expect(res.success).toBe(false);
+    expect(res.fieldErrors?.subject).toBeTruthy();
+    expect(h.getConfirmed).not.toHaveBeenCalled();
+  });
+});
+
+describe("unsubscribeNewsletter", () => {
+  it("unsubscribes a valid token", async () => {
+    h.state.row = { id: "s1", unsubscribed_at: null };
+    expect(await unsubscribeNewsletter("tok")).toBe("ok");
+    expect(h.calls.update[0]).toHaveProperty("unsubscribed_at");
+  });
+
+  it("is idempotent for an already-unsubscribed token", async () => {
+    h.state.row = { id: "s1", unsubscribed_at: "2026-01-01" };
+    expect(await unsubscribeNewsletter("tok")).toBe("ok");
+    expect(h.calls.update).toHaveLength(0);
+  });
+
+  it("returns invalid for an unknown or empty token", async () => {
+    h.state.row = null;
+    expect(await unsubscribeNewsletter("bad")).toBe("invalid");
+    expect(await unsubscribeNewsletter("")).toBe("invalid");
   });
 });

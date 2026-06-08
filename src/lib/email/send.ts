@@ -95,6 +95,44 @@ export async function sendCommentApprovedEmail(
   }
 }
 
+interface BatchRecipient {
+  email: string;
+  unsubscribe_token: string;
+}
+
+/**
+ * Sends one batch (<= 100) of a newsletter issue, building each recipient's
+ * personal unsubscribe link. Caller is responsible for chunking.
+ */
+export async function sendNewsletterBatch(
+  subject: string,
+  body: string,
+  recipients: BatchRecipient[],
+): Promise<boolean> {
+  const baseUrl = await getBaseUrl();
+  const res = await fetch(`${baseUrl}/api/email/newsletter-batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify({
+      subject,
+      body,
+      recipients: recipients.map((r) => ({
+        email: r.email,
+        unsubscribeUrl: `${baseUrl}/newsletter/unsubscribe?token=${encodeURIComponent(r.unsubscribe_token)}`,
+      })),
+    }),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    console.error("[email] Newsletter batch failed:", res.status, errBody);
+    return false;
+  }
+  return true;
+}
+
 /**
  * Sends the double opt-in confirmation email for the blog newsletter. The
  * confirm link carries the subscriber's token; clicking it confirms them.

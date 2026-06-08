@@ -1,12 +1,19 @@
 "use server";
 
 import { headers } from "next/headers";
+import { requireAdmin } from "@/lib/auth/helpers";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { newsletterSchema } from "@/lib/schemas/newsletter";
+import {
+  newsletterSchema,
+  newsletterIssueSchema,
+} from "@/lib/schemas/newsletter";
 import { clientIpFrom, hashIp } from "@/lib/rate-limit";
+import { chunk } from "@/lib/chunk";
+import { getConfirmedSubscribers } from "./queries";
 import {
   sendNewsletterConfirmEmail,
   sendNewsletterWelcomeEmail,
+  sendNewsletterBatch,
 } from "@/lib/email/send";
 
 export interface NewsletterResult {
@@ -61,10 +68,23 @@ export async function subscribeNewsletter(
 
   const { data: existing } = await supabase
     .from("newsletter_subscribers")
-    .select("confirmed_at")
+    .select("id, confirmed_at, unsubscribed_at")
     .eq("email", input.email)
     .maybeSingle();
-  if ((existing as { confirmed_at: string | null } | null)?.confirmed_at) {
+  const ex = existing as {
+    id: string;
+    confirmed_at: string | null;
+    unsubscribed_at: string | null;
+  } | null;
+  if (ex?.confirmed_at) {
+    // Already confirmed: re-subscribe silently if they had unsubscribed,
+    // otherwise nothing to do (and no enumeration).
+    if (ex.unsubscribed_at) {
+      await supabase
+        .from("newsletter_subscribers")
+        .update({ unsubscribed_at: null })
+        .eq("id", ex.id);
+    }
     return { success: true };
   }
 
@@ -121,4 +141,70 @@ export async function confirmNewsletter(token: string): Promise<ConfirmResult> {
 
   await sendNewsletterWelcomeEmail(row.email);
   return "confirmed";
+}
+
+export interface SendIssueResult {
+  success: boolean;
+  error?: "invalid" | "unknown";
+  sent?: number;
+  fieldErrors?: Record<string, string>;
+}
+
+const NEWSLETTER_BATCH_SIZE = 100; // Resend batch limit
+
+/**
+ * Send a newsletter issue to every confirmed, not-unsubscribed subscriber.
+ * Admin only. Each email carries the recipient's unsubscribe link.
+ */
+export async function sendNewsletterIssue(
+  raw: unknown,
+): Promise<SendIssueResult> {
+  await requireAdmin();
+
+  const parsed = newsletterIssueSchema.safeParse(raw);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const f = String(issue.path[0]);
+      if (!fieldErrors[f]) fieldErrors[f] = issue.message;
+    }
+    return { success: false, error: "invalid", fieldErrors };
+  }
+  const { subject, body } = parsed.data;
+
+  const recipients = await getConfirmedSubscribers();
+  if (recipients.length === 0) return { success: true, sent: 0 };
+
+  let sent = 0;
+  for (const batch of chunk(recipients, NEWSLETTER_BATCH_SIZE)) {
+    const ok = await sendNewsletterBatch(subject, body, batch);
+    if (ok) sent += batch.length;
+  }
+  return { success: true, sent };
+}
+
+export type UnsubscribeResult = "ok" | "invalid";
+
+/** Unsubscribe by token (from the email footer). Idempotent. */
+export async function unsubscribeNewsletter(
+  token: string,
+): Promise<UnsubscribeResult> {
+  if (!token) return "invalid";
+  const supabase = createServiceRoleClient();
+
+  const { data: sub } = await supabase
+    .from("newsletter_subscribers")
+    .select("id, unsubscribed_at")
+    .eq("unsubscribe_token", token)
+    .maybeSingle();
+  const row = sub as { id: string; unsubscribed_at: string | null } | null;
+  if (!row) return "invalid";
+
+  if (!row.unsubscribed_at) {
+    await supabase
+      .from("newsletter_subscribers")
+      .update({ unsubscribed_at: new Date().toISOString() })
+      .eq("id", row.id);
+  }
+  return "ok";
 }
