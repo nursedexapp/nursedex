@@ -16,10 +16,13 @@ import {
   Quote,
   Link as LinkIcon,
   Image as ImageIcon,
+  Video,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Embed } from "@/components/blog/tiptap/Embed";
+import { parseEmbed } from "@/lib/blog/embed";
 import type { TiptapDoc } from "@/types/database";
 
 interface PostEditorProps {
@@ -49,6 +52,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
         },
       }),
       Image,
+      Embed,
     ],
     content: value ?? EMPTY_DOC,
     onUpdate: ({ editor }) => onChange(editor.getJSON() as TiptapDoc),
@@ -115,6 +119,17 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
     }
   }
 
+  function insertEmbed() {
+    if (!editor) return;
+    const url = window.prompt("Paste a YouTube or Vimeo URL");
+    if (!url) return;
+    if (!parseEmbed(url)) {
+      toast.error("Only YouTube and Vimeo links are supported.");
+      return;
+    }
+    editor.chain().focus().setEmbed({ url }).run();
+  }
+
   const btn = (
     on: boolean,
     onClick: () => void,
@@ -170,6 +185,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           className="hidden"
           onChange={onPickImage}
         />
+        {btn(false, insertEmbed, "Embed a video", Video)}
       </div>
       <EditorContent editor={editor} className="px-3 py-2" />
     </div>

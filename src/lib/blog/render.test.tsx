@@ -159,6 +159,25 @@ describe("PostContent renderer", () => {
     expect(out).toContain("click");
   });
 
+  it("renders a known embed as a normalized provider iframe", () => {
+    const out = html(
+      doc({
+        type: "embed",
+        attrs: { url: "https://youtu.be/dQw4w9WgXcQ" },
+      }),
+    );
+    expect(out).toContain('src="https://www.youtube.com/embed/dQw4w9WgXcQ"');
+    expect(out).toContain("<iframe");
+  });
+
+  it("drops an embed from an unknown provider", () => {
+    const out = html(
+      doc({ type: "embed", attrs: { url: "https://evil.com/embed/x" } }),
+    );
+    expect(out).not.toContain("evil.com");
+    expect(out).not.toContain("<iframe");
+  });
+
   it("renders an image on the allowlisted host but drops an off-host image", () => {
     const good = html(doc({ type: "image", attrs: { src: `https://${IMAGE_HOST}/c.png`, alt: "c" } }));
     expect(good).toContain(`src="https://${IMAGE_HOST}/c.png"`);
