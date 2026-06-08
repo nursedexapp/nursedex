@@ -14,8 +14,28 @@ export const BLOG_SEO_DESCRIPTION_MAX = 200;
  */
 export const tiptapDocSchema = z.object({
   type: z.literal("doc"),
-  content: z.array(z.record(z.string(), z.unknown())).min(1, "Write some content"),
+  content: z
+    .array(z.record(z.string(), z.unknown()))
+    .min(1, "Write some content"),
 });
+
+/**
+ * Content as sent from the editor. The client serializes the Tiptap JSON to
+ * a string before calling the server action: passing the raw object loses
+ * node `attrs` (heading level, image src, embed url, etc.) across the
+ * Server Action serialization boundary, so we send a string and parse it
+ * here. An object is still accepted (older callers, tests).
+ */
+export const contentInputSchema = z.preprocess((v) => {
+  if (typeof v === "string") {
+    try {
+      return JSON.parse(v);
+    } catch {
+      return v;
+    }
+  }
+  return v;
+}, tiptapDocSchema);
 
 export const blogIntentSchema = z.enum(["draft", "publish", "schedule"]);
 export type BlogIntent = z.infer<typeof blogIntentSchema>;
@@ -33,22 +53,33 @@ export const blogPostSchema = z
       .string()
       .trim()
       .max(BLOG_SLUG_MAX)
-      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens")
+      .regex(
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+        "Use lowercase letters, numbers, and hyphens",
+      )
       .optional()
       .or(z.literal("")),
     excerpt: z
       .string()
       .trim()
-      .max(BLOG_EXCERPT_MAX, `Keep the excerpt under ${BLOG_EXCERPT_MAX} characters`)
+      .max(
+        BLOG_EXCERPT_MAX,
+        `Keep the excerpt under ${BLOG_EXCERPT_MAX} characters`,
+      )
       .optional()
       .or(z.literal("")),
-    content: tiptapDocSchema,
+    content: contentInputSchema,
     cover_image_url: z
       .string()
       .url("Cover image must be a valid URL")
       .optional()
       .or(z.literal("")),
-    seo_title: z.string().trim().max(BLOG_SEO_TITLE_MAX).optional().or(z.literal("")),
+    seo_title: z
+      .string()
+      .trim()
+      .max(BLOG_SEO_TITLE_MAX)
+      .optional()
+      .or(z.literal("")),
     seo_description: z
       .string()
       .trim()
@@ -86,13 +117,21 @@ export const blogAutosaveSchema = z.object({
     .string()
     .trim()
     .max(BLOG_SLUG_MAX)
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens")
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Use lowercase letters, numbers, and hyphens",
+    )
     .optional()
     .or(z.literal("")),
   excerpt: z.string().trim().max(BLOG_EXCERPT_MAX).optional().or(z.literal("")),
-  content: tiptapDocSchema,
+  content: contentInputSchema,
   cover_image_url: z.string().url().optional().or(z.literal("")),
-  seo_title: z.string().trim().max(BLOG_SEO_TITLE_MAX).optional().or(z.literal("")),
+  seo_title: z
+    .string()
+    .trim()
+    .max(BLOG_SEO_TITLE_MAX)
+    .optional()
+    .or(z.literal("")),
   seo_description: z
     .string()
     .trim()
@@ -113,5 +152,8 @@ export const blogCategorySchema = z.object({
     .string()
     .trim()
     .min(1, "Name is required")
-    .max(BLOG_CATEGORY_NAME_MAX, `Keep it under ${BLOG_CATEGORY_NAME_MAX} characters`),
+    .max(
+      BLOG_CATEGORY_NAME_MAX,
+      `Keep it under ${BLOG_CATEGORY_NAME_MAX} characters`,
+    ),
 });

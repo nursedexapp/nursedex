@@ -155,7 +155,8 @@ export function PostEditorForm({
         title,
         slug: slug || undefined,
         excerpt: excerpt || undefined,
-        content: content ?? { type: "doc", content: [] },
+        // Stringified so node attrs survive the server action boundary.
+        content: JSON.stringify(content ?? { type: "doc", content: [] }),
         cover_image_url: coverImageUrl || undefined,
         seo_title: seoTitle || undefined,
         seo_description: seoDescription || undefined,
@@ -208,7 +209,8 @@ export function PostEditorForm({
         title,
         slug: slug || undefined,
         excerpt: excerpt || undefined,
-        content: content ?? { type: "doc", content: [] },
+        // Stringified so node attrs survive the server action boundary.
+        content: JSON.stringify(content ?? { type: "doc", content: [] }),
         cover_image_url: coverImageUrl || undefined,
         seo_title: seoTitle || undefined,
         seo_description: seoDescription || undefined,
