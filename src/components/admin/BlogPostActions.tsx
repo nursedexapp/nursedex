@@ -14,6 +14,7 @@ import {
 import {
   archivePost,
   unpublishPost,
+  publishNow,
   deletePost,
   togglePinned,
   type BlogActionResult,
@@ -63,6 +64,12 @@ export function BlogPostActions({ id, status, pinned }: BlogPostActionsProps) {
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {(status === BlogPostStatus.SCHEDULED ||
+          status === BlogPostStatus.DRAFT) && (
+          <DropdownMenuItem onSelect={() => run(publishNow, "Post published.")}>
+            Publish now
+          </DropdownMenuItem>
+        )}
         {status === BlogPostStatus.PUBLISHED && (
           <DropdownMenuItem
             onSelect={() =>

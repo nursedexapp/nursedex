@@ -305,6 +305,11 @@ export async function unpublishPost(id: string): Promise<BlogActionResult> {
   return patchStatus(id, toDraft());
 }
 
+/** Publish a draft or scheduled post immediately, stamped with now. */
+export async function publishNow(id: string): Promise<BlogActionResult> {
+  return patchStatus(id, toPublished(new Date()));
+}
+
 /** Archive a post (hidden from the public index, kept in the admin list). */
 export async function archivePost(id: string): Promise<BlogActionResult> {
   return patchStatus(id, toArchived());
