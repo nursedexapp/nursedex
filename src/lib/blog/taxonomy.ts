@@ -21,6 +21,26 @@ export function normalizeNames(names: string[]): string[] {
   return out;
 }
 
+/**
+ * When merging tag A into tag B, the post ids that need a new link to B:
+ * posts tagged A but not already tagged B (so the (post_id, tag_id) primary
+ * key is never violated). Deduped. Pure, so it is unit testable.
+ */
+export function tagRelinkPostIds(
+  sourcePostIds: string[],
+  targetPostIds: string[],
+): string[] {
+  const already = new Set(targetPostIds);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of sourcePostIds) {
+    if (already.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
 // Find-or-create runs with the service-role client so it sees rows
 // regardless of RLS and so the UNIQUE(slug) constraint is the real arbiter
 // (see memory: slug uniqueness RLS blind spot). A losing insert race falls
