@@ -6,6 +6,7 @@ import {
   toListItems,
 } from "@/lib/blog/queries";
 import { BlogPostList } from "@/components/blog/BlogPostList";
+import { BlogFeaturedHero } from "@/components/blog/BlogFeaturedHero";
 import { BlogSearch } from "@/components/blog/BlogSearch";
 import { NewsletterCta } from "@/components/blog/NewsletterCta";
 
@@ -72,6 +73,12 @@ export default async function BlogIndexPage({
   const items = await toListItems(posts);
   const basePath = query ? `/blog?q=${encodeURIComponent(query)}` : "/blog";
 
+  // On the first, unfiltered page, give a pinned top post a hero treatment
+  // and drop it from the list below so it is not shown twice.
+  const featured =
+    page === 1 && !query && items[0]?.pinned ? items[0] : null;
+  const listItems = featured ? items.slice(1) : items;
+
   return (
     <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
@@ -105,8 +112,10 @@ export default async function BlogIndexPage({
           )}
         </header>
 
+        {featured && <BlogFeaturedHero post={featured} />}
+
         <BlogPostList
-          posts={items}
+          posts={listItems}
           page={page}
           totalPages={totalPages}
           basePath={basePath}
