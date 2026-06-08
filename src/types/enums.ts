@@ -196,6 +196,12 @@ export const BLOG_POST_STATUS_LABELS: Record<BlogPostStatus, string> = {
   [BlogPostStatus.ARCHIVED]: "Archived",
 };
 
+export enum BlogCommentStatus {
+  PENDING = "pending",
+  APPROVED = "approved",
+  REJECTED = "rejected",
+}
+
 export enum AdminActionType {
   VERIFY_NURSE = "verify_nurse",
   REJECT_NURSE = "reject_nurse",
