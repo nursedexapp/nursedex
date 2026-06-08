@@ -12,6 +12,7 @@ import {
 import { getBlogSlugRedirect } from "@/lib/blog/redirects";
 import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
 import { BlogArticle } from "@/components/blog/BlogArticle";
+import { NewsletterCta } from "@/components/blog/NewsletterCta";
 
 export const revalidate = 60;
 
@@ -91,6 +92,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           related={related}
           showShare
         />
+
+        <div className="mt-12">
+          <NewsletterCta source="blog_post" />
+        </div>
       </main>
     </div>
   );
