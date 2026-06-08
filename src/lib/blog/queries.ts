@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import type { BlogPost, BlogCategory, BlogTag } from "@/types/database";
+import type {
+  BlogPost,
+  BlogCategory,
+  BlogTag,
+  BlogPostListItem,
+} from "@/types/database";
+import { selectRelatedPosts } from "./related";
 
 /** Default number of posts shown per page on the public blog index. */
 export const BLOG_PAGE_SIZE = 9;
@@ -252,7 +258,7 @@ export async function getPublishedPostsByTag(
 /** Map posts to list items hydrated with their category name/slug. */
 export async function toListItems(
   posts: BlogPost[],
-): Promise<import("@/types/database").BlogPostListItem[]> {
+): Promise<BlogPostListItem[]> {
   if (posts.length === 0) return [];
   const categories = await getCategories();
   const byId = new Map(categories.map((c) => [c.id, c]));
@@ -264,4 +270,48 @@ export async function toListItems(
       categorySlug: cat?.slug ?? null,
     };
   });
+}
+
+/**
+ * Up to `limit` related posts for a post: those sharing the most tags
+ * first, then recent posts (same category preferred) to fill. Excludes the
+ * post itself. The ranking is the pure selectRelatedPosts helper.
+ */
+export async function getRelatedPosts(
+  post: BlogPost,
+  limit = 3,
+): Promise<BlogPostListItem[]> {
+  const supabase = createServiceRoleClient();
+
+  // Posts reached through a shared tag: one row per shared tag, so a post
+  // that shares two tags shows up twice and scores higher.
+  let tagMatches: BlogPost[] = [];
+  const tagIds = (await getTagsForPost(post.id)).map((t) => t.id);
+  if (tagIds.length > 0) {
+    const { data } = await supabase
+      .from("blog_post_tags")
+      .select("blog_posts!inner(*)")
+      .in("tag_id", tagIds)
+      .eq("blog_posts.status", "published")
+      .neq("post_id", post.id);
+    tagMatches = ((data ?? []) as unknown as { blog_posts: BlogPost | null }[])
+      .map((r) => r.blog_posts)
+      .filter((p): p is BlogPost => p !== null);
+  }
+
+  // Recency fallback pool (a few extra so de-duping still leaves enough).
+  const { data: recent } = await supabase
+    .from("blog_posts")
+    .select("*")
+    .eq("status", "published")
+    .neq("id", post.id)
+    .order("publish_at", { ascending: false })
+    .limit(limit + 5);
+
+  const chosen = selectRelatedPosts(tagMatches, (recent ?? []) as BlogPost[], {
+    selfId: post.id,
+    categoryId: post.category_id,
+    limit,
+  });
+  return toListItems(chosen);
 }
