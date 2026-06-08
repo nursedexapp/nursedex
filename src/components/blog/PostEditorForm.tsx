@@ -4,19 +4,29 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import { toast } from "sonner";
-import { Loader2, Upload, X, Check } from "lucide-react";
+import { Loader2, Upload, X, Check, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PostEditor } from "@/components/blog/PostEditor";
-import { savePost, autosavePost } from "@/lib/blog/actions";
+import { savePost, autosavePost, createCategory } from "@/lib/blog/actions";
 import type { BlogIntent } from "@/lib/schemas/blog";
-import type { BlogPost, TiptapDoc } from "@/types/database";
+import type {
+  BlogCategory,
+  BlogPost,
+  BlogTag,
+  TiptapDoc,
+} from "@/types/database";
 
 interface PostEditorFormProps {
   post: BlogPost | null;
+  categories: BlogCategory[];
+  allTags: BlogTag[];
+  postTags: BlogTag[];
 }
+
+type CategoryOption = { id: string; name: string };
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
@@ -26,7 +36,12 @@ function toLocalInput(iso: string | null): string {
   return new Date(d.getTime() - off).toISOString().slice(0, 16);
 }
 
-export function PostEditorForm({ post }: PostEditorFormProps) {
+export function PostEditorForm({
+  post,
+  categories: initialCategories,
+  allTags,
+  postTags,
+}: PostEditorFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -45,19 +60,25 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Taxonomy. Categories are picked from existing or created explicitly;
+  // tags are free-form chips resolved to ids when the post is saved.
+  const [categories, setCategories] = useState<CategoryOption[]>(
+    initialCategories.map((c) => ({ id: c.id, name: c.name })),
+  );
+  const [categoryId, setCategoryId] = useState(post?.category_id ?? "");
+  const [tags, setTags] = useState<string[]>(postTags.map((t) => t.name));
+  const [tagInput, setTagInput] = useState("");
+  const [newCategory, setNewCategory] = useState("");
+  const [addingCategory, setAddingCategory] = useState(false);
+
   const [id, setId] = useState(post?.id);
   const [autosaveState, setAutosaveState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
 
-  // Autosave only applies to content that is not publicly visible: a new
-  // post, a draft, or an archived post. We never silently rewrite a live
-  // published or scheduled post; those rely on the unsaved-changes guard.
   const autosaveEnabled =
     !post || post.status === "draft" || post.status === "archived";
 
-  // Serialized snapshot of the editable fields. When it differs from the
-  // last saved snapshot the form is dirty (has unsaved edits).
   const snapshot = useMemo(
     () =>
       JSON.stringify({
@@ -68,8 +89,20 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
         coverImageUrl,
         seoTitle,
         seoDescription,
+        categoryId,
+        tags,
       }),
-    [title, slug, excerpt, content, coverImageUrl, seoTitle, seoDescription],
+    [
+      title,
+      slug,
+      excerpt,
+      content,
+      coverImageUrl,
+      seoTitle,
+      seoDescription,
+      categoryId,
+      tags,
+    ],
   );
   const savedSnapshotRef = useRef(snapshot);
   const latestSnapshotRef = useRef(snapshot);
@@ -80,8 +113,7 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
     setDirty(snapshot !== savedSnapshotRef.current);
   }, [snapshot]);
 
-  // Warn before a hard navigation (refresh, tab close, external link) when
-  // there are unsaved edits.
+  // Warn before a hard navigation (refresh, tab close, external link).
   useEffect(() => {
     if (!dirty) return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -92,8 +124,7 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
-  // Debounced autosave: 2s after the last edit, when enabled, dirty, not
-  // mid manual save, and the title (which the slug derives from) is set.
+  // Debounced autosave for non-public posts (new, draft, archived).
   useEffect(() => {
     if (!autosaveEnabled || !dirty || pending || !title.trim()) return;
     const sent = snapshot;
@@ -108,6 +139,8 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
         cover_image_url: coverImageUrl || undefined,
         seo_title: seoTitle || undefined,
         seo_description: seoDescription || undefined,
+        category_id: categoryId || undefined,
+        tags,
       })
         .then((res) => {
           if (!res.success) {
@@ -116,7 +149,6 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
           }
           if (res.id && !id) setId(res.id);
           savedSnapshotRef.current = sent;
-          // Only clear dirty if nothing changed while we were saving.
           if (latestSnapshotRef.current === sent) {
             setDirty(false);
             setAutosaveState("saved");
@@ -138,6 +170,8 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
     coverImageUrl,
     seoTitle,
     seoDescription,
+    categoryId,
+    tags,
   ]);
 
   function submit(intent: BlogIntent) {
@@ -158,6 +192,8 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
         cover_image_url: coverImageUrl || undefined,
         seo_title: seoTitle || undefined,
         seo_description: seoDescription || undefined,
+        category_id: categoryId || undefined,
+        tags,
         publish_at: publishAtIso,
       });
 
@@ -170,8 +206,6 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
         );
         return;
       }
-      // Clear the dirty state so the unsaved-changes guard does not fire
-      // as we navigate away after a successful save.
       savedSnapshotRef.current = latestSnapshotRef.current;
       setDirty(false);
       toast.success(
@@ -218,10 +252,60 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
     }
   }
 
+  function addTag(value: string) {
+    const name = value.trim();
+    if (!name) return;
+    setTags((prev) =>
+      prev.some((t) => t.toLowerCase() === name.toLowerCase())
+        ? prev
+        : [...prev, name],
+    );
+    setTagInput("");
+  }
+
+  function removeTag(name: string) {
+    setTags((prev) => prev.filter((t) => t !== name));
+  }
+
+  function onTagKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagInput);
+    } else if (e.key === "Backspace" && !tagInput && tags.length > 0) {
+      removeTag(tags[tags.length - 1]);
+    }
+  }
+
+  async function onAddCategory() {
+    const name = newCategory.trim();
+    if (!name) return;
+    setAddingCategory(true);
+    try {
+      const res = await createCategory(name);
+      if (!res.success || !res.category) {
+        toast.error("Could not add the category.");
+        return;
+      }
+      const created = res.category;
+      setCategories((prev) =>
+        prev.some((c) => c.id === created.id)
+          ? prev
+          : [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setCategoryId(created.id);
+      setNewCategory("");
+    } finally {
+      setAddingCategory(false);
+    }
+  }
+
   const err = (field: string) =>
     errors[field] ? (
       <p className="text-error mt-1 text-sm">{errors[field]}</p>
     ) : null;
+
+  const selectClass =
+    "border-border bg-warm-white mt-1 h-9 w-full rounded-md border px-3 text-sm";
 
   return (
     <div className="space-y-6">
@@ -263,6 +347,88 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
           className="mt-1"
         />
         {err("excerpt")}
+      </div>
+
+      <div>
+        <Label htmlFor="category">Category</Label>
+        <select
+          id="category"
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          className={selectClass}
+        >
+          <option value="">No category</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <div className="mt-2 flex items-center gap-2">
+          <Input
+            value={newCategory}
+            onChange={(e) => setNewCategory(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void onAddCategory();
+              }
+            }}
+            placeholder="Add a new category"
+            className="h-8"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void onAddCategory()}
+            disabled={addingCategory || !newCategory.trim()}
+          >
+            {addingCategory ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+            Add
+          </Button>
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="tags">Tags</Label>
+        <div className="border-border bg-warm-white mt-1 flex flex-wrap items-center gap-1.5 rounded-md border p-2">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="bg-sage/15 text-soft-black inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm"
+            >
+              {tag}
+              <button
+                type="button"
+                onClick={() => removeTag(tag)}
+                aria-label={`Remove ${tag}`}
+                className="text-soft-black-light hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          ))}
+          <input
+            id="tags"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={onTagKeyDown}
+            onBlur={() => addTag(tagInput)}
+            list="blog-tag-suggestions"
+            placeholder={tags.length === 0 ? "Add tags (Enter or comma)" : ""}
+            className="min-w-32 flex-1 bg-transparent text-sm outline-none"
+          />
+          <datalist id="blog-tag-suggestions">
+            {allTags.map((t) => (
+              <option key={t.id} value={t.name} />
+            ))}
+          </datalist>
+        </div>
       </div>
 
       <div>

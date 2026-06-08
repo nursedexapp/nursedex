@@ -297,6 +297,28 @@ export interface BlogPost {
   publish_at: string | null;
   seo_title: string | null;
   seo_description: string | null;
+  category_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface BlogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BlogTag {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+}
+
+/** A post plus its resolved taxonomy, used for index/archive cards. */
+export interface BlogPostListItem extends BlogPost {
+  categoryName: string | null;
+  categorySlug: string | null;
 }

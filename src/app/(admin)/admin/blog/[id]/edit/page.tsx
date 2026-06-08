@@ -3,7 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PostEditorForm } from "@/components/blog/PostEditorForm";
-import { getPostById } from "@/lib/blog/queries";
+import {
+  getPostById,
+  getCategories,
+  getTags,
+  getTagsForPost,
+} from "@/lib/blog/queries";
 
 export const metadata: Metadata = {
   title: "Edit post | NurseDex Admin",
@@ -21,6 +26,12 @@ export default async function EditBlogPostPage({
   const post = await getPostById(id);
   if (!post) notFound();
 
+  const [categories, allTags, postTags] = await Promise.all([
+    getCategories(),
+    getTags(),
+    getTagsForPost(post.id),
+  ]);
+
   return (
     <div className="mx-auto w-full max-w-3xl p-6 sm:p-8">
       <Link
@@ -33,7 +44,12 @@ export default async function EditBlogPostPage({
       <h1 className="font-heading text-soft-black mb-6 text-2xl font-semibold">
         Edit post
       </h1>
-      <PostEditorForm post={post} />
+      <PostEditorForm
+        post={post}
+        categories={categories}
+        allTags={allTags}
+        postTags={postTags}
+      />
     </div>
   );
 }

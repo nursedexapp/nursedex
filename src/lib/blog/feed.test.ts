@@ -16,6 +16,7 @@ function post(overrides: Partial<BlogPost>): BlogPost {
     publish_at: "2026-06-01T12:00:00.000Z",
     seo_title: null,
     seo_description: null,
+    category_id: null,
     created_at: "2026-05-30T12:00:00.000Z",
     updated_at: "2026-06-01T12:00:00.000Z",
     ...overrides,

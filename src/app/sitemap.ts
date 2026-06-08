@@ -92,5 +92,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] failed to fetch blog posts:", err);
   }
 
-  return [...staticEntries, ...nurseEntries, ...blogEntries];
+  let taxonomyEntries: MetadataRoute.Sitemap = [];
+  try {
+    const supabase = createServiceRoleClient();
+    const [cats, tags] = await Promise.all([
+      supabase.from("blog_categories").select("slug, updated_at"),
+      supabase.from("blog_tags").select("slug"),
+    ]);
+
+    const catEntries: MetadataRoute.Sitemap = (
+      (cats.data ?? []) as { slug: string; updated_at: string }[]
+    ).map((c) => ({
+      url: `${BASE_URL}/blog/category/${c.slug}`,
+      lastModified: new Date(c.updated_at),
+      changeFrequency: "weekly" as const,
+      priority: 0.4,
+    }));
+    const tagEntries: MetadataRoute.Sitemap = (
+      (tags.data ?? []) as { slug: string }[]
+    ).map((t) => ({
+      url: `${BASE_URL}/blog/tag/${t.slug}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.3,
+    }));
+    taxonomyEntries = [...catEntries, ...tagEntries];
+  } catch (err) {
+    console.error("[sitemap] failed to fetch blog taxonomy:", err);
+  }
+
+  return [
+    ...staticEntries,
+    ...nurseEntries,
+    ...blogEntries,
+    ...taxonomyEntries,
+  ];
 }
