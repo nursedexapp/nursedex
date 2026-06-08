@@ -20,7 +20,10 @@ export function NewsletterCta({ source }: { source: string }) {
       const res = await subscribeNewsletter({ email, source, website });
       if (!res.success) {
         setError(
-          res.fieldErrors?.email ?? "Something went wrong. Please try again.",
+          res.fieldErrors?.email ??
+            (res.error === "rate_limited"
+              ? "Too many attempts from your network. Please try again later."
+              : "Something went wrong. Please try again."),
         );
         return;
       }

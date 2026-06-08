@@ -1,7 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { newsletterSchema } from "@/lib/schemas/newsletter";
+import { clientIpFrom, hashIp } from "@/lib/rate-limit";
 import {
   sendNewsletterConfirmEmail,
   sendNewsletterWelcomeEmail,
@@ -9,9 +11,12 @@ import {
 
 export interface NewsletterResult {
   success: boolean;
-  error?: "invalid" | "unknown";
+  error?: "invalid" | "unknown" | "rate_limited";
   fieldErrors?: Record<string, string>;
 }
+
+// Max new subscriptions per IP per hour (each sends a confirmation email).
+const RATE_LIMIT_PER_HOUR = 5;
 
 /**
  * Subscribe an email to the blog newsletter (double opt-in). A new or
@@ -39,6 +44,21 @@ export async function subscribeNewsletter(
 
   const supabase = createServiceRoleClient();
 
+  // Rate limit new subscriptions per network so the endpoint cannot be used
+  // to blast confirmation emails at many addresses.
+  const ipHash = await hashIp(
+    clientIpFrom((await headers()).get("x-forwarded-for")),
+  );
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await supabase
+    .from("newsletter_subscribers")
+    .select("id", { count: "exact", head: true })
+    .eq("ip_hash", ipHash)
+    .gte("created_at", oneHourAgo);
+  if (count !== null && count >= RATE_LIMIT_PER_HOUR) {
+    return { success: false, error: "rate_limited" };
+  }
+
   const { data: existing } = await supabase
     .from("newsletter_subscribers")
     .select("confirmed_at")
@@ -56,6 +76,7 @@ export async function subscribeNewsletter(
       email: input.email,
       source: input.source || null,
       confirmation_token: token,
+      ip_hash: ipHash,
     },
     { onConflict: "email" },
   );
