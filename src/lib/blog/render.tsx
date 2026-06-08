@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import NextImage from "next/image";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
 import { headingId, nodeText } from "./toc";
 import { parseEmbed } from "./embed";
@@ -155,8 +156,25 @@ function renderNode(
       const src = node.attrs?.src;
       if (!isAllowedImageSrc(src)) return null;
       const alt = typeof node.attrs?.alt === "string" ? node.attrs.alt : "";
-      // Body images are arbitrary external URLs validated against an
-      // allowlist; next/image is not a fit for inline editorial content.
+      const width = Number(node.attrs?.width);
+      const height = Number(node.attrs?.height);
+      // With intrinsic dimensions (captured on upload) use next/image, which
+      // is responsive, format-optimized, and avoids layout shift. The host
+      // is allowlisted both here and in next.config remotePatterns.
+      if (width > 0 && height > 0) {
+        return (
+          <NextImage
+            key={key}
+            src={src as string}
+            alt={alt}
+            width={width}
+            height={height}
+            sizes="(max-width: 768px) 100vw, 768px"
+            className="h-auto w-full rounded-lg"
+          />
+        );
+      }
+      // Legacy images without stored dimensions fall back to a plain img.
       // eslint-disable-next-line @next/next/no-img-element
       return <img key={key} src={src as string} alt={alt} loading="lazy" />;
     }

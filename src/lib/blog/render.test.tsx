@@ -178,6 +178,19 @@ describe("PostContent renderer", () => {
     expect(out).not.toContain("<iframe");
   });
 
+  it("uses next/image (width/height) for an image with stored dimensions", () => {
+    const out = html(
+      doc({
+        type: "image",
+        attrs: { src: `https://${IMAGE_HOST}/d.png`, alt: "d", width: 800, height: 600 },
+      }),
+    );
+    // width/height are present only on the next/image path; the plain <img>
+    // fallback carries neither.
+    expect(out).toContain('width="800"');
+    expect(out).toContain('height="600"');
+  });
+
   it("renders an image on the allowlisted host but drops an off-host image", () => {
     const good = html(doc({ type: "image", attrs: { src: `https://${IMAGE_HOST}/c.png`, alt: "c" } }));
     expect(good).toContain(`src="https://${IMAGE_HOST}/c.png"`);

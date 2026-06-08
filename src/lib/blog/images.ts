@@ -1,3 +1,4 @@
+import { imageSize } from "image-size";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
@@ -45,9 +46,15 @@ function extFor(bytes: Uint8Array): string {
  * RLS authorizes the write; callers must already be an admin (the upload
  * route gates with requireAdmin()).
  */
+export interface UploadedBlogImage {
+  url: string;
+  width?: number;
+  height?: number;
+}
+
 export async function uploadBlogImage(
   file: File,
-): Promise<{ url: string } | { error: string }> {
+): Promise<UploadedBlogImage | { error: string }> {
   if (file.size > BLOG_IMAGE_MAX_BYTES) {
     return { error: "Image exceeds the 5MB size limit." };
   }
@@ -55,6 +62,21 @@ export async function uploadBlogImage(
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!hasValidImageMagic(bytes)) {
     return { error: "File is not a valid image (JPG, PNG, or WebP)." };
+  }
+
+  // Intrinsic dimensions let the renderer use next/image (responsive,
+  // optimized, no layout shift). Best effort: a parse failure just omits
+  // them and the renderer falls back to a plain <img>.
+  let width: number | undefined;
+  let height: number | undefined;
+  try {
+    const dims = imageSize(bytes);
+    if (dims.width && dims.height) {
+      width = dims.width;
+      height = dims.height;
+    }
+  } catch {
+    // ignore unparseable dimensions
   }
 
   const year = new Date().getFullYear();
@@ -71,7 +93,7 @@ export async function uploadBlogImage(
   }
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return { url: data.publicUrl };
+  return { url: data.publicUrl, width, height };
 }
 
 /**
