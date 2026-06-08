@@ -117,7 +117,7 @@ export function DateTimePicker({ value, onChange, id }: DateTimePickerProps) {
       day.getMonth(),
       day.getDate(),
       base ? base.getHours() : 9,
-      base ? base.getMinutes() : 0,
+      0,
     );
     onChange(toLocal(next));
   }
@@ -140,17 +140,16 @@ export function DateTimePicker({ value, onChange, id }: DateTimePickerProps) {
       ? 12
       : selected.getHours() % 12
     : 9;
-  const minute = selected ? selected.getMinutes() : 0;
   const isPm = selected ? selected.getHours() >= 12 : false;
 
+  // Scheduling is constrained to whole hours: the publish cron runs at the
+  // top of each hour, so allowing minutes would make a 4:15 post look late
+  // (it would not go live until 5:00). Minutes are always 0.
   function changeHour(h12: number) {
-    setTime((h12 % 12) + (isPm ? 12 : 0), minute);
-  }
-  function changeMinute(mi: number) {
-    setTime(selected ? selected.getHours() : 9, mi);
+    setTime((h12 % 12) + (isPm ? 12 : 0), 0);
   }
   function changeMeridiem(pm: boolean) {
-    setTime((hour12 % 12) + (pm ? 12 : 0), minute);
+    setTime((hour12 % 12) + (pm ? 12 : 0), 0);
   }
 
   const label = selected
@@ -258,19 +257,7 @@ export function DateTimePicker({ value, onChange, id }: DateTimePickerProps) {
                 </option>
               ))}
             </select>
-            <span className="text-soft-black-light">:</span>
-            <select
-              aria-label="Minute"
-              value={minute}
-              onChange={(e) => changeMinute(Number(e.target.value))}
-              className={selectClass}
-            >
-              {Array.from({ length: 12 }, (_, i) => i * 5).map((mi) => (
-                <option key={mi} value={mi}>
-                  {pad(mi)}
-                </option>
-              ))}
-            </select>
+            <span className="text-soft-black-light text-sm">:00</span>
             <select
               aria-label="AM or PM"
               value={isPm ? "pm" : "am"}
@@ -298,6 +285,10 @@ export function DateTimePicker({ value, onChange, id }: DateTimePickerProps) {
               </button>
             </div>
           </div>
+
+          <p className="text-soft-black-light mt-2 text-xs">
+            Posts go live at the top of the selected hour.
+          </p>
         </div>
       )}
     </div>
