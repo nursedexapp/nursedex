@@ -120,10 +120,35 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error("[sitemap] failed to fetch blog taxonomy:", err);
   }
 
+  let authorEntries: MetadataRoute.Sitemap = [];
+  try {
+    const supabase = createServiceRoleClient();
+    const { data } = await supabase
+      .from("blog_posts")
+      .select("author_id")
+      .eq("status", "published")
+      .not("author_id", "is", null);
+    const ids = [
+      ...new Set(
+        ((data ?? []) as { author_id: string | null }[])
+          .map((r) => r.author_id)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    authorEntries = ids.map((id) => ({
+      url: `${BASE_URL}/blog/author/${id}`,
+      changeFrequency: "weekly" as const,
+      priority: 0.3,
+    }));
+  } catch (err) {
+    console.error("[sitemap] failed to fetch blog authors:", err);
+  }
+
   return [
     ...staticEntries,
     ...nurseEntries,
     ...blogEntries,
     ...taxonomyEntries,
+    ...authorEntries,
   ];
 }
