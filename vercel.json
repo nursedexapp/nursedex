@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/publish-scheduled-posts",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/blog-image-gc",
+      "schedule": "0 4 * * *"
     }
   ]
 }
