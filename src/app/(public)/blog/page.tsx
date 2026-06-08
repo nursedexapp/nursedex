@@ -7,6 +7,7 @@ import {
 } from "@/lib/blog/queries";
 import { BlogPostList } from "@/components/blog/BlogPostList";
 import { BlogSearch } from "@/components/blog/BlogSearch";
+import { NewsletterCta } from "@/components/blog/NewsletterCta";
 
 export const revalidate = 60;
 
@@ -103,6 +104,12 @@ export default async function BlogIndexPage({
               : "No posts yet. Check back soon."
           }
         />
+
+        {!query && (
+          <div className="mt-16">
+            <NewsletterCta source="blog_index" />
+          </div>
+        )}
       </main>
     </div>
   );
