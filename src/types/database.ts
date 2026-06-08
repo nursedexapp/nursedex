@@ -300,6 +300,7 @@ export interface BlogPost {
   seo_description: string | null;
   category_id: string | null;
   pinned: boolean;
+  reading_time_minutes: number;
   created_at: string;
   updated_at: string;
 }

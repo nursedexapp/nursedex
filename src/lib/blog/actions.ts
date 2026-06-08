@@ -10,7 +10,7 @@ import {
 } from "@/lib/schemas/blog";
 import { ensureUniqueSlug } from "./slug";
 import { collectImagePaths, removeBlogImagePaths } from "./images";
-import { extractPlainText } from "./text";
+import { extractPlainText, readingTimeFromText } from "./text";
 import {
   findOrCreateTags,
   syncPostTags,
@@ -78,6 +78,7 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
   const slug = await ensureUniqueSlug(input.slug || input.title, input.id);
 
   const supabase = await createClient();
+  const contentText = extractPlainText(input.content as unknown as TiptapDoc);
   const fields = {
     title: input.title,
     slug,
@@ -87,7 +88,8 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
     seo_title: input.seo_title || null,
     seo_description: input.seo_description || null,
     category_id: input.category_id || null,
-    content_text: extractPlainText(input.content as unknown as TiptapDoc),
+    content_text: contentText,
+    reading_time_minutes: readingTimeFromText(contentText),
     status: patch.status,
     publish_at: patch.publish_at,
   };
@@ -182,13 +184,15 @@ export async function restoreRevision(
     );
   }
 
+  const revContentText = extractPlainText(rev.content);
   const { data: post, error } = await supabase
     .from("blog_posts")
     .update({
       title: rev.title,
       excerpt: rev.excerpt,
       content: rev.content,
-      content_text: extractPlainText(rev.content),
+      content_text: revContentText,
+      reading_time_minutes: readingTimeFromText(revContentText),
     })
     .eq("id", rev.post_id)
     .select("slug")
@@ -227,6 +231,7 @@ export async function autosavePost(raw: unknown): Promise<AutosaveResult> {
   const slug = await ensureUniqueSlug(input.slug || input.title, input.id);
   const supabase = await createClient();
 
+  const contentText = extractPlainText(input.content as unknown as TiptapDoc);
   const fields = {
     title: input.title,
     slug,
@@ -236,7 +241,8 @@ export async function autosavePost(raw: unknown): Promise<AutosaveResult> {
     seo_title: input.seo_title || null,
     seo_description: input.seo_description || null,
     category_id: input.category_id || null,
-    content_text: extractPlainText(input.content as unknown as TiptapDoc),
+    content_text: contentText,
+    reading_time_minutes: readingTimeFromText(contentText),
   };
 
   let postId: string;
