@@ -574,6 +574,9 @@ export function PostEditorForm({
                 excerpt: excerpt || null,
                 content: content ?? { type: "doc", content: [] },
                 cover_image_url: coverImageUrl || null,
+                categoryName:
+                  categories.find((c) => c.id === categoryId)?.name ?? null,
+                tags,
               });
               window.open(
                 `/blog/preview/${id}`,
