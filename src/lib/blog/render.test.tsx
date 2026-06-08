@@ -100,6 +100,18 @@ describe("PostContent renderer", () => {
     expect(extractHeadings(d).map((h) => h.id)).toEqual(["intro", "intro-1"]);
   });
 
+  it("syntax-highlights code blocks", () => {
+    const out = html(
+      doc({
+        type: "codeBlock",
+        attrs: { language: "javascript" },
+        content: [{ type: "text", text: "const x = 1;" }],
+      }),
+    );
+    expect(out).toContain('class="hljs"');
+    expect(out).toContain("hljs-keyword");
+  });
+
   it("clamps heading levels into h2..h6 so post body never emits an h1", () => {
     const out = html(
       doc({ type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "x" }] }),

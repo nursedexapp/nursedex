@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
 import { headingId, nodeText } from "./toc";
+import { CodeBlock } from "@/components/blog/CodeBlock";
 
 /**
  * Render a stored Tiptap (ProseMirror) document to React elements.
@@ -135,12 +136,18 @@ function renderNode(
       return <li key={key}>{renderChildren(node, key, seen)}</li>;
     case "blockquote":
       return <blockquote key={key}>{renderChildren(node, key, seen)}</blockquote>;
-    case "codeBlock":
-      return (
-        <pre key={key}>
-          <code>{renderChildren(node, key, seen)}</code>
-        </pre>
-      );
+    case "codeBlock": {
+      // Preserve the raw code (newlines included) for the highlighter,
+      // rather than the whitespace-collapsing renderChildren path.
+      const code = (node.content ?? [])
+        .map((c) => (c.type === "hardBreak" ? "\n" : (c.text ?? "")))
+        .join("");
+      const language =
+        typeof node.attrs?.language === "string"
+          ? node.attrs.language
+          : undefined;
+      return <CodeBlock key={key} code={code} language={language} />;
+    }
     case "hardBreak":
       return <br key={key} />;
     case "image": {

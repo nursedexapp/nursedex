@@ -127,3 +127,51 @@ body {
     animation: iconPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 }
+
+/* highlight.js token colors (GitHub dark) for blog code blocks. The block
+   background and layout live on the <pre> in CodeBlock.tsx. */
+.hljs {
+  color: #c9d1d9;
+}
+.hljs-comment,
+.hljs-quote {
+  color: #8b949e;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: #ff7b72;
+}
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition {
+  color: #a5d6ff;
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-meta,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: #79c0ff;
+}
+.hljs-variable,
+.hljs-attr,
+.hljs-params {
+  color: #ffa657;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: bold;
+}
