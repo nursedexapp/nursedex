@@ -25,13 +25,30 @@ vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({ from: () => h.builder() }),
 }));
 
-import { normalizeNames, findOrCreateTags } from "./taxonomy";
+import {
+  normalizeNames,
+  findOrCreateTags,
+  tagRelinkPostIds,
+} from "./taxonomy";
 
 describe("normalizeNames", () => {
   it("trims, drops blanks, and dedupes case-insensitively preserving order", () => {
     expect(
       normalizeNames([" Home Care ", "home care", "", "Licensing", "  "]),
     ).toEqual(["Home Care", "Licensing"]);
+  });
+});
+
+describe("tagRelinkPostIds", () => {
+  it("returns source posts not already linked to the target, deduped", () => {
+    expect(tagRelinkPostIds(["p1", "p2", "p3", "p2"], ["p2", "p4"])).toEqual([
+      "p1",
+      "p3",
+    ]);
+  });
+
+  it("returns nothing when every source post already has the target", () => {
+    expect(tagRelinkPostIds(["p1", "p2"], ["p1", "p2", "p3"])).toEqual([]);
   });
 });
 

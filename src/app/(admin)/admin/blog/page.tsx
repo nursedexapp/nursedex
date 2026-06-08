@@ -4,7 +4,7 @@ import { Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Tags } from "lucide-react";
 import { getAllPostsForAdmin } from "@/lib/blog/queries";
 import { getPendingCommentCount } from "@/lib/comments/queries";
 import { BLOG_POST_STATUS_LABELS, BlogPostStatus } from "@/types/enums";
@@ -49,6 +49,13 @@ export default async function AdminBlogPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin/blog/taxonomy"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            <Tags className="size-4" />
+            Categories &amp; tags
+          </Link>
           <Link
             href="/admin/blog/comments"
             className={buttonVariants({ variant: "outline" })}

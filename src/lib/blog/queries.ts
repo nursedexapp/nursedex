@@ -210,6 +210,50 @@ export async function getTags(): Promise<BlogTag[]> {
   return (data ?? []) as BlogTag[];
 }
 
+export interface CategoryWithCount extends BlogCategory {
+  postCount: number;
+}
+export interface TagWithCount extends BlogTag {
+  postCount: number;
+}
+
+/**
+ * Categories and tags with how many posts (any status) use each, for the
+ * admin taxonomy manager. Counts are tallied from two bulk reads rather
+ * than a query per row.
+ */
+export async function getTaxonomyForAdmin(): Promise<{
+  categories: CategoryWithCount[];
+  tags: TagWithCount[];
+}> {
+  const supabase = createServiceRoleClient();
+  const [catsRes, tagsRes, postCats, postTags] = await Promise.all([
+    supabase.from("blog_categories").select("*").order("name"),
+    supabase.from("blog_tags").select("*").order("name"),
+    supabase.from("blog_posts").select("category_id"),
+    supabase.from("blog_post_tags").select("tag_id"),
+  ]);
+
+  const catCount = new Map<string, number>();
+  for (const r of (postCats.data ?? []) as { category_id: string | null }[]) {
+    if (r.category_id) catCount.set(r.category_id, (catCount.get(r.category_id) ?? 0) + 1);
+  }
+  const tagCount = new Map<string, number>();
+  for (const r of (postTags.data ?? []) as { tag_id: string }[]) {
+    tagCount.set(r.tag_id, (tagCount.get(r.tag_id) ?? 0) + 1);
+  }
+
+  const categories = ((catsRes.data ?? []) as BlogCategory[]).map((c) => ({
+    ...c,
+    postCount: catCount.get(c.id) ?? 0,
+  }));
+  const tags = ((tagsRes.data ?? []) as BlogTag[]).map((t) => ({
+    ...t,
+    postCount: tagCount.get(t.id) ?? 0,
+  }));
+  return { categories, tags };
+}
+
 /**
  * Categories and tags that have at least one published post. Used by the
  * sitemap so empty/draft-only archives (thin pages) are not listed.
