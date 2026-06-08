@@ -118,8 +118,8 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
         toast.error(json.error ?? "Image upload failed.");
         return;
       }
-      const alt = window.prompt("Describe the image (alt text)") ?? "";
-      const caption = window.prompt("Caption (optional)") ?? "";
+      // Insert without forcing alt/caption prompts. The author sets them
+      // (optionally) by clicking the image and using its toolbar.
       editor
         .chain()
         .focus()
@@ -127,13 +127,14 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           type: "image",
           attrs: {
             src: json.url,
-            alt,
-            caption: caption.trim() || null,
+            alt: "",
+            caption: null,
             width: json.width ?? null,
             height: json.height ?? null,
           },
         })
         .run();
+      toast.success("Image added. Click it to set alt text and a caption.");
     } catch {
       toast.error("Image upload failed.");
     } finally {
@@ -168,6 +169,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
     <button
       type="button"
       onClick={onClick}
+      title={label}
       aria-label={label}
       aria-pressed={on}
       className={cn(
@@ -182,11 +184,36 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
   return (
     <div className="border-border bg-warm-white rounded-md border">
       <div className="border-border flex flex-wrap items-center gap-0.5 border-b p-1.5">
-        {btn(active.bold, () => editor.chain().focus().toggleBold().run(), "Bold", Bold)}
-        {btn(active.italic, () => editor.chain().focus().toggleItalic().run(), "Italic", Italic)}
-        {btn(active.strike, () => editor.chain().focus().toggleStrike().run(), "Strikethrough", Strikethrough)}
-        {btn(active.code, () => editor.chain().focus().toggleCode().run(), "Inline code", Code)}
-        {btn(active.codeBlock, () => editor.chain().focus().toggleCodeBlock().run(), "Code block", SquareCode)}
+        {btn(
+          active.bold,
+          () => editor.chain().focus().toggleBold().run(),
+          "Bold",
+          Bold,
+        )}
+        {btn(
+          active.italic,
+          () => editor.chain().focus().toggleItalic().run(),
+          "Italic",
+          Italic,
+        )}
+        {btn(
+          active.strike,
+          () => editor.chain().focus().toggleStrike().run(),
+          "Strikethrough",
+          Strikethrough,
+        )}
+        {btn(
+          active.code,
+          () => editor.chain().focus().toggleCode().run(),
+          "Inline code",
+          Code,
+        )}
+        {btn(
+          active.codeBlock,
+          () => editor.chain().focus().toggleCodeBlock().run(),
+          "Code block",
+          SquareCode,
+        )}
         {active.codeBlock && (
           <select
             aria-label="Code block language"
@@ -211,11 +238,36 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           </select>
         )}
         <span className="bg-border mx-1 h-5 w-px" />
-        {btn(active.h2, () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2", Heading2)}
-        {btn(active.h3, () => editor.chain().focus().toggleHeading({ level: 3 }).run(), "Heading 3", Heading3)}
-        {btn(active.bullet, () => editor.chain().focus().toggleBulletList().run(), "Bullet list", List)}
-        {btn(active.ordered, () => editor.chain().focus().toggleOrderedList().run(), "Numbered list", ListOrdered)}
-        {btn(active.quote, () => editor.chain().focus().toggleBlockquote().run(), "Quote", Quote)}
+        {btn(
+          active.h2,
+          () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+          "Heading 2",
+          Heading2,
+        )}
+        {btn(
+          active.h3,
+          () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+          "Heading 3",
+          Heading3,
+        )}
+        {btn(
+          active.bullet,
+          () => editor.chain().focus().toggleBulletList().run(),
+          "Bullet list",
+          List,
+        )}
+        {btn(
+          active.ordered,
+          () => editor.chain().focus().toggleOrderedList().run(),
+          "Numbered list",
+          ListOrdered,
+        )}
+        {btn(
+          active.quote,
+          () => editor.chain().focus().toggleBlockquote().run(),
+          "Quote",
+          Quote,
+        )}
         <span className="bg-border mx-1 h-5 w-px" />
         {btn(active.link, setLink, "Link", LinkIcon)}
         <button
