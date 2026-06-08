@@ -25,6 +25,8 @@ const draft = {
   excerpt: null,
   content: { type: "doc" as const, content: [] },
   cover_image_url: null,
+  categoryName: "Home Care",
+  tags: ["Licensing"],
 };
 
 describe("preview draft storage", () => {
