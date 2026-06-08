@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { MessageSquare, Tags } from "lucide-react";
 import { getAllPostsForAdmin } from "@/lib/blog/queries";
 import { getPendingCommentCount } from "@/lib/comments/queries";
+import { getBlogPostViews } from "@/lib/analytics/post-views";
 import { BLOG_POST_STATUS_LABELS, BlogPostStatus } from "@/types/enums";
 import { BlogPostActions } from "@/components/admin/BlogPostActions";
 
@@ -32,9 +33,10 @@ function formatDate(iso: string | null): string {
 }
 
 export default async function AdminBlogPage() {
-  const [posts, pendingComments] = await Promise.all([
+  const [posts, pendingComments, views] = await Promise.all([
     getAllPostsForAdmin(),
     getPendingCommentCount(),
+    getBlogPostViews(),
   ]);
 
   return (
@@ -99,6 +101,11 @@ export default async function AdminBlogPage() {
                       : post.status === BlogPostStatus.PUBLISHED
                         ? `Published ${formatDate(post.publish_at)}`
                         : `Updated ${formatDate(post.updated_at)}`}
+                    {post.status === BlogPostStatus.PUBLISHED &&
+                      views[post.id] != null &&
+                      ` · ${views[post.id].toLocaleString()} ${
+                        views[post.id] === 1 ? "view" : "views"
+                      }`}
                   </p>
                 </div>
                 {post.pinned && (
