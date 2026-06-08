@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PostEditor } from "@/components/blog/PostEditor";
+import { DateTimePicker } from "@/components/blog/DateTimePicker";
 import { savePost, autosavePost, createCategory } from "@/lib/blog/actions";
 import { writePreviewDraft } from "@/lib/blog/preview-draft";
 import { slugify } from "@/lib/blog/slugify";
@@ -544,13 +545,13 @@ export function PostEditorForm({
       {showSchedule && (
         <div>
           <Label htmlFor="publish_at">Publish at</Label>
-          <Input
-            id="publish_at"
-            type="datetime-local"
-            value={publishAtLocal}
-            onChange={(e) => setPublishAtLocal(e.target.value)}
-            className="mt-1 w-auto"
-          />
+          <div className="mt-1">
+            <DateTimePicker
+              id="publish_at"
+              value={publishAtLocal}
+              onChange={setPublishAtLocal}
+            />
+          </div>
           {err("publish_at")}
         </div>
       )}
