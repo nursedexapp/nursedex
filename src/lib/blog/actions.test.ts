@@ -58,6 +58,14 @@ vi.mock("./taxonomy", () => tax);
 const redir = vi.hoisted(() => ({ saveBlogSlugRedirect: vi.fn() }));
 vi.mock("./redirects", () => redir);
 
+// Revisions use the service-role client (server-only); mock so the test
+// loads. Snapshotting on save is exercised separately in revisions.test.ts.
+const rev = vi.hoisted(() => ({
+  snapshotRevision: vi.fn(),
+  getRevision: vi.fn(),
+}));
+vi.mock("./revisions", () => rev);
+
 import { savePost, autosavePost, deletePost, createCategory } from "./actions";
 
 const PUB = (p: string) =>

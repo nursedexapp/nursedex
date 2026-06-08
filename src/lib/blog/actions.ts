@@ -17,6 +17,7 @@ import {
   findOrCreateCategory,
 } from "./taxonomy";
 import { saveBlogSlugRedirect } from "./redirects";
+import { snapshotRevision, getRevision } from "./revisions";
 import { toDraft, toPublished, toArchived, toScheduled } from "./transitions";
 import type { StatusPatch } from "./transitions";
 import type { TiptapDoc } from "@/types/database";
@@ -134,8 +135,72 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
   const tagIds = await findOrCreateTags(input.tags ?? []);
   await syncPostTags(postId, tagIds);
 
+  // Snapshot this saved version so it can be viewed/restored later.
+  await snapshotRevision(
+    postId,
+    {
+      title: input.title,
+      excerpt: input.excerpt || null,
+      content: input.content as unknown as TiptapDoc,
+    },
+    user.id,
+  );
+
   revalidateBlog(slug);
   return { success: true, slug, id: postId };
+}
+
+/**
+ * Restore a post's body (title, excerpt, content) to a prior revision. The
+ * restore is itself snapshotted, so it can be undone like any other save.
+ */
+export async function restoreRevision(
+  revisionId: string,
+): Promise<BlogActionResult> {
+  const user = await requireAdmin();
+  const rev = await getRevision(revisionId);
+  if (!rev) return { success: false, error: "unknown" };
+
+  const supabase = await createClient();
+
+  // Snapshot the current content first (it may include un-snapshotted
+  // autosave changes) so restoring never loses the present version.
+  const { data: current } = await supabase
+    .from("blog_posts")
+    .select("title, excerpt, content")
+    .eq("id", rev.post_id)
+    .maybeSingle();
+  if (current) {
+    await snapshotRevision(
+      rev.post_id,
+      {
+        title: current.title as string,
+        excerpt: (current.excerpt as string | null) ?? null,
+        content: current.content as TiptapDoc,
+      },
+      user.id,
+    );
+  }
+
+  const { data: post, error } = await supabase
+    .from("blog_posts")
+    .update({
+      title: rev.title,
+      excerpt: rev.excerpt,
+      content: rev.content,
+      content_text: extractPlainText(rev.content),
+    })
+    .eq("id", rev.post_id)
+    .select("slug")
+    .single();
+  if (error || !post) {
+    console.error("[blog] restoreRevision failed:", error?.message);
+    return { success: false, error: "unknown" };
+  }
+
+  const slug = post.slug as string;
+  revalidateBlog(slug);
+  return { success: true, slug, id: rev.post_id };
 }
 
 export interface AutosaveResult {
