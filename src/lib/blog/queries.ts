@@ -69,6 +69,7 @@ export async function getPublishedPostsPage(
     .from("blog_posts")
     .select("*", { count: "exact" })
     .eq("status", "published")
+    .order("pinned", { ascending: false })
     .order("publish_at", { ascending: false })
     .range(from, to);
 

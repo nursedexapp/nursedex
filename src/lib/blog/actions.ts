@@ -239,6 +239,30 @@ export async function archivePost(id: string): Promise<BlogActionResult> {
   return patchStatus(id, toArchived());
 }
 
+/** Toggle whether a post is pinned (featured) to the top of the index. */
+export async function togglePinned(id: string): Promise<BlogActionResult> {
+  await requireAdmin();
+  const supabase = await createClient();
+  const { data: current } = await supabase
+    .from("blog_posts")
+    .select("pinned")
+    .eq("id", id)
+    .maybeSingle();
+
+  const { data, error } = await supabase
+    .from("blog_posts")
+    .update({ pinned: !(current as { pinned: boolean } | null)?.pinned })
+    .eq("id", id)
+    .select("slug")
+    .single();
+  if (error || !data) {
+    console.error("[blog] togglePinned failed:", error?.message);
+    return { success: false, error: "unknown" };
+  }
+  revalidateBlog(data.slug as string);
+  return { success: true, id, slug: data.slug as string };
+}
+
 /** Permanently delete a post and remove the images it owned. */
 export async function deletePost(id: string): Promise<BlogActionResult> {
   await requireAdmin();
