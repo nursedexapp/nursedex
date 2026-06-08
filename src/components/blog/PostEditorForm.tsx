@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { PostEditor } from "@/components/blog/PostEditor";
 import { savePost, autosavePost, createCategory } from "@/lib/blog/actions";
 import { writePreviewDraft } from "@/lib/blog/preview-draft";
+import { slugify } from "@/lib/blog/slugify";
 import type { BlogIntent } from "@/lib/schemas/blog";
 import type {
   BlogCategory,
@@ -50,12 +51,29 @@ export function PostEditorForm({
 
   const [title, setTitle] = useState(post?.title ?? "");
   const [slug, setSlug] = useState(post?.slug ?? "");
+  // For a new post, keep the slug in sync with the title as it is typed,
+  // until the slug is edited by hand (then leave it alone). Never auto-change
+  // an existing post's slug, since that would break its published URL.
+  const [slugLocked, setSlugLocked] = useState(Boolean(post?.slug));
+
+  function onTitleChange(value: string) {
+    setTitle(value);
+    if (!slugLocked) setSlug(slugify(value));
+  }
   const [excerpt, setExcerpt] = useState(post?.excerpt ?? "");
-  const [content, setContent] = useState<TiptapDoc | null>(post?.content ?? null);
-  const [coverImageUrl, setCoverImageUrl] = useState(post?.cover_image_url ?? "");
+  const [content, setContent] = useState<TiptapDoc | null>(
+    post?.content ?? null,
+  );
+  const [coverImageUrl, setCoverImageUrl] = useState(
+    post?.cover_image_url ?? "",
+  );
   const [seoTitle, setSeoTitle] = useState(post?.seo_title ?? "");
-  const [seoDescription, setSeoDescription] = useState(post?.seo_description ?? "");
-  const [showSchedule, setShowSchedule] = useState(post?.status === "scheduled");
+  const [seoDescription, setSeoDescription] = useState(
+    post?.seo_description ?? "",
+  );
+  const [showSchedule, setShowSchedule] = useState(
+    post?.status === "scheduled",
+  );
   const [publishAtLocal, setPublishAtLocal] = useState(
     toLocalInput(post?.publish_at ?? null),
   );
@@ -239,7 +257,10 @@ export function PostEditorForm({
     try {
       const body = new FormData();
       body.append("file", file);
-      const res = await fetch("/api/admin/blog/images", { method: "POST", body });
+      const res = await fetch("/api/admin/blog/images", {
+        method: "POST",
+        body,
+      });
       const json = await res.json();
       if (!res.ok) {
         toast.error(json.error ?? "Image upload failed.");
@@ -315,7 +336,7 @@ export function PostEditorForm({
         <Input
           id="title"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => onTitleChange(e.target.value)}
           placeholder="A clear, search-friendly headline"
           className="mt-1"
         />
@@ -327,8 +348,11 @@ export function PostEditorForm({
         <Input
           id="slug"
           value={slug}
-          onChange={(e) => setSlug(e.target.value)}
-          placeholder="Auto-generated from the title if left blank"
+          onChange={(e) => {
+            setSlug(e.target.value);
+            setSlugLocked(true);
+          }}
+          placeholder="Auto-generated from the title"
           className="mt-1"
         />
         <p className="text-soft-black-light mt-1 text-xs">
