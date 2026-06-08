@@ -17,11 +17,13 @@ import {
   Link as LinkIcon,
   Image as ImageIcon,
   Video,
+  Superscript,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Embed } from "@/components/blog/tiptap/Embed";
+import { Footnote } from "@/components/blog/tiptap/Footnote";
 import { parseEmbed } from "@/lib/blog/embed";
 import type { TiptapDoc } from "@/types/database";
 
@@ -53,6 +55,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
       }),
       BlogImage,
       Embed,
+      Footnote,
     ],
     content: value ?? EMPTY_DOC,
     onUpdate: ({ editor }) => onChange(editor.getJSON() as TiptapDoc),
@@ -111,6 +114,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
         return;
       }
       const alt = window.prompt("Describe the image (alt text)") ?? "";
+      const caption = window.prompt("Caption (optional)") ?? "";
       editor
         .chain()
         .focus()
@@ -119,6 +123,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           attrs: {
             src: json.url,
             alt,
+            caption: caption.trim() || null,
             width: json.width ?? null,
             height: json.height ?? null,
           },
@@ -140,6 +145,13 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
       return;
     }
     editor.chain().focus().setEmbed({ url }).run();
+  }
+
+  function insertFootnote() {
+    if (!editor) return;
+    const text = window.prompt("Footnote text");
+    if (!text || !text.trim()) return;
+    editor.chain().focus().setFootnote({ text: text.trim() }).run();
   }
 
   const btn = (
@@ -198,6 +210,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           onChange={onPickImage}
         />
         {btn(false, insertEmbed, "Embed a video", Video)}
+        {btn(false, insertFootnote, "Add a footnote", Superscript)}
       </div>
       <EditorContent editor={editor} className="px-3 py-2" />
     </div>

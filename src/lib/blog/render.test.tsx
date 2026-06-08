@@ -200,6 +200,46 @@ describe("PostContent renderer", () => {
     expect(bad).not.toContain("<img");
   });
 
+  it("wraps a captioned image in a figure with a figcaption", () => {
+    const out = html(
+      doc({
+        type: "image",
+        attrs: { src: `https://${IMAGE_HOST}/p.png`, alt: "p", caption: "A nice caption" },
+      }),
+    );
+    expect(out).toContain("<figure");
+    expect(out).toContain("<figcaption");
+    expect(out).toContain("A nice caption");
+  });
+
+  it("numbers inline footnote refs and renders a footnotes section", () => {
+    const out = html(
+      doc(
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "a" },
+            { type: "footnote", attrs: { text: "First note" } },
+          ],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "footnote", attrs: { text: "Second note" } }],
+        },
+      ),
+    );
+    // Inline references, numbered in document order.
+    expect(out).toContain('id="fnref-1"');
+    expect(out).toContain('href="#fn-1"');
+    expect(out).toContain('id="fnref-2"');
+    // Footnotes section with matching anchors and backlinks.
+    expect(out).toContain('id="fn-1"');
+    expect(out).toContain("First note");
+    expect(out).toContain('id="fn-2"');
+    expect(out).toContain("Second note");
+    expect(out).toContain('href="#fnref-1"');
+  });
+
   it("returns nothing for an empty or malformed document", () => {
     expect(html({ type: "doc" } as TiptapDoc)).toBe("");
     expect(renderToStaticMarkup(<PostContent doc={null} />)).toBe("");

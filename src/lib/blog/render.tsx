@@ -2,8 +2,13 @@ import { Fragment, type ReactNode } from "react";
 import NextImage from "next/image";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
 import { headingId, nodeText } from "./toc";
+import { collectFootnotes } from "./footnotes";
 import { parseEmbed } from "./embed";
 import { CodeBlock } from "@/components/blog/CodeBlock";
+
+// Reserved key in the shared `seen` map used to number footnotes in
+// document order. It cannot collide with a heading slug.
+const FN_KEY = " footnote";
 
 /**
  * Render a stored Tiptap (ProseMirror) document to React elements.
@@ -156,15 +161,16 @@ function renderNode(
       const src = node.attrs?.src;
       if (!isAllowedImageSrc(src)) return null;
       const alt = typeof node.attrs?.alt === "string" ? node.attrs.alt : "";
+      const caption =
+        typeof node.attrs?.caption === "string" ? node.attrs.caption.trim() : "";
       const width = Number(node.attrs?.width);
       const height = Number(node.attrs?.height);
       // With intrinsic dimensions (captured on upload) use next/image, which
       // is responsive, format-optimized, and avoids layout shift. The host
       // is allowlisted both here and in next.config remotePatterns.
-      if (width > 0 && height > 0) {
-        return (
+      const img =
+        width > 0 && height > 0 ? (
           <NextImage
-            key={key}
             src={src as string}
             alt={alt}
             width={width}
@@ -172,11 +178,37 @@ function renderNode(
             sizes="(max-width: 768px) 100vw, 768px"
             className="h-auto w-full rounded-lg"
           />
+        ) : (
+          // Legacy images without stored dimensions fall back to a plain img.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src as string} alt={alt} loading="lazy" />
+        );
+      if (caption) {
+        return (
+          <figure key={key} className="my-6">
+            {img}
+            <figcaption className="text-soft-black-light mt-2 text-center text-sm">
+              {caption}
+            </figcaption>
+          </figure>
         );
       }
-      // Legacy images without stored dimensions fall back to a plain img.
-      // eslint-disable-next-line @next/next/no-img-element
-      return <img key={key} src={src as string} alt={alt} loading="lazy" />;
+      return <Fragment key={key}>{img}</Fragment>;
+    }
+    case "footnote": {
+      const text =
+        typeof node.attrs?.text === "string" ? node.attrs.text.trim() : "";
+      if (!text) return null;
+      // Number in document order via the shared map (matches collectFootnotes).
+      const n = (seen.get(FN_KEY) ?? 0) + 1;
+      seen.set(FN_KEY, n);
+      return (
+        <sup key={key} id={`fnref-${n}`}>
+          <a href={`#fn-${n}`} className="text-teal-dark no-underline">
+            [{n}]
+          </a>
+        </sup>
+      );
     }
     case "embed": {
       // Only ever iframe a normalized provider embed URL (see parseEmbed);
@@ -221,7 +253,34 @@ function renderChildren(
 export function PostContent({ doc }: { doc: TiptapDoc | null | undefined }) {
   if (!doc || doc.type !== "doc" || !doc.content) return null;
   // Shared across the render pass so heading ids de-dupe in document order,
-  // matching extractHeadings used by the table of contents.
+  // matching extractHeadings used by the table of contents, and so footnotes
+  // are numbered in document order matching collectFootnotes below.
   const seen = new Map<string, number>();
-  return <>{doc.content.map((node, i) => renderNode(node, `n-${i}`, seen))}</>;
+  const footnotes = collectFootnotes(doc);
+  return (
+    <>
+      {doc.content.map((node, i) => renderNode(node, `n-${i}`, seen))}
+      {footnotes.length > 0 && (
+        <section className="border-sage-light/40 mt-10 border-t pt-6">
+          <h2 className="font-heading text-soft-black mb-3 text-lg font-semibold">
+            Footnotes
+          </h2>
+          <ol className="text-soft-black-light space-y-2 text-sm">
+            {footnotes.map((f) => (
+              <li key={f.number} id={`fn-${f.number}`}>
+                {f.text}{" "}
+                <a
+                  href={`#fnref-${f.number}`}
+                  aria-label="Back to content"
+                  className="text-teal-dark"
+                >
+                  {"\u21A9"}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+    </>
+  );
 }
