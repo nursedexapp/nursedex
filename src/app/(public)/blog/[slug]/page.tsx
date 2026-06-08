@@ -28,6 +28,7 @@ export async function generateMetadata({
 
   const description = post.seo_description || post.excerpt || undefined;
   const url = `https://nursedex.com/blog/${post.slug}`;
+  const authorName = await getAuthorName(post.author_id);
   return {
     title: `${post.seo_title || post.title} | NurseDex`,
     description,
@@ -42,6 +43,12 @@ export async function generateMetadata({
       url,
       publishedTime: post.publish_at ?? undefined,
       modifiedTime: post.updated_at,
+      authors: authorName ? [authorName] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.seo_title || post.title,
+      description,
     },
   };
 }
@@ -82,6 +89,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           tags={tags}
           authorName={authorName}
           related={related}
+          showShare
         />
       </main>
     </div>
