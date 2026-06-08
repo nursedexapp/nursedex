@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, History } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { PostEditorForm } from "@/components/blog/PostEditorForm";
 import {
   getPostById,
@@ -41,9 +42,18 @@ export default async function EditBlogPostPage({
         <ArrowLeft className="size-4" />
         Back to posts
       </Link>
-      <h1 className="font-heading text-soft-black mb-6 text-2xl font-semibold">
-        Edit post
-      </h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="font-heading text-soft-black text-2xl font-semibold">
+          Edit post
+        </h1>
+        <Link
+          href={`/admin/blog/${id}/revisions`}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          <History className="size-4" />
+          History
+        </Link>
+      </div>
       <PostEditorForm
         post={post}
         categories={categories}

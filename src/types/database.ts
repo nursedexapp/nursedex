@@ -334,3 +334,13 @@ export interface BlogComment {
   status: BlogCommentStatus;
   created_at: string;
 }
+
+export interface BlogPostRevision {
+  id: string;
+  post_id: string;
+  title: string;
+  excerpt: string | null;
+  content: TiptapDoc;
+  created_by: string | null;
+  created_at: string;
+}
