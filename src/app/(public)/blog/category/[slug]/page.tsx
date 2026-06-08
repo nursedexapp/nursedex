@@ -31,6 +31,10 @@ export async function generateMetadata({
     title: `${archive.category.name} | NurseDex Blog`,
     description: `Posts in ${archive.category.name} on the NurseDex blog.`,
     alternates: { canonical },
+    // A category with no published posts is a thin page; keep it out of search.
+    ...(archive.total === 0
+      ? { robots: { index: false, follow: false } }
+      : {}),
   };
 }
 
