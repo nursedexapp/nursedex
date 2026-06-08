@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
+import { BlogImage } from "@/components/blog/tiptap/BlogImage";
 import {
   Bold,
   Italic,
@@ -51,7 +51,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           HTMLAttributes: { rel: "noopener nofollow", target: "_blank" },
         },
       }),
-      Image,
+      BlogImage,
       Embed,
     ],
     content: value ?? EMPTY_DOC,
@@ -111,7 +111,19 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
         return;
       }
       const alt = window.prompt("Describe the image (alt text)") ?? "";
-      editor.chain().focus().setImage({ src: json.url, alt }).run();
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "image",
+          attrs: {
+            src: json.url,
+            alt,
+            width: json.width ?? null,
+            height: json.height ?? null,
+          },
+        })
+        .run();
     } catch {
       toast.error("Image upload failed.");
     } finally {
