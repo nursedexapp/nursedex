@@ -36,6 +36,51 @@ export async function sendProfileSetupEmail(
   }
 }
 
+/**
+ * Sends the double opt-in confirmation email for the blog newsletter. The
+ * confirm link carries the subscriber's token; clicking it confirms them.
+ */
+export async function sendNewsletterConfirmEmail(
+  to: string,
+  token: string,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const confirmUrl = `${baseUrl}/newsletter/confirm?token=${encodeURIComponent(token)}`;
+
+  const res = await fetch(`${baseUrl}/api/email/newsletter-confirm`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify({ to, confirmUrl }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Newsletter confirm email failed:", res.status, body);
+  }
+}
+
+/** Sends the welcome email once a newsletter subscriber confirms. */
+export async function sendNewsletterWelcomeEmail(to: string): Promise<void> {
+  const baseUrl = await getBaseUrl();
+
+  const res = await fetch(`${baseUrl}/api/email/newsletter-welcome`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify({ to }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Newsletter welcome email failed:", res.status, body);
+  }
+}
+
 interface SendAccountExistsNoticeArgs {
   to: string;
   firstName?: string;

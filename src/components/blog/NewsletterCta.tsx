@@ -33,7 +33,9 @@ export function NewsletterCta({ source }: { source: string }) {
       {status === "success" ? (
         <div className="text-soft-black flex items-center gap-2">
           <CheckCircle2 className="text-teal size-5" />
-          <p className="text-sm font-medium">Thanks! You are subscribed.</p>
+          <p className="text-sm font-medium">
+            Almost there! Check your email to confirm.
+          </p>
         </div>
       ) : (
         <>
