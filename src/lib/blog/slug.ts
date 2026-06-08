@@ -1,20 +1,9 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { slugify } from "./slugify";
 
-/**
- * Turn a title into a URL slug. Pure string transform, no IO, so it is
- * unit testable on its own. Decomposes accented characters and drops the
- * combining marks (so "café" becomes "cafe", not "cafe-"), lowercases,
- * replaces any run of non alphanumeric characters with a single hyphen,
- * and trims hyphens from the ends.
- */
-export function slugify(title: string): string {
-  return title
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+// Re-exported so existing server-side importers keep working; client code
+// should import from "./slugify" directly to avoid the service-role taint.
+export { slugify };
 
 /**
  * Produce a slug for a post title that is unique across blog_posts.
