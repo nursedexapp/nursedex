@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import type { TiptapDoc } from "@/types/database";
-import { extractPlainText, readingTimeMinutes } from "./text";
+import {
+  extractPlainText,
+  readingTimeMinutes,
+  readingTimeFromText,
+} from "./text";
 
 function docOf(words: number): TiptapDoc {
   return {
@@ -66,5 +70,14 @@ describe("readingTimeMinutes", () => {
     expect(readingTimeMinutes(docOf(220))).toBe(1);
     expect(readingTimeMinutes(docOf(221))).toBe(2);
     expect(readingTimeMinutes(docOf(660))).toBe(3);
+  });
+});
+
+describe("readingTimeFromText", () => {
+  it("counts words from flattened text (the stored content_text)", () => {
+    expect(readingTimeFromText("")).toBe(1);
+    expect(readingTimeFromText(null)).toBe(1);
+    expect(readingTimeFromText("word ".repeat(220).trim())).toBe(1);
+    expect(readingTimeFromText("word ".repeat(221).trim())).toBe(2);
   });
 });
