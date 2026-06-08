@@ -125,6 +125,7 @@ export default async function AdminBlogPage() {
                 </Badge>
                 <BlogPostActions
                   id={post.id}
+                  slug={post.slug}
                   status={post.status}
                   pinned={post.pinned}
                 />

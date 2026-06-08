@@ -23,11 +23,17 @@ import { BlogPostStatus } from "@/types/enums";
 
 interface BlogPostActionsProps {
   id: string;
+  slug: string;
   status: BlogPostStatus;
   pinned: boolean;
 }
 
-export function BlogPostActions({ id, status, pinned }: BlogPostActionsProps) {
+export function BlogPostActions({
+  id,
+  slug,
+  status,
+  pinned,
+}: BlogPostActionsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -64,6 +70,16 @@ export function BlogPostActions({ id, status, pinned }: BlogPostActionsProps) {
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {status === BlogPostStatus.PUBLISHED && (
+          <DropdownMenuItem
+            onClick={() => {
+              setOpen(false);
+              window.open(`/blog/${slug}`, "_blank", "noopener");
+            }}
+          >
+            View post
+          </DropdownMenuItem>
+        )}
         {(status === BlogPostStatus.SCHEDULED ||
           status === BlogPostStatus.DRAFT) && (
           <DropdownMenuItem onClick={() => run(publishNow, "Post published.")}>
@@ -79,14 +95,14 @@ export function BlogPostActions({ id, status, pinned }: BlogPostActionsProps) {
               )
             }
           >
-            {pinned ? "Unpin from top" : "Pin to top (feature)"}
+            {pinned ? "Unpin from top" : "Pin to top"}
           </DropdownMenuItem>
         )}
         {status === BlogPostStatus.PUBLISHED && (
           <DropdownMenuItem
             onClick={() => run(unpublishPost, "Moved back to draft.")}
           >
-            Unpublish (back to draft)
+            Unpublish
           </DropdownMenuItem>
         )}
         {status !== BlogPostStatus.ARCHIVED && (
