@@ -46,6 +46,7 @@ interface DonePayload {
   active_min?: number | null;
   commit_span_min?: number | null;
   summary: string;
+  changelog?: string;
   prs?: { url: string; title?: string }[];
   note?: string;
 }
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
       id,
       title: req.title,
       summary: body.summary.trim(),
+      changelog: body.changelog?.trim() || null,
       prs,
       rate,
       billedMin: Math.round(billedMin),

@@ -314,6 +314,7 @@ export function completionBlocks(opts: {
   id: number;
   title: string;
   summary: string;
+  changelog?: string | null;
   prs: { url: string; title?: string }[];
   rate: number;
   billedMin: number;
@@ -333,6 +334,13 @@ export function completionBlocks(opts: {
     },
     { type: "section", text: { type: "mrkdwn", text: opts.summary } },
   ];
+
+  if (opts.changelog?.trim()) {
+    blocks.push({
+      type: "section",
+      text: { type: "mrkdwn", text: `*Changelog*\n${opts.changelog.trim()}` },
+    });
+  }
 
   if (opts.prs.length) {
     const list = opts.prs
