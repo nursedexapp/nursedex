@@ -5,6 +5,7 @@ import { extractHeadings } from "@/lib/blog/toc";
 import { readingTimeMinutes } from "@/lib/blog/text";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import { BlogToc } from "@/components/blog/BlogToc";
+import { BlogShareButtons } from "@/components/blog/BlogShareButtons";
 import type {
   BlogCategory,
   BlogPost,
@@ -18,6 +19,8 @@ interface BlogArticleProps {
   tags: BlogTag[];
   authorName: string | null;
   related: BlogPostListItem[];
+  /** Show share buttons. Off for the draft preview (not publicly shareable). */
+  showShare?: boolean;
 }
 
 function formatDate(iso: string | null): string {
@@ -39,6 +42,7 @@ export function BlogArticle({
   tags,
   authorName,
   related,
+  showShare = false,
 }: BlogArticleProps) {
   const headings = extractHeadings(post.content);
 
@@ -95,6 +99,15 @@ export function BlogArticle({
               {tag.name}
             </Link>
           ))}
+        </div>
+      )}
+
+      {showShare && (
+        <div className="border-sage-light/40 mt-8 border-t pt-6">
+          <BlogShareButtons
+            url={`https://nursedex.com/blog/${post.slug}`}
+            title={post.title}
+          />
         </div>
       )}
 
