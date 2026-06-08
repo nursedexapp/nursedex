@@ -1,0 +1,61 @@
+import { test, expect } from "@playwright/test";
+
+// Authenticated author flow. Runs as the seeded admin (storageState from
+// auth.setup.ts) only when E2E_AUTH=1 against a local/test Supabase.
+
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+async function fillNewPost(
+  page: import("@playwright/test").Page,
+  title: string,
+  body: string,
+) {
+  await page.goto("/admin/blog/new");
+  await page.locator("#title").fill(title);
+  const editor = page.locator(".ProseMirror");
+  await editor.click();
+  await editor.pressSequentially(body);
+}
+
+test("admin can create and publish a post that appears publicly", async ({
+  page,
+}) => {
+  const title = `E2E Post ${Date.now()}`;
+  const body = "Hello from the authenticated e2e test.";
+
+  await fillNewPost(page, title, body);
+  await page.getByRole("button", { name: "Publish now" }).click();
+
+  // Back to the list, with the new post shown.
+  await page.waitForURL(/\/admin\/blog$/);
+  await expect(page.getByText(title)).toBeVisible();
+
+  // The published post renders on its public page.
+  await page.goto(`/blog/${slugify(title)}`);
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+  await expect(page.getByText(body)).toBeVisible();
+
+  // And it appears on the public index.
+  await page.goto("/blog");
+  await expect(page.getByText(title)).toBeVisible();
+});
+
+test("a saved draft never appears publicly", async ({ page }) => {
+  const title = `E2E Draft ${Date.now()}`;
+
+  await fillNewPost(page, title, "This draft should stay private.");
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await page.waitForURL(/\/admin\/blog$/);
+
+  // Not on the index and the direct URL 404s (draft is not published).
+  await page.goto("/blog");
+  await expect(page.getByText(title)).toHaveCount(0);
+
+  const res = await page.goto(`/blog/${slugify(title)}`);
+  expect(res?.status()).toBe(404);
+});
