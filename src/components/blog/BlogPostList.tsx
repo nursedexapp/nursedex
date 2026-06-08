@@ -1,6 +1,7 @@
 import Link from "next/link";
 import NextImage from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { readingTimeMinutes } from "@/lib/blog/text";
 import type { BlogPostListItem } from "@/types/database";
 
 interface BlogPostListProps {
@@ -58,7 +59,10 @@ export function BlogPostList({
                 </div>
               )}
               <div className="text-soft-black-light flex items-center gap-2 text-sm">
-                <span>{formatDate(post.publish_at)}</span>
+                <span>
+                  {formatDate(post.publish_at)} ·{" "}
+                  {readingTimeMinutes(post.content)} min read
+                </span>
                 {post.categoryName && post.categorySlug && (
                   <span className="bg-sage/15 text-teal-dark rounded-full px-2 py-0.5 text-xs font-medium">
                     {post.categoryName}

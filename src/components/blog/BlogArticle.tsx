@@ -1,6 +1,7 @@
 import Link from "next/link";
 import NextImage from "next/image";
 import { PostContent } from "@/lib/blog/render";
+import { readingTimeMinutes } from "@/lib/blog/text";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import type {
   BlogCategory,
@@ -43,7 +44,8 @@ export function BlogArticle({
         <div className="text-soft-black-light flex items-center gap-2 text-sm">
           <span>
             {formatDate(post.publish_at)}
-            {authorName ? <> · By {authorName}</> : null}
+            {authorName ? <> · By {authorName}</> : null} ·{" "}
+            {readingTimeMinutes(post.content)} min read
           </span>
           {category && (
             <Link

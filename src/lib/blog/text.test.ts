@@ -1,7 +1,19 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import type { TiptapDoc } from "@/types/database";
-import { extractPlainText } from "./text";
+import { extractPlainText, readingTimeMinutes } from "./text";
+
+function docOf(words: number): TiptapDoc {
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: Array(words).fill("word").join(" ") }],
+      },
+    ],
+  };
+}
 
 describe("extractPlainText", () => {
   it("flattens headings, paragraphs, and lists to text", () => {
@@ -41,5 +53,18 @@ describe("extractPlainText", () => {
     ).toBe("a b");
     expect(extractPlainText({ type: "doc" } as TiptapDoc)).toBe("");
     expect(extractPlainText(null)).toBe("");
+  });
+});
+
+describe("readingTimeMinutes", () => {
+  it("is at least 1 minute, even for empty or tiny posts", () => {
+    expect(readingTimeMinutes(null)).toBe(1);
+    expect(readingTimeMinutes(docOf(5))).toBe(1);
+  });
+
+  it("rounds up to whole minutes at ~220 wpm", () => {
+    expect(readingTimeMinutes(docOf(220))).toBe(1);
+    expect(readingTimeMinutes(docOf(221))).toBe(2);
+    expect(readingTimeMinutes(docOf(660))).toBe(3);
   });
 });
