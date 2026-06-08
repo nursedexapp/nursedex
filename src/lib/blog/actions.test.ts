@@ -89,6 +89,8 @@ describe("savePost", () => {
     });
     expect(res.success).toBe(true);
     expect(res.slug).toBe("my-post");
+    // The body is flattened to content_text for full text search.
+    expect(h.calls.insert[0]).toMatchObject({ content_text: "hello" });
     expect(h.revalidatePath).toHaveBeenCalledWith("/blog");
     expect(h.revalidatePath).toHaveBeenCalledWith("/blog/my-post");
   });
