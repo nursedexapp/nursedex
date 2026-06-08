@@ -254,6 +254,60 @@ export async function getTaxonomyForAdmin(): Promise<{
   return { categories, tags };
 }
 
+/**
+ * Categories and tags that have at least one published post. Used by the
+ * sitemap so empty/draft-only archives (thin pages) are not listed.
+ */
+export async function getIndexableTaxonomy(): Promise<{
+  categories: { slug: string; updated_at: string }[];
+  tags: { slug: string }[];
+}> {
+  const supabase = createServiceRoleClient();
+
+  const { data: posts } = await supabase
+    .from("blog_posts")
+    .select("id, category_id")
+    .eq("status", "published");
+  const pub = (posts ?? []) as { id: string; category_id: string | null }[];
+  const catIds = [
+    ...new Set(pub.map((p) => p.category_id).filter((id): id is string => !!id)),
+  ];
+  const postIds = pub.map((p) => p.id);
+
+  let tagIds: string[] = [];
+  if (postIds.length > 0) {
+    const { data: pt } = await supabase
+      .from("blog_post_tags")
+      .select("tag_id")
+      .in("post_id", postIds);
+    tagIds = [
+      ...new Set(((pt ?? []) as { tag_id: string }[]).map((r) => r.tag_id)),
+    ];
+  }
+
+  const categories: { slug: string; updated_at: string }[] = [];
+  if (catIds.length > 0) {
+    const { data: cats } = await supabase
+      .from("blog_categories")
+      .select("slug, updated_at")
+      .in("id", catIds);
+    categories.push(
+      ...((cats ?? []) as { slug: string; updated_at: string }[]),
+    );
+  }
+
+  const tags: { slug: string }[] = [];
+  if (tagIds.length > 0) {
+    const { data: tg } = await supabase
+      .from("blog_tags")
+      .select("slug")
+      .in("id", tagIds);
+    tags.push(...((tg ?? []) as { slug: string }[]));
+  }
+
+  return { categories, tags };
+}
+
 export async function getCategoryById(
   id: string | null,
 ): Promise<BlogCategory | null> {

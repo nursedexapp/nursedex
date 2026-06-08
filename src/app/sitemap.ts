@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { getIndexableTaxonomy } from "@/lib/blog/queries";
 
 const BASE_URL = "https://nursedex.com";
 
@@ -94,23 +95,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   let taxonomyEntries: MetadataRoute.Sitemap = [];
   try {
-    const supabase = createServiceRoleClient();
-    const [cats, tags] = await Promise.all([
-      supabase.from("blog_categories").select("slug, updated_at"),
-      supabase.from("blog_tags").select("slug"),
-    ]);
+    // Only taxonomy with at least one published post (no thin archives).
+    const { categories, tags } = await getIndexableTaxonomy();
 
-    const catEntries: MetadataRoute.Sitemap = (
-      (cats.data ?? []) as { slug: string; updated_at: string }[]
-    ).map((c) => ({
+    const catEntries: MetadataRoute.Sitemap = categories.map((c) => ({
       url: `${BASE_URL}/blog/category/${c.slug}`,
       lastModified: new Date(c.updated_at),
       changeFrequency: "weekly" as const,
       priority: 0.4,
     }));
-    const tagEntries: MetadataRoute.Sitemap = (
-      (tags.data ?? []) as { slug: string }[]
-    ).map((t) => ({
+    const tagEntries: MetadataRoute.Sitemap = tags.map((t) => ({
       url: `${BASE_URL}/blog/tag/${t.slug}`,
       changeFrequency: "weekly" as const,
       priority: 0.3,
