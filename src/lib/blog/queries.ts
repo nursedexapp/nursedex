@@ -1,6 +1,34 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { BlogPost } from "@/types/database";
+import { authorDisplayName } from "./author";
+
+/**
+ * Display name for a post's author, or null if there is no author (the FK
+ * is ON DELETE SET NULL) or no usable name. Read with the service-role
+ * client so a public, sessionless request can resolve it, the same way the
+ * post itself is fetched. We query the author separately rather than
+ * embedding to avoid PostgREST relationship-detection surprises.
+ */
+export async function getAuthorName(
+  authorId: string | null,
+): Promise<string | null> {
+  if (!authorId) return null;
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select("first_name, last_name")
+    .eq("id", authorId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[blog] getAuthorName failed:", error.message);
+    return null;
+  }
+  return authorDisplayName(
+    data as { first_name: string | null; last_name: string | null } | null,
+  );
+}
 
 /** Default number of posts shown per page on the public blog index. */
 export const BLOG_PAGE_SIZE = 9;
