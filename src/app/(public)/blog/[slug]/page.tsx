@@ -13,6 +13,7 @@ import { getBlogSlugRedirect } from "@/lib/blog/redirects";
 import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
 import { BlogArticle } from "@/components/blog/BlogArticle";
 import { NewsletterCta } from "@/components/blog/NewsletterCta";
+import { BlogPostAnalytics } from "@/components/blog/BlogPostAnalytics";
 
 export const revalidate = 60;
 
@@ -75,6 +76,11 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
         <ArticleJsonLd post={post} authorName={authorName} />
+        <BlogPostAnalytics
+          postId={post.id}
+          slug={post.slug}
+          category={category?.name ?? null}
+        />
 
         <Link
           href="/blog"
