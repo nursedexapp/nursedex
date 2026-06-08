@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   Video,
   Superscript,
+  SquareCode,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { Embed } from "@/components/blog/tiptap/Embed";
 import { Footnote } from "@/components/blog/tiptap/Footnote";
 import { parseEmbed } from "@/lib/blog/embed";
+import { CODE_LANGUAGES } from "@/lib/blog/code-languages";
 import type { TiptapDoc } from "@/types/database";
 
 interface PostEditorProps {
@@ -80,6 +82,9 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
       ordered: editor?.isActive("orderedList") ?? false,
       quote: editor?.isActive("blockquote") ?? false,
       link: editor?.isActive("link") ?? false,
+      codeBlock: editor?.isActive("codeBlock") ?? false,
+      codeLang:
+        (editor?.getAttributes("codeBlock").language as string | null) ?? "",
     }),
   });
 
@@ -181,6 +186,30 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
         {btn(active.italic, () => editor.chain().focus().toggleItalic().run(), "Italic", Italic)}
         {btn(active.strike, () => editor.chain().focus().toggleStrike().run(), "Strikethrough", Strikethrough)}
         {btn(active.code, () => editor.chain().focus().toggleCode().run(), "Inline code", Code)}
+        {btn(active.codeBlock, () => editor.chain().focus().toggleCodeBlock().run(), "Code block", SquareCode)}
+        {active.codeBlock && (
+          <select
+            aria-label="Code block language"
+            value={active.codeLang}
+            onChange={(e) =>
+              editor
+                .chain()
+                .focus()
+                .updateAttributes("codeBlock", {
+                  language: e.target.value || null,
+                })
+                .run()
+            }
+            className="border-border bg-warm-white text-soft-black-light h-8 rounded-md border px-1.5 text-xs"
+          >
+            <option value="">Auto</option>
+            {CODE_LANGUAGES.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        )}
         <span className="bg-border mx-1 h-5 w-px" />
         {btn(active.h2, () => editor.chain().focus().toggleHeading({ level: 2 }).run(), "Heading 2", Heading2)}
         {btn(active.h3, () => editor.chain().focus().toggleHeading({ level: 3 }).run(), "Heading 3", Heading3)}
