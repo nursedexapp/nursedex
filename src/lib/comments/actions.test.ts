@@ -28,6 +28,7 @@ const h = vi.hoisted(() => {
     builder,
     revalidatePath: vi.fn(),
     sendComment: vi.fn(),
+    sendApproved: vi.fn(),
   };
 });
 
@@ -35,6 +36,7 @@ vi.mock("next/cache", () => ({ revalidatePath: h.revalidatePath }));
 vi.mock("next/server", () => ({ after: (fn: () => unknown) => fn() }));
 vi.mock("@/lib/email/send", () => ({
   sendCommentSubmittedEmail: h.sendComment,
+  sendCommentApprovedEmail: h.sendApproved,
 }));
 vi.mock("@/lib/auth/helpers", () => ({
   requireAdmin: async () => ({ id: "admin-1" }),
@@ -46,6 +48,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
 import {
   submitComment,
   approveComment,
+  rejectComment,
   deleteComment,
 } from "./actions";
 
@@ -103,17 +106,45 @@ describe("submitComment", () => {
 });
 
 describe("moderation", () => {
-  it("approveComment revalidates the post page", async () => {
-    h.state.single = { data: { post_id: "post-9" }, error: null };
-    h.state.maybeSingle = { data: { slug: "my-post" }, error: null };
+  it("approveComment revalidates the post page and emails the commenter", async () => {
+    h.state.single = {
+      data: { post_id: "post-9", author_email: "reader@x.com" },
+      error: null,
+    };
+    h.state.maybeSingle = {
+      data: { slug: "my-post", title: "My Post" },
+      error: null,
+    };
     const res = await approveComment("c1");
     expect(res.success).toBe(true);
     expect(h.revalidatePath).toHaveBeenCalledWith("/blog/my-post");
+    expect(h.sendApproved).toHaveBeenCalledWith({
+      to: "reader@x.com",
+      postTitle: "My Post",
+      slug: "my-post",
+    });
+  });
+
+  it("rejectComment does not email the commenter", async () => {
+    h.state.single = {
+      data: { post_id: "post-9", author_email: "reader@x.com" },
+      error: null,
+    };
+    h.state.maybeSingle = {
+      data: { slug: "my-post", title: "My Post" },
+      error: null,
+    };
+    const res = await rejectComment("c1");
+    expect(res.success).toBe(true);
+    expect(h.sendApproved).not.toHaveBeenCalled();
   });
 
   it("deleteComment revalidates the post page", async () => {
     h.state.single = { data: { post_id: "post-9" }, error: null };
-    h.state.maybeSingle = { data: { slug: "my-post" }, error: null };
+    h.state.maybeSingle = {
+      data: { slug: "my-post", title: "My Post" },
+      error: null,
+    };
     const res = await deleteComment("c1");
     expect(res.success).toBe(true);
     expect(h.revalidatePath).toHaveBeenCalledWith("/blog/my-post");
