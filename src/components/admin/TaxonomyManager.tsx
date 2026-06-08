@@ -89,7 +89,8 @@ export function TaxonomyManager({
                   <div className="min-w-0 flex-1">
                     <p className="text-soft-black font-medium">{item.name}</p>
                     <p className="text-soft-black-light text-xs">
-                      /{item.slug} &middot; {item.postCount} {plural(item.postCount)}
+                      /{item.slug} &middot; {item.postCount}{" "}
+                      {plural(item.postCount)}
                     </p>
                   </div>
                   <DropdownMenu>
@@ -106,12 +107,16 @@ export function TaxonomyManager({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onSelect={() => {
+                        onClick={() => {
                           const name = window.prompt(
                             `Rename ${cfg.label}`,
                             item.name,
                           );
-                          if (name && name.trim() && name.trim() !== item.name) {
+                          if (
+                            name &&
+                            name.trim() &&
+                            name.trim() !== item.name
+                          ) {
                             act(
                               () => cfg.onRename(item.id, name),
                               `Renamed to ${name.trim()}.`,
@@ -132,7 +137,7 @@ export function TaxonomyManager({
                               .map((o) => (
                                 <DropdownMenuItem
                                   key={o.id}
-                                  onSelect={() => {
+                                  onClick={() => {
                                     if (
                                       window.confirm(
                                         `Merge "${item.name}" into "${o.name}"? "${item.name}" will be removed.`,
@@ -154,14 +159,12 @@ export function TaxonomyManager({
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         variant="destructive"
-                        onSelect={() => {
+                        onClick={() => {
                           const note =
                             item.postCount > 0
                               ? ` It is used by ${item.postCount} ${plural(item.postCount)}, which will be ${cfg.orphanVerb}.`
                               : "";
-                          if (
-                            window.confirm(`Delete "${item.name}"?${note}`)
-                          ) {
+                          if (window.confirm(`Delete "${item.name}"?${note}`)) {
                             act(() => cfg.onDelete(item.id), "Deleted.");
                           }
                         }}
