@@ -41,7 +41,7 @@ export default async function AdminBlogPage() {
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6 sm:p-8">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-soft-black text-2xl font-semibold">
             Blog
@@ -50,7 +50,7 @@ export default async function AdminBlogPage() {
             Write, schedule, and publish posts.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/admin/blog/newsletter"
             className={buttonVariants({ variant: "outline" })}
