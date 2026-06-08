@@ -10,6 +10,8 @@ export interface PreviewDraft {
   excerpt: string | null;
   content: TiptapDoc;
   cover_image_url: string | null;
+  categoryName: string | null;
+  tags: string[];
   ts: number;
 }
 
