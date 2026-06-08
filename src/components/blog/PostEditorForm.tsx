@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import { toast } from "sonner";
-import { Loader2, Upload, X, Check, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2, Upload, X, Check, Plus, Eye } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -560,6 +560,18 @@ export function PostEditorForm({
         >
           Save draft
         </Button>
+
+        {id && (
+          <a
+            href={`/blog/preview/${id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ variant: "ghost" })}
+          >
+            <Eye className="size-4" />
+            Preview
+          </a>
+        )}
 
         <span
           className="text-soft-black-light ml-auto inline-flex items-center gap-1 text-sm"
