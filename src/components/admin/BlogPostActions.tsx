@@ -66,13 +66,13 @@ export function BlogPostActions({ id, status, pinned }: BlogPostActionsProps) {
       <DropdownMenuContent align="end">
         {(status === BlogPostStatus.SCHEDULED ||
           status === BlogPostStatus.DRAFT) && (
-          <DropdownMenuItem onSelect={() => run(publishNow, "Post published.")}>
+          <DropdownMenuItem onClick={() => run(publishNow, "Post published.")}>
             Publish now
           </DropdownMenuItem>
         )}
         {status === BlogPostStatus.PUBLISHED && (
           <DropdownMenuItem
-            onSelect={() =>
+            onClick={() =>
               run(
                 togglePinned,
                 pinned ? "Unpinned." : "Pinned to the top of the blog.",
@@ -90,7 +90,7 @@ export function BlogPostActions({ id, status, pinned }: BlogPostActionsProps) {
           </DropdownMenuItem>
         )}
         {status !== BlogPostStatus.ARCHIVED && (
-          <DropdownMenuItem onSelect={() => run(archivePost, "Post archived.")}>
+          <DropdownMenuItem onClick={() => run(archivePost, "Post archived.")}>
             Archive
           </DropdownMenuItem>
         )}
