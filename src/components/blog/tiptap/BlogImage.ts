@@ -11,6 +11,7 @@ export const BlogImage = Image.extend({
       ...this.parent?.(),
       width: { default: null },
       height: { default: null },
+      caption: { default: null },
     };
   },
 });
