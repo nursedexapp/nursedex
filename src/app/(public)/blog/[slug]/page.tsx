@@ -25,7 +25,10 @@ export async function generateMetadata({
   return {
     title: `${post.seo_title || post.title} | NurseDex`,
     description,
-    alternates: { canonical: url },
+    alternates: {
+      canonical: url,
+      types: { "application/rss+xml": "https://nursedex.com/blog/feed.xml" },
+    },
     openGraph: {
       title: post.seo_title || post.title,
       description,
