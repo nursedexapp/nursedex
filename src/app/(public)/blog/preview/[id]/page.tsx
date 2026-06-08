@@ -10,7 +10,7 @@ import {
   getAuthorName,
   getRelatedPosts,
 } from "@/lib/blog/queries";
-import { BlogArticle } from "@/components/blog/BlogArticle";
+import { BlogPreviewArticle } from "@/components/blog/BlogPreviewArticle";
 import { BLOG_POST_STATUS_LABELS } from "@/types/enums";
 
 // Admin only and never cached: a preview must always show the latest saved
@@ -54,7 +54,7 @@ export default async function BlogPreviewPage({ params }: PreviewPageProps) {
           Back to editor
         </Link>
 
-        <BlogArticle
+        <BlogPreviewArticle
           post={post}
           category={category}
           tags={tags}

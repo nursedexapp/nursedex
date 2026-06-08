@@ -1,4 +1,4 @@
-import { slugify } from "./slug";
+import { slugify } from "./slugify";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
 
 export interface TocHeading {
