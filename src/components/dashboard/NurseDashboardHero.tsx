@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Clock, Sparkles, Eye, AlertTriangle, X } from "lucide-react";
 
 const CELEBRATION_KEY = "nursedex.celebrated.verified";
@@ -53,11 +54,7 @@ function PendingHero({ slug }: { slug: string }) {
   );
 }
 
-function RejectedHero({
-  rejectedReason,
-}: {
-  rejectedReason?: string | null;
-}) {
+function RejectedHero({ rejectedReason }: { rejectedReason?: string | null }) {
   return (
     <HeroFrame tone="error">
       <HeroIcon tone="error" Icon={AlertTriangle} />
@@ -145,8 +142,8 @@ function CelebrationHero({
         <div className="flex-1 pr-6">
           <HeroHeading>Welcome to NurseDex. Your profile is live.</HeroHeading>
           <HeroBody>
-            Families in New York can now find you. Share your link with
-            people who&apos;ve worked with you and reviews can roll in.
+            Families in New York can now find you. Share your link with people
+            who&apos;ve worked with you and reviews can roll in.
           </HeroBody>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button
@@ -213,8 +210,8 @@ function LiveHero({ slug }: { slug: string }) {
       <div className="flex-1">
         <HeroHeading>Your profile is live</HeroHeading>
         <HeroBody>
-          Families in New York can find you. Share your link to start
-          collecting reviews from past clients.
+          Families in New York can find you. Share your link to start collecting
+          reviews from past clients.
         </HeroBody>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button

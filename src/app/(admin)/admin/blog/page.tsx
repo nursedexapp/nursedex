@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { MessageSquare, Tags, Mail } from "lucide-react";
 import { getAllPostsForAdmin } from "@/lib/blog/queries";
 import { getPendingCommentCount } from "@/lib/comments/queries";
