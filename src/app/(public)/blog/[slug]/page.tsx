@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import {
   getPublishedPostBySlug,
@@ -9,6 +9,7 @@ import {
   getAuthorName,
   getRelatedPosts,
 } from "@/lib/blog/queries";
+import { getBlogSlugRedirect } from "@/lib/blog/redirects";
 import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
 import { BlogArticle } from "@/components/blog/BlogArticle";
 
@@ -48,7 +49,12 @@ export async function generateMetadata({
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
   const post = await getPublishedPostBySlug(slug);
-  if (!post) notFound();
+  if (!post) {
+    // An old slug for a renamed post permanently redirects to the current one.
+    const redirectTo = await getBlogSlugRedirect(slug);
+    if (redirectTo) permanentRedirect(`/blog/${redirectTo}`);
+    notFound();
+  }
 
   const [category, tags, authorName, related] = await Promise.all([
     getCategoryById(post.category_id),

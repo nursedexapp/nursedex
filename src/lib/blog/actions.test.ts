@@ -55,6 +55,9 @@ const tax = vi.hoisted(() => ({
 }));
 vi.mock("./taxonomy", () => tax);
 
+const redir = vi.hoisted(() => ({ saveBlogSlugRedirect: vi.fn() }));
+vi.mock("./redirects", () => redir);
+
 import { savePost, autosavePost, deletePost, createCategory } from "./actions";
 
 const PUB = (p: string) =>
@@ -74,6 +77,7 @@ beforeEach(() => {
   tax.findOrCreateTags.mockResolvedValue([]);
   tax.syncPostTags.mockResolvedValue(undefined);
   tax.findOrCreateCategory.mockResolvedValue("cat-1");
+  redir.saveBlogSlugRedirect.mockResolvedValue(undefined);
 });
 
 describe("savePost", () => {
@@ -215,5 +219,47 @@ describe("createCategory", () => {
     const res = await createCategory("   ");
     expect(res.success).toBe(false);
     expect(tax.findOrCreateCategory).not.toHaveBeenCalled();
+  });
+});
+
+describe("slug redirects on save", () => {
+  const id = "00000000-0000-4000-8000-00000000000b";
+
+  it("records a redirect when a published post's slug changes", async () => {
+    h.state.result = {
+      data: { id, slug: "old-slug", status: "published" },
+      error: null,
+    };
+    const res = await savePost({
+      id,
+      intent: "publish",
+      title: "My Post",
+      content: validContent,
+    });
+    expect(res.success).toBe(true);
+    // ensureUniqueSlug is mocked to return "my-post".
+    expect(redir.saveBlogSlugRedirect).toHaveBeenCalledWith(
+      "old-slug",
+      "my-post",
+      id,
+    );
+  });
+
+  it("does not record a redirect for a draft slug change", async () => {
+    h.state.result = {
+      data: { id, slug: "old-slug", status: "draft" },
+      error: null,
+    };
+    await savePost({ id, intent: "draft", title: "My Post", content: validContent });
+    expect(redir.saveBlogSlugRedirect).not.toHaveBeenCalled();
+  });
+
+  it("does not record a redirect when the slug is unchanged", async () => {
+    h.state.result = {
+      data: { id, slug: "my-post", status: "published" },
+      error: null,
+    };
+    await savePost({ id, intent: "publish", title: "My Post", content: validContent });
+    expect(redir.saveBlogSlugRedirect).not.toHaveBeenCalled();
   });
 });

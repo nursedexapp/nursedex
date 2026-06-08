@@ -16,6 +16,7 @@ import {
   syncPostTags,
   findOrCreateCategory,
 } from "./taxonomy";
+import { saveBlogSlugRedirect } from "./redirects";
 import { toDraft, toPublished, toArchived, toScheduled } from "./transitions";
 import type { StatusPatch } from "./transitions";
 import type { TiptapDoc } from "@/types/database";
@@ -92,6 +93,14 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
 
   let postId: string;
   if (input.id) {
+    // Read the current slug/status first so we can record a redirect if a
+    // published post's public URL is about to change.
+    const { data: prev } = await supabase
+      .from("blog_posts")
+      .select("slug, status")
+      .eq("id", input.id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from("blog_posts")
       .update(fields)
@@ -101,6 +110,14 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
       return { success: false, error: "unknown" };
     }
     postId = input.id;
+
+    const prevSlug = (prev as { slug: string; status: string } | null)?.slug;
+    const wasPublished =
+      (prev as { status: string } | null)?.status === "published";
+    if (wasPublished && prevSlug && prevSlug !== slug) {
+      await saveBlogSlugRedirect(prevSlug, slug, postId);
+      revalidatePath(`/blog/${prevSlug}`);
+    }
   } else {
     const { data, error } = await supabase
       .from("blog_posts")
