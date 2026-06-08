@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import type { BlogPost } from "@/types/database";
+import type { BlogPost, BlogCategory, BlogTag } from "@/types/database";
 
 /** Default number of posts shown per page on the public blog index. */
 export const BLOG_PAGE_SIZE = 9;
@@ -105,4 +105,163 @@ export async function getPostById(id: string): Promise<BlogPost | null> {
     return null;
   }
   return (data as BlogPost | null) ?? null;
+}
+
+// ─── Taxonomy reads ─────────────────────────────────────────
+
+/** All categories, alphabetical. Service role: public, sessionless read. */
+export async function getCategories(): Promise<BlogCategory[]> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("blog_categories")
+    .select("*")
+    .order("name");
+  if (error) {
+    console.error("[blog] getCategories failed:", error.message);
+    return [];
+  }
+  return (data ?? []) as BlogCategory[];
+}
+
+/** All tags, alphabetical. */
+export async function getTags(): Promise<BlogTag[]> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("blog_tags")
+    .select("*")
+    .order("name");
+  if (error) {
+    console.error("[blog] getTags failed:", error.message);
+    return [];
+  }
+  return (data ?? []) as BlogTag[];
+}
+
+export async function getCategoryById(
+  id: string | null,
+): Promise<BlogCategory | null> {
+  if (!id) return null;
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("blog_categories")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  return (data as BlogCategory | null) ?? null;
+}
+
+/** Tags attached to a post, alphabetical. */
+export async function getTagsForPost(postId: string): Promise<BlogTag[]> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("blog_post_tags")
+    .select("blog_tags(*)")
+    .eq("post_id", postId);
+  if (error) {
+    console.error("[blog] getTagsForPost failed:", error.message);
+    return [];
+  }
+  const rows = (data ?? []) as unknown as { blog_tags: BlogTag | null }[];
+  return rows
+    .map((r) => r.blog_tags)
+    .filter((t): t is BlogTag => t !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ─── Archive listings ───────────────────────────────────────
+
+export interface CategoryArchive extends PublishedPostsPage {
+  category: BlogCategory;
+}
+
+export interface TagArchive extends PublishedPostsPage {
+  tag: BlogTag;
+}
+
+/** Published posts in a category by slug, or null if the category is unknown. */
+export async function getPublishedPostsByCategory(
+  slug: string,
+  page: number,
+  pageSize: number = BLOG_PAGE_SIZE,
+): Promise<CategoryArchive | null> {
+  const supabase = createServiceRoleClient();
+  const { data: category } = await supabase
+    .from("blog_categories")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!category) return null;
+
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const from = (safePage - 1) * pageSize;
+  const { data, count } = await supabase
+    .from("blog_posts")
+    .select("*", { count: "exact" })
+    .eq("status", "published")
+    .eq("category_id", (category as BlogCategory).id)
+    .order("publish_at", { ascending: false })
+    .range(from, from + pageSize - 1);
+
+  const total = count ?? 0;
+  return {
+    category: category as BlogCategory,
+    posts: (data ?? []) as BlogPost[],
+    total,
+    page: safePage,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+/** Published posts with a tag by slug, or null if the tag is unknown. */
+export async function getPublishedPostsByTag(
+  slug: string,
+  page: number,
+  pageSize: number = BLOG_PAGE_SIZE,
+): Promise<TagArchive | null> {
+  const supabase = createServiceRoleClient();
+  const { data: tag } = await supabase
+    .from("blog_tags")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (!tag) return null;
+
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const from = (safePage - 1) * pageSize;
+  const { data, count } = await supabase
+    .from("blog_posts")
+    // !inner makes the join a filter: only posts linked to this tag.
+    .select("*, blog_post_tags!inner(tag_id)", { count: "exact" })
+    .eq("status", "published")
+    .eq("blog_post_tags.tag_id", (tag as BlogTag).id)
+    .order("publish_at", { ascending: false })
+    .range(from, from + pageSize - 1);
+
+  const total = count ?? 0;
+  return {
+    tag: tag as BlogTag,
+    posts: (data ?? []) as unknown as BlogPost[],
+    total,
+    page: safePage,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+/** Map posts to list items hydrated with their category name/slug. */
+export async function toListItems(
+  posts: BlogPost[],
+): Promise<import("@/types/database").BlogPostListItem[]> {
+  if (posts.length === 0) return [];
+  const categories = await getCategories();
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  return posts.map((post) => {
+    const cat = post.category_id ? byId.get(post.category_id) : undefined;
+    return {
+      ...post,
+      categoryName: cat?.name ?? null,
+      categorySlug: cat?.slug ?? null,
+    };
+  });
 }

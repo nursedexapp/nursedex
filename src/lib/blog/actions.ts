@@ -3,9 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/helpers";
-import { blogPostSchema, blogAutosaveSchema } from "@/lib/schemas/blog";
+import {
+  blogPostSchema,
+  blogAutosaveSchema,
+  blogCategorySchema,
+} from "@/lib/schemas/blog";
 import { ensureUniqueSlug } from "./slug";
 import { collectImagePaths, removeBlogImagePaths } from "./images";
+import {
+  findOrCreateTags,
+  syncPostTags,
+  findOrCreateCategory,
+} from "./taxonomy";
 import { toDraft, toPublished, toArchived, toScheduled } from "./transitions";
 import type { StatusPatch } from "./transitions";
 import type { TiptapDoc } from "@/types/database";
@@ -74,10 +83,12 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
     cover_image_url: input.cover_image_url || null,
     seo_title: input.seo_title || null,
     seo_description: input.seo_description || null,
+    category_id: input.category_id || null,
     status: patch.status,
     publish_at: patch.publish_at,
   };
 
+  let postId: string;
   if (input.id) {
     const { error } = await supabase
       .from("blog_posts")
@@ -87,21 +98,25 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
       console.error("[blog] update failed:", error.message);
       return { success: false, error: "unknown" };
     }
-    revalidateBlog(slug);
-    return { success: true, slug, id: input.id };
+    postId = input.id;
+  } else {
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .insert({ ...fields, author_id: user.id })
+      .select("id")
+      .single();
+    if (error || !data) {
+      console.error("[blog] insert failed:", error?.message);
+      return { success: false, error: "unknown" };
+    }
+    postId = data.id as string;
   }
 
-  const { data, error } = await supabase
-    .from("blog_posts")
-    .insert({ ...fields, author_id: user.id })
-    .select("id")
-    .single();
-  if (error || !data) {
-    console.error("[blog] insert failed:", error?.message);
-    return { success: false, error: "unknown" };
-  }
+  const tagIds = await findOrCreateTags(input.tags ?? []);
+  await syncPostTags(postId, tagIds);
+
   revalidateBlog(slug);
-  return { success: true, slug, id: data.id as string };
+  return { success: true, slug, id: postId };
 }
 
 export interface AutosaveResult {
@@ -136,8 +151,10 @@ export async function autosavePost(raw: unknown): Promise<AutosaveResult> {
     cover_image_url: input.cover_image_url || null,
     seo_title: input.seo_title || null,
     seo_description: input.seo_description || null,
+    category_id: input.category_id || null,
   };
 
+  let postId: string;
   if (input.id) {
     const { error } = await supabase
       .from("blog_posts")
@@ -147,19 +164,29 @@ export async function autosavePost(raw: unknown): Promise<AutosaveResult> {
       console.error("[blog] autosave update failed:", error.message);
       return { success: false, error: "unknown" };
     }
-    return { success: true, id: input.id };
+    postId = input.id;
+  } else {
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .insert({
+        ...fields,
+        status: "draft",
+        publish_at: null,
+        author_id: user.id,
+      })
+      .select("id")
+      .single();
+    if (error || !data) {
+      console.error("[blog] autosave insert failed:", error?.message);
+      return { success: false, error: "unknown" };
+    }
+    postId = data.id as string;
   }
 
-  const { data, error } = await supabase
-    .from("blog_posts")
-    .insert({ ...fields, status: "draft", publish_at: null, author_id: user.id })
-    .select("id")
-    .single();
-  if (error || !data) {
-    console.error("[blog] autosave insert failed:", error?.message);
-    return { success: false, error: "unknown" };
-  }
-  return { success: true, id: data.id as string };
+  const tagIds = await findOrCreateTags(input.tags ?? []);
+  await syncPostTags(postId, tagIds);
+
+  return { success: true, id: postId };
 }
 
 async function patchStatus(
@@ -220,4 +247,26 @@ export async function deletePost(id: string): Promise<BlogActionResult> {
 
   revalidateBlog();
   return { success: true, id };
+}
+
+export interface CreateCategoryResult {
+  success: boolean;
+  category?: { id: string; name: string };
+  error?: string;
+}
+
+/**
+ * Create a category from the editor (or return the existing one with the
+ * same slug). Categories are created explicitly so autosave never coins a
+ * category from a half-typed name.
+ */
+export async function createCategory(
+  name: string,
+): Promise<CreateCategoryResult> {
+  await requireAdmin();
+  const parsed = blogCategorySchema.safeParse({ name });
+  if (!parsed.success) return { success: false, error: "invalid" };
+  const id = await findOrCreateCategory(parsed.data.name);
+  if (!id) return { success: false, error: "unknown" };
+  return { success: true, category: { id, name: parsed.data.name } };
 }

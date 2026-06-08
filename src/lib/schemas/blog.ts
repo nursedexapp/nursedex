@@ -57,6 +57,10 @@ export const blogPostSchema = z
       .or(z.literal("")),
     // ISO datetime, required only when intent is "schedule"
     publish_at: z.string().datetime().optional().or(z.literal("")),
+    // Taxonomy: an existing category id (categories are created
+    // explicitly) and free-form tag names (find-or-create in the action).
+    category_id: z.string().uuid().optional().or(z.literal("")),
+    tags: z.array(z.string().trim().max(50)).max(20).optional(),
   })
   .refine((v) => v.intent !== "schedule" || !!v.publish_at, {
     message: "Pick a date and time to schedule.",
@@ -95,6 +99,19 @@ export const blogAutosaveSchema = z.object({
     .max(BLOG_SEO_DESCRIPTION_MAX)
     .optional()
     .or(z.literal("")),
+  category_id: z.string().uuid().optional().or(z.literal("")),
+  tags: z.array(z.string().trim().max(50)).max(20).optional(),
 });
 
 export type BlogAutosaveInput = z.infer<typeof blogAutosaveSchema>;
+
+export const BLOG_CATEGORY_NAME_MAX = 60;
+
+/** Input for creating a category from the editor. */
+export const blogCategorySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(BLOG_CATEGORY_NAME_MAX, `Keep it under ${BLOG_CATEGORY_NAME_MAX} characters`),
+});

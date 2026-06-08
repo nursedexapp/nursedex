@@ -46,7 +46,16 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
-import { savePost, autosavePost, deletePost } from "./actions";
+// Taxonomy uses the service-role client (server-only); mock it so the test
+// loads and so we can assert the post-save tag sync.
+const tax = vi.hoisted(() => ({
+  findOrCreateTags: vi.fn(),
+  syncPostTags: vi.fn(),
+  findOrCreateCategory: vi.fn(),
+}));
+vi.mock("./taxonomy", () => tax);
+
+import { savePost, autosavePost, deletePost, createCategory } from "./actions";
 
 const PUB = (p: string) =>
   `https://x.supabase.co/storage/v1/object/public/blog-images/${p}`;
@@ -62,6 +71,9 @@ beforeEach(() => {
   h.calls.insert = [];
   h.calls.update = [];
   h.remove.mockResolvedValue({ error: null });
+  tax.findOrCreateTags.mockResolvedValue([]);
+  tax.syncPostTags.mockResolvedValue(undefined);
+  tax.findOrCreateCategory.mockResolvedValue("cat-1");
 });
 
 describe("savePost", () => {
@@ -149,5 +161,57 @@ describe("deletePost", () => {
       "blog/2026/cover.jpg",
       "blog/2026/inline.png",
     ]);
+  });
+});
+
+describe("post taxonomy", () => {
+  const categoryId = "00000000-0000-4000-8000-00000000000c";
+
+  it("savePost persists category_id and syncs resolved tags", async () => {
+    tax.findOrCreateTags.mockResolvedValue(["t1", "t2"]);
+    const res = await savePost({
+      intent: "draft",
+      title: "My Post",
+      content: validContent,
+      category_id: categoryId,
+      tags: ["Home Care", "Licensing"],
+    });
+    expect(res.success).toBe(true);
+    expect(h.calls.insert[0]).toMatchObject({ category_id: categoryId });
+    expect(tax.findOrCreateTags).toHaveBeenCalledWith(["Home Care", "Licensing"]);
+    expect(tax.syncPostTags).toHaveBeenCalledWith("p1", ["t1", "t2"]);
+  });
+
+  it("autosavePost syncs tags without touching status", async () => {
+    tax.findOrCreateTags.mockResolvedValue(["t1"]);
+    const res = await autosavePost({
+      id: "00000000-0000-4000-8000-00000000000a",
+      title: "My Post",
+      content: validContent,
+      tags: ["Home Care"],
+    });
+    expect(res.success).toBe(true);
+    const payload = h.calls.update[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("status");
+    expect(tax.syncPostTags).toHaveBeenCalledWith(
+      "00000000-0000-4000-8000-00000000000a",
+      ["t1"],
+    );
+  });
+});
+
+describe("createCategory", () => {
+  it("creates a category and returns its id and name", async () => {
+    tax.findOrCreateCategory.mockResolvedValue("cat-9");
+    const res = await createCategory("Home Care");
+    expect(res.success).toBe(true);
+    expect(res.category).toEqual({ id: "cat-9", name: "Home Care" });
+    expect(tax.findOrCreateCategory).toHaveBeenCalledWith("Home Care");
+  });
+
+  it("rejects a blank name", async () => {
+    const res = await createCategory("   ");
+    expect(res.success).toBe(false);
+    expect(tax.findOrCreateCategory).not.toHaveBeenCalled();
   });
 });
