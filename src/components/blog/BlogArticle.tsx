@@ -1,8 +1,10 @@
 import Link from "next/link";
 import NextImage from "next/image";
 import { PostContent } from "@/lib/blog/render";
+import { extractHeadings } from "@/lib/blog/toc";
 import { readingTimeMinutes } from "@/lib/blog/text";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
+import { BlogToc } from "@/components/blog/BlogToc";
 import type {
   BlogCategory,
   BlogPost,
@@ -38,6 +40,8 @@ export function BlogArticle({
   authorName,
   related,
 }: BlogArticleProps) {
+  const headings = extractHeadings(post.content);
+
   return (
     <>
       <header className="mb-8">
@@ -73,6 +77,8 @@ export function BlogArticle({
           />
         </div>
       )}
+
+      <BlogToc headings={headings} />
 
       <article className="prose prose-headings:font-heading prose-headings:text-soft-black prose-a:text-teal-dark prose-img:rounded-lg max-w-none">
         <PostContent doc={post.content} />
