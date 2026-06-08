@@ -8,9 +8,21 @@ const h = vi.hoisted(() => {
   const state: { result: { data: unknown; error: unknown } } = {
     result: { data: { id: "p1" }, error: null },
   };
+  const calls: { insert: unknown[]; update: unknown[] } = {
+    insert: [],
+    update: [],
+  };
   function builder() {
     const b: Record<string, unknown> = {};
-    for (const m of ["insert", "update", "delete", "select", "eq"]) {
+    b.insert = (payload: unknown) => {
+      calls.insert.push(payload);
+      return b;
+    };
+    b.update = (payload: unknown) => {
+      calls.update.push(payload);
+      return b;
+    };
+    for (const m of ["delete", "select", "eq"]) {
       b[m] = () => b;
     }
     b.single = () => Promise.resolve(state.result);
@@ -18,7 +30,7 @@ const h = vi.hoisted(() => {
     b.then = (resolve: (v: unknown) => void) => resolve(state.result);
     return b;
   }
-  return { revalidatePath, state, builder };
+  return { revalidatePath, state, calls, builder };
 });
 
 vi.mock("next/cache", () => ({ revalidatePath: h.revalidatePath }));
@@ -30,7 +42,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ from: () => h.builder() }),
 }));
 
-import { savePost } from "./actions";
+import { savePost, autosavePost } from "./actions";
 
 const validContent = {
   type: "doc" as const,
@@ -40,6 +52,8 @@ const validContent = {
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.result = { data: { id: "p1" }, error: null };
+  h.calls.insert = [];
+  h.calls.update = [];
 });
 
 describe("savePost", () => {
@@ -71,5 +85,38 @@ describe("savePost", () => {
     });
     expect(res.success).toBe(false);
     expect(res.fieldErrors?.publish_at).toBeTruthy();
+  });
+});
+
+describe("autosavePost", () => {
+  it("creates a draft for a new post and returns its id", async () => {
+    const res = await autosavePost({ title: "My Post", content: validContent });
+    expect(res.success).toBe(true);
+    expect(res.id).toBe("p1");
+    expect(h.calls.insert).toHaveLength(1);
+    expect(h.calls.insert[0]).toMatchObject({ status: "draft", publish_at: null });
+    // Autosave never revalidates public surfaces.
+    expect(h.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("updates an existing post without touching status or publish_at", async () => {
+    const res = await autosavePost({
+      id: "00000000-0000-4000-8000-000000000007",
+      title: "My Post",
+      content: validContent,
+    });
+    expect(res.success).toBe(true);
+    expect(h.calls.update).toHaveLength(1);
+    const payload = h.calls.update[0] as Record<string, unknown>;
+    expect(payload).not.toHaveProperty("status");
+    expect(payload).not.toHaveProperty("publish_at");
+    expect(payload).not.toHaveProperty("author_id");
+    expect(h.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects input without a title", async () => {
+    const res = await autosavePost({ title: "", content: validContent });
+    expect(res.success).toBe(false);
+    expect(h.calls.insert).toHaveLength(0);
   });
 });

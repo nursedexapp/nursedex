@@ -1,16 +1,16 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import { toast } from "sonner";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PostEditor } from "@/components/blog/PostEditor";
-import { savePost } from "@/lib/blog/actions";
+import { savePost, autosavePost } from "@/lib/blog/actions";
 import type { BlogIntent } from "@/lib/schemas/blog";
 import type { BlogPost, TiptapDoc } from "@/types/database";
 
@@ -45,6 +45,101 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const [id, setId] = useState(post?.id);
+  const [autosaveState, setAutosaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+
+  // Autosave only applies to content that is not publicly visible: a new
+  // post, a draft, or an archived post. We never silently rewrite a live
+  // published or scheduled post; those rely on the unsaved-changes guard.
+  const autosaveEnabled =
+    !post || post.status === "draft" || post.status === "archived";
+
+  // Serialized snapshot of the editable fields. When it differs from the
+  // last saved snapshot the form is dirty (has unsaved edits).
+  const snapshot = useMemo(
+    () =>
+      JSON.stringify({
+        title,
+        slug,
+        excerpt,
+        content,
+        coverImageUrl,
+        seoTitle,
+        seoDescription,
+      }),
+    [title, slug, excerpt, content, coverImageUrl, seoTitle, seoDescription],
+  );
+  const savedSnapshotRef = useRef(snapshot);
+  const latestSnapshotRef = useRef(snapshot);
+  latestSnapshotRef.current = snapshot;
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    setDirty(snapshot !== savedSnapshotRef.current);
+  }, [snapshot]);
+
+  // Warn before a hard navigation (refresh, tab close, external link) when
+  // there are unsaved edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
+
+  // Debounced autosave: 2s after the last edit, when enabled, dirty, not
+  // mid manual save, and the title (which the slug derives from) is set.
+  useEffect(() => {
+    if (!autosaveEnabled || !dirty || pending || !title.trim()) return;
+    const sent = snapshot;
+    const handle = setTimeout(() => {
+      setAutosaveState("saving");
+      autosavePost({
+        id,
+        title,
+        slug: slug || undefined,
+        excerpt: excerpt || undefined,
+        content: content ?? { type: "doc", content: [] },
+        cover_image_url: coverImageUrl || undefined,
+        seo_title: seoTitle || undefined,
+        seo_description: seoDescription || undefined,
+      })
+        .then((res) => {
+          if (!res.success) {
+            setAutosaveState("error");
+            return;
+          }
+          if (res.id && !id) setId(res.id);
+          savedSnapshotRef.current = sent;
+          // Only clear dirty if nothing changed while we were saving.
+          if (latestSnapshotRef.current === sent) {
+            setDirty(false);
+            setAutosaveState("saved");
+          }
+        })
+        .catch(() => setAutosaveState("error"));
+    }, 2000);
+    return () => clearTimeout(handle);
+  }, [
+    autosaveEnabled,
+    dirty,
+    pending,
+    snapshot,
+    id,
+    title,
+    slug,
+    excerpt,
+    content,
+    coverImageUrl,
+    seoTitle,
+    seoDescription,
+  ]);
+
   function submit(intent: BlogIntent) {
     setErrors({});
     const publishAtIso =
@@ -54,7 +149,7 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
 
     startTransition(async () => {
       const res = await savePost({
-        id: post?.id,
+        id,
         intent,
         title,
         slug: slug || undefined,
@@ -75,6 +170,10 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
         );
         return;
       }
+      // Clear the dirty state so the unsaved-changes guard does not fire
+      // as we navigate away after a successful save.
+      savedSnapshotRef.current = latestSnapshotRef.current;
+      setDirty(false);
       toast.success(
         intent === "publish"
           ? "Post published."
@@ -85,6 +184,16 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
       router.push("/admin/blog");
       router.refresh();
     });
+  }
+
+  function cancel() {
+    if (
+      dirty &&
+      !window.confirm("You have unsaved changes. Leave without saving?")
+    ) {
+      return;
+    }
+    router.push("/admin/blog");
   }
 
   async function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
@@ -285,12 +394,31 @@ export function PostEditorForm({ post }: PostEditorFormProps) {
         >
           Save draft
         </Button>
+
+        <span
+          className="text-soft-black-light ml-auto inline-flex items-center gap-1 text-sm"
+          aria-live="polite"
+        >
+          {autosaveState === "saving" ? (
+            <>
+              <Loader2 className="size-3.5 animate-spin" />
+              Saving…
+            </>
+          ) : dirty ? (
+            "Unsaved changes"
+          ) : autosaveState === "saved" ? (
+            <>
+              <Check className="size-3.5" />
+              Saved
+            </>
+          ) : null}
+        </span>
+
         <Button
           variant="ghost"
           type="button"
-          onClick={() => router.push("/admin/blog")}
+          onClick={cancel}
           disabled={pending}
-          className="ml-auto"
         >
           Cancel
         </Button>

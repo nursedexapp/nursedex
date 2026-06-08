@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/helpers";
-import { blogPostSchema } from "@/lib/schemas/blog";
+import { blogPostSchema, blogAutosaveSchema } from "@/lib/schemas/blog";
 import { ensureUniqueSlug } from "./slug";
 import { toDraft, toPublished, toArchived, toScheduled } from "./transitions";
 import type { StatusPatch } from "./transitions";
@@ -100,6 +100,64 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
   }
   revalidateBlog(slug);
   return { success: true, slug, id: data.id as string };
+}
+
+export interface AutosaveResult {
+  success: boolean;
+  id?: string;
+  error?: string;
+}
+
+/**
+ * Background autosave. Persists the editable fields without ever touching
+ * `status` or `publish_at`, so an autosave can never unpublish or
+ * reschedule a post. A new post (no id) is created as a draft and its id
+ * is returned so the editor can keep updating the same row. Does not
+ * revalidate: drafts are not public, and published edits surface on the
+ * next explicit save (which revalidates) or the page's revalidate window.
+ */
+export async function autosavePost(raw: unknown): Promise<AutosaveResult> {
+  const user = await requireAdmin();
+
+  const parsed = blogAutosaveSchema.safeParse(raw);
+  if (!parsed.success) return { success: false, error: "invalid" };
+  const input = parsed.data;
+
+  const slug = await ensureUniqueSlug(input.slug || input.title, input.id);
+  const supabase = await createClient();
+
+  const fields = {
+    title: input.title,
+    slug,
+    excerpt: input.excerpt || null,
+    content: input.content,
+    cover_image_url: input.cover_image_url || null,
+    seo_title: input.seo_title || null,
+    seo_description: input.seo_description || null,
+  };
+
+  if (input.id) {
+    const { error } = await supabase
+      .from("blog_posts")
+      .update(fields)
+      .eq("id", input.id);
+    if (error) {
+      console.error("[blog] autosave update failed:", error.message);
+      return { success: false, error: "unknown" };
+    }
+    return { success: true, id: input.id };
+  }
+
+  const { data, error } = await supabase
+    .from("blog_posts")
+    .insert({ ...fields, status: "draft", publish_at: null, author_id: user.id })
+    .select("id")
+    .single();
+  if (error || !data) {
+    console.error("[blog] autosave insert failed:", error?.message);
+    return { success: false, error: "unknown" };
+  }
+  return { success: true, id: data.id as string };
 }
 
 async function patchStatus(

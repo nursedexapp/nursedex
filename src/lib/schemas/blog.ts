@@ -64,3 +64,37 @@ export const blogPostSchema = z
   });
 
 export type BlogPostInput = z.infer<typeof blogPostSchema>;
+
+/**
+ * Input for a background autosave. Like a post save but with no `intent`
+ * and no scheduling: autosave never changes a post's status or publish
+ * time, it only persists the editable fields. A title is still required
+ * because the slug derives from it.
+ */
+export const blogAutosaveSchema = z.object({
+  id: z.string().uuid().optional(),
+  title: z
+    .string()
+    .trim()
+    .min(1, "Title is required")
+    .max(BLOG_TITLE_MAX, `Keep the title under ${BLOG_TITLE_MAX} characters`),
+  slug: z
+    .string()
+    .trim()
+    .max(BLOG_SLUG_MAX)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens")
+    .optional()
+    .or(z.literal("")),
+  excerpt: z.string().trim().max(BLOG_EXCERPT_MAX).optional().or(z.literal("")),
+  content: tiptapDocSchema,
+  cover_image_url: z.string().url().optional().or(z.literal("")),
+  seo_title: z.string().trim().max(BLOG_SEO_TITLE_MAX).optional().or(z.literal("")),
+  seo_description: z
+    .string()
+    .trim()
+    .max(BLOG_SEO_DESCRIPTION_MAX)
+    .optional()
+    .or(z.literal("")),
+});
+
+export type BlogAutosaveInput = z.infer<typeof blogAutosaveSchema>;
