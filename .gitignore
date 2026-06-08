@@ -33,6 +33,7 @@ Legal/
 /playwright-report/
 /blob-report/
 /coverage/
+/e2e/.auth/
 
 # Sentry
 .sentryclirc

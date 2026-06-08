@@ -5,8 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/helpers";
 import { blogPostSchema, blogAutosaveSchema } from "@/lib/schemas/blog";
 import { ensureUniqueSlug } from "./slug";
+import { collectImagePaths, removeBlogImagePaths } from "./images";
 import { toDraft, toPublished, toArchived, toScheduled } from "./transitions";
 import type { StatusPatch } from "./transitions";
+import type { TiptapDoc } from "@/types/database";
 
 export interface BlogActionResult {
   success: boolean;
@@ -190,15 +192,32 @@ export async function archivePost(id: string): Promise<BlogActionResult> {
   return patchStatus(id, toArchived());
 }
 
-/** Permanently delete a post. */
+/** Permanently delete a post and remove the images it owned. */
 export async function deletePost(id: string): Promise<BlogActionResult> {
   await requireAdmin();
   const supabase = await createClient();
+
+  // Capture the post's images before deleting the row so we can clean up
+  // storage. The GC cron is the backstop, but this frees them immediately.
+  const { data: existing } = await supabase
+    .from("blog_posts")
+    .select("cover_image_url, content")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase.from("blog_posts").delete().eq("id", id);
   if (error) {
     console.error("[blog] delete failed:", error.message);
     return { success: false, error: "unknown" };
   }
+
+  if (existing) {
+    const paths = collectImagePaths(
+      existing as { cover_image_url: string | null; content: TiptapDoc | null },
+    );
+    await removeBlogImagePaths(supabase, paths);
+  }
+
   revalidateBlog();
   return { success: true, id };
 }

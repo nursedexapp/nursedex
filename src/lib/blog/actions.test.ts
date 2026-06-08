@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // vi.hoisted, because vi.mock is lifted above the imports.
 const h = vi.hoisted(() => {
   const revalidatePath = vi.fn();
+  const remove = vi.fn();
   const state: { result: { data: unknown; error: unknown } } = {
     result: { data: { id: "p1" }, error: null },
   };
@@ -30,7 +31,7 @@ const h = vi.hoisted(() => {
     b.then = (resolve: (v: unknown) => void) => resolve(state.result);
     return b;
   }
-  return { revalidatePath, state, calls, builder };
+  return { revalidatePath, remove, state, calls, builder };
 });
 
 vi.mock("next/cache", () => ({ revalidatePath: h.revalidatePath }));
@@ -39,10 +40,16 @@ vi.mock("@/lib/auth/helpers", () => ({
 }));
 vi.mock("./slug", () => ({ ensureUniqueSlug: async () => "my-post" }));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ from: () => h.builder() }),
+  createClient: async () => ({
+    from: () => h.builder(),
+    storage: { from: () => ({ remove: h.remove }) },
+  }),
 }));
 
-import { savePost, autosavePost } from "./actions";
+import { savePost, autosavePost, deletePost } from "./actions";
+
+const PUB = (p: string) =>
+  `https://x.supabase.co/storage/v1/object/public/blog-images/${p}`;
 
 const validContent = {
   type: "doc" as const,
@@ -54,6 +61,7 @@ beforeEach(() => {
   h.state.result = { data: { id: "p1" }, error: null };
   h.calls.insert = [];
   h.calls.update = [];
+  h.remove.mockResolvedValue({ error: null });
 });
 
 describe("savePost", () => {
@@ -118,5 +126,28 @@ describe("autosavePost", () => {
     const res = await autosavePost({ title: "", content: validContent });
     expect(res.success).toBe(false);
     expect(h.calls.insert).toHaveLength(0);
+  });
+});
+
+describe("deletePost", () => {
+  it("removes the deleted post's cover and inline images from storage", async () => {
+    h.state.result = {
+      data: {
+        cover_image_url: PUB("blog/2026/cover.jpg"),
+        content: {
+          type: "doc",
+          content: [{ type: "image", attrs: { src: PUB("blog/2026/inline.png") } }],
+        },
+      },
+      error: null,
+    };
+
+    const res = await deletePost("00000000-0000-4000-8000-000000000009");
+    expect(res.success).toBe(true);
+    expect(h.remove).toHaveBeenCalledTimes(1);
+    expect(h.remove.mock.calls[0][0].sort()).toEqual([
+      "blog/2026/cover.jpg",
+      "blog/2026/inline.png",
+    ]);
   });
 });
