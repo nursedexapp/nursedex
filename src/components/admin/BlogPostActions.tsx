@@ -15,6 +15,7 @@ import {
   archivePost,
   unpublishPost,
   deletePost,
+  togglePinned,
   type BlogActionResult,
 } from "@/lib/blog/actions";
 import { BlogPostStatus } from "@/types/enums";
@@ -22,9 +23,10 @@ import { BlogPostStatus } from "@/types/enums";
 interface BlogPostActionsProps {
   id: string;
   status: BlogPostStatus;
+  pinned: boolean;
 }
 
-export function BlogPostActions({ id, status }: BlogPostActionsProps) {
+export function BlogPostActions({ id, status, pinned }: BlogPostActionsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
@@ -61,6 +63,18 @@ export function BlogPostActions({ id, status }: BlogPostActionsProps) {
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {status === BlogPostStatus.PUBLISHED && (
+          <DropdownMenuItem
+            onSelect={() =>
+              run(
+                togglePinned,
+                pinned ? "Unpinned." : "Pinned to the top of the blog.",
+              )
+            }
+          >
+            {pinned ? "Unpin from top" : "Pin to top (feature)"}
+          </DropdownMenuItem>
+        )}
         {status === BlogPostStatus.PUBLISHED && (
           <DropdownMenuItem
             onClick={() => run(unpublishPost, "Moved back to draft.")}

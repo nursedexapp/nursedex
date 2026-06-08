@@ -66,7 +66,13 @@ const rev = vi.hoisted(() => ({
 }));
 vi.mock("./revisions", () => rev);
 
-import { savePost, autosavePost, deletePost, createCategory } from "./actions";
+import {
+  savePost,
+  autosavePost,
+  deletePost,
+  createCategory,
+  togglePinned,
+} from "./actions";
 
 const PUB = (p: string) =>
   `https://x.supabase.co/storage/v1/object/public/blog-images/${p}`;
@@ -227,6 +233,16 @@ describe("createCategory", () => {
     const res = await createCategory("   ");
     expect(res.success).toBe(false);
     expect(tax.findOrCreateCategory).not.toHaveBeenCalled();
+  });
+});
+
+describe("togglePinned", () => {
+  it("flips pinned from the current value and revalidates", async () => {
+    h.state.result = { data: { pinned: false, slug: "my-post" }, error: null };
+    const res = await togglePinned("00000000-0000-4000-8000-00000000000d");
+    expect(res.success).toBe(true);
+    expect(h.calls.update[0]).toMatchObject({ pinned: true });
+    expect(h.revalidatePath).toHaveBeenCalledWith("/blog");
   });
 });
 

@@ -28,7 +28,8 @@ beforeEach(() => {
     count: 1,
     error: null,
   });
-  order.mockReturnValue({ range });
+  // order() is chainable (pinned, then publish_at) and ends in range().
+  order.mockReturnValue({ order, range });
   textSearch.mockReturnValue({ order });
   eqStatus.mockReturnValue({ order, textSearch });
   select.mockReturnValue({ eq: eqStatus });
@@ -41,6 +42,7 @@ describe("getPublishedPostsPage", () => {
     expect(from).toHaveBeenCalledWith("blog_posts");
     expect(select).toHaveBeenCalledWith("*", { count: "exact" });
     expect(eqStatus).toHaveBeenCalledWith("status", "published");
+    expect(order).toHaveBeenCalledWith("pinned", { ascending: false });
     expect(order).toHaveBeenCalledWith("publish_at", { ascending: false });
   });
 

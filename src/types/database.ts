@@ -299,6 +299,7 @@ export interface BlogPost {
   seo_title: string | null;
   seo_description: string | null;
   category_id: string | null;
+  pinned: boolean;
   created_at: string;
   updated_at: string;
 }

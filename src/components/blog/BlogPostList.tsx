@@ -58,11 +58,16 @@ export function BlogPostList({
                   />
                 </div>
               )}
-              <div className="text-soft-black-light flex items-center gap-2 text-sm">
+              <div className="text-soft-black-light flex flex-wrap items-center gap-2 text-sm">
                 <span>
                   {formatDate(post.publish_at)} ·{" "}
                   {readingTimeMinutes(post.content)} min read
                 </span>
+                {post.pinned && (
+                  <span className="bg-cream-light text-cream-dark rounded-full px-2 py-0.5 text-xs font-medium">
+                    Featured
+                  </span>
+                )}
                 {post.categoryName && post.categorySlug && (
                   <span className="bg-sage/15 text-teal-dark rounded-full px-2 py-0.5 text-xs font-medium">
                     {post.categoryName}

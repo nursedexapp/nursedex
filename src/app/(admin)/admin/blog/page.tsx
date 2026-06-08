@@ -94,10 +94,19 @@ export default async function AdminBlogPage() {
                         : `Updated ${formatDate(post.updated_at)}`}
                   </p>
                 </div>
+                {post.pinned && (
+                  <Badge className="bg-cream-light text-cream-dark">
+                    Featured
+                  </Badge>
+                )}
                 <Badge className={STATUS_STYLES[post.status]}>
                   {BLOG_POST_STATUS_LABELS[post.status]}
                 </Badge>
-                <BlogPostActions id={post.id} status={post.status} />
+                <BlogPostActions
+                  id={post.id}
+                  status={post.status}
+                  pinned={post.pinned}
+                />
               </CardContent>
             </Card>
           ))}
