@@ -75,6 +75,18 @@ export default async function BlogIndexPage({
   return (
     <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
+        {/* rel prev/next for paginated index pages. React 19 hoists these
+            <link> tags into <head>. Not emitted on search result pages. */}
+        {!query && page > 1 && (
+          <link
+            rel="prev"
+            href={page - 1 <= 1 ? BASE : `${BASE}?page=${page - 1}`}
+          />
+        )}
+        {!query && page < totalPages && (
+          <link rel="next" href={`${BASE}?page=${page + 1}`} />
+        )}
+
         <header className="mb-10">
           <h1 className="font-heading text-soft-black text-3xl font-semibold sm:text-4xl">
             The NurseDex Blog

@@ -11,6 +11,8 @@ import {
 } from "@/lib/blog/queries";
 import { getBlogSlugRedirect } from "@/lib/blog/redirects";
 import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
+import { BreadcrumbJsonLd } from "@/components/shared/BreadcrumbJsonLd";
+import { blogPostBreadcrumbs } from "@/lib/blog/breadcrumbs";
 import { BlogArticle } from "@/components/blog/BlogArticle";
 import { NewsletterCta } from "@/components/blog/NewsletterCta";
 import { BlogPostAnalytics } from "@/components/blog/BlogPostAnalytics";
@@ -76,6 +78,12 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
         <ArticleJsonLd post={post} authorName={authorName} />
+        <BreadcrumbJsonLd
+          items={blogPostBreadcrumbs(
+            post,
+            category ? { name: category.name, slug: category.slug } : null,
+          )}
+        />
         <BlogPostAnalytics
           postId={post.id}
           slug={post.slug}
