@@ -52,8 +52,22 @@ export function BlogArticle({
         <div className="text-soft-black-light flex items-center gap-2 text-sm">
           <span>
             {formatDate(post.publish_at)}
-            {authorName ? <> · By {authorName}</> : null} ·{" "}
-            {readingTimeMinutes(post.content)} min read
+            {authorName ? (
+              <>
+                {" · By "}
+                {post.author_id ? (
+                  <Link
+                    href={`/blog/author/${post.author_id}`}
+                    className="hover:text-teal-dark hover:underline"
+                  >
+                    {authorName}
+                  </Link>
+                ) : (
+                  authorName
+                )}
+              </>
+            ) : null}{" "}
+            · {readingTimeMinutes(post.content)} min read
           </span>
           {category && (
             <Link

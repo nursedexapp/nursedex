@@ -250,6 +250,47 @@ export interface TagArchive extends PublishedPostsPage {
   tag: BlogTag;
 }
 
+export interface AuthorArchive extends PublishedPostsPage {
+  authorId: string;
+  authorName: string | null;
+}
+
+/**
+ * Published posts by a given author, or null if the author has none (so an
+ * arbitrary id does not render an empty page). Author display name is
+ * resolved separately, the same way the byline is.
+ */
+export async function getPublishedPostsByAuthor(
+  authorId: string,
+  page: number,
+  pageSize: number = BLOG_PAGE_SIZE,
+): Promise<AuthorArchive | null> {
+  const supabase = createServiceRoleClient();
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const from = (safePage - 1) * pageSize;
+
+  const { data, count } = await supabase
+    .from("blog_posts")
+    .select("*", { count: "exact" })
+    .eq("status", "published")
+    .eq("author_id", authorId)
+    .order("publish_at", { ascending: false })
+    .range(from, from + pageSize - 1);
+
+  const total = count ?? 0;
+  if (total === 0) return null;
+
+  return {
+    authorId,
+    authorName: await getAuthorName(authorId),
+    posts: (data ?? []) as BlogPost[],
+    total,
+    page: safePage,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
 /** Published posts in a category by slug, or null if the category is unknown. */
 export async function getPublishedPostsByCategory(
   slug: string,
