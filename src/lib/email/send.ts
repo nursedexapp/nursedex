@@ -67,6 +67,34 @@ export async function sendCommentSubmittedEmail(
   }
 }
 
+interface SendCommentApprovedArgs {
+  to: string;
+  postTitle: string;
+  slug: string;
+}
+
+/** Notifies a commenter that their comment was approved and is now live. */
+export async function sendCommentApprovedEmail(
+  args: SendCommentApprovedArgs,
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const postUrl = `${baseUrl}/blog/${args.slug}`;
+
+  const res = await fetch(`${baseUrl}/api/email/comment-approved`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.CRON_SECRET}`,
+    },
+    body: JSON.stringify({ to: args.to, postTitle: args.postTitle, postUrl }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error("[email] Comment approved email failed:", res.status, body);
+  }
+}
+
 /**
  * Sends the double opt-in confirmation email for the blog newsletter. The
  * confirm link carries the subscriber's token; clicking it confirms them.

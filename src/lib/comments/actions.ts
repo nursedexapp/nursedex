@@ -5,7 +5,10 @@ import { after } from "next/server";
 import { requireAdmin } from "@/lib/auth/helpers";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { blogCommentSchema } from "@/lib/schemas/comment";
-import { sendCommentSubmittedEmail } from "@/lib/email/send";
+import {
+  sendCommentSubmittedEmail,
+  sendCommentApprovedEmail,
+} from "@/lib/email/send";
 
 export interface CommentResult {
   success: boolean;
@@ -13,15 +16,22 @@ export interface CommentResult {
   fieldErrors?: Record<string, string>;
 }
 
-/** Revalidate a post's public page so newly approved/removed comments show. */
-async function revalidatePostById(postId: string) {
+/**
+ * Revalidate a post's public page so newly approved/removed comments show,
+ * and return its slug + title (used to link the commenter to the post).
+ */
+async function revalidatePostById(
+  postId: string,
+): Promise<{ slug: string; title: string } | null> {
   const supabase = createServiceRoleClient();
   const { data } = await supabase
     .from("blog_posts")
-    .select("slug")
+    .select("slug, title")
     .eq("id", postId)
     .maybeSingle();
-  if (data?.slug) revalidatePath(`/blog/${data.slug}`);
+  const row = data as { slug: string; title: string } | null;
+  if (row?.slug) revalidatePath(`/blog/${row.slug}`);
+  return row ?? null;
 }
 
 /**
@@ -90,13 +100,24 @@ async function setStatus(
     .from("blog_comments")
     .update({ status })
     .eq("id", id)
-    .select("post_id")
+    .select("post_id, author_email")
     .single();
   if (error || !data) {
     console.error("[comments] moderation failed:", error?.message);
     return { success: false, error: "unknown" };
   }
-  await revalidatePostById(data.post_id as string);
+  const post = await revalidatePostById(data.post_id as string);
+
+  // Let the commenter know their comment is now live.
+  if (status === "approved" && post && data.author_email) {
+    after(() =>
+      sendCommentApprovedEmail({
+        to: data.author_email as string,
+        postTitle: post.title,
+        slug: post.slug,
+      }),
+    );
+  }
   return { success: true };
 }
 
