@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import { toast } from "sonner";
 import { Loader2, Upload, X, Check, Plus, Eye } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PostEditor } from "@/components/blog/PostEditor";
 import { savePost, autosavePost, createCategory } from "@/lib/blog/actions";
+import { writePreviewDraft } from "@/lib/blog/preview-draft";
 import type { BlogIntent } from "@/lib/schemas/blog";
 import type {
   BlogCategory,
@@ -562,15 +563,28 @@ export function PostEditorForm({
         </Button>
 
         {id && (
-          <a
-            href={`/blog/preview/${id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonVariants({ variant: "ghost" })}
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              // Stash the current body so the preview tab reflects unsaved
+              // edits without persisting them.
+              writePreviewDraft(id, {
+                title,
+                excerpt: excerpt || null,
+                content: content ?? { type: "doc", content: [] },
+                cover_image_url: coverImageUrl || null,
+              });
+              window.open(
+                `/blog/preview/${id}`,
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
           >
             <Eye className="size-4" />
             Preview
-          </a>
+          </Button>
         )}
 
         <span
