@@ -43,3 +43,26 @@ export async function getBlogSlugRedirect(
     .maybeSingle();
   return (data?.new_slug as string | undefined) ?? null;
 }
+
+/**
+ * Like getBlogSlugRedirect, but only returns the target when it resolves to
+ * a published post. A redirect can point at a slug whose post was later
+ * unpublished or archived (deletes cascade the row away, but unpublishing
+ * does not), and following it would send the reader to a 404. In that case
+ * we return null so the caller can 404 directly instead.
+ */
+export async function getLiveBlogSlugRedirect(
+  oldSlug: string,
+): Promise<string | null> {
+  const newSlug = await getBlogSlugRedirect(oldSlug);
+  if (!newSlug) return null;
+
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase
+    .from("blog_posts")
+    .select("slug")
+    .eq("slug", newSlug)
+    .eq("status", "published")
+    .maybeSingle();
+  return data ? newSlug : null;
+}

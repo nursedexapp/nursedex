@@ -9,7 +9,7 @@ import {
   getAuthorName,
   getRelatedPosts,
 } from "@/lib/blog/queries";
-import { getBlogSlugRedirect } from "@/lib/blog/redirects";
+import { getLiveBlogSlugRedirect } from "@/lib/blog/redirects";
 import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
 import { BreadcrumbJsonLd } from "@/components/shared/BreadcrumbJsonLd";
 import { blogPostBreadcrumbs } from "@/lib/blog/breadcrumbs";
@@ -62,8 +62,10 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
   const post = await getPublishedPostBySlug(slug);
   if (!post) {
-    // An old slug for a renamed post permanently redirects to the current one.
-    const redirectTo = await getBlogSlugRedirect(slug);
+    // An old slug for a renamed post permanently redirects to the current
+    // one, but only when the target still resolves to a published post (the
+    // target may have been unpublished/archived); otherwise we 404.
+    const redirectTo = await getLiveBlogSlugRedirect(slug);
     if (redirectTo) permanentRedirect(`/blog/${redirectTo}`);
     notFound();
   }
