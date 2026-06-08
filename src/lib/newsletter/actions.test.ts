@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const h = vi.hoisted(() => {
   const state = {
     row: null as unknown, // maybeSingle result
+    count: 0, // rate-limit count
     upsertError: null as unknown,
     updateError: null as unknown,
   };
@@ -12,6 +13,7 @@ const h = vi.hoisted(() => {
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.eq = () => b;
+    b.gte = () => b;
     b.maybeSingle = () => Promise.resolve({ data: state.row });
     b.upsert = (payload: unknown) => {
       calls.upsert.push(payload);
@@ -21,13 +23,18 @@ const h = vi.hoisted(() => {
       calls.update.push(payload);
       return b;
     };
+    // Awaited directly by the count query and the confirm update; each
+    // destructures the field it needs.
     b.then = (resolve: (v: unknown) => void) =>
-      resolve({ error: state.updateError });
+      resolve({ count: state.count, error: state.updateError });
     return b;
   }
   return { state, calls, builder, sendConfirm: vi.fn(), sendWelcome: vi.fn() };
 });
 
+vi.mock("next/headers", () => ({
+  headers: async () => ({ get: () => "1.2.3.4" }),
+}));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({ from: () => h.builder() }),
 }));
@@ -41,6 +48,7 @@ import { subscribeNewsletter, confirmNewsletter } from "./actions";
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.row = null;
+  h.state.count = 0;
   h.state.upsertError = null;
   h.state.updateError = null;
   h.calls.upsert = [];
@@ -96,6 +104,22 @@ describe("subscribeNewsletter", () => {
     expect(res.success).toBe(false);
     expect(res.error).toBe("unknown");
     expect(h.sendConfirm).not.toHaveBeenCalled();
+  });
+
+  it("rate-limits when the IP is over the hourly cap", async () => {
+    h.state.count = 5;
+    const res = await subscribeNewsletter({ email: "a@b.com" });
+    expect(res.success).toBe(false);
+    expect(res.error).toBe("rate_limited");
+    expect(h.calls.upsert).toHaveLength(0);
+    expect(h.sendConfirm).not.toHaveBeenCalled();
+  });
+
+  it("stores the hashed IP with the subscription", async () => {
+    await subscribeNewsletter({ email: "a@b.com" });
+    expect(
+      (h.calls.upsert[0] as { ip_hash: string }).ip_hash,
+    ).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 
