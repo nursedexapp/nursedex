@@ -3,6 +3,7 @@ import NextImage from "next/image";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
 import { headingId, nodeText } from "./toc";
 import { collectFootnotes } from "./footnotes";
+import { imageAlignClass } from "./image-align";
 import { parseEmbed } from "./embed";
 import { CodeBlock } from "@/components/blog/CodeBlock";
 
@@ -181,19 +182,26 @@ function renderNode(
         ) : (
           // Legacy images without stored dimensions fall back to a plain img.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={src as string} alt={alt} loading="lazy" />
+          <img
+            src={src as string}
+            alt={alt}
+            loading="lazy"
+            className="w-full rounded-lg"
+          />
         );
-      if (caption) {
-        return (
-          <figure key={key} className="my-6">
-            {img}
+      return (
+        <figure
+          key={key}
+          className={`my-6 ${imageAlignClass(node.attrs?.align)}`}
+        >
+          {img}
+          {caption && (
             <figcaption className="text-soft-black-light mt-2 text-center text-sm">
               {caption}
             </figcaption>
-          </figure>
-        );
-      }
-      return <Fragment key={key}>{img}</Fragment>;
+          )}
+        </figure>
+      );
     }
     case "footnote": {
       const text =
