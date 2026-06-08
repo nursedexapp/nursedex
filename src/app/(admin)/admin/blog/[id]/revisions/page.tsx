@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, GitCompare } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { getPostById } from "@/lib/blog/queries";
 import { getRevisions } from "@/lib/blog/revisions";
 import { extractPlainText } from "@/lib/blog/text";

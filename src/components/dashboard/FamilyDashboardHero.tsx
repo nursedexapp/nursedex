@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Heart, ListChecks, Search } from "lucide-react";
 
 interface FamilyDashboardHeroProps {
