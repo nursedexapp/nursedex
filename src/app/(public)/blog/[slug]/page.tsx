@@ -8,9 +8,11 @@ import {
   getCategoryById,
   getTagsForPost,
   getAuthorName,
+  getRelatedPosts,
 } from "@/lib/blog/queries";
 import { PostContent } from "@/lib/blog/render";
 import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
+import { RelatedPosts } from "@/components/blog/RelatedPosts";
 
 export const revalidate = 60;
 
@@ -59,10 +61,11 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const post = await getPublishedPostBySlug(slug);
   if (!post) notFound();
 
-  const [category, tags, authorName] = await Promise.all([
+  const [category, tags, authorName, related] = await Promise.all([
     getCategoryById(post.category_id),
     getTagsForPost(post.id),
     getAuthorName(post.author_id),
+    getRelatedPosts(post),
   ]);
 
   return (
@@ -128,6 +131,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             ))}
           </div>
         )}
+
+        <RelatedPosts posts={related} />
       </main>
     </div>
   );
