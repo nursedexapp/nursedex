@@ -11,3 +11,13 @@ export const newsletterSchema = z.object({
 });
 
 export type NewsletterInput = z.infer<typeof newsletterSchema>;
+
+export const NEWSLETTER_SUBJECT_MAX = 150;
+export const NEWSLETTER_BODY_MAX = 20000;
+
+export const newsletterIssueSchema = z.object({
+  subject: z.string().trim().min(1, "Subject is required").max(NEWSLETTER_SUBJECT_MAX),
+  body: z.string().trim().min(1, "Body is required").max(NEWSLETTER_BODY_MAX),
+});
+
+export type NewsletterIssueInput = z.infer<typeof newsletterIssueSchema>;
