@@ -87,6 +87,44 @@ export async function getPublishedPostsPage(
   };
 }
 
+/**
+ * Full text search over published posts (title, excerpt, body), newest
+ * first. Uses the generated search_vector column with websearch parsing,
+ * so multi-word and quoted queries work. Same shape as the index page so
+ * the results reuse the list and pagination.
+ */
+export async function searchPublishedPosts(
+  query: string,
+  page: number,
+  pageSize: number = BLOG_PAGE_SIZE,
+): Promise<PublishedPostsPage> {
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const from = (safePage - 1) * pageSize;
+
+  const supabase = createServiceRoleClient();
+  const { data, error, count } = await supabase
+    .from("blog_posts")
+    .select("*", { count: "exact" })
+    .eq("status", "published")
+    .textSearch("search_vector", query, { type: "websearch", config: "english" })
+    .order("publish_at", { ascending: false })
+    .range(from, from + pageSize - 1);
+
+  if (error) {
+    console.error("[blog] searchPublishedPosts failed:", error.message);
+    return { posts: [], total: 0, page: safePage, pageSize, totalPages: 0 };
+  }
+
+  const total = count ?? 0;
+  return {
+    posts: (data ?? []) as BlogPost[],
+    total,
+    page: safePage,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
 /** A single published post by slug, or null if not found / not published. */
 export async function getPublishedPostBySlug(
   slug: string,

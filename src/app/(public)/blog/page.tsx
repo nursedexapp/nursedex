@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getPublishedPostsPage, toListItems } from "@/lib/blog/queries";
+import {
+  getPublishedPostsPage,
+  searchPublishedPosts,
+  toListItems,
+} from "@/lib/blog/queries";
 import { BlogPostList } from "@/components/blog/BlogPostList";
+import { BlogSearch } from "@/components/blog/BlogSearch";
 
 export const revalidate = 60;
 
@@ -10,7 +15,7 @@ const DESCRIPTION =
   "Guides and stories on home care, finding a nurse in New York, licensing, and caring for the people you love.";
 
 interface BlogIndexPageProps {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; q?: string }>;
 }
 
 function parsePage(raw: string | undefined): number {
@@ -20,7 +25,17 @@ function parsePage(raw: string | undefined): number {
 export async function generateMetadata({
   searchParams,
 }: BlogIndexPageProps): Promise<Metadata> {
-  const page = parsePage((await searchParams).page);
+  const params = await searchParams;
+  const query = params.q?.trim();
+  if (query) {
+    // Search result pages should not be indexed.
+    return {
+      title: `Search: ${query} | NurseDex Blog`,
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const page = parsePage(params.page);
   const canonical = page > 1 ? `${BASE}?page=${page}` : BASE;
   return {
     title: page > 1 ? `Blog (Page ${page}) | NurseDex` : "Blog | NurseDex",
@@ -41,15 +56,20 @@ export async function generateMetadata({
 export default async function BlogIndexPage({
   searchParams,
 }: BlogIndexPageProps) {
-  const requested = parsePage((await searchParams).page);
-  const { posts, page, totalPages, total } =
-    await getPublishedPostsPage(requested);
+  const params = await searchParams;
+  const query = params.q?.trim() ?? "";
+  const requested = parsePage(params.page);
 
-  // Out of range paged URLs 404 rather than render an empty list (keeps
-  // crawlers off thin pages). Page 1 with no posts shows the empty state.
+  const result = query
+    ? await searchPublishedPosts(query, requested)
+    : await getPublishedPostsPage(requested);
+  const { posts, page, totalPages, total } = result;
+
+  // Out of range paged URLs 404 rather than render an empty list.
   if (total > 0 && requested > totalPages) notFound();
 
   const items = await toListItems(posts);
+  const basePath = query ? `/blog?q=${encodeURIComponent(query)}` : "/blog";
 
   return (
     <div className="flex flex-1 flex-col">
@@ -62,13 +82,26 @@ export default async function BlogIndexPage({
             Guides and stories on home care, finding trusted nurses, and caring
             for the people you love.
           </p>
+          <div className="mt-6">
+            <BlogSearch initialQuery={query} />
+          </div>
+          {query && (
+            <p className="text-soft-black-light mt-4 text-sm">
+              {total} result{total === 1 ? "" : "s"} for &ldquo;{query}&rdquo;
+            </p>
+          )}
         </header>
 
         <BlogPostList
           posts={items}
           page={page}
           totalPages={totalPages}
-          basePath="/blog"
+          basePath={basePath}
+          emptyMessage={
+            query
+              ? "No posts match your search."
+              : "No posts yet. Check back soon."
+          }
         />
       </main>
     </div>

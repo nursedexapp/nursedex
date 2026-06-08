@@ -22,7 +22,11 @@ function formatDate(iso: string | null): string {
 }
 
 function pageHref(basePath: string, page: number): string {
-  return page <= 1 ? basePath : `${basePath}?page=${page}`;
+  if (page <= 1) return basePath;
+  // basePath may already carry a query (e.g. a search), so pick the right
+  // separator rather than always appending "?page=".
+  const sep = basePath.includes("?") ? "&" : "?";
+  return `${basePath}${sep}page=${page}`;
 }
 
 export function BlogPostList({

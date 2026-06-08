@@ -10,6 +10,7 @@ import {
 } from "@/lib/schemas/blog";
 import { ensureUniqueSlug } from "./slug";
 import { collectImagePaths, removeBlogImagePaths } from "./images";
+import { extractPlainText } from "./text";
 import {
   findOrCreateTags,
   syncPostTags,
@@ -84,6 +85,7 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
     seo_title: input.seo_title || null,
     seo_description: input.seo_description || null,
     category_id: input.category_id || null,
+    content_text: extractPlainText(input.content as unknown as TiptapDoc),
     status: patch.status,
     publish_at: patch.publish_at,
   };
@@ -152,6 +154,7 @@ export async function autosavePost(raw: unknown): Promise<AutosaveResult> {
     seo_title: input.seo_title || null,
     seo_description: input.seo_description || null,
     category_id: input.category_id || null,
+    content_text: extractPlainText(input.content as unknown as TiptapDoc),
   };
 
   let postId: string;
