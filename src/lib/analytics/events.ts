@@ -43,6 +43,9 @@ export const ANALYTICS_EVENTS = {
   // Waitlist
   WAITLIST_SIGNUP: "waitlist_signup",
 
+  // Blog
+  BLOG_POST_VIEWED: "blog_post_viewed",
+
   // General
   CONTACT_FORM_SUBMITTED: "contact_form_submitted",
   PAGE_VIEWED: "page_viewed",
