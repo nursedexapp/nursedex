@@ -3,7 +3,7 @@ import Link from "next/link";
 import NextImage from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getPublishedPostBySlug } from "@/lib/blog/queries";
+import { getPublishedPostBySlug, getAuthorName } from "@/lib/blog/queries";
 import { PostContent } from "@/lib/blog/render";
 import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
 
@@ -51,10 +51,12 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const post = await getPublishedPostBySlug(slug);
   if (!post) notFound();
 
+  const authorName = await getAuthorName(post.author_id);
+
   return (
     <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 sm:py-16">
-        <ArticleJsonLd post={post} />
+        <ArticleJsonLd post={post} authorName={authorName} />
 
         <Link
           href="/blog"
@@ -67,6 +69,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
         <header className="mb-8">
           <p className="text-soft-black-light text-sm">
             {formatDate(post.publish_at)}
+            {authorName ? <> · By {authorName}</> : null}
           </p>
           <h1 className="font-heading text-soft-black mt-2 text-3xl font-semibold sm:text-4xl">
             {post.title}
