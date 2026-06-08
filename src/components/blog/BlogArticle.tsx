@@ -2,7 +2,6 @@ import Link from "next/link";
 import NextImage from "next/image";
 import { PostContent } from "@/lib/blog/render";
 import { extractHeadings } from "@/lib/blog/toc";
-import { readingTimeMinutes } from "@/lib/blog/text";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import { BlogToc } from "@/components/blog/BlogToc";
 import { BlogShareButtons } from "@/components/blog/BlogShareButtons";
@@ -67,7 +66,7 @@ export function BlogArticle({
                 )}
               </>
             ) : null}{" "}
-            · {readingTimeMinutes(post.content)} min read
+            · {post.reading_time_minutes} min read
           </span>
           {category && (
             <Link

@@ -18,6 +18,7 @@ function post(overrides: Partial<BlogPost>): BlogPost {
     seo_description: null,
     category_id: null,
     pinned: false,
+    reading_time_minutes: 1,
     created_at: "2026-05-30T12:00:00.000Z",
     updated_at: "2026-06-01T12:00:00.000Z",
     ...overrides,
