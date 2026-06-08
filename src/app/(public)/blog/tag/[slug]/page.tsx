@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getPublishedPostsByTag, toListItems } from "@/lib/blog/queries";
+import { getLiveTaxonomyRedirect } from "@/lib/blog/taxonomy-redirects";
 import { BlogPostList } from "@/components/blog/BlogPostList";
 
 export const revalidate = 60;
@@ -45,7 +46,13 @@ export default async function TagArchivePage({
   const { slug } = await params;
   const requested = parsePage((await searchParams).page);
   const archive = await getPublishedPostsByTag(slug, requested);
-  if (!archive) notFound();
+  if (!archive) {
+    // A renamed/merged tag: redirect to its current slug if it still
+    // resolves, otherwise 404.
+    const to = await getLiveTaxonomyRedirect("tag", slug);
+    if (to) permanentRedirect(`/blog/tag/${to}`);
+    notFound();
+  }
 
   const { tag, posts, page, totalPages, total } = archive;
   if (total > 0 && requested > totalPages) notFound();

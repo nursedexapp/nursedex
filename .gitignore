@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Vercel plugin agent guidance (generated, local-only)
 AGENTS.md
+
+# Skill manager lockfile (generated, local-only)
+skills-lock.json
