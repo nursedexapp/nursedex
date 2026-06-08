@@ -4,7 +4,9 @@ import { Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { MessageSquare } from "lucide-react";
 import { getAllPostsForAdmin } from "@/lib/blog/queries";
+import { getPendingCommentCount } from "@/lib/comments/queries";
 import { BLOG_POST_STATUS_LABELS, BlogPostStatus } from "@/types/enums";
 import { BlogPostActions } from "@/components/admin/BlogPostActions";
 
@@ -30,7 +32,10 @@ function formatDate(iso: string | null): string {
 }
 
 export default async function AdminBlogPage() {
-  const posts = await getAllPostsForAdmin();
+  const [posts, pendingComments] = await Promise.all([
+    getAllPostsForAdmin(),
+    getPendingCommentCount(),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6 sm:p-8">
@@ -43,10 +48,24 @@ export default async function AdminBlogPage() {
             Write, schedule, and publish posts.
           </p>
         </div>
-        <Link href="/admin/blog/new" className={buttonVariants()}>
-          <Plus className="size-4" />
-          New post
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/blog/comments"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            <MessageSquare className="size-4" />
+            Comments
+            {pendingComments > 0 && (
+              <span className="bg-teal ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold text-white tabular-nums">
+                {pendingComments}
+              </span>
+            )}
+          </Link>
+          <Link href="/admin/blog/new" className={buttonVariants()}>
+            <Plus className="size-4" />
+            New post
+          </Link>
+        </div>
       </div>
 
       {posts.length === 0 ? (

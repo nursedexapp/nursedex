@@ -16,6 +16,7 @@ import { blogPostBreadcrumbs } from "@/lib/blog/breadcrumbs";
 import { BlogArticle } from "@/components/blog/BlogArticle";
 import { NewsletterCta } from "@/components/blog/NewsletterCta";
 import { BlogPostAnalytics } from "@/components/blog/BlogPostAnalytics";
+import { BlogComments } from "@/components/blog/BlogComments";
 
 export const revalidate = 60;
 
@@ -106,6 +107,8 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           related={related}
           showShare
         />
+
+        <BlogComments postId={post.id} />
 
         <div className="mt-12">
           <NewsletterCta source="blog_post" />

@@ -14,6 +14,7 @@ import type {
   HireStatus,
   AdminActionType,
   BlogPostStatus,
+  BlogCommentStatus,
 } from "./enums";
 
 export interface User {
@@ -321,4 +322,14 @@ export interface BlogTag {
 export interface BlogPostListItem extends BlogPost {
   categoryName: string | null;
   categorySlug: string | null;
+}
+
+export interface BlogComment {
+  id: string;
+  post_id: string;
+  author_name: string;
+  author_email: string;
+  body: string;
+  status: BlogCommentStatus;
+  created_at: string;
 }
