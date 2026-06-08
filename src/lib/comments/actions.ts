@@ -1,9 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireAdmin } from "@/lib/auth/helpers";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { blogCommentSchema } from "@/lib/schemas/comment";
+import { sendCommentSubmittedEmail } from "@/lib/email/send";
 
 export interface CommentResult {
   success: boolean;
@@ -46,10 +48,11 @@ export async function submitComment(raw: unknown): Promise<CommentResult> {
   // Only accept comments on a published post.
   const { data: post } = await supabase
     .from("blog_posts")
-    .select("status")
+    .select("status, title")
     .eq("id", input.post_id)
     .maybeSingle();
-  if ((post as { status: string } | null)?.status !== "published") {
+  const postRow = post as { status: string; title: string } | null;
+  if (postRow?.status !== "published") {
     return { success: false, error: "invalid" };
   }
 
@@ -64,6 +67,16 @@ export async function submitComment(raw: unknown): Promise<CommentResult> {
     console.error("[comments] submit failed:", error.message);
     return { success: false, error: "unknown" };
   }
+
+  // Notify admins after the response (an un-awaited send dies on freeze).
+  after(() =>
+    sendCommentSubmittedEmail({
+      postTitle: postRow.title,
+      authorName: input.author_name,
+      body: input.body,
+    }),
+  );
+
   return { success: true };
 }
 
