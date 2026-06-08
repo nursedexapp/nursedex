@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod/v4";
+import { handleEmailRoute } from "@/lib/email/route-handler";
 
 const schema = z.object({
   to: z.email(),
@@ -11,42 +12,24 @@ const schema = z.object({
   notes: z.string().nullable(),
 });
 
-export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const parsed = schema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
-
-  try {
-    const { Resend } = await import("resend");
-    const { DisputeDecision } =
-      await import("@/lib/email/templates/DisputeDecision");
-
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const subject =
-      parsed.data.decision === "keep"
-        ? "NurseDex: review dispute decision (kept)"
-        : "NurseDex: review dispute decision (removed)";
-
-    const { error } = await resend.emails.send({
-      from: "NurseDex Team <noreply@nursedex.com>",
-      to: parsed.data.to,
-      replyTo: "support@nursedex.com",
-      subject,
-      react: DisputeDecision(parsed.data),
-    });
-    if (error) {
-      console.error("[email] dispute decision send failed:", error);
-      return NextResponse.json({ error: "Send failed" }, { status: 500 });
-    }
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("[email] dispute decision error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
-  }
+export function POST(request: NextRequest) {
+  return handleEmailRoute(
+    request,
+    schema,
+    async (data) => {
+      const { DisputeDecision } =
+        await import("@/lib/email/templates/DisputeDecision");
+      return {
+        from: "NurseDex Team <noreply@nursedex.com>",
+        to: data.to,
+        replyTo: "support@nursedex.com",
+        subject:
+          data.decision === "keep"
+            ? "NurseDex: review dispute decision (kept)"
+            : "NurseDex: review dispute decision (removed)",
+        react: DisputeDecision(data),
+      };
+    },
+    "dispute decision",
+  );
 }

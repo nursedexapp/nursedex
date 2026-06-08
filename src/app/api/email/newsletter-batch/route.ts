@@ -22,9 +22,8 @@ export async function POST(request: NextRequest) {
   const { subject, body, recipients } = parsed.data;
   try {
     const { Resend } = await import("resend");
-    const { NewsletterIssue } = await import(
-      "@/lib/email/templates/NewsletterIssue"
-    );
+    const { NewsletterIssue } =
+      await import("@/lib/email/templates/NewsletterIssue");
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { error } = await resend.batch.send(
       recipients.map((r) => ({
