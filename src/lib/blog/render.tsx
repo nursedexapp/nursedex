@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import type { TiptapDoc, TiptapNode } from "@/types/database";
 import { headingId, nodeText } from "./toc";
+import { parseEmbed } from "./embed";
 import { CodeBlock } from "@/components/blog/CodeBlock";
 
 /**
@@ -158,6 +159,30 @@ function renderNode(
       // allowlist; next/image is not a fit for inline editorial content.
       // eslint-disable-next-line @next/next/no-img-element
       return <img key={key} src={src as string} alt={alt} loading="lazy" />;
+    }
+    case "embed": {
+      // Only ever iframe a normalized provider embed URL (see parseEmbed);
+      // an unrecognized or tampered URL is dropped.
+      const parsed = parseEmbed(
+        typeof node.attrs?.url === "string" ? node.attrs.url : null,
+      );
+      if (!parsed) return null;
+      return (
+        <div
+          key={key}
+          className="relative my-6 aspect-video w-full overflow-hidden rounded-lg"
+        >
+          <iframe
+            src={parsed.embedUrl}
+            title={parsed.provider === "youtube" ? "YouTube video" : "Vimeo video"}
+            className="absolute inset-0 h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+      );
     }
     default:
       // Unknown node types are dropped entirely.
