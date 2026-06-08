@@ -66,8 +66,20 @@ function sameDay(a: Date, b: Date): boolean {
 export function DateTimePicker({ value, onChange, id }: DateTimePickerProps) {
   const selected = parseLocal(value);
   const [open, setOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
   const [view, setView] = useState(() => selected ?? new Date());
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Open above the trigger when there is not enough room below it (e.g. the
+  // schedule field sits near the bottom of the editor). Measured on open.
+  function toggle() {
+    if (!open && rootRef.current) {
+      const rect = rootRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUp(spaceBelow < 380 && rect.top > spaceBelow);
+    }
+    setOpen((o) => !o);
+  }
 
   // Close on outside click or Escape.
   useEffect(() => {
@@ -160,7 +172,7 @@ export function DateTimePicker({ value, onChange, id }: DateTimePickerProps) {
       <button
         type="button"
         id={id}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggle}
         className={cn(
           "border-border bg-warm-white inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm",
           selected ? "text-soft-black" : "text-soft-black-light",
@@ -171,7 +183,12 @@ export function DateTimePicker({ value, onChange, id }: DateTimePickerProps) {
       </button>
 
       {open && (
-        <div className="border-border bg-warm-white absolute left-0 z-50 mt-1 w-auto rounded-lg border p-3 shadow-md">
+        <div
+          className={cn(
+            "border-border bg-warm-white absolute left-0 z-50 w-auto rounded-lg border p-3 shadow-md",
+            openUp ? "bottom-full mb-1" : "top-full mt-1",
+          )}
+        >
           <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
