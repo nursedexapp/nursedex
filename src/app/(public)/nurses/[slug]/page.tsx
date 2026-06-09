@@ -32,6 +32,11 @@ export async function generateMetadata({
   params,
 }: NurseProfilePageProps): Promise<Metadata> {
   const { slug } = await params;
+  // A redirected slug is resolved by the page component; don't 404 it here.
+  const redirectSlug = await getSlugRedirect(slug);
+  if (redirectSlug) {
+    return {};
+  }
   // Mirror the page's fallback so an admin or the nurse themselves
   // doesn't see "Nurse Not Found" in the browser tab while previewing
   // a pending profile.
@@ -49,8 +54,13 @@ export async function generateMetadata({
     }
   }
 
+  // No matching profile for this viewer: 404 here in generateMetadata, which
+  // runs before the page streams. The page's loading.tsx puts the page render
+  // behind a Suspense boundary, so a notFound() thrown in the page body lands
+  // after the 200 shell has flushed and can't set the status. Throwing here
+  // sets a real 404.
   if (!nurse) {
-    return { title: "Nurse Not Found | NurseDex" };
+    notFound();
   }
 
   const credentialLabel =
