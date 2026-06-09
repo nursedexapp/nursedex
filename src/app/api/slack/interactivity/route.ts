@@ -304,8 +304,9 @@ async function handleTriage(
           ? `🟠 Triaged as *Ad Hoc* at $75/hr, estimate ${estimate} hrs (~${cost}). Awaiting approval before work starts.`
           : `🟢 Triaged as *Maintenance* at $25/hr, estimate ${estimate} hrs (~${cost}). Cleared to start.`,
       );
-      // Maintenance is cleared on triage, so open its GitHub issue now.
-      if (req.status === "approved") await ensureIssue(req);
+      // Maintenance is cleared on triage, so open its GitHub issue. Run it
+      // after the response so a slow GitHub call cannot stick the modal.
+      if (req.status === "approved") after(() => ensureIssue(req));
     }
     return ACK;
   } catch (err) {
@@ -345,7 +346,8 @@ async function handleDecision(
         ? `✅ Approved by <@${userId}>. Cleared to start.`
         : `⛔ Rejected by <@${userId}>.`,
     );
-    // Open the GitHub issue once an ad hoc request is approved.
-    if (approve) await ensureIssue(req);
+    // Open the GitHub issue once an ad hoc request is approved. Run it after
+    // the response so a slow GitHub call cannot stick the button.
+    if (approve) after(() => ensureIssue(req));
   }
 }

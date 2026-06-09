@@ -97,6 +97,11 @@ export async function ensureIssue(req: RequestRow): Promise<void> {
     });
   } catch (err) {
     console.error(`createIssue for request ${req.id} failed:`, err);
+    // Surface the failure in the thread so a missing issue is not silent.
+    await postReply(
+      req,
+      `⚠️ Could not create a GitHub issue for request #${req.id} automatically. Create one manually and link it here.`,
+    );
     return;
   }
 
