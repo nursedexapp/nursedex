@@ -16,3 +16,11 @@ test("a nonexistent nurse profile is noindexed", async ({ page }) => {
     .getAttribute("content");
   expect(robots).toContain("noindex");
 });
+
+test("a nonexistent blog post returns a real 404", async ({ page }) => {
+  // Blog routes are not behind a loading.tsx, so notFound() yields a true 404.
+  // Guards against a future loading.tsx turning these into soft-404s (HTTP
+  // 200), which matters for SEO on indexable blog URLs. See #326.
+  const res = await page.goto("/blog/zzz-definitely-not-a-real-post-12345");
+  expect(res?.status()).toBe(404);
+});
