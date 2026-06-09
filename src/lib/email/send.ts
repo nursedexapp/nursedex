@@ -7,11 +7,23 @@
 
 import { headers } from "next/headers";
 
+// The request host, used as the target for the internal /api/email/* POST so
+// it reaches the same running deployment (including previews).
 async function getBaseUrl(): Promise<string> {
   const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
   const proto = h.get("x-forwarded-proto") ?? "http";
   return `${proto}://${host}`;
+}
+
+// The canonical public site URL, used for links that appear *inside* emails
+// (confirm, unsubscribe, post, moderation). Never the request host: an email
+// sent from a preview deployment must still link to the live site.
+function getSiteUrl(): string {
+  return (process.env.NEXT_PUBLIC_SITE_URL || "https://nursedex.com").replace(
+    /\/$/,
+    "",
+  );
 }
 
 export async function sendProfileSetupEmail(
@@ -50,7 +62,7 @@ export async function sendCommentSubmittedEmail(
   args: SendCommentSubmittedArgs,
 ): Promise<void> {
   const baseUrl = await getBaseUrl();
-  const moderateUrl = `${baseUrl}/admin/blog/comments`;
+  const moderateUrl = `${getSiteUrl()}/admin/blog/comments`;
 
   const res = await fetch(`${baseUrl}/api/email/comment-submitted`, {
     method: "POST",
@@ -78,7 +90,7 @@ export async function sendCommentApprovedEmail(
   args: SendCommentApprovedArgs,
 ): Promise<void> {
   const baseUrl = await getBaseUrl();
-  const postUrl = `${baseUrl}/blog/${args.slug}`;
+  const postUrl = `${getSiteUrl()}/blog/${args.slug}`;
 
   const res = await fetch(`${baseUrl}/api/email/comment-approved`, {
     method: "POST",
@@ -121,7 +133,7 @@ export async function sendNewsletterBatch(
       body,
       recipients: recipients.map((r) => ({
         email: r.email,
-        unsubscribeUrl: `${baseUrl}/newsletter/unsubscribe?token=${encodeURIComponent(r.unsubscribe_token)}`,
+        unsubscribeUrl: `${getSiteUrl()}/newsletter/unsubscribe?token=${encodeURIComponent(r.unsubscribe_token)}`,
       })),
     }),
   });
@@ -142,7 +154,7 @@ export async function sendNewsletterConfirmEmail(
   token: string,
 ): Promise<void> {
   const baseUrl = await getBaseUrl();
-  const confirmUrl = `${baseUrl}/newsletter/confirm?token=${encodeURIComponent(token)}`;
+  const confirmUrl = `${getSiteUrl()}/newsletter/confirm?token=${encodeURIComponent(token)}`;
 
   const res = await fetch(`${baseUrl}/api/email/newsletter-confirm`, {
     method: "POST",
