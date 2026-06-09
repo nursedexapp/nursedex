@@ -43,3 +43,17 @@ npm run test:e2e:auth
 `test:e2e:auth` sets `E2E_AUTH=1`, which adds the `setup` and `authenticated`
 Playwright projects. Without it, those projects are excluded and only the
 unauthenticated specs run.
+
+## Route smoke tests
+
+`smoke.auth.spec.ts` signs in as admin and loads every key admin route and the
+main public routes, asserting each returns a non-error status and does not fall
+into an error boundary. This catches render-time crashes (a server/client
+boundary mistake, a bad query) that typecheck and the build miss and that
+otherwise only surface in production. It is read-only, but loads admin routes,
+so it runs under the same `E2E_AUTH=1` authenticated project as the blog specs.
+
+Note: the GitHub Actions CI job (`.github/workflows/ci.yml`) currently runs only
+lint, typecheck, and the vitest suite, not Playwright. To have these smoke tests
+gate CI, an e2e job pointed at a dedicated test Supabase (with its secrets) is
+needed.
