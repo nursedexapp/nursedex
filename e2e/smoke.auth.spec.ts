@@ -30,7 +30,6 @@ const PUBLIC_ROUTES = [
   "/",
   "/nurses",
   "/blog",
-  "/welcome",
   "/about",
   "/how-it-works",
   "/pricing",
