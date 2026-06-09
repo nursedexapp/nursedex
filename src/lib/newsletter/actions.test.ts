@@ -13,6 +13,7 @@ const h = vi.hoisted(() => {
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.eq = () => b;
+    b.is = () => b;
     b.gte = () => b;
     b.maybeSingle = () => Promise.resolve({ data: state.row });
     b.upsert = (payload: unknown) => {
@@ -59,6 +60,7 @@ import {
   confirmNewsletter,
   sendNewsletterIssue,
   unsubscribeNewsletter,
+  unsubscribeByEmail,
 } from "./actions";
 
 beforeEach(() => {
@@ -229,5 +231,25 @@ describe("unsubscribeNewsletter", () => {
     h.state.row = null;
     expect(await unsubscribeNewsletter("bad")).toBe("invalid");
     expect(await unsubscribeNewsletter("")).toBe("invalid");
+  });
+});
+
+describe("unsubscribeByEmail", () => {
+  it("unsubscribes a valid email and reports success", async () => {
+    const res = await unsubscribeByEmail({ email: "a@b.com" });
+    expect(res.success).toBe(true);
+    expect(h.calls.update[0]).toHaveProperty("unsubscribed_at");
+  });
+
+  it("reports success even when nothing matched (no enumeration)", async () => {
+    const res = await unsubscribeByEmail({ email: "unknown@x.com" });
+    expect(res.success).toBe(true);
+  });
+
+  it("rejects an invalid email without writing", async () => {
+    const res = await unsubscribeByEmail({ email: "nope" });
+    expect(res.success).toBe(false);
+    expect(res.error).toBe("invalid");
+    expect(h.calls.update).toHaveLength(0);
   });
 });

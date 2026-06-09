@@ -12,6 +12,11 @@ export const newsletterSchema = z.object({
 
 export type NewsletterInput = z.infer<typeof newsletterSchema>;
 
+// Email-based unsubscribe (the generic email footer link, no token).
+export const unsubscribeEmailSchema = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email"),
+});
+
 export const NEWSLETTER_SUBJECT_MAX = 150;
 export const NEWSLETTER_BODY_MAX = 20000;
 
