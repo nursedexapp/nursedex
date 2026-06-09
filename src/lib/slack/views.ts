@@ -1,7 +1,7 @@
 // Block Kit builders for the consulting request flow. Kept as plain
 // objects (no SDK) and typed loosely as JSON since Slack accepts any
 // valid Block Kit shape.
-import { OPS_CHANNEL_ID } from "./constants";
+import { OPS_CHANNEL_ID, NOTIFY_USER_IDS } from "./constants";
 
 type Json = Record<string, unknown>;
 
@@ -338,8 +338,23 @@ export function completionBlocks(opts: {
         text: `✅ Request #${opts.id} done: ${opts.title}`.slice(0, 150),
       },
     },
-    { type: "section", text: { type: "mrkdwn", text: opts.summary } },
   ];
+
+  // Ping both parties (Dan + Tiana) so completion shows up as a notification.
+  if (NOTIFY_USER_IDS.length) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: NOTIFY_USER_IDS.map((u) => `<@${u}>`).join(" "),
+      },
+    });
+  }
+
+  blocks.push({
+    type: "section",
+    text: { type: "mrkdwn", text: opts.summary },
+  });
 
   if (opts.changelog?.trim()) {
     blocks.push({

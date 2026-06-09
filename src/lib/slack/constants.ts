@@ -4,12 +4,17 @@
 // import it.
 export const OPS_CHANNEL_ID = "C0B8VPN6DMG";
 
-// Dan's Slack member ID, tagged on every new request so he gets pinged.
-// Empty = no tag (so the code is safe until the ID is filled in).
+// Dan (ops/dev) and Tiana (client) member IDs. Dan is tagged on every new
+// request; both are tagged when a request is completed and on the monthly
+// invoice. Empty = no tag (so the code is safe until an ID is filled in).
 export const OPS_NOTIFY_USER_ID = "U0A6FV2R3FH";
+export const CLIENT_NOTIFY_USER_ID = "U0A6R1LJWJX";
 
-// Tagged on the monthly invoice (Dan + Tiana) when there are billable
-// hours. The invoice does not post at all when there are none.
-export const INVOICE_NOTIFY_USER_IDS = [OPS_NOTIFY_USER_ID, "U0A6R1LJWJX"].filter(
-  Boolean,
-);
+// Both parties, notified on completion and on the monthly invoice.
+export const NOTIFY_USER_IDS = [
+  OPS_NOTIFY_USER_ID,
+  CLIENT_NOTIFY_USER_ID,
+].filter(Boolean);
+
+// Kept as an alias for the monthly invoice, which notifies the same parties.
+export const INVOICE_NOTIFY_USER_IDS = NOTIFY_USER_IDS;
