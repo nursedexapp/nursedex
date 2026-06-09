@@ -69,6 +69,7 @@ export interface NurseProfile {
   review_count: number;
   has_photo: boolean;
   is_seed: boolean;
+  is_hidden: boolean;
   save_count_for_upsell: number;
   last_upsell_shown_at: string | null;
   created_at: string;

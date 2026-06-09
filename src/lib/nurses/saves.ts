@@ -82,6 +82,7 @@ export async function getSavedNurses(
     )
     .in("user_id", nurseIds)
     .eq("verification_status", "verified")
+    .eq("is_hidden", false)
     .eq("users.is_deleted", false)
     .eq("users.is_suspended", false);
 

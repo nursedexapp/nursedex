@@ -198,6 +198,7 @@ async function runQuery(
     `,
     )
     .eq("verification_status", "verified")
+    .eq("is_hidden", false)
     .eq("users.is_deleted", false)
     .eq("users.is_suspended", false);
 
