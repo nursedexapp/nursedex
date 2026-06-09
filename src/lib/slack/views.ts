@@ -82,7 +82,10 @@ export function homeView(): Json {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: "Submit and track post-build consulting work. New requests are triaged, estimated, and billed in <#" + OPS_CHANNEL_ID + ">.",
+          text:
+            "Submit and track post-build consulting work. New requests are triaged, estimated, and billed in <#" +
+            OPS_CHANNEL_ID +
+            ">.",
         },
       },
       { type: "divider" },
@@ -254,7 +257,10 @@ export function requestRootBlocks(req: RequestView): Json[] {
   }
 
   const blocks: Json[] = [
-    { type: "header", text: { type: "plain_text", text: heading.slice(0, 150) } },
+    {
+      type: "header",
+      text: { type: "plain_text", text: heading.slice(0, 150) },
+    },
     { type: "section", fields },
   ];
 
@@ -343,17 +349,34 @@ export function completionBlocks(opts: {
   }
 
   if (opts.prs.length) {
-    const list = opts.prs
-      .map((p) => `• <${p.url}|${p.title ?? p.url}>`)
-      .join("\n");
-    blocks.push({
-      type: "section",
-      text: { type: "mrkdwn", text: `*Merged PRs*\n${list}` },
+    // A Slack section's mrkdwn text caps at 3000 chars, so split a long PR
+    // list across multiple section blocks instead of dropping the message.
+    const lines = opts.prs.map((p) => `• <${p.url}|${p.title ?? p.url}>`);
+    const groups: string[] = [];
+    let cur = "";
+    for (const line of lines) {
+      if (cur && cur.length + 1 + line.length > 2800) {
+        groups.push(cur);
+        cur = line;
+      } else {
+        cur = cur ? `${cur}\n${line}` : line;
+      }
+    }
+    if (cur) groups.push(cur);
+    groups.forEach((text, i) => {
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: i === 0 ? `*Merged PRs*\n${text}` : text,
+        },
+      });
     });
   }
 
   const signals: string[] = [`${billedHrs.toFixed(2)} hrs billed (active)`];
-  if (opts.wallMin != null) signals.push(`wall ${(opts.wallMin / 60).toFixed(2)}`);
+  if (opts.wallMin != null)
+    signals.push(`wall ${(opts.wallMin / 60).toFixed(2)}`);
   if (opts.commitMin != null)
     signals.push(`commits ${(opts.commitMin / 60).toFixed(2)}`);
 
