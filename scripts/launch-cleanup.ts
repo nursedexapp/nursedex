@@ -4,13 +4,12 @@
  * Two independent operations, both DRY RUN unless CONFIRM=1:
  *
  *  1. HIDE the demo seed nurses (nurse_profiles.is_seed = true) by setting
- *     verification_status to 'rejected'. This removes them from search
- *     (src/lib/nurses/search.ts), profile pages, the sitemap, saves, and
- *     reveals (all gate on verification_status='verified') WITHOUT deleting
- *     any data, so they can be brought back later. Fully reversible:
- *     run with RESTORE=1 to set the seed nurses back to 'verified'.
- *     Only verification_status is touched, so the BEFORE UPDATE OF credential
- *     re-verify trigger (migration 007) never fires.
+ *     is_hidden = true (migration 041). Hidden profiles drop out of search,
+ *     the public profile page, the sitemap, saves, and reveals WITHOUT
+ *     deleting any data. Reversible: run with RESTORE=1 to set is_hidden back
+ *     to false. Hiding also resets verification_status to 'verified' to undo
+ *     the earlier launch hack that hid seeds via verification_status='rejected'
+ *     (before the dedicated flag existed), so re-running reconciles them.
  *
  *  2. DELETE the real test accounts named in TEST_EMAILS (comma-separated).
  *     Deletes the auth user, which cascades to public.users and every
@@ -56,10 +55,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
 const mode = CONFIRM ? "EXECUTE" : "DRY RUN";
 
 async function hideOrRestoreSeedNurses() {
-  const target = RESTORE ? "verified" : "rejected";
+  const targetHidden = !RESTORE;
   const { data: rows, error } = await supabase
     .from("nurse_profiles")
-    .select("user_id, verification_status")
+    .select("user_id, is_hidden")
     .eq("is_seed", true);
   if (error) {
     console.error("Failed to read seed nurses:", error.message);
@@ -68,23 +67,30 @@ async function hideOrRestoreSeedNurses() {
   const seeds = rows ?? [];
   console.log(
     `\n[seed nurses] ${seeds.length} found (is_seed=true). ` +
-      `${RESTORE ? "Restoring to" : "Hiding by setting"} verification_status='${target}'.`,
+      `${RESTORE ? "Restoring (is_hidden=false)" : "Hiding (is_hidden=true)"}.`,
   );
-  const toChange = seeds.filter((r) => r.verification_status !== target);
+  const toChange = seeds.filter((r) => r.is_hidden !== targetHidden);
   console.log(
-    `  ${toChange.length} need changing (already '${target}': ${seeds.length - toChange.length}).`,
+    `  ${toChange.length} need changing (already ${targetHidden ? "hidden" : "visible"}: ${seeds.length - toChange.length}).`,
   );
-  if (!CONFIRM || toChange.length === 0) return;
+  if (!CONFIRM) return;
 
+  // When hiding, also reset verification_status to 'verified' to undo the
+  // earlier hack that hid seeds via verification_status='rejected'.
+  const update = targetHidden
+    ? { is_hidden: true, verification_status: "verified" as const }
+    : { is_hidden: false };
   const { error: upErr } = await supabase
     .from("nurse_profiles")
-    .update({ verification_status: target })
+    .update(update)
     .eq("is_seed", true);
   if (upErr) {
     console.error("  Update failed:", upErr.message);
     process.exit(1);
   }
-  console.log(`  Done: ${toChange.length} seed nurses set to '${target}'.`);
+  console.log(
+    `  Done: ${seeds.length} seed nurses set to is_hidden=${targetHidden}.`,
+  );
 }
 
 async function deleteTestAccounts() {

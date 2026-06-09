@@ -42,6 +42,7 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
       slug,
       credential,
       verification_status,
+      is_hidden,
       users!inner(first_name, last_name, is_deleted, is_suspended)
     `,
     )
@@ -55,6 +56,7 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
     slug: string;
     credential: string;
     verification_status: string;
+    is_hidden: boolean;
     users: {
       first_name: string | null;
       last_name: string | null;
@@ -66,6 +68,7 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
 
   if (
     nurse.verification_status !== "verified" ||
+    nurse.is_hidden ||
     nurse.users.is_deleted ||
     nurse.users.is_suspended
   ) {

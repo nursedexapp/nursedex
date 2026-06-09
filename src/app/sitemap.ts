@@ -56,7 +56,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         users!inner ( is_deleted, is_suspended )
       `,
       )
-      .eq("verification_status", "verified");
+      .eq("verification_status", "verified")
+      .eq("is_hidden", false);
 
     type Row = {
       slug: string;
