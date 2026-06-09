@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { getPendingCommentCount } from "@/lib/comments/queries";
 import { compareVerificationQueueRows } from "./sla";
 
 export interface AdminCounts {
@@ -7,37 +8,41 @@ export interface AdminCounts {
   pendingReviews: number;
   pendingDisputes: number;
   removalRequests: number;
+  pendingComments: number;
 }
 
 export async function getAdminCounts(): Promise<AdminCounts> {
   const supabase = await createClient();
 
-  const [verifications, reviews, disputes, removals] = await Promise.all([
-    supabase
-      .from("nurse_profiles")
-      .select("user_id", { count: "exact", head: true })
-      .eq("verification_status", "pending"),
-    supabase
-      .from("reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "pending")
-      .eq("email_verified", true),
-    supabase
-      .from("reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "disputed"),
-    supabase
-      .from("reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("removal_requested", true)
-      .eq("status", "approved"),
-  ]);
+  const [verifications, reviews, disputes, removals, pendingComments] =
+    await Promise.all([
+      supabase
+        .from("nurse_profiles")
+        .select("user_id", { count: "exact", head: true })
+        .eq("verification_status", "pending"),
+      supabase
+        .from("reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .eq("email_verified", true),
+      supabase
+        .from("reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "disputed"),
+      supabase
+        .from("reviews")
+        .select("id", { count: "exact", head: true })
+        .eq("removal_requested", true)
+        .eq("status", "approved"),
+      getPendingCommentCount(),
+    ]);
 
   return {
     pendingVerifications: verifications.count ?? 0,
     pendingReviews: reviews.count ?? 0,
     pendingDisputes: disputes.count ?? 0,
     removalRequests: removals.count ?? 0,
+    pendingComments,
   };
 }
 
