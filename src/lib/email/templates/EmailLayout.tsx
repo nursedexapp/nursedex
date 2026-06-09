@@ -62,15 +62,16 @@ export function EmailLayout({
             {BUSINESS_ADDRESS.line1}, {BUSINESS_ADDRESS.city},{" "}
             {BUSINESS_ADDRESS.state} {BUSINESS_ADDRESS.zip}
           </Text>
-          <Text style={footerText}>
-            <Link
-              href={unsubscribeUrl ?? "https://nursedex.com/unsubscribe"}
-              style={footerLink}
-            >
-              Unsubscribe
-            </Link>{" "}
-            from marketing emails
-          </Text>
+          {/* Only marketing emails carry an unsubscribe link. Transactional
+              emails (no unsubscribeUrl) are not marketing and omit it. */}
+          {unsubscribeUrl && (
+            <Text style={footerText}>
+              <Link href={unsubscribeUrl} style={footerLink}>
+                Unsubscribe
+              </Link>{" "}
+              from these emails
+            </Text>
+          )}
         </Section>
       </Body>
     </Html>
