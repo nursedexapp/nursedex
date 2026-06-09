@@ -40,6 +40,14 @@ export function MobileNav({ isLoggedIn }: MobileNavProps) {
             Find a Nurse
           </Link>
 
+          <Link
+            href="/blog"
+            onClick={() => setOpen(false)}
+            className="font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors"
+          >
+            Blog
+          </Link>
+
           {isLoggedIn ? (
             <>
               <Link

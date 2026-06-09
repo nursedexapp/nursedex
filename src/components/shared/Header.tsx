@@ -23,6 +23,13 @@ export async function Header() {
             Find a Nurse
           </Link>
 
+          <Link
+            href="/blog"
+            className="font-body text-soft-black-light hover:text-soft-black text-sm transition-colors"
+          >
+            Blog
+          </Link>
+
           {isLoggedIn ? (
             <Link
               href="/dashboard"
