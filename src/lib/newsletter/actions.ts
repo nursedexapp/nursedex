@@ -6,6 +6,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   newsletterSchema,
   newsletterIssueSchema,
+  unsubscribeEmailSchema,
 } from "@/lib/schemas/newsletter";
 import { clientIpFrom, hashIp } from "@/lib/rate-limit";
 import { chunk } from "@/lib/chunk";
@@ -200,6 +201,32 @@ export async function sendNewsletterIssue(
 export type UnsubscribeResult = "ok" | "invalid";
 
 /** Unsubscribe by token (from the email footer). Idempotent. */
+export interface UnsubscribeByEmailResult {
+  success: boolean;
+  error?: "invalid";
+}
+
+/**
+ * Unsubscribe by email, for the generic footer link present in every email
+ * (no per-recipient token). Always reports success for a valid email so the
+ * page cannot be used to probe whether an address is subscribed.
+ */
+export async function unsubscribeByEmail(
+  raw: unknown,
+): Promise<UnsubscribeByEmailResult> {
+  const parsed = unsubscribeEmailSchema.safeParse(raw);
+  if (!parsed.success) return { success: false, error: "invalid" };
+
+  const supabase = createServiceRoleClient();
+  await supabase
+    .from("newsletter_subscribers")
+    .update({ unsubscribed_at: new Date().toISOString() })
+    .eq("email", parsed.data.email)
+    .is("unsubscribed_at", null);
+
+  return { success: true };
+}
+
 export async function unsubscribeNewsletter(
   token: string,
 ): Promise<UnsubscribeResult> {
