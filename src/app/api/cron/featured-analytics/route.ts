@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
     `,
     )
     .eq("tier", "featured")
-    .eq("verification_status", "verified");
+    .eq("verification_status", "verified")
+    .eq("is_hidden", false);
 
   if (error) {
     console.error("[cron featured-analytics] query failed:", error.message);

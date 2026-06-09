@@ -135,7 +135,8 @@ export async function getCohortComparison(
     .select("user_id")
     .eq("credential", me.credential)
     .eq("primary_care_type", me.primary_care_type)
-    .eq("verification_status", "verified");
+    .eq("verification_status", "verified")
+    .eq("is_hidden", false);
   type CohortRow = { user_id: string };
   const cohortIds = ((cohort ?? []) as CohortRow[]).map((c) => c.user_id);
   if (cohortIds.length < 5) {
