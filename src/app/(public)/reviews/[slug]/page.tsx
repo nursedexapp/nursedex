@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { ExternalReviewForm } from "@/components/reviews/ExternalReviewForm";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 
@@ -31,23 +32,21 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
 
   const service = createServiceRoleClient();
 
-  // Resolve the slug to a nurse. Only allow verified, non-deleted,
-  // non-suspended profiles — pending nurses don't have public review
-  // pages yet.
-  const { data: nurseRow } = await service
-    .from("nurse_profiles")
-    .select(
-      `
-      user_id,
-      slug,
-      credential,
-      verification_status,
-      is_hidden,
-      users!inner(first_name, last_name, is_deleted, is_suspended)
-    `,
-    )
-    .eq("slug", slug)
-    .maybeSingle();
+  // Resolve the slug to a publicly visible nurse (verified, not hidden, not
+  // deleted/suspended). Pending or hidden profiles have no public review page.
+  const { data: nurseRow } = await applyVisibleNurseFilter(
+    service
+      .from("nurse_profiles")
+      .select(
+        `
+        user_id,
+        slug,
+        credential,
+        users!inner(first_name, last_name, is_deleted, is_suspended)
+      `,
+      )
+      .eq("slug", slug),
+  ).maybeSingle();
 
   if (!nurseRow) notFound();
 
@@ -55,25 +54,12 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
     user_id: string;
     slug: string;
     credential: string;
-    verification_status: string;
-    is_hidden: boolean;
     users: {
       first_name: string | null;
       last_name: string | null;
-      is_deleted: boolean;
-      is_suspended: boolean;
     };
   };
   const nurse = nurseRow as unknown as Resolved;
-
-  if (
-    nurse.verification_status !== "verified" ||
-    nurse.is_hidden ||
-    nurse.users.is_deleted ||
-    nurse.users.is_suspended
-  ) {
-    notFound();
-  }
 
   // Get or create the review_links row for this nurse, server-side.
   // The form needs a token for submit_external_review's gate.

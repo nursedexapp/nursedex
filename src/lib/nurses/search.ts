@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { applyVisibleNurseFilter } from "./visibility";
 import { getSignedPhotoUrl } from "@/lib/profile/photos";
 import { SEARCH } from "@/lib/constants";
 import { GENDER_FILTER_ANY, type SearchFilters } from "./search-params";
@@ -196,11 +197,8 @@ async function runQuery(
         is_suspended
       )
     `,
-    )
-    .eq("verification_status", "verified")
-    .eq("is_hidden", false)
-    .eq("users.is_deleted", false)
-    .eq("users.is_suspended", false);
+    );
+  query = applyVisibleNurseFilter(query);
 
   // Availability visibility:
   // - unavailable_visibility='hidden' → NEVER in search.
