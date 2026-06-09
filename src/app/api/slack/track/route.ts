@@ -87,32 +87,45 @@ export async function POST(request: NextRequest) {
   const rate = req.rate ?? (req.type ? RATES[req.type as RequestType] : 0) ?? 0;
   const supabase = createServiceRoleClient();
 
-  const { error: entryError } = await supabase
-    .from("consulting_time_entries")
-    .insert({
-      request_id: id,
-      wall_clock_min: body.wall_clock_min ?? null,
-      active_min: body.active_min ?? null,
-      commit_span_min: body.commit_span_min ?? null,
-      billed_min: Math.round(billedMin),
-      note: body.note ?? null,
-    });
-  if (entryError) {
-    console.error("Time entry insert failed:", entryError);
-    return NextResponse.json({ error: "Failed to log time" }, { status: 500 });
-  }
+  // A request that is already done is treated as a repost: log time and mark
+  // done only on the first completion, so a retry (e.g. after a failed Slack
+  // post) does not double-log the hours. The completion is still re-posted.
+  const isRepost = req.status === "done";
 
-  const { error: updateError } = await supabase
-    .from("consulting_requests")
-    .update({
-      status: "done",
-      summary: body.summary.trim(),
-      pr_urls: prs.map((p) => p.url),
-    })
-    .eq("id", id);
-  if (updateError) {
-    console.error("Request update failed:", updateError);
-    return NextResponse.json({ error: "Failed to update request" }, { status: 500 });
+  if (!isRepost) {
+    const { error: entryError } = await supabase
+      .from("consulting_time_entries")
+      .insert({
+        request_id: id,
+        wall_clock_min: body.wall_clock_min ?? null,
+        active_min: body.active_min ?? null,
+        commit_span_min: body.commit_span_min ?? null,
+        billed_min: Math.round(billedMin),
+        note: body.note ?? null,
+      });
+    if (entryError) {
+      console.error("Time entry insert failed:", entryError);
+      return NextResponse.json(
+        { error: "Failed to log time" },
+        { status: 500 },
+      );
+    }
+
+    const { error: updateError } = await supabase
+      .from("consulting_requests")
+      .update({
+        status: "done",
+        summary: body.summary.trim(),
+        pr_urls: prs.map((p) => p.url),
+      })
+      .eq("id", id);
+    if (updateError) {
+      console.error("Request update failed:", updateError);
+      return NextResponse.json(
+        { error: "Failed to update request" },
+        { status: 500 },
+      );
+    }
   }
 
   // Post the completion report and refresh the root to the done state.
