@@ -110,7 +110,11 @@ describe("savePost", () => {
   });
 
   it("rejects invalid input with field errors and does not revalidate", async () => {
-    const res = await savePost({ intent: "draft", title: "", content: validContent });
+    const res = await savePost({
+      intent: "draft",
+      title: "",
+      content: validContent,
+    });
     expect(res.success).toBe(false);
     expect(res.fieldErrors?.title).toBeTruthy();
     expect(h.revalidatePath).not.toHaveBeenCalled();
@@ -134,7 +138,10 @@ describe("autosavePost", () => {
     expect(res.success).toBe(true);
     expect(res.id).toBe("p1");
     expect(h.calls.insert).toHaveLength(1);
-    expect(h.calls.insert[0]).toMatchObject({ status: "draft", publish_at: null });
+    expect(h.calls.insert[0]).toMatchObject({
+      status: "draft",
+      publish_at: null,
+    });
     // Autosave never revalidates public surfaces.
     expect(h.revalidatePath).not.toHaveBeenCalled();
   });
@@ -168,7 +175,9 @@ describe("deletePost", () => {
         cover_image_url: PUB("blog/2026/cover.jpg"),
         content: {
           type: "doc",
-          content: [{ type: "image", attrs: { src: PUB("blog/2026/inline.png") } }],
+          content: [
+            { type: "image", attrs: { src: PUB("blog/2026/inline.png") } },
+          ],
         },
       },
       error: null,
@@ -198,7 +207,10 @@ describe("post taxonomy", () => {
     });
     expect(res.success).toBe(true);
     expect(h.calls.insert[0]).toMatchObject({ category_id: categoryId });
-    expect(tax.findOrCreateTags).toHaveBeenCalledWith(["Home Care", "Licensing"]);
+    expect(tax.findOrCreateTags).toHaveBeenCalledWith([
+      "Home Care",
+      "Licensing",
+    ]);
     expect(tax.syncPostTags).toHaveBeenCalledWith("p1", ["t1", "t2"]);
   });
 
@@ -274,7 +286,12 @@ describe("slug redirects on save", () => {
       data: { id, slug: "old-slug", status: "draft" },
       error: null,
     };
-    await savePost({ id, intent: "draft", title: "My Post", content: validContent });
+    await savePost({
+      id,
+      intent: "draft",
+      title: "My Post",
+      content: validContent,
+    });
     expect(redir.saveBlogSlugRedirect).not.toHaveBeenCalled();
   });
 
@@ -283,7 +300,90 @@ describe("slug redirects on save", () => {
       data: { id, slug: "my-post", status: "published" },
       error: null,
     };
-    await savePost({ id, intent: "publish", title: "My Post", content: validContent });
+    await savePost({
+      id,
+      intent: "publish",
+      title: "My Post",
+      content: validContent,
+    });
     expect(redir.saveBlogSlugRedirect).not.toHaveBeenCalled();
+  });
+});
+
+describe("post content round-trip (regression: node attrs lost across the action boundary)", () => {
+  // Exercises every node type that carries attrs/marks. Before the fix
+  // (#282) these were silently stripped when saving, breaking images,
+  // embeds, heading levels, code language, and footnotes on the live post.
+  const richContent = {
+    type: "doc" as const,
+    content: [
+      {
+        type: "heading",
+        attrs: { level: 3 },
+        content: [{ type: "text", text: "Title" }],
+      },
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: "bold", marks: [{ type: "bold" }] }],
+      },
+      {
+        type: "image",
+        attrs: { src: "/img.jpg", alt: "alt", caption: "cap", align: "left" },
+      },
+      {
+        type: "codeBlock",
+        attrs: { language: "javascript" },
+        content: [{ type: "text", text: "x" }],
+      },
+      {
+        type: "embed",
+        attrs: { url: "https://youtube.com/watch?v=dQw4w9WgXcQ" },
+      },
+      {
+        type: "paragraph",
+        content: [{ type: "footnote", attrs: { text: "a footnote" } }],
+      },
+    ],
+  };
+
+  it("savePost stores attrs from a stringified body (as the editor sends it)", async () => {
+    const res = await savePost({
+      intent: "publish",
+      title: "Rich Post",
+      content: JSON.stringify(richContent),
+    });
+    expect(res.success).toBe(true);
+    const stored = (h.calls.insert[0] as { content: unknown }).content;
+    expect(stored).toEqual(richContent);
+  });
+
+  it("savePost still preserves attrs from a plain object (back-compat)", async () => {
+    await savePost({
+      intent: "publish",
+      title: "Rich Post",
+      content: richContent,
+    });
+    const stored = (h.calls.insert[0] as { content: unknown }).content;
+    expect(stored).toEqual(richContent);
+  });
+
+  it("autosavePost stores attrs from a stringified body", async () => {
+    await autosavePost({
+      title: "Rich Post",
+      content: JSON.stringify(richContent),
+    });
+    const stored = (h.calls.insert[0] as { content: unknown }).content;
+    expect(stored).toEqual(richContent);
+  });
+
+  it("snapshots the saved revision with attrs intact", async () => {
+    await savePost({
+      intent: "publish",
+      title: "Rich Post",
+      content: JSON.stringify(richContent),
+    });
+    expect(rev.snapshotRevision).toHaveBeenCalled();
+    const snap = rev.snapshotRevision.mock.calls[0][1] as { content: unknown };
+    expect(snap.content).toEqual(richContent);
   });
 });
