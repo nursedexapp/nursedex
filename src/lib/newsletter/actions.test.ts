@@ -101,6 +101,23 @@ describe("subscribeNewsletter", () => {
     expect(h.sendConfirm).not.toHaveBeenCalled();
   });
 
+  it("re-confirms a previously unsubscribed address with a fresh email", async () => {
+    h.state.row = {
+      id: "s1",
+      confirmed_at: "2026-01-01T00:00:00Z",
+      unsubscribed_at: "2026-02-01T00:00:00Z",
+    };
+    const res = await subscribeNewsletter({ email: "a@b.com" });
+    expect(res.success).toBe(true);
+    // Reset to unconfirmed and cleared the unsubscribe.
+    expect(h.calls.update[0]).toMatchObject({
+      confirmed_at: null,
+      unsubscribed_at: null,
+    });
+    // A fresh confirmation email is sent so re-activation needs a re-confirm.
+    expect(h.sendConfirm).toHaveBeenCalledWith("a@b.com", expect.any(String));
+  });
+
   it("silently drops a filled honeypot", async () => {
     const res = await subscribeNewsletter({ email: "a@b.com", website: "x" });
     expect(res.success).toBe(true);

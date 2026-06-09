@@ -76,15 +76,29 @@ export async function subscribeNewsletter(
     confirmed_at: string | null;
     unsubscribed_at: string | null;
   } | null;
-  if (ex?.confirmed_at) {
-    // Already confirmed: re-subscribe silently if they had unsubscribed,
-    // otherwise nothing to do (and no enumeration).
-    if (ex.unsubscribed_at) {
-      await supabase
-        .from("newsletter_subscribers")
-        .update({ unsubscribed_at: null })
-        .eq("id", ex.id);
+  if (ex?.unsubscribed_at) {
+    // Re-subscribing after opting out: re-establish consent through the
+    // double opt-in. Reset to unconfirmed, clear the unsubscribe, and send
+    // a fresh confirmation email so the address is only re-activated once
+    // the owner confirms again.
+    const token = crypto.randomUUID();
+    const { error } = await supabase
+      .from("newsletter_subscribers")
+      .update({
+        confirmation_token: token,
+        confirmed_at: null,
+        unsubscribed_at: null,
+      })
+      .eq("id", ex.id);
+    if (error) {
+      console.error("[newsletter] resubscribe failed:", error.message);
+      return { success: false, error: "unknown" };
     }
+    await sendNewsletterConfirmEmail(input.email, token);
+    return { success: true };
+  }
+  if (ex?.confirmed_at) {
+    // Already an active subscriber: nothing to do, and no enumeration.
     return { success: true };
   }
 
