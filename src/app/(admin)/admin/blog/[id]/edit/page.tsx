@@ -42,17 +42,19 @@ export default async function EditBlogPostPage({
         <ArrowLeft className="size-4" />
         Back to posts
       </Link>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-heading text-soft-black text-2xl font-semibold">
           Edit post
         </h1>
-        <Link
-          href={`/admin/blog/${id}/revisions`}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          <History className="size-4" />
-          History
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/admin/blog/${id}/revisions`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            <History className="size-4" />
+            History
+          </Link>
+        </div>
       </div>
       <PostEditorForm
         post={post}
