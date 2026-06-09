@@ -22,7 +22,7 @@ export default function PrivacyPolicyPage() {
           Privacy Policy
         </h1>
         <p className="font-body text-soft-black-light mt-2 text-sm">
-          Last updated: March 31, 2026
+          Last updated: June 9, 2026
         </p>
 
         <div className="font-body text-soft-black-light mt-10 space-y-8 leading-relaxed">
@@ -47,10 +47,15 @@ export default function PrivacyPolicyPage() {
               What we collect
             </h2>
             <p className="mt-3">
-              When you join the waitlist, we collect your email address and the
-              role you selected (family or caregiver). If you arrived through a
-              referral link, we also store the referral source so we can measure
-              which channels are working.
+              When you create an account, we collect your email address, name,
+              role (family or nurse), and ZIP code. Nurses additionally provide
+              the profile information they choose to share, such as credentials
+              and license details, experience, languages, rates, and
+              availability. If you use paid features, billing information is
+              collected and processed by our payment provider; we do not store
+              full card numbers. If you arrived through a referral link, we may
+              also store the referral source so we can measure which channels
+              are working.
             </p>
             <p className="mt-3">
               When you use the site, we collect standard analytics data: pages
@@ -66,8 +71,8 @@ export default function PrivacyPolicyPage() {
             </h2>
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>
-                To notify you when NurseDex launches or when we have important
-                updates.
+                To create and operate your account, and to send you account,
+                transactional, and important service updates.
               </li>
               <li>
                 To understand how visitors use the site so we can improve it.
@@ -117,10 +122,10 @@ export default function PrivacyPolicyPage() {
               Data retention
             </h2>
             <p className="mt-3">
-              We retain your waitlist email until you ask us to remove it, or
-              until you create a full account (at which point the waitlist entry
-              is no longer needed). Analytics data is retained in aggregate form
-              and is not linked to your identity after 90 days.
+              We retain your account information for as long as your account is
+              active. You can ask us to delete your account and associated
+              personal data at any time. Analytics data is retained in aggregate
+              form and is not linked to your identity after 90 days.
             </p>
           </section>
 
@@ -133,7 +138,7 @@ export default function PrivacyPolicyPage() {
               <li>See what personal data we hold about you.</li>
               <li>Have your data corrected or deleted.</li>
               <li>Opt out of analytics tracking.</li>
-              <li>Withdraw from the waitlist at any time.</li>
+              <li>Delete your account at any time.</li>
             </ul>
             <p className="mt-3">
               To exercise any of these rights, email{" "}
@@ -165,7 +170,7 @@ export default function PrivacyPolicyPage() {
             </h2>
             <p className="mt-3">
               We may update this privacy policy from time to time. If we make
-              significant changes, we will notify waitlist members by email. The
+              significant changes, we will notify registered users by email. The
               &quot;last updated&quot; date at the top of this page reflects the
               most recent revision.
             </p>

@@ -21,7 +21,7 @@ export default function TermsOfServicePage() {
           Terms of Service
         </h1>
         <p className="font-body text-soft-black-light mt-2 text-sm">
-          Last updated: March 31, 2026
+          Last updated: June 9, 2026
         </p>
 
         <div className="font-body text-soft-black-light mt-10 space-y-8 leading-relaxed">
@@ -59,23 +59,6 @@ export default function TermsOfServicePage() {
           </section>
 
           <section>
-            <h2 className="font-heading text-soft-black text-xl">Waitlist</h2>
-            <p className="mt-3">
-              Joining the waitlist is free and does not obligate you to use
-              NurseDex when it launches. By joining, you consent to receiving
-              email communications about the NurseDex launch and related
-              updates. You may unsubscribe at any time by emailing{" "}
-              <a
-                href="mailto:support@nursedex.com"
-                className="text-teal hover:text-teal-dark underline underline-offset-2"
-              >
-                support@nursedex.com
-              </a>
-              .
-            </p>
-          </section>
-
-          <section>
             <h2 className="font-heading text-soft-black text-xl">
               Eligibility
             </h2>
@@ -93,10 +76,12 @@ export default function TermsOfServicePage() {
               Accounts and profiles
             </h2>
             <p className="mt-3">
-              When NurseDex launches, users will create accounts to access the
-              platform. You are responsible for keeping your login credentials
-              secure. You agree to notify us immediately if you suspect
-              unauthorized access to your account.
+              You create an account to access the platform. You are responsible
+              for keeping your login credentials secure and for activity under
+              your account, and you agree to notify us immediately if you
+              suspect unauthorized access. You may delete your account at any
+              time by emailing support@nursedex.com, and we may suspend or
+              remove accounts that violate these terms.
             </p>
             <p className="mt-3">
               Caregiver profiles must contain accurate, truthful information.
@@ -110,14 +95,14 @@ export default function TermsOfServicePage() {
               Payments and refunds
             </h2>
             <p className="mt-3">
-              Families will pay a monthly subscription to unlock caregiver
-              contact information. Caregivers can create profiles for free, with
+              Families pay a monthly subscription to unlock caregiver contact
+              information. Caregivers can create profiles for free, with
               optional paid upgrades for featured placement in search results.
             </p>
             <p className="mt-3">
               All payments are processed through Stripe. Subscription details
-              and pricing will be published before launch. All sales are final.
-              NurseDex does not offer refunds.
+              and pricing are published on our pricing page. All sales are
+              final. NurseDex does not offer refunds.
             </p>
           </section>
 
