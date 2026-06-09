@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
   const published = (data ?? []) as { slug: string }[];
   if (published.length > 0) {
     revalidatePath("/blog");
+    revalidatePath("/sitemap.xml");
     for (const p of published) revalidatePath(`/blog/${p.slug}`);
   }
 
