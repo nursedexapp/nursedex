@@ -3,10 +3,10 @@ import path from "path";
 
 export default defineConfig({
   test: {
-    // Default to `node` — no tests in this project need a DOM. If a future
-    // component test needs jsdom, add `// @vitest-environment jsdom` at the
-    // top of that file. (jsdom + vitest 4.1.4 currently hangs the worker
-    // pool — see memory feedback_vitest_jsdom.)
+    // Default to `node` — most tests need no DOM. For a test that does (e.g.
+    // the Tiptap editor specs), add `// @vitest-environment happy-dom` at the
+    // top of that file. Use happy-dom, not jsdom: jsdom + vitest 4.1.4 hangs
+    // the worker pool in this repo (see memory feedback_vitest_jsdom).
     environment: "node",
     setupFiles: [],
     include: ["src/**/*.test.{ts,tsx}"],
