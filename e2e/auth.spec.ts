@@ -1,5 +1,20 @@
 import { test, expect } from "@playwright/test";
 
+// Mirrors PASSWORD_RECOVERY.COOKIE_NAME in src/lib/constants.ts. The
+// reset-password page only renders the form when this recovery marker is
+// present (set by the recovery callback); otherwise it shows an expired
+// notice (see src/app/(auth)/reset-password/page.tsx).
+const RECOVERY_COOKIE = "nursedex_pw_recovery";
+
+async function grantRecoverySession(
+  context: import("@playwright/test").BrowserContext,
+  baseURL = "http://localhost:3000",
+) {
+  await context.addCookies([
+    { name: RECOVERY_COOKIE, value: "1", url: baseURL },
+  ]);
+}
+
 // These E2E tests verify the auth UI flows render and behave correctly.
 // They test page rendering, form validation, navigation, and redirects.
 // Actual Supabase auth (signup/login with real credentials) is not tested
@@ -39,13 +54,30 @@ test.describe("Auth pages load correctly", () => {
     await expect(page.getByText("Back to sign in")).toBeVisible();
   });
 
-  test("reset-password page renders", async ({ page }) => {
+  test("reset-password page renders the form with a recovery session", async ({
+    page,
+    context,
+  }) => {
+    await grantRecoverySession(context);
     await page.goto("/reset-password");
 
     await expect(page.getByRole("heading", { name: "Set new password" })).toBeVisible();
     await expect(page.locator("#password")).toBeVisible();
     await expect(page.locator("#confirmPassword")).toBeVisible();
     await expect(page.getByRole("button", { name: "Update password" })).toBeVisible();
+  });
+
+  test("reset-password page shows an expired notice without a recovery session", async ({
+    page,
+  }) => {
+    await page.goto("/reset-password");
+
+    await expect(
+      page.getByRole("heading", { name: "Link invalid or expired" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Request a new link" }),
+    ).toBeVisible();
   });
 });
 
@@ -123,7 +155,8 @@ test.describe("Form validation", () => {
     await expect(passwordInput).toHaveAttribute("type", "password");
   });
 
-  test("reset-password validates password match", async ({ page }) => {
+  test("reset-password validates password match", async ({ page, context }) => {
+    await grantRecoverySession(context);
     await page.goto("/reset-password");
 
     await page.locator("#password").fill("newpassword123");
