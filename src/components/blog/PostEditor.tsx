@@ -42,6 +42,13 @@ const EMPTY_DOC: TiptapDoc = {
 export function PostEditor({ value, onChange }: PostEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  // Inline toolbar input (replaces window.prompt) for inserting a link,
+  // embed, or footnote. Null when closed.
+  const [inline, setInline] = useState<{
+    kind: "link" | "embed" | "footnote";
+    value: string;
+    error: string | null;
+  } | null>(null);
 
   const editor = useEditor({
     // immediatelyRender must be false under Next so the server and first
@@ -96,9 +103,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
       editor.chain().focus().unsetLink().run();
       return;
     }
-    const url = window.prompt("Link URL (https://...)");
-    if (!url) return;
-    editor.chain().focus().setLink({ href: url }).run();
+    setInline({ kind: "link", value: "", error: null });
   }
 
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
@@ -143,21 +148,37 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
   }
 
   function insertEmbed() {
-    if (!editor) return;
-    const url = window.prompt("Paste a YouTube or Vimeo URL");
-    if (!url) return;
-    if (!parseEmbed(url)) {
-      toast.error("Only YouTube and Vimeo links are supported.");
-      return;
-    }
-    editor.chain().focus().setEmbed({ url }).run();
+    setInline({ kind: "embed", value: "", error: null });
   }
 
   function insertFootnote() {
-    if (!editor) return;
-    const text = window.prompt("Footnote text");
-    if (!text || !text.trim()) return;
-    editor.chain().focus().setFootnote({ text: text.trim() }).run();
+    setInline({ kind: "footnote", value: "", error: null });
+  }
+
+  // Commit the inline input: validate (embed URLs must be YouTube/Vimeo) and
+  // insert the node, or surface an inline error.
+  function submitInline() {
+    if (!inline || !editor) return;
+    const v = inline.value.trim();
+    if (!v) {
+      setInline(null);
+      return;
+    }
+    if (inline.kind === "link") {
+      editor.chain().focus().setLink({ href: v }).run();
+    } else if (inline.kind === "embed") {
+      if (!parseEmbed(v)) {
+        setInline({
+          ...inline,
+          error: "Only YouTube and Vimeo links are supported.",
+        });
+        return;
+      }
+      editor.chain().focus().setEmbed({ url: v }).run();
+    } else {
+      editor.chain().focus().setFootnote({ text: v }).run();
+    }
+    setInline(null);
   }
 
   const btn = (
@@ -269,7 +290,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           Quote,
         )}
         <span className="bg-border mx-1 h-5 w-px" />
-        {btn(active.link, setLink, "Link", LinkIcon)}
+        {btn(active.link || inline?.kind === "link", setLink, "Link", LinkIcon)}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -290,9 +311,61 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           className="hidden"
           onChange={onPickImage}
         />
-        {btn(false, insertEmbed, "Embed a video", Video)}
-        {btn(false, insertFootnote, "Add a footnote", Superscript)}
+        {btn(inline?.kind === "embed", insertEmbed, "Embed a video", Video)}
+        {btn(
+          inline?.kind === "footnote",
+          insertFootnote,
+          "Add a footnote",
+          Superscript,
+        )}
       </div>
+
+      {inline && (
+        <div className="border-border flex flex-wrap items-center gap-2 border-b p-1.5">
+          <input
+            autoFocus
+            type={inline.kind === "footnote" ? "text" : "url"}
+            value={inline.value}
+            onChange={(e) =>
+              setInline({ ...inline, value: e.target.value, error: null })
+            }
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                submitInline();
+              } else if (e.key === "Escape") {
+                setInline(null);
+              }
+            }}
+            placeholder={
+              inline.kind === "link"
+                ? "https://example.com"
+                : inline.kind === "embed"
+                  ? "Paste a YouTube or Vimeo URL"
+                  : "Footnote text"
+            }
+            className="border-border bg-warm-white text-soft-black h-8 min-w-0 flex-1 rounded-md border px-2 text-sm"
+          />
+          <button
+            type="button"
+            onClick={submitInline}
+            className="bg-teal hover:bg-teal-dark rounded-md px-3 py-1.5 text-sm font-medium text-white transition-colors"
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => setInline(null)}
+            className="text-soft-black-light hover:text-foreground px-1 text-sm"
+          >
+            Cancel
+          </button>
+          {inline.error && (
+            <span className="text-error w-full text-xs">{inline.error}</span>
+          )}
+        </div>
+      )}
+
       <EditorContent editor={editor} className="px-3 py-2" />
     </div>
   );
