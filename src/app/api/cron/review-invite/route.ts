@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     `,
     )
     .eq("verification_status", "verified")
+    .eq("is_hidden", false)
     .gte("verified_at", earliest)
     .lte("verified_at", latest);
 

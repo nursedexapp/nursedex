@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     )
     .eq("tier", "free")
     .eq("verification_status", "verified")
+    .eq("is_hidden", false)
     .gte("save_count_for_upsell", UPSELL_SAVE_THRESHOLD)
     .or(
       `last_upsell_shown_at.is.null,last_upsell_shown_at.lt.${cooldownCutoff}`,
