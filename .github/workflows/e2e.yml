@@ -45,14 +45,21 @@ jobs:
 
       # Map the local stack's URL/keys onto the names the app reads. The
       # anon key doubles as the publishable key for supabase-js locally.
+      # `-o env` quotes values (KEY="val"); eval into the shell to strip the
+      # quotes, then write clean values to GITHUB_ENV (which keeps quotes
+      # literal and would otherwise produce an "Invalid supabaseUrl").
       - name: Export Supabase env for the app
         run: |
-          supabase status -o env \
+          eval "$(supabase status -o env \
             --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
             --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
-            --override-name auth.service_role_key=SUPABASE_SECRET_KEY \
-            >> "$GITHUB_ENV"
-          echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000" >> "$GITHUB_ENV"
+            --override-name auth.service_role_key=SUPABASE_SECRET_KEY)"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+            echo "SUPABASE_SECRET_KEY=$SUPABASE_SECRET_KEY"
+            echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
+          } >> "$GITHUB_ENV"
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
