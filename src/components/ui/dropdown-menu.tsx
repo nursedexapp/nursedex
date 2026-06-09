@@ -85,6 +85,14 @@ function DropdownMenuItem({
   inset?: boolean;
   variant?: "default" | "destructive";
 }) {
+  // Base UI's Menu.Item only fires onClick. onSelect is a Radix prop it
+  // ignores, so warn in dev if one slips through (e.g. via a spread) before
+  // it ships as a silently dead action. The lint rule catches the static case.
+  if (process.env.NODE_ENV !== "production" && "onSelect" in props) {
+    console.warn(
+      "DropdownMenuItem received an `onSelect` prop, which @base-ui ignores. Use `onClick` instead.",
+    );
+  }
   return (
     <MenuPrimitive.Item
       data-slot="dropdown-menu-item"
