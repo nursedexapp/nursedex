@@ -13,6 +13,7 @@ import {
   Search,
   Star,
   BarChart3,
+  Newspaper,
 } from "lucide-react";
 import { signOut } from "@/lib/auth/actions";
 import { NavPendingIcon } from "@/components/nav/NavPendingIcon";
@@ -29,6 +30,7 @@ const NURSE_NAV: NavItem[] = [
   { href: "/dashboard/preview", label: "Preview", icon: Eye },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/dashboard/reviews", label: "Reviews", icon: Star },
+  { href: "/blog", label: "Blog", icon: Newspaper },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
@@ -37,6 +39,7 @@ const FAMILY_NAV: NavItem[] = [
   { href: "/nurses", label: "Find a Nurse", icon: Search },
   { href: "/dashboard/saved", label: "Saved Nurses", icon: Heart },
   { href: "/dashboard/revealed", label: "Revealed", icon: Eye },
+  { href: "/blog", label: "Blog", icon: Newspaper },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
