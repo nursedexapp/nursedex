@@ -50,7 +50,14 @@ export async function generateMetadata({
   }
 
   if (!nurse) {
-    return { title: "Nurse Not Found | NurseDex" };
+    // A missing or hidden profile renders the not-found UI, but the route
+    // streams behind nurses/loading.tsx, so the response is already a 200 and
+    // notFound() can't change the status. noindex the soft-404 so search
+    // engines drop it instead of indexing a "not found" page. See #323.
+    return {
+      title: "Nurse Not Found | NurseDex",
+      robots: { index: false, follow: false },
+    };
   }
 
   const credentialLabel =
