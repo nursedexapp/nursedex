@@ -23,10 +23,16 @@ function revalidate() {
   // Covers the index (chips), every archive, and the manager.
   revalidatePath("/blog", "layout");
   revalidatePath("/admin/blog/taxonomy");
+  // Renames/merges change which archive URLs the sitemap lists.
+  revalidatePath("/sitemap.xml");
 }
 
 /** Rename a category or tag (regenerating its slug). */
-async function rename(kind: Kind, id: string, name: string): Promise<TaxonomyResult> {
+async function rename(
+  kind: Kind,
+  id: string,
+  name: string,
+): Promise<TaxonomyResult> {
   await requireAdmin();
   const trimmed = name.trim();
   const slug = slugify(trimmed);

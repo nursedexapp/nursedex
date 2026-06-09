@@ -35,6 +35,8 @@ function revalidateBlog(slug?: string) {
   revalidatePath("/blog");
   if (slug) revalidatePath(`/blog/${slug}`);
   revalidatePath("/admin/blog");
+  // Publishing/unpublishing/renaming changes which URLs the sitemap lists.
+  revalidatePath("/sitemap.xml");
 }
 
 /**

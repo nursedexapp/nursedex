@@ -2,6 +2,11 @@ import type { MetadataRoute } from "next";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getIndexableTaxonomy } from "@/lib/blog/queries";
 
+// Refresh at most hourly so scheduled publishes and taxonomy changes reach
+// the sitemap without a deploy. Post mutations also revalidate it explicitly
+// (see revalidateBlog) for an immediate update.
+export const revalidate = 3600;
+
 const BASE_URL = "https://nursedex.com";
 
 const STATIC_PAGES: Array<{
