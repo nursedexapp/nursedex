@@ -15,9 +15,17 @@ import { BUSINESS_ADDRESS } from "@/lib/constants";
 interface EmailLayoutProps {
   preview: string;
   children: React.ReactNode;
+  // A per-recipient one-click unsubscribe URL (e.g. the newsletter's
+  // tokenized link). Falls back to the generic email-entry page for emails
+  // that have no recipient token.
+  unsubscribeUrl?: string;
 }
 
-export function EmailLayout({ preview, children }: EmailLayoutProps) {
+export function EmailLayout({
+  preview,
+  children,
+  unsubscribeUrl,
+}: EmailLayoutProps) {
   return (
     <Html>
       <Head>
@@ -55,7 +63,10 @@ export function EmailLayout({ preview, children }: EmailLayoutProps) {
             {BUSINESS_ADDRESS.state} {BUSINESS_ADDRESS.zip}
           </Text>
           <Text style={footerText}>
-            <Link href="https://nursedex.com/unsubscribe" style={footerLink}>
+            <Link
+              href={unsubscribeUrl ?? "https://nursedex.com/unsubscribe"}
+              style={footerLink}
+            >
               Unsubscribe
             </Link>{" "}
             from marketing emails

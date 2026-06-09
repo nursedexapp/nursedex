@@ -1,4 +1,4 @@
-import { Text, Section, Hr, Link } from "@react-email/components";
+import { Text, Section, Hr } from "@react-email/components";
 import { EmailLayout } from "./EmailLayout";
 
 interface NewsletterIssueProps {
@@ -18,7 +18,7 @@ export function NewsletterIssue({
     .filter(Boolean);
 
   return (
-    <EmailLayout preview={subject}>
+    <EmailLayout preview={subject} unsubscribeUrl={unsubscribeUrl}>
       <Section>
         <Text style={heading}>{subject}</Text>
         {paragraphs.map((p, i) => (
@@ -28,11 +28,7 @@ export function NewsletterIssue({
         ))}
         <Hr style={hr} />
         <Text style={footer}>
-          You are receiving this because you subscribed to the NurseDex blog.{" "}
-          <Link href={unsubscribeUrl} style={footerLink}>
-            Unsubscribe
-          </Link>
-          .
+          You are receiving this because you subscribed to the NurseDex blog.
         </Text>
       </Section>
     </EmailLayout>
@@ -60,4 +56,3 @@ const footer = {
   color: "#636E72",
   margin: "0",
 };
-const footerLink = { color: "#2A7B6F", textDecoration: "underline" };
