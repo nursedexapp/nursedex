@@ -60,6 +60,7 @@ interface AdminSidebarProps {
     pendingReviews: number;
     pendingDisputes: number;
     removalRequests: number;
+    pendingComments: number;
   };
 }
 
@@ -72,6 +73,8 @@ function badgeFor(href: string, c: AdminSidebarProps["counts"]): number {
       return c.pendingReviews + c.removalRequests;
     case "/admin/disputes":
       return c.pendingDisputes;
+    case "/admin/blog":
+      return c.pendingComments;
     default:
       return 0;
   }
@@ -136,7 +139,9 @@ export function AdminSidebar({ isSuperAdmin, counts }: AdminSidebarProps) {
           NurseDex Admin
         </p>
         <nav className="space-y-1">{navLinks()}</nav>
-        <div className="border-sage/20 mt-6 border-t pt-4">{signOutButton()}</div>
+        <div className="border-sage/20 mt-6 border-t pt-4">
+          {signOutButton()}
+        </div>
       </aside>
 
       {/* Mobile top bar */}
