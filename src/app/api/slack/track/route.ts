@@ -87,45 +87,60 @@ export async function POST(request: NextRequest) {
   const rate = req.rate ?? (req.type ? RATES[req.type as RequestType] : 0) ?? 0;
   const supabase = createServiceRoleClient();
 
-  // A request that is already done is treated as a repost: log time and mark
-  // done only on the first completion, so a retry (e.g. after a failed Slack
-  // post) does not double-log the hours. The completion is still re-posted.
-  const isRepost = req.status === "done";
-
-  if (!isRepost) {
-    const { error: entryError } = await supabase
+  // Idempotency guard: once a request is done or invoiced, /done is a no-op.
+  // Re-running must not log a second time entry (double counting the invoice),
+  // revert an invoiced request to done, re-post the completion report (thread
+  // clutter), or re-close the issue. Return the already-recorded totals so a
+  // retry still sees success.
+  if (req.status === "done" || req.status === "invoiced") {
+    const { data: entries } = await supabase
       .from("consulting_time_entries")
-      .insert({
-        request_id: id,
-        wall_clock_min: body.wall_clock_min ?? null,
-        active_min: body.active_min ?? null,
-        commit_span_min: body.commit_span_min ?? null,
-        billed_min: Math.round(billedMin),
-        note: body.note ?? null,
-      });
-    if (entryError) {
-      console.error("Time entry insert failed:", entryError);
-      return NextResponse.json(
-        { error: "Failed to log time" },
-        { status: 500 },
-      );
-    }
+      .select("billed_min")
+      .eq("request_id", id);
+    const totalMin = (entries ?? []).reduce(
+      (sum, e) => sum + (e.billed_min ?? 0),
+      0,
+    );
+    const hrs = totalMin / 60;
+    return NextResponse.json({
+      ok: true,
+      request_id: id,
+      already_completed: true,
+      status: req.status,
+      billed_hours: Number(hrs.toFixed(2)),
+      cost: Number((rate * hrs).toFixed(2)),
+    });
+  }
 
-    const { error: updateError } = await supabase
-      .from("consulting_requests")
-      .update({
-        status: "done",
-        summary: body.summary.trim(),
-        pr_urls: prs.map((p) => p.url),
-      })
-      .eq("id", id);
-    if (updateError) {
-      console.error("Request update failed:", updateError);
-      return NextResponse.json(
-        { error: "Failed to update request" },
-        { status: 500 },
-      );
-    }
+  const { error: entryError } = await supabase
+    .from("consulting_time_entries")
+    .insert({
+      request_id: id,
+      wall_clock_min: body.wall_clock_min ?? null,
+      active_min: body.active_min ?? null,
+      commit_span_min: body.commit_span_min ?? null,
+      billed_min: Math.round(billedMin),
+      note: body.note ?? null,
+    });
+  if (entryError) {
+    console.error("Time entry insert failed:", entryError);
+    return NextResponse.json({ error: "Failed to log time" }, { status: 500 });
+  }
+
+  const { error: updateError } = await supabase
+    .from("consulting_requests")
+    .update({
+      status: "done",
+      summary: body.summary.trim(),
+      pr_urls: prs.map((p) => p.url),
+    })
+    .eq("id", id);
+  if (updateError) {
+    console.error("Request update failed:", updateError);
+    return NextResponse.json(
+      { error: "Failed to update request" },
+      { status: 500 },
+    );
   }
 
   // Post the completion report and refresh the root to the done state.
