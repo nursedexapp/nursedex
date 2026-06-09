@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { closeIssue } from "@/lib/github";
 import { slackPost } from "@/lib/slack/client";
 import { completionBlocks, RATES, type RequestType } from "@/lib/slack/views";
-import { getRequest, refreshRoot } from "@/lib/slack/requests";
+import { getRequest, postReply, refreshRoot } from "@/lib/slack/requests";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -163,13 +163,22 @@ export async function POST(request: NextRequest) {
   const fresh = await getRequest(id);
   if (fresh) await refreshRoot(fresh);
 
-  // Close the linked GitHub issue, if one was opened on approval.
+  // Close the linked GitHub issue, if one was opened on approval. Run it after
+  // the response so a slow GitHub call does not hold up /done, and note a
+  // failure in the thread so it is not silent.
   if (req.github_issue_number) {
-    try {
-      await closeIssue(req.github_issue_number);
-    } catch (err) {
-      console.error(`Closing issue #${req.github_issue_number} failed:`, err);
-    }
+    const issueNumber = req.github_issue_number;
+    after(async () => {
+      try {
+        await closeIssue(issueNumber);
+      } catch (err) {
+        console.error(`Closing issue #${issueNumber} failed:`, err);
+        await postReply(
+          req,
+          `⚠️ Could not auto-close GitHub issue #${issueNumber}. Close it manually.`,
+        );
+      }
+    });
   }
 
   const billedHrs = billedMin / 60;
