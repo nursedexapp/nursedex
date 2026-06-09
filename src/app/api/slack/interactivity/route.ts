@@ -170,6 +170,11 @@ async function handleNewRequest(
     status: "submitted",
   };
 
+  // Tracked across the try/catch so an insert failure can clean up the
+  // thread root we already posted instead of leaving it orphaned.
+  let ts: string | null = null;
+  let rowCreated = false;
+
   try {
     // Post the thread root first to get its timestamp (slack_thread_ts is
     // NOT NULL), then insert, then backfill the request number.
@@ -178,7 +183,7 @@ async function handleNewRequest(
       text: `New request: ${title}`,
       blocks: requestRootBlocks({ id: 0, ...fields }),
     });
-    const ts = posted.ts as string;
+    ts = posted.ts as string;
 
     const supabase = createServiceRoleClient();
     const { data, error } = await supabase
@@ -196,6 +201,7 @@ async function handleNewRequest(
       .select("id")
       .single();
     if (error) throw error;
+    rowCreated = true;
 
     await slackPost("chat.update", {
       channel: OPS_CHANNEL_ID,
@@ -238,6 +244,15 @@ async function handleNewRequest(
     return ACK;
   } catch (err) {
     console.error("New request submit failed:", err);
+    // If the thread root was posted but the row never persisted, delete the
+    // message so a retry does not leave a trail of orphaned threads.
+    if (ts && !rowCreated) {
+      try {
+        await slackPost("chat.delete", { channel: OPS_CHANNEL_ID, ts });
+      } catch (delErr) {
+        console.error("Failed to delete orphaned request message:", delErr);
+      }
+    }
     return formErrors({
       title: "Something went wrong creating the request. Try again.",
     });
