@@ -5,7 +5,13 @@ const schema = z.object({
   subject: z.string().min(1),
   body: z.string().min(1),
   recipients: z
-    .array(z.object({ email: z.email(), unsubscribeUrl: z.string().url() }))
+    .array(
+      z.object({
+        email: z.email(),
+        unsubscribeUrl: z.string().url(),
+        listUnsubscribeUrl: z.string().url(),
+      }),
+    )
     .min(1)
     .max(100), // Resend batch limit
 });
@@ -30,6 +36,12 @@ export async function POST(request: NextRequest) {
         from: "NurseDex <noreply@nursedex.com>",
         to: r.email,
         subject,
+        // RFC 8058: lets Gmail/Apple Mail show a native one-click unsubscribe
+        // (and is required for bulk senders).
+        headers: {
+          "List-Unsubscribe": `<${r.listUnsubscribeUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
         react: NewsletterIssue({
           subject,
           body,

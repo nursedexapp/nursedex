@@ -131,10 +131,16 @@ export async function sendNewsletterBatch(
     body: JSON.stringify({
       subject,
       body,
-      recipients: recipients.map((r) => ({
-        email: r.email,
-        unsubscribeUrl: `${getSiteUrl()}/newsletter/unsubscribe?token=${encodeURIComponent(r.unsubscribe_token)}`,
-      })),
+      recipients: recipients.map((r) => {
+        const token = encodeURIComponent(r.unsubscribe_token);
+        return {
+          email: r.email,
+          // Visible footer link (friendly page).
+          unsubscribeUrl: `${getSiteUrl()}/newsletter/unsubscribe?token=${token}`,
+          // One-click target for the List-Unsubscribe header (accepts POST).
+          listUnsubscribeUrl: `${getSiteUrl()}/api/newsletter/unsubscribe?token=${token}`,
+        };
+      }),
     }),
   });
   if (!res.ok) {
