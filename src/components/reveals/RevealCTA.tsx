@@ -168,7 +168,8 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
         <ul className="text-soft-black space-y-2 py-2 text-sm">
           <li>
             <span className="text-teal mr-2">•</span>$
-            {PRICING.FAMILY_ACCESS_MONTHLY}/month, billed monthly
+            {PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR} for your first year, then
+            ${PRICING.FAMILY_ACCESS_ANNUAL}/yr
           </li>
           <li>
             <span className="text-teal mr-2">•</span>
@@ -181,31 +182,30 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
           </li>
         </ul>
         <Button
-          onClick={() => handleSubscribe("month")}
+          onClick={() => handleSubscribe("year")}
           disabled={subscribing !== null}
           className="w-full"
         >
-          {subscribing === "month" ? (
+          {subscribing === "year" ? (
             <>
               <Loader2 className="mr-1.5 size-3.5 animate-spin" />
               Redirecting to checkout...
             </>
           ) : (
-            "Subscribe monthly"
+            `Get your first year for $${PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR}`
           )}
         </Button>
         <button
           type="button"
-          onClick={() => handleSubscribe("year")}
+          onClick={() => handleSubscribe("month")}
           disabled={subscribing !== null}
           className="text-teal-dark hover:text-teal w-full text-center text-sm font-medium underline underline-offset-2 disabled:opacity-50"
         >
-          {subscribing === "year" ? (
+          {subscribing === "month" ? (
             "Redirecting to checkout..."
           ) : (
             <>
-              Or get your first year for $
-              {PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR}
+              Or subscribe monthly for ${PRICING.FAMILY_ACCESS_MONTHLY}/month
             </>
           )}
         </button>
