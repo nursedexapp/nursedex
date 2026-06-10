@@ -298,7 +298,7 @@ export async function updateNurseProfile(
   // Fetch current profile for comparison
   const { data: currentProfile } = await supabase
     .from("nurse_profiles")
-    .select("slug, credential")
+    .select("slug, credential, verification_status")
     .eq("user_id", user.id)
     .single();
 
@@ -350,8 +350,17 @@ export async function updateNurseProfile(
 
   const photos = (data.photos as string[]) || [];
 
+  // A rejected profile re-enters the review queue on save. The rejection
+  // reason is kept so the admin queue can badge it as a resubmission;
+  // approval clears it.
+  const resubmission =
+    currentProfile.verification_status === "rejected"
+      ? { verification_status: "pending" as const }
+      : {};
+
   // Build the profile update; the slug is set per-path below.
   const profileUpdate = {
+    ...resubmission,
     credential: data.credential,
     license_number: data.license_number,
     care_types: data.care_types,
