@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import * as Sentry from "@sentry/nextjs";
+import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/server";
 import {
   STRIPE_PLANS,
@@ -75,25 +77,36 @@ async function createCheckoutSession(
   // last param and break the celebration's exact upgraded=featured check.
   const successSep = successPath.includes("?") ? "&" : "?";
 
-  const session = await getStripe().checkout.sessions.create({
-    mode: "subscription",
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${origin}${successPath}${successSep}session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${origin}${cancelPath}`,
-    customer: customerId,
-    customer_email: customerId ? undefined : user.email,
-    client_reference_id: user.id,
-    metadata: { user_id: user.id, plan_type: planType },
-    subscription_data: {
+  // Catching here keeps Stripe failures (bad coupon, misconfigured price,
+  // network) as a toast-able { error } instead of an unhandled action crash.
+  // Sentry's global handler never sees caught errors, so capture explicitly.
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await getStripe().checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${origin}${successPath}${successSep}session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}${cancelPath}`,
+      customer: customerId,
+      customer_email: customerId ? undefined : user.email,
+      client_reference_id: user.id,
       metadata: { user_id: user.id, plan_type: planType },
-    },
-    // Stripe rejects allow_promotion_codes alongside an explicit discount, so
-    // a fixed coupon (the annual first-year promo) and the open promo-code
-    // field are mutually exclusive.
-    ...(opts?.couponId
-      ? { discounts: [{ coupon: opts.couponId }] }
-      : { allow_promotion_codes: true }),
-  });
+      subscription_data: {
+        metadata: { user_id: user.id, plan_type: planType },
+      },
+      // Stripe rejects allow_promotion_codes alongside an explicit discount, so
+      // a fixed coupon (the annual first-year promo) and the open promo-code
+      // field are mutually exclusive.
+      ...(opts?.couponId
+        ? { discounts: [{ coupon: opts.couponId }] }
+        : { allow_promotion_codes: true }),
+    });
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { action: "createCheckoutSession", plan_type: planType },
+    });
+    return { error: "Couldn't start checkout. Please try again." };
+  }
 
   if (!session.url) return { error: "Stripe didn't return a checkout URL." };
   return { url: session.url };
@@ -161,11 +174,18 @@ export async function getCustomerPortalUrl(): Promise<CheckoutResult> {
   }
 
   const origin = await siteOrigin();
-  const session = await getStripe().billingPortal.sessions.create({
-    customer: row.stripe_customer_id,
-    return_url: `${origin}/dashboard`,
-  });
-  return { url: session.url };
+  try {
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: row.stripe_customer_id,
+      return_url: `${origin}/dashboard`,
+    });
+    return { url: session.url };
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: { action: "getCustomerPortalUrl" },
+    });
+    return { error: "Couldn't open the billing portal. Please try again." };
+  }
 }
 
 /**
