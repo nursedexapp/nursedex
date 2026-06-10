@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import NextImage from "next/image";
 import Link from "next/link";
 import {
   Search,
@@ -55,15 +56,13 @@ function Hero() {
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <Card className="border-teal/20 from-teal/5 to-warm-white bg-gradient-to-b">
             <CardContent className="space-y-3 pt-6">
-              <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                Looking for a nurse
-              </p>
-              <h2 className="font-heading text-soft-black text-xl font-semibold">
-                Find a verified nurse near you
+              <h2 className="font-heading text-soft-black text-2xl font-bold sm:text-3xl">
+                Are you looking for a nurse?
               </h2>
               <p className="text-soft-black-light text-sm">
-                Search by credential, care type, language, and availability. See
-                real reviews from other New York families.
+                Find a verified nurse near you. Search by credential, care type,
+                language, and availability, and see real reviews from other New
+                York families.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
@@ -84,16 +83,13 @@ function Hero() {
 
           <Card className="border-sage/30 from-sage/10 to-warm-white bg-gradient-to-b">
             <CardContent className="space-y-3 pt-6">
-              <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                Nurse in New York
-              </p>
-              <h2 className="font-heading text-soft-black text-xl font-semibold">
-                Build a profile that families call
+              <h2 className="font-heading text-soft-black text-2xl font-bold sm:text-3xl">
+                Are you a nurse?
               </h2>
               <p className="text-soft-black-light text-sm">
-                Post your credentials, your bio, your availability. Get verified
-                and start getting found by families looking for exactly what you
-                offer.
+                Build a profile that families call. Post your credentials, your
+                bio, and your availability. Get verified and start getting found
+                by families looking for exactly what you offer.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link
@@ -102,15 +98,39 @@ function Hero() {
                 >
                   Join NurseDex free
                 </Link>
-                <Link
-                  href="/pricing"
-                  className="border-soft-black/20 text-soft-black hover:bg-soft-black/5 inline-flex items-center rounded-lg border px-4 py-2 text-sm font-medium transition-colors"
-                >
-                  See pricing
-                </Link>
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        <div className="mt-8 grid grid-cols-3 gap-3 sm:gap-4">
+          {[
+            {
+              src: "/images/home/nurse-listening-to-childs-heart.jpg",
+              alt: "A nurse listening to a young girl's heartbeat with a stethoscope",
+            },
+            {
+              src: "/images/home/nurse-with-elderly-patient.jpg",
+              alt: "A nurse caring for a smiling elderly woman at home",
+            },
+            {
+              src: "/images/home/nurse-smiling-with-young-patient.jpg",
+              alt: "A smiling nurse checking a child's heartbeat",
+            },
+          ].map((photo) => (
+            <div
+              key={photo.src}
+              className="relative aspect-[4/5] overflow-hidden rounded-2xl"
+            >
+              <NextImage
+                src={photo.src}
+                alt={photo.alt}
+                fill
+                sizes="(max-width: 640px) 33vw, 368px"
+                className="object-cover"
+              />
+            </div>
+          ))}
         </div>
       </div>
     </section>
