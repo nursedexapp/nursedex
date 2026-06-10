@@ -4,13 +4,16 @@ import Stripe from "stripe";
 let cached: Stripe | null = null;
 
 /**
- * Pinned to the version both webhook endpoints (sandbox and live) were
- * created with, so outgoing API calls and incoming webhook payloads always
- * share a shape. Stripe doesn't allow changing api_version on an existing
- * webhook endpoint: to upgrade, recreate the endpoints at the new version,
- * rotate STRIPE_WEBHOOK_SECRET, and bump this constant in the same change.
+ * Pinned to the version the installed stripe SDK ships with (its types only
+ * accept this literal), so bumping the SDK fails the typecheck until this
+ * constant is consciously updated. The webhook endpoints (sandbox and live)
+ * were created at 2026-03-25.dahlia, one monthly release behind: same major,
+ * so payload shapes are compatible. Stripe doesn't allow changing api_version
+ * on an existing webhook endpoint, so if an SDK bump ever crosses into a new
+ * major version, recreate the endpoints at that version and rotate
+ * STRIPE_WEBHOOK_SECRET in the same change.
  */
-const STRIPE_API_VERSION = "2026-03-25.dahlia";
+const STRIPE_API_VERSION = "2026-04-22.dahlia";
 
 /**
  * Lazy-initialized Stripe server client. Throws if STRIPE_SECRET_KEY isn't
