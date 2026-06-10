@@ -30,7 +30,7 @@ export function FamilyAccessCard({
   isLoggedInFamily,
   hasActiveSub,
 }: FamilyAccessCardProps) {
-  const [interval, setInterval] = useState<"monthly" | "annual">("monthly");
+  const [interval, setInterval] = useState<"monthly" | "annual">("annual");
   const isAnnual = interval === "annual";
 
   const ctaClass =
