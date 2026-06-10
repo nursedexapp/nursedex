@@ -140,6 +140,7 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
       posthog.capture(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
         plan: "family_access",
         interval,
+        source: "reveal_paywall",
       });
     }
     const result = await createFamilyAccessCheckout({ returnTo, interval });
@@ -204,9 +205,7 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
           {subscribing === "month" ? (
             "Redirecting to checkout..."
           ) : (
-            <>
-              Or subscribe monthly for ${PRICING.FAMILY_ACCESS_MONTHLY}/month
-            </>
+            <>Or subscribe monthly for ${PRICING.FAMILY_ACCESS_MONTHLY}/month</>
           )}
         </button>
         <p className="text-soft-black-light text-center text-xs">

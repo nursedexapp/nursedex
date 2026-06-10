@@ -49,6 +49,11 @@ function showFeaturedUpsellToast() {
           posthog.capture(ANALYTICS_EVENTS.FEATURED_UPSELL_CLICKED, {
             surface: "profile_edit",
           });
+          posthog.capture(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
+            plan: "nurse_featured",
+            interval: "month",
+            source: "profile_edit_upsell",
+          });
         }
         const result = await createNurseFeaturedCheckout();
         if (result.error) {

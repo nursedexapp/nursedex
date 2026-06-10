@@ -8,6 +8,8 @@ import {
   getCustomerPortalUrl,
   redirectToCheckout,
 } from "@/lib/subscriptions/actions";
+import { posthog } from "@/lib/posthog";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 type Action =
   | "nurse_featured_checkout"
@@ -31,6 +33,16 @@ export function CheckoutButton({
 
   const onClick = () => {
     setError(null);
+    if (action !== "customer_portal" && posthog.__loaded) {
+      posthog.capture(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
+        plan:
+          action === "nurse_featured_checkout"
+            ? "nurse_featured"
+            : "family_access",
+        interval: action === "family_access_annual_checkout" ? "year" : "month",
+        source: "pricing_page",
+      });
+    }
     startTransition(async () => {
       const result =
         action === "nurse_featured_checkout"
