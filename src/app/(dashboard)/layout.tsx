@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 import { PastDueBanner } from "@/components/dashboard/PastDueBanner";
 import { AppFooter } from "@/components/shared/AppFooter";
+import { PostHogIdentify } from "@/components/PostHogIdentify";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -65,6 +66,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="bg-warm-white flex min-h-screen flex-col">
+      {user && <PostHogIdentify userId={user.id} email={user.email} />}
       {pastDueBanner}
       <div className="flex flex-1">
         <DashboardSidebar role={role} />

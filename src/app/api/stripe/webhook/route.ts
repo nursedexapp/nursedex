@@ -3,6 +3,8 @@ import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { GRACE_PERIODS } from "@/lib/constants";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import { captureServerEvent } from "@/lib/analytics/server";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import {
   sendSubscriptionConfirmedEmail,
@@ -113,6 +115,21 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // Welcome email, dedup by subscription id so a retried webhook
   // doesn't fire it twice.
   await maybeNotifyConfirmed({ userId, planType, subscription: sub });
+
+  // Funnel completion. Captured here rather than on the client because the
+  // buyer may close the tab on Stripe's confirmation page and never return.
+  await captureServerEvent({
+    distinctId: userId,
+    event: ANALYTICS_EVENTS.SUBSCRIPTION_COMPLETED,
+    properties: {
+      plan: planType,
+      interval:
+        sub.items.data[0]?.price?.recurring?.interval === "year"
+          ? "year"
+          : "month",
+      source: "stripe_webhook",
+    },
+  });
 }
 
 async function handleSubscriptionUpserted(sub: Stripe.Subscription) {
@@ -192,6 +209,12 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
       .eq("family_user_id", row.user_id)
       .is("access_expires_at", null);
   }
+
+  await captureServerEvent({
+    distinctId: row.user_id,
+    event: ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED,
+    properties: { plan: row.plan_type, source: "stripe_webhook" },
+  });
 }
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {

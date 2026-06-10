@@ -15,7 +15,6 @@ export const ANALYTICS_EVENTS = {
   PROFILE_UPDATED: "profile_updated",
   PHOTO_UPLOADED: "photo_uploaded",
   AVAILABILITY_TOGGLED: "availability_toggled",
-  FEATURED_UPGRADE: "featured_upgrade",
   FEATURED_UPSELL_SHOWN: "featured_upsell_shown",
   FEATURED_UPSELL_CLICKED: "featured_upsell_clicked",
 
@@ -29,6 +28,9 @@ export const ANALYTICS_EVENTS = {
   REVEAL_ATTEMPTED: "reveal_attempted",
   REVEAL_COMPLETED: "reveal_completed",
   SUBSCRIPTION_STARTED: "subscription_started",
+  // Completed/cancelled fire server-side from the Stripe webhook (the only
+  // reliable place: a buyer may never return from Stripe's checkout page).
+  SUBSCRIPTION_COMPLETED: "subscription_completed",
   SUBSCRIPTION_CANCELLED: "subscription_cancelled",
 
   // Reviews
