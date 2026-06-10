@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { getSignedPhotoUrl } from "@/lib/profile/photos";
 import type { NurseSearchCard } from "@/lib/nurses/search";
 
@@ -67,7 +68,7 @@ export async function getRevealedNurses(
 
   const nurseIds = revealRows.map((r) => r.nurse_user_id);
 
-  const { data, error } = await supabase
+  const cardsQuery = supabase
     .from("nurse_profiles")
     .select(
       `
@@ -96,11 +97,8 @@ export async function getRevealedNurses(
       )
     `,
     )
-    .in("user_id", nurseIds)
-    .eq("verification_status", "verified")
-    .eq("is_hidden", false)
-    .eq("users.is_deleted", false)
-    .eq("users.is_suspended", false);
+    .in("user_id", nurseIds);
+  const { data, error } = await applyVisibleNurseFilter(cardsQuery);
 
   if (error || !data) return [];
 

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { getIndexableTaxonomy } from "@/lib/blog/queries";
 
 // Refresh at most hourly so scheduled publishes and taxonomy changes reach
@@ -47,7 +48,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let nurseEntries: MetadataRoute.Sitemap = [];
   try {
     const supabase = createServiceRoleClient();
-    const { data } = await supabase
+    const nurseQuery = supabase
       .from("nurse_profiles")
       .select(
         `
@@ -55,9 +56,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         updated_at,
         users!inner ( is_deleted, is_suspended )
       `,
-      )
-      .eq("verification_status", "verified")
-      .eq("is_hidden", false);
+      );
+    const { data } = await applyVisibleNurseFilter(nurseQuery);
 
     type Row = {
       slug: string;
