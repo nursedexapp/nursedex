@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { sendUpgradeNudgeEmail } from "@/lib/email/send";
 import {
   UPSELL_SAVE_THRESHOLD,
@@ -30,19 +31,18 @@ export async function GET(request: NextRequest) {
     Date.now() - UPSELL_COOLDOWN_DAYS * DAY_MS,
   ).toISOString();
 
-  const { data, error } = await supabase
+  const nurseQuery = supabase
     .from("nurse_profiles")
     .select(
       `
       user_id,
       save_count_for_upsell,
       last_upsell_shown_at,
-      users:user_id (email, first_name, is_deleted, is_suspended)
+      users!inner (email, first_name, is_deleted, is_suspended)
     `,
     )
-    .eq("tier", "free")
-    .eq("verification_status", "verified")
-    .eq("is_hidden", false)
+    .eq("tier", "free");
+  const { data, error } = await applyVisibleNurseFilter(nurseQuery)
     .gte("save_count_for_upsell", UPSELL_SAVE_THRESHOLD)
     .or(
       `last_upsell_shown_at.is.null,last_upsell_shown_at.lt.${cooldownCutoff}`,
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
       first_name: string | null;
       is_deleted: boolean;
       is_suspended: boolean;
-    } | null;
+    };
   };
 
   const todayBucket = new Date().toISOString().slice(0, 10);
@@ -70,10 +70,6 @@ export async function GET(request: NextRequest) {
   let skipped = 0;
 
   for (const row of (data ?? []) as unknown as Row[]) {
-    if (!row.users || row.users.is_deleted || row.users.is_suspended) {
-      skipped++;
-      continue;
-    }
     const ok = await shouldSendOnce(supabase, {
       recipientUserId: row.user_id,
       emailType: "upgrade_nudge",

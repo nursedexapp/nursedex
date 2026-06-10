@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { sendFeaturedAnalyticsEmail } from "@/lib/email/send";
 
 export const runtime = "nodejs";
@@ -32,17 +33,16 @@ export async function GET(request: NextRequest) {
   const lastWeekStart = new Date(now - 14 * DAY_MS);
   const lastWeekEnd = thisWeekStart;
 
-  const { data: featured, error } = await supabase
+  const nurseQuery = supabase
     .from("nurse_profiles")
     .select(
       `
       user_id,
-      users:user_id (email, first_name, is_deleted, is_suspended)
+      users!inner (email, first_name, is_deleted, is_suspended)
     `,
     )
-    .eq("tier", "featured")
-    .eq("verification_status", "verified")
-    .eq("is_hidden", false);
+    .eq("tier", "featured");
+  const { data: featured, error } = await applyVisibleNurseFilter(nurseQuery);
 
   if (error) {
     console.error("[cron featured-analytics] query failed:", error.message);
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       first_name: string | null;
       is_deleted: boolean;
       is_suspended: boolean;
-    } | null;
+    };
   };
 
   const todayBucket = new Date().toISOString().slice(0, 10);
@@ -64,11 +64,6 @@ export async function GET(request: NextRequest) {
   let skipped = 0;
 
   for (const row of (featured ?? []) as unknown as Row[]) {
-    if (!row.users || row.users.is_deleted || row.users.is_suspended) {
-      skipped++;
-      continue;
-    }
-
     const thisWeek = await sumAnalytics(
       supabase,
       row.user_id,

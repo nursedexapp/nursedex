@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { sendReviewInviteEmail } from "@/lib/email/send";
 
 export const runtime = "nodejs";
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
   const earliest = new Date(now - 28 * DAY_MS).toISOString();
   const latest = new Date(now - 14 * DAY_MS).toISOString();
 
-  const { data, error } = await supabase
+  const nurseQuery = supabase
     .from("nurse_profiles")
     .select(
       `
@@ -37,9 +38,8 @@ export async function GET(request: NextRequest) {
       verified_at,
       users!inner ( email, first_name, is_deleted, is_suspended )
     `,
-    )
-    .eq("verification_status", "verified")
-    .eq("is_hidden", false)
+    );
+  const { data, error } = await applyVisibleNurseFilter(nurseQuery)
     .gte("verified_at", earliest)
     .lte("verified_at", latest);
 
@@ -57,18 +57,13 @@ export async function GET(request: NextRequest) {
       first_name: string | null;
       is_deleted: boolean;
       is_suspended: boolean;
-    } | null;
+    };
   };
 
   let sent = 0;
   let skipped = 0;
 
   for (const row of (data ?? []) as unknown as Row[]) {
-    if (!row.users || row.users.is_deleted || row.users.is_suspended) {
-      skipped++;
-      continue;
-    }
-
     const ok = await shouldSendOnce(supabase, {
       recipientUserId: row.user_id,
       emailType: "review_invite",
