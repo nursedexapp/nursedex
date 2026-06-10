@@ -55,7 +55,7 @@ function Hero() {
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           <Card className="border-teal/20 from-teal/5 to-warm-white bg-gradient-to-b">
-            <CardContent className="space-y-3 pt-6">
+            <CardContent className="flex flex-1 flex-col gap-3 pt-6">
               <h2 className="font-heading text-soft-black text-2xl font-bold sm:text-3xl">
                 Are you looking for a nurse?
               </h2>
@@ -64,7 +64,7 @@ function Hero() {
                 language, and availability, and see real reviews from other New
                 York families.
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-auto flex flex-wrap gap-2">
                 <Link
                   href="/nurses"
                   className="bg-teal hover:bg-teal-dark inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
@@ -82,7 +82,7 @@ function Hero() {
           </Card>
 
           <Card className="border-sage/30 from-sage/10 to-warm-white bg-gradient-to-b">
-            <CardContent className="space-y-3 pt-6">
+            <CardContent className="flex flex-1 flex-col gap-3 pt-6">
               <h2 className="font-heading text-soft-black text-2xl font-bold sm:text-3xl">
                 Are you a nurse?
               </h2>
@@ -91,7 +91,7 @@ function Hero() {
                 bio, and your availability. Get verified and start getting found
                 by families looking for exactly what you offer.
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="mt-auto flex flex-wrap gap-2">
                 <Link
                   href="/signup"
                   className="bg-soft-black hover:bg-soft-black/90 inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
