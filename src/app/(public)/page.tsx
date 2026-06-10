@@ -289,7 +289,7 @@ function FinalCTAs() {
       <div className="mx-auto max-w-6xl px-6 py-16">
         <div className="grid gap-4 sm:grid-cols-2">
           <Card className="border-teal/20">
-            <CardContent className="space-y-3 pt-6">
+            <CardContent className="flex flex-1 flex-col gap-3 pt-6">
               <h3 className="font-heading text-soft-black text-lg font-semibold">
                 Ready to find a nurse?
               </h3>
@@ -297,16 +297,18 @@ function FinalCTAs() {
                 Browsing is free. You only pay if you decide to reach out
                 directly to a nurse you&apos;ve found.
               </p>
-              <Link
-                href="/nurses"
-                className="bg-teal hover:bg-teal-dark inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
-              >
-                Browse nurses
-              </Link>
+              <div className="mt-auto flex flex-wrap gap-2">
+                <Link
+                  href="/nurses"
+                  className="bg-teal hover:bg-teal-dark inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
+                >
+                  Browse nurses
+                </Link>
+              </div>
             </CardContent>
           </Card>
           <Card className="border-sage/30">
-            <CardContent className="space-y-3 pt-6">
+            <CardContent className="flex flex-1 flex-col gap-3 pt-6">
               <h3 className="font-heading text-soft-black text-lg font-semibold">
                 Ready to be found?
               </h3>
@@ -314,12 +316,14 @@ function FinalCTAs() {
                 Free to join. Build a profile, get verified, and let families
                 come to you.
               </p>
-              <Link
-                href="/signup"
-                className="bg-soft-black hover:bg-soft-black/90 inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
-              >
-                Join NurseDex
-              </Link>
+              <div className="mt-auto flex flex-wrap gap-2">
+                <Link
+                  href="/signup"
+                  className="bg-soft-black hover:bg-soft-black/90 inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
+                >
+                  Join NurseDex
+                </Link>
+              </div>
             </CardContent>
           </Card>
         </div>
