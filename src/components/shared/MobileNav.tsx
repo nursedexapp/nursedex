@@ -10,6 +10,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { signOut } from "@/lib/auth/actions";
+import { resetPostHog } from "@/lib/posthog";
 
 interface MobileNavProps {
   isLoggedIn: boolean;
@@ -57,7 +58,13 @@ export function MobileNav({ isLoggedIn }: MobileNavProps) {
               >
                 Dashboard
               </Link>
-              <form action={signOut} onSubmit={() => setOpen(false)}>
+              <form
+                action={signOut}
+                onSubmit={() => {
+                  resetPostHog();
+                  setOpen(false);
+                }}
+              >
                 <button
                   type="submit"
                   className="font-body text-soft-black hover:bg-sage/10 mt-1 flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left text-sm transition-colors"

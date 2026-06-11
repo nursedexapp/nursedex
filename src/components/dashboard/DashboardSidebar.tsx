@@ -16,6 +16,7 @@ import {
   Newspaper,
 } from "lucide-react";
 import { signOut } from "@/lib/auth/actions";
+import { resetPostHog } from "@/lib/posthog";
 import { NavPendingIcon } from "@/components/nav/NavPendingIcon";
 
 interface NavItem {
@@ -88,7 +89,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
             })}
           </nav>
           <div className="border-sage/20 border-t px-2 py-3">
-            <form action={signOut}>
+            <form action={signOut} onSubmit={resetPostHog}>
               <button
                 type="submit"
                 className="text-muted-foreground hover:bg-sage/10 hover:text-foreground flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors"
