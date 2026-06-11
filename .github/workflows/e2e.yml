@@ -29,10 +29,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Pinned: v2.106.0 (2026-06-11) stopped exposing public schema tables
+      # through the Data API by default on local start/reset, which breaks
+      # every query with "permission denied". Unpin once explicit GRANTs for
+      # anon/authenticated/service_role land in a migration (issue #354).
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.105.0
 
       # A throwaway local Supabase (Docker) so the run needs no secrets and
       # never touches a real database. start applies migrations + seed; reset
