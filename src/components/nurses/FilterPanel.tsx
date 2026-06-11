@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -216,38 +216,36 @@ export function FilterPanel({
 
       {/* Rate max */}
       <FilterSection label="Max hourly rate ($)">
-        <Input
+        <DebouncedFilterInput
           type="number"
           inputMode="numeric"
           min={0}
           step={1}
-          value={initialFilters.rate_max ?? ""}
+          value={
+            initialFilters.rate_max !== undefined
+              ? String(initialFilters.rate_max)
+              : ""
+          }
           placeholder="e.g. 40"
-          onChange={(e) => {
-            const raw = e.target.value.trim();
-            apply({
-              rate_max: raw === "" ? undefined : Number.parseInt(raw, 10),
-            });
-          }}
+          onCommit={(raw) => apply({ rate_max: parseFilterInt(raw) })}
         />
       </FilterSection>
 
       {/* Experience min */}
       <FilterSection label="Min years of experience">
-        <Input
+        <DebouncedFilterInput
           type="number"
           inputMode="numeric"
           min={0}
           max={70}
           step={1}
-          value={initialFilters.experience_min ?? ""}
+          value={
+            initialFilters.experience_min !== undefined
+              ? String(initialFilters.experience_min)
+              : ""
+          }
           placeholder="e.g. 5"
-          onChange={(e) => {
-            const raw = e.target.value.trim();
-            apply({
-              experience_min: raw === "" ? undefined : Number.parseInt(raw, 10),
-            });
-          }}
+          onCommit={(raw) => apply({ experience_min: parseFilterInt(raw) })}
         />
       </FilterSection>
 
@@ -261,17 +259,17 @@ export function FilterPanel({
             >
               Your zip code
             </Label>
-            <Input
+            <DebouncedFilterInput
               id="filter-zip"
               type="text"
               inputMode="numeric"
               maxLength={5}
               placeholder="11779"
               value={initialFilters.zip ?? ""}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/\D/g, "").slice(0, 5);
-                apply({ zip: raw.length === 5 ? raw : undefined });
-              }}
+              sanitize={(raw) => raw.replace(/\D/g, "").slice(0, 5)}
+              onCommit={(raw) =>
+                apply({ zip: raw.length === 5 ? raw : undefined })
+              }
             />
           </div>
           <div>
@@ -385,6 +383,71 @@ export function FilterPanel({
         </Button>
       </div>
     </div>
+  );
+}
+
+const COMMIT_DELAY_MS = 400;
+
+const parseFilterInt = (raw: string): number | undefined => {
+  const trimmed = raw.trim();
+  if (trimmed === "") return undefined;
+  const parsed = Number.parseInt(trimmed, 10);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
+// Free text filter inputs cannot be controlled directly by the URL state:
+// every keystroke starts a router transition, and the re-render that follows
+// would reset the input to the stale URL value, eating fast keystrokes
+// (e.g. the second digit of "15 years"). The typed text lives in local state
+// and is committed to the URL after a short pause.
+function DebouncedFilterInput({
+  value,
+  onCommit,
+  sanitize,
+  ...inputProps
+}: {
+  value: string;
+  onCommit: (raw: string) => void;
+  sanitize?: (raw: string) => string;
+} & Omit<React.ComponentProps<typeof Input>, "value" | "onChange">) {
+  const [text, setText] = useState(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const commitPendingRef = useRef(false);
+  const lastValueRef = useRef(value);
+  const onCommitRef = useRef(onCommit);
+
+  useEffect(() => {
+    onCommitRef.current = onCommit;
+  }, [onCommit]);
+
+  // Adopt external URL changes (clear all, back/forward navigation) unless
+  // the user has an uncommitted edit in flight.
+  useEffect(() => {
+    if (value !== lastValueRef.current) {
+      lastValueRef.current = value;
+      if (!commitPendingRef.current) setText(value);
+    }
+  }, [value]);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <Input
+      {...inputProps}
+      value={text}
+      onChange={(e) => {
+        const raw = sanitize ? sanitize(e.target.value) : e.target.value;
+        setText(raw);
+        commitPendingRef.current = true;
+        clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          commitPendingRef.current = false;
+          onCommitRef.current(raw);
+        }, COMMIT_DELAY_MS);
+      }}
+    />
   );
 }
 
