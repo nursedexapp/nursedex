@@ -16,4 +16,13 @@ export function initPostHog() {
   });
 }
 
+/**
+ * Drops the identified person and assigns a fresh anonymous id. Call on
+ * sign-out so the next user on this device doesn't merge their events into
+ * the previous user's PostHog person.
+ */
+export function resetPostHog() {
+  if (posthog.__loaded) posthog.reset();
+}
+
 export { posthog };

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckoutButton } from "@/components/pricing/CheckoutButton";
 import { FamilyAccessCard } from "@/components/pricing/FamilyAccessCard";
+import { PostHogIdentify } from "@/components/PostHogIdentify";
 import { PRICING } from "@/lib/constants";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
@@ -75,6 +76,10 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
+      {/* The pricing page is the main public conversion surface; identify
+          logged-in visitors here so subscription_started isn't anonymous
+          for users who never visited the dashboard this session. */}
+      {user && <PostHogIdentify userId={user.id} email={user.email} />}
       <main className="flex-1">
         <section className="border-sage-light/40 border-b">
           <div className="mx-auto max-w-6xl px-6 py-12 sm:py-16">
