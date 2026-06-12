@@ -21,6 +21,11 @@ export interface AnalyticsTotals {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Demo nurse accounts seeded to populate the directory share this email
+// prefix. They are real rows (kept so the directory isn't empty) but must
+// not count as signups, or they inflate the nurse total by 15.
+const SEED_EMAIL_PATTERN = "noreply+seed-%@nursedex.com";
+
 export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
   // Super-admin-only aggregate dashboard (the page calls requireSuperAdmin).
   // Use the service-role client so the platform-wide counts don't depend on
@@ -51,22 +56,26 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
       .from("users")
       .select("id", { count: "exact", head: true })
       .eq("role", "nurse")
-      .eq("is_deleted", false),
+      .eq("is_deleted", false)
+      .not("email", "ilike", SEED_EMAIL_PATTERN),
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
       .eq("role", "family")
-      .eq("is_deleted", false),
+      .eq("is_deleted", false)
+      .not("email", "ilike", SEED_EMAIL_PATTERN),
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
       .gte("created_at", sevenDaysAgo)
-      .eq("is_deleted", false),
+      .eq("is_deleted", false)
+      .not("email", "ilike", SEED_EMAIL_PATTERN),
     supabase
       .from("users")
       .select("id", { count: "exact", head: true })
       .gte("created_at", thirtyDaysAgo)
-      .eq("is_deleted", false),
+      .eq("is_deleted", false)
+      .not("email", "ilike", SEED_EMAIL_PATTERN),
     supabase
       .from("subscriptions")
       .select("id", { count: "exact", head: true })
