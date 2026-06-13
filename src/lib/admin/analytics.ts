@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PRICING } from "@/lib/constants";
+import { SEED_EMAIL_PATTERN } from "./seed";
 
 export interface AnalyticsTotals {
   signups: { nurse: number; family: number; total: number };
@@ -20,11 +21,6 @@ export interface AnalyticsTotals {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-// Demo nurse accounts seeded to populate the directory share this email
-// prefix. They are real rows (kept so the directory isn't empty) but must
-// not count as signups, or they inflate the nurse total by 15.
-const SEED_EMAIL_PATTERN = "noreply+seed-%@nursedex.com";
 
 export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
   // Super-admin-only aggregate dashboard (the page calls requireSuperAdmin).
