@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getPendingCommentCount } from "@/lib/comments/queries";
 import { compareVerificationQueueRows } from "./sla";
+import { SEED_EMAIL_PATTERN } from "./seed";
 
 export interface AdminCounts {
   pendingVerifications: number;
@@ -324,11 +325,16 @@ export async function getAccounts(args: {
 }): Promise<AccountRow[]> {
   const supabase = await createClient();
 
+  // Hide the seeded demo nurses (noreply+seed-*, also nurse_profiles.is_seed)
+  // and soft-deleted accounts so the list shows only real, live users. The
+  // seed rows exist to populate the public directory, not to be managed here.
   let q = supabase
     .from("users")
     .select(
       "id, email, first_name, last_name, role, is_suspended, is_deleted, created_at",
     )
+    .eq("is_deleted", false)
+    .not("email", "ilike", SEED_EMAIL_PATTERN)
     .order("created_at", { ascending: false })
     .limit(100);
 
