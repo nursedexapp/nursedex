@@ -155,9 +155,15 @@ export async function createNurseFeaturedCheckout(): Promise<CheckoutResult> {
 
 /**
  * Returns a Stripe billing portal URL for the current user. Use for
- * "Manage subscription" CTAs on dashboards.
+ * "Manage subscription" CTAs on dashboards and settings.
+ *
+ * returnTo is the in-app path Stripe sends the user back to after they
+ * close the portal. Defaults to /dashboard so existing dashboard callers
+ * keep their behavior; the settings card passes /dashboard/settings.
  */
-export async function getCustomerPortalUrl(): Promise<CheckoutResult> {
+export async function getCustomerPortalUrl(
+  returnTo: string = "/dashboard",
+): Promise<CheckoutResult> {
   const user = await getCurrentUser();
   if (!user) return { error: "Not authenticated" };
 
@@ -177,7 +183,7 @@ export async function getCustomerPortalUrl(): Promise<CheckoutResult> {
   try {
     const session = await getStripe().billingPortal.sessions.create({
       customer: row.stripe_customer_id,
-      return_url: `${origin}/dashboard`,
+      return_url: `${origin}${returnTo}`,
     });
     return { url: session.url };
   } catch (err) {
