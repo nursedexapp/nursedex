@@ -39,19 +39,21 @@ export default async function DashboardPage() {
 
   // Family dashboard
   if (!isNurse) {
-    const [{ data: familyProfile }, recentReveals, featured] = await Promise.all([
-      supabase
-        .from("family_profiles")
-        .select("survey_completed")
-        .eq("user_id", user.id)
-        .single(),
-      getRevealedNurses(user.id, 3),
-      searchNurses({
-        filters: parseSearchParams(new URLSearchParams()),
-        viewerZip: user.zip_code ?? null,
-        viewerCommPref: user.communication_preference ?? null,
-      }),
-    ]);
+    const [{ data: familyProfile }, recentReveals, featured, familySub] =
+      await Promise.all([
+        supabase
+          .from("family_profiles")
+          .select("survey_completed")
+          .eq("user_id", user.id)
+          .single(),
+        getRevealedNurses(user.id, 3),
+        searchNurses({
+          filters: parseSearchParams(new URLSearchParams()),
+          viewerZip: user.zip_code ?? null,
+          viewerCommPref: user.communication_preference ?? null,
+        }),
+        getActiveSubscription(user.id, "family_access"),
+      ]);
     const hasTakenSurvey = familyProfile?.survey_completed === true;
     // Featured nurses to fill the dashboard for families who haven't
     // revealed anyone yet, so the page isn't a near-empty survey prompt.
@@ -68,6 +70,17 @@ export default async function DashboardPage() {
             hasTakenSurvey={hasTakenSurvey}
             recentRevealsCount={recentReveals.length}
           />
+
+          {familySub && (
+            <ManageSubscriptionCard
+              planLabel="Family Access"
+              title="Subscription"
+              returnTo="/dashboard"
+              renewsOn={familySub.current_period_end}
+              cancelAtPeriodEnd={familySub.cancel_at_period_end}
+              isPastDue={familySub.status === "past_due"}
+            />
+          )}
 
           {recentReveals.length > 0 && (
             <section>
