@@ -3,9 +3,11 @@ import { requireAuth } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { resetPassword, signOut } from "@/lib/auth/actions";
 import { updateFamilyContact } from "@/lib/family/actions";
+import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SettingsForm } from "./SettingsForm";
+import { ManageBilling } from "./ManageBilling";
 
 async function updateMarketing(optOut: boolean) {
   "use server";
@@ -37,6 +39,15 @@ async function saveContact(formData: FormData) {
 export default async function SettingsPage() {
   const user = await requireAuth();
   const isFamily = user.role === "family";
+
+  // Surface a billing card only when the user actually has a subscription to
+  // manage. Free/never-subscribed users have no Stripe customer, so the
+  // portal call would just error. Plan type is fixed by role: nurses can only
+  // hold Featured, families only Family Access.
+  const billingPlan = isFamily ? "family_access" : "nurse_featured";
+  const subscription = await getActiveSubscription(user.id, billingPlan);
+  const billingPlanLabel =
+    billingPlan === "family_access" ? "Family Access" : "Featured";
 
   // For family, fetch the canonical zip/comm pref from family_profiles
   // (kept in sync with users.* by onboarding/settings updates).
@@ -78,6 +89,15 @@ export default async function SettingsPage() {
           familyContact={familyContact}
           onSaveContact={isFamily ? saveContact : undefined}
         />
+
+        {subscription && (
+          <ManageBilling
+            planLabel={billingPlanLabel}
+            renewsOn={subscription.current_period_end}
+            cancelAtPeriodEnd={subscription.cancel_at_period_end}
+            isPastDue={subscription.status === "past_due"}
+          />
+        )}
 
         <Card className="border-sage/20">
           <CardHeader>
