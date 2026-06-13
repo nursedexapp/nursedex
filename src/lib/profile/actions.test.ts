@@ -60,7 +60,7 @@ vi.mock("./upsell", () => ({
   markUpsellShown: vi.fn(),
 }));
 
-import { updateNurseProfile } from "./actions";
+import { updateNurseProfile, saveOnboardingStep } from "./actions";
 
 // A complete, schema-valid payload (matches what the edit form sends after
 // fullProfileSchema validation). Names and credential match the existing slug
@@ -147,5 +147,37 @@ describe("updateNurseProfile server-side validation", () => {
     expect(res.error).toBeTruthy();
     expect(res.success).toBeFalsy();
     expect(h.calls.profileUpdates).toHaveLength(0);
+  });
+});
+
+describe("saveOnboardingStep server-side validation (step 2 credentials)", () => {
+  const step2 = {
+    credential: "rn",
+    license_number: "12345",
+    care_types: ["elderly"],
+    primary_care_type: null,
+  };
+
+  it("rejects a non-HHA credential with no license number and writes nothing", async () => {
+    // One single for the getNurseTier lookup before validation runs.
+    h.state.singles = [{ tier: "free" }];
+    const res = await saveOnboardingStep(2, {
+      ...step2,
+      credential: "rn",
+      license_number: "",
+    });
+    expect(res.error).toBeTruthy();
+    expect(h.calls.profileUpdates).toHaveLength(0);
+  });
+
+  it("accepts an HHA with no license number and stores null", async () => {
+    h.state.singles = [{ tier: "free" }];
+    const res = await saveOnboardingStep(2, {
+      ...step2,
+      credential: "hha",
+      license_number: "",
+    });
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({ license_number: null });
   });
 });
