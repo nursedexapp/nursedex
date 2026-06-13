@@ -6,7 +6,16 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requireAuth, requireRole } from "@/lib/auth/helpers";
-import { UserRole } from "@/types/enums";
+import { UserRole, NurseTier } from "@/types/enums";
+import {
+  step1Schema,
+  step2Schema,
+  step3Schema,
+  step4Schema,
+  step5Schema,
+  fullProfileSchema,
+} from "@/lib/schemas/profile";
+import type { ZodError } from "zod";
 import { calculateCompleteness } from "./completeness";
 import { claimSlug, saveSlugRedirect } from "./slug";
 import {
@@ -48,6 +57,27 @@ function describeDbError(
   }
 }
 
+/** Surface the first validation message so the user sees something actionable. */
+function firstValidationError(error: ZodError): string {
+  return (
+    error.issues[0]?.message ??
+    "Some details are invalid. Please review the form and try again."
+  );
+}
+
+/** A nurse's tier drives the care-type, bio, and photo limits in the schemas. */
+async function getNurseTier(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<NurseTier> {
+  const { data } = await supabase
+    .from("nurse_profiles")
+    .select("tier")
+    .eq("user_id", userId)
+    .single();
+  return (data?.tier as NurseTier | undefined) ?? NurseTier.FREE;
+}
+
 // ── Fetch nurse profile for the current user ────────────────
 
 export async function getNurseProfile() {
@@ -72,6 +102,26 @@ export async function saveOnboardingStep(
 ): Promise<ProfileActionResult> {
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
+
+  // Re-validate with the same schema the client form uses. Server actions are
+  // a public entry point, so the form rules (including the credential-aware
+  // license number requirement) must be enforced here too, not just client side.
+  if (step >= 1 && step <= 5) {
+    const schema =
+      step === 2 || step === 4
+        ? (step === 2 ? step2Schema : step4Schema)(
+            await getNurseTier(supabase, user.id),
+          )
+        : step === 1
+          ? step1Schema
+          : step === 3
+            ? step3Schema
+            : step5Schema;
+    const parsed = schema.safeParse(data);
+    if (!parsed.success) {
+      return { error: firstValidationError(parsed.error) };
+    }
+  }
 
   // Step 1 updates both users table and nurse_profiles
   if (step === 1) {
@@ -298,12 +348,21 @@ export async function updateNurseProfile(
   // Fetch current profile for comparison
   const { data: currentProfile } = await supabase
     .from("nurse_profiles")
-    .select("slug, credential, verification_status")
+    .select("slug, credential, verification_status, tier")
     .eq("user_id", user.id)
     .single();
 
   if (!currentProfile) {
     return { error: "Profile not found" };
+  }
+
+  // Re-validate with the same schema the edit form uses. This action is a
+  // public entry point, so the form rules (including the credential-aware
+  // license number requirement) must be enforced here too, not just client side.
+  const tier = (currentProfile.tier as NurseTier | undefined) ?? NurseTier.FREE;
+  const parsed = fullProfileSchema(tier).safeParse(data);
+  if (!parsed.success) {
+    return { error: firstValidationError(parsed.error) };
   }
 
   // Update users table (name, phone, zip, comm preference)
