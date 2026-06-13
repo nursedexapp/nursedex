@@ -5,6 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { getAccounts, getRateLimitFlagged } from "@/lib/admin/queries";
+import {
+  ACCOUNT_TABS,
+  accountsQueryForTab,
+  resolveAccountsTab,
+} from "@/lib/admin/accounts-view";
 import { AccountRowActions } from "@/components/admin/AccountRowActions";
 
 export const metadata: Metadata = {
@@ -20,14 +25,7 @@ export default async function AdminAccountsPage({
   searchParams,
 }: AccountsPageProps) {
   const params = await searchParams;
-  const tab =
-    params.tab === "nurses"
-      ? "nurses"
-      : params.tab === "families"
-        ? "families"
-        : params.tab === "flagged"
-          ? "flagged"
-          : "all";
+  const tab = resolveAccountsTab(params.tab);
 
   if (tab === "flagged") {
     const flagged = await getRateLimitFlagged();
@@ -70,9 +68,8 @@ export default async function AdminAccountsPage({
     );
   }
 
-  const role =
-    tab === "nurses" ? "nurse" : tab === "families" ? "family" : undefined;
-  const accounts = await getAccounts({ query: params.q, role });
+  const { role, deleted } = accountsQueryForTab(tab);
+  const accounts = await getAccounts({ query: params.q, role, deleted });
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6 sm:p-8">
@@ -106,7 +103,13 @@ export default async function AdminAccountsPage({
       </form>
 
       {accounts.length === 0 ? (
-        <Empty msg="No matching accounts." />
+        <Empty
+          msg={
+            tab === "removed" && !params.q
+              ? "No removed accounts."
+              : "No matching accounts."
+          }
+        />
       ) : (
         <div className="space-y-3">
           {accounts.map((u) => (
@@ -170,23 +173,9 @@ function Header() {
 }
 
 function Tabs({ active, q }: { active: string; q: string }) {
-  const tabs: Array<{ key: string; label: string; href: string }> = [
-    { key: "all", label: "All", href: "/admin/accounts" },
-    { key: "nurses", label: "Nurses", href: "/admin/accounts?tab=nurses" },
-    {
-      key: "families",
-      label: "Families",
-      href: "/admin/accounts?tab=families",
-    },
-    {
-      key: "flagged",
-      label: "Rate limit flagged",
-      href: "/admin/accounts?tab=flagged",
-    },
-  ];
   return (
     <nav className="border-sage/20 mb-6 flex flex-wrap items-center gap-1 border-b text-sm">
-      {tabs.map((t) => {
+      {ACCOUNT_TABS.map((t) => {
         const href =
           q && t.key !== "flagged"
             ? `${t.href}${t.href.includes("?") ? "&" : "?"}q=${encodeURIComponent(q)}`
