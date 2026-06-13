@@ -6,11 +6,13 @@ import {
   Heart,
   Star,
   DollarSign,
+  CreditCard,
   Briefcase,
 } from "lucide-react";
 import { requireSuperAdmin } from "@/lib/auth/helpers";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAnalyticsTotals } from "@/lib/admin/analytics";
+import { subscriptionPipelineLabel } from "@/lib/admin/subscription-health";
 import { PRICING } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -60,7 +62,7 @@ export default async function AnalyticsPage() {
       </Section>
 
       <Section title="Revenue">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             icon={<DollarSign className="size-4" />}
             label="MRR"
@@ -75,6 +77,12 @@ export default async function AnalyticsPage() {
             icon={<Star className="size-4" />}
             label="Active Family Access"
             value={t.activeFamilyAccess}
+          />
+          <Stat
+            icon={<CreditCard className="size-4" />}
+            label="Subscription records"
+            value={t.totalSubscriptions}
+            sub={subscriptionPipelineLabel(t.lastSubscriptionSyncAt, Date.now())}
           />
         </div>
       </Section>
