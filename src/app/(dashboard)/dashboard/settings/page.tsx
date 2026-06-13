@@ -7,7 +7,7 @@ import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SettingsForm } from "./SettingsForm";
-import { ManageBilling } from "./ManageBilling";
+import { ManageSubscriptionCard } from "@/components/dashboard/ManageSubscriptionCard";
 
 async function updateMarketing(optOut: boolean) {
   "use server";
@@ -91,8 +91,10 @@ export default async function SettingsPage() {
         />
 
         {subscription && (
-          <ManageBilling
+          <ManageSubscriptionCard
             planLabel={billingPlanLabel}
+            title="Billing"
+            returnTo="/dashboard/settings"
             renewsOn={subscription.current_period_end}
             cancelAtPeriodEnd={subscription.cancel_at_period_end}
             isPastDue={subscription.status === "past_due"}

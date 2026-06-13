@@ -12,6 +12,17 @@ export interface AnalyticsTotals {
   activeFamilyAccess: number;
   /** MRR computed from active subs at our published prices, in dollars. */
   mrr: number;
+  /**
+   * Subscription rows of any status. Lets an admin tell a genuinely empty
+   * pipeline (0) from a broken Stripe webhook (rows expected but absent) when
+   * MRR and the active counts both read 0.
+   */
+  totalSubscriptions: number;
+  /**
+   * updated_at of the most recently written subscription row, a proxy for the
+   * last time the Stripe webhook landed. null when no subscription rows exist.
+   */
+  lastSubscriptionSyncAt: string | null;
   totalReveals: number;
   revealsLast30d: number;
   totalSaves: number;
@@ -41,6 +52,8 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
     activeFeatured,
     activeFamilyAccess,
     activeFamilyAccessAnnual,
+    totalSubscriptions,
+    lastSubscriptionSync,
     totalReveals,
     reveals30d,
     totalSaves,
@@ -88,6 +101,15 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
       .eq("plan_type", "family_access")
       .eq("billing_interval", "year")
       .in("status", ["active", "past_due"]),
+    // Every subscription row, any status: the empty-vs-broken signal.
+    supabase.from("subscriptions").select("id", { count: "exact", head: true }),
+    // Most recent webhook write, as a freshness signal for the pipeline.
+    supabase
+      .from("subscriptions")
+      .select("updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
     supabase.from("reveals").select("id", { count: "exact", head: true }),
     supabase
       .from("reveals")
@@ -126,6 +148,9 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
     activeFeatured: featured,
     activeFamilyAccess: familyAccess,
     mrr,
+    totalSubscriptions: totalSubscriptions.count ?? 0,
+    lastSubscriptionSyncAt:
+      (lastSubscriptionSync.data?.updated_at as string | undefined) ?? null,
     totalReveals: totalReveals.count ?? 0,
     revealsLast30d: reveals30d.count ?? 0,
     totalSaves: totalSaves.count ?? 0,

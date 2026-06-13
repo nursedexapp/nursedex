@@ -10,7 +10,7 @@ import { Greeting } from "@/components/dashboard/Greeting";
 import { CompletenessCard } from "@/components/dashboard/CompletenessCard";
 import { QuickActions } from "@/components/dashboard/QuickActions";
 import { FeaturedUpsell } from "@/components/dashboard/FeaturedUpsell";
-import { ManageFeatured } from "@/components/dashboard/ManageFeatured";
+import { ManageSubscriptionCard } from "@/components/dashboard/ManageSubscriptionCard";
 import { ReviewLinkCard } from "@/components/dashboard/ReviewLinkCard";
 import { NurseClaimHireCard } from "@/components/hires/NurseClaimHireCard";
 import { UpgradeCelebration } from "@/components/dashboard/UpgradeCelebration";
@@ -187,7 +187,10 @@ export default async function DashboardPage() {
             <NurseClaimHireCard slug={profile.slug} />
             {profile.tier === "free" && <FeaturedUpsell isVerified={true} />}
             {profile.tier === "featured" && featuredSub && (
-              <ManageFeatured
+              <ManageSubscriptionCard
+                planLabel="Featured"
+                featured
+                returnTo="/dashboard"
                 renewsOn={featuredSub.current_period_end}
                 cancelAtPeriodEnd={featuredSub.cancel_at_period_end}
                 isPastDue={featuredSub.status === "past_due"}
