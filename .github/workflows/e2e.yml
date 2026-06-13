@@ -37,6 +37,10 @@ jobs:
         uses: supabase/setup-cli@v2
         with:
           version: latest
+          # Resolving "latest" hits the GitHub API; without a token it uses the
+          # unauthenticated 60/hr limit and intermittently fails with "rate
+          # limit exceeded". The default workflow token raises that ceiling.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # A throwaway local Supabase (Docker) so the run needs no secrets and
       # never touches a real database. start applies migrations + seed; reset
