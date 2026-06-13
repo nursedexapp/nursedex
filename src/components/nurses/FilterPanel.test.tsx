@@ -97,6 +97,25 @@ describe("FilterPanel free text inputs", () => {
     });
   });
 
+  it("hints that a partial zip is not filtering, and clears the hint at five digits", () => {
+    render(<FilterPanel initialFilters={defaultFilters()} />);
+    const zip = screen.getByLabelText<HTMLInputElement>(/your zip code/i);
+    const hint = /enter all 5 digits/i;
+
+    // Empty: no hint.
+    expect(screen.queryByText(hint)).not.toBeInTheDocument();
+
+    // Partial: the field is not committing a filter, so surface that.
+    fireEvent.change(zip, { target: { value: "117" } });
+    const hintEl = screen.getByText(hint);
+    expect(hintEl).toBeInTheDocument();
+    expect(zip).toHaveAccessibleDescription(/enter all 5 digits/i);
+
+    // Five digits: the filter commits, so the hint goes away.
+    fireEvent.change(zip, { target: { value: "11779" } });
+    expect(screen.queryByText(hint)).not.toBeInTheDocument();
+  });
+
   it("clearing a field removes its filter from the URL", () => {
     render(
       <FilterPanel

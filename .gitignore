@@ -35,6 +35,9 @@ Legal/
 /coverage/
 /e2e/.auth/
 
+# Playwright MCP browser snapshots (generated, local-only)
+/.playwright-mcp/
+
 # Sentry
 .sentryclirc
 
