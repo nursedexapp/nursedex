@@ -4,7 +4,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckboxGroup } from "./CheckboxGroup";
 import { TierLimitBanner } from "./TierLimitBanner";
-import { CREDENTIAL_LABELS, CareType, CARE_TYPE_LABELS } from "@/types/enums";
+import {
+  CREDENTIAL_LABELS,
+  CareType,
+  CARE_TYPE_LABELS,
+  Credential,
+} from "@/types/enums";
 import type { NurseTier } from "@/types/enums";
 import { TIER_LIMITS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -36,6 +41,19 @@ export function CredentialsFields({
     limits.maxCareTypes === Infinity ? undefined : limits.maxCareTypes;
   const atCareTypeLimit =
     maxCareTypes !== undefined && values.care_types.length >= maxCareTypes;
+
+  // HHAs don't carry a license or certification number, so the field is
+  // optional for them. CNAs hold a certification number; everyone else a
+  // license number.
+  const isHHA = values.credential === Credential.HHA;
+  const credentialNumberLabel =
+    values.credential === Credential.CNA
+      ? "Certification number"
+      : isHHA
+        ? "License or certification number"
+        : values.credential
+          ? "License number"
+          : "License or certification number";
 
   return (
     <>
@@ -76,28 +94,42 @@ export function CredentialsFields({
         )}
       </div>
 
-      {/* License number — emphasized because incorrect numbers will fail
-          verification, which is one of the few places this wizard can
-          fail in a way that's annoying to recover from. */}
+      {/* License/certification number — emphasized because incorrect numbers
+          will fail verification, which is one of the few places this wizard
+          can fail in a way that's annoying to recover from. Optional for HHAs,
+          who don't carry a number. */}
       <div className="border-warning/30 bg-warning/5 space-y-2 rounded-lg border-l-4 p-4">
-        <Label htmlFor="license_number" className="text-soft-black text-sm font-semibold">
-          License number
+        <Label
+          htmlFor="license_number"
+          className="text-soft-black text-sm font-semibold"
+        >
+          {credentialNumberLabel}
+          {isHHA && (
+            <span className="text-muted-foreground ml-1 font-normal">
+              (optional)
+            </span>
+          )}
         </Label>
         <p className="text-soft-black-light text-xs">
-          Please double check this. We verify your license against the New York
-          State registry. A typo will hold up your profile going live.
+          {isHHA
+            ? "Home Health Aides don't have a license or certification number, so this is optional. If you have one, adding it helps families verify you."
+            : "Please double check this. We check it against New York State records, and a typo will hold up your profile going live."}
         </p>
         <Input
           id="license_number"
           value={values.license_number}
           onChange={(e) => onChange("license_number", e.target.value)}
-          placeholder="Your NY State license number"
+          placeholder={
+            isHHA
+              ? "Optional for Home Health Aides"
+              : "Your NY State license or certification number"
+          }
           aria-invalid={errors.license_number ? true : undefined}
           className="bg-warm-white"
         />
         <p className="text-muted-foreground text-xs">
-          Your license number will appear on your profile so families can
-          verify it themselves.
+          If you add one, it will appear on your profile so families can verify
+          it themselves.
         </p>
         {errors.license_number && (
           <p className="text-destructive text-xs">{errors.license_number}</p>

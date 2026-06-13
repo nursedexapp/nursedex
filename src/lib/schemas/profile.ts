@@ -46,8 +46,7 @@ export function step2Schema(tier: NurseTier) {
       credential: z.nativeEnum(Credential, "Credential type is required"),
       license_number: z
         .string()
-        .min(1, "License number is required")
-        .max(30, "License number is too long"),
+        .max(30, "License or certification number is too long"),
       care_types: z
         .array(z.nativeEnum(CareType))
         .min(1, "Select at least one care type")
@@ -66,7 +65,22 @@ export function step2Schema(tier: NurseTier) {
         message: "Select a primary care type when you have multiple",
         path: ["primary_care_type"],
       },
-    );
+    )
+    .refine((data) => isLicenseNumberValid(data), {
+      message: "License or certification number is required",
+      path: ["license_number"],
+    });
+}
+
+// HHAs don't carry a license or certification number, so the field is
+// optional for them and required for every other credential.
+function isLicenseNumberValid(data: {
+  credential: Credential;
+  license_number: string;
+}): boolean {
+  return (
+    data.credential === Credential.HHA || data.license_number.trim().length > 0
+  );
 }
 
 export type Step2Data = z.infer<ReturnType<typeof step2Schema>>;
@@ -214,7 +228,7 @@ export function fullProfileSchema(tier: NurseTier) {
       languages: z.array(z.string().min(1)).min(1),
       // Step 2
       credential: z.nativeEnum(Credential),
-      license_number: z.string().min(1).max(30),
+      license_number: z.string().max(30),
       care_types: z
         .array(z.nativeEnum(CareType))
         .min(1)
@@ -286,7 +300,11 @@ export function fullProfileSchema(tier: NurseTier) {
         message: "Select a primary care type",
         path: ["primary_care_type"],
       },
-    );
+    )
+    .refine((data) => isLicenseNumberValid(data), {
+      message: "License or certification number is required",
+      path: ["license_number"],
+    });
 }
 
 export type FullProfileData = z.infer<ReturnType<typeof fullProfileSchema>>;

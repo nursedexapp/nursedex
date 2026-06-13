@@ -111,7 +111,7 @@ export async function saveOnboardingStep(
       .from("nurse_profiles")
       .update({
         credential: data.credential,
-        license_number: data.license_number,
+        license_number: ((data.license_number as string) ?? "").trim() || null,
         care_types: data.care_types,
         primary_care_type: data.primary_care_type ?? null,
       })
@@ -362,7 +362,7 @@ export async function updateNurseProfile(
   const profileUpdate = {
     ...resubmission,
     credential: data.credential,
-    license_number: data.license_number,
+    license_number: ((data.license_number as string) ?? "").trim() || null,
     care_types: data.care_types,
     primary_care_type: data.primary_care_type ?? null,
     skills: data.skills ?? [],
