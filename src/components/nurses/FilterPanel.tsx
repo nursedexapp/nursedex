@@ -270,6 +270,11 @@ export function FilterPanel({
               onCommit={(raw) =>
                 apply({ zip: raw.length === 5 ? raw : undefined })
               }
+              renderHint={(text) =>
+                text.length > 0 && text.length < 5
+                  ? "Enter all 5 digits to filter by distance."
+                  : null
+              }
             />
           </div>
           <div>
@@ -404,11 +409,13 @@ function DebouncedFilterInput({
   value,
   onCommit,
   sanitize,
+  renderHint,
   ...inputProps
 }: {
   value: string;
   onCommit: (raw: string) => void;
   sanitize?: (raw: string) => string;
+  renderHint?: (text: string) => React.ReactNode;
 } & Omit<React.ComponentProps<typeof Input>, "value" | "onChange">) {
   const [text, setText] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -433,21 +440,39 @@ function DebouncedFilterInput({
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
+  const hint = renderHint?.(text);
+  const hintId = inputProps.id ? `${inputProps.id}-hint` : undefined;
+
   return (
-    <Input
-      {...inputProps}
-      value={text}
-      onChange={(e) => {
-        const raw = sanitize ? sanitize(e.target.value) : e.target.value;
-        setText(raw);
-        commitPendingRef.current = true;
-        clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => {
-          commitPendingRef.current = false;
-          onCommitRef.current(raw);
-        }, COMMIT_DELAY_MS);
-      }}
-    />
+    <>
+      <Input
+        {...inputProps}
+        aria-describedby={
+          hint && hintId ? hintId : inputProps["aria-describedby"]
+        }
+        value={text}
+        onChange={(e) => {
+          const raw = sanitize ? sanitize(e.target.value) : e.target.value;
+          setText(raw);
+          commitPendingRef.current = true;
+          clearTimeout(timerRef.current);
+          timerRef.current = setTimeout(() => {
+            commitPendingRef.current = false;
+            onCommitRef.current(raw);
+          }, COMMIT_DELAY_MS);
+        }}
+      />
+      {renderHint ? (
+        <p
+          id={hintId}
+          role="status"
+          aria-live="polite"
+          className="text-soft-black-light mt-1 min-h-4 text-xs"
+        >
+          {hint}
+        </p>
+      ) : null}
+    </>
   );
 }
 
