@@ -28,7 +28,7 @@ const FREE_NURSE_PERKS = [
   "Profile in search results",
   "Up to 1 photo and 150-character bio",
   "Up to 2 care types",
-  "License verification (72-hour SLA)",
+  "Credential verification (72-hour SLA)",
   "Collect reviews from past clients",
 ];
 
@@ -37,7 +37,7 @@ const FEATURED_NURSE_PERKS = [
   "Featured badge on every profile view",
   "Up to 3 photos and 500-character bio",
   "Unlimited care types",
-  "Priority license verification (24-hour SLA)",
+  "Priority credential verification (24-hour SLA)",
   "Weekly performance email + analytics dashboard",
   "Cohort comparison: see how you stack up",
 ];

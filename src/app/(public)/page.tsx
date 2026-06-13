@@ -16,7 +16,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export const metadata: Metadata = {
   title: "NurseDex | New York's trusted nurse directory",
   description:
-    "Find trusted nurses across New York, or build a profile that gets families to call. NurseDex connects verified nurses with the families that need them.",
+    "Find trusted nurses across New York, or build a profile that gets families to call. NurseDex connects nurses and aides with the families that need them.",
   alternates: { canonical: "/" },
   openGraph: {
     title: "NurseDex | New York's trusted nurse directory",
@@ -48,7 +48,7 @@ function Hero() {
           New York&apos;s trusted nurse directory
         </h1>
         <p className="text-soft-black-light mx-auto mt-4 max-w-2xl text-center text-base sm:text-lg">
-          Verified nurses, real reviews, direct contact. Built for families
+          Trusted nurses and aides, real reviews, direct contact. Built for families
           across New York looking for care, and for nurses who deserve to be
           found.
         </p>
@@ -60,7 +60,7 @@ function Hero() {
                 Are you looking for a nurse?
               </h2>
               <p className="text-soft-black-light text-sm">
-                Find a verified nurse near you. Search by credential, care type,
+                Find the right nurse or aide near you. Search by credential, care type,
                 language, and availability, and see real reviews from other New
                 York families.
               </p>
@@ -141,8 +141,8 @@ function TrustSignals() {
   const items = [
     {
       icon: <ShieldCheck className="size-5" />,
-      title: "License-verified",
-      desc: "Every nurse on NurseDex has had their license checked against the NY State database.",
+      title: "Credentials reviewed",
+      desc: "Licenses, certifications, and credentials are reviewed when applicable, so families can hire with confidence.",
     },
     {
       icon: <Heart className="size-5" />,
@@ -233,7 +233,7 @@ function DualHowItWorks() {
               <Step
                 icon={<UserCheck className="size-4" />}
                 title="Get verified"
-                desc="Our team checks your license against the NY State database. 24-72 hours."
+                desc="Our team reviews your credentials against NY State records when applicable. 24-72 hours."
               />
               <Step
                 icon={<Search className="size-4" />}

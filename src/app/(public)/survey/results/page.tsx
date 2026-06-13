@@ -96,7 +96,7 @@ export default async function SurveyResultsPage({
           <p className="text-soft-black-light text-sm">
             {hasResults
               ? isLowResult
-                ? "These are the closest fits for now. We add new verified nurses every week."
+                ? "These are the closest fits for now. We add new nurses and aides every week."
                 : "Create a free account to see full profiles, contact info, and save your favorites."
               : "We don't have anyone matching every filter yet. Try loosening a filter, or sign up to be notified when matching nurses join."}
           </p>

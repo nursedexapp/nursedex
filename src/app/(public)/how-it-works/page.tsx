@@ -33,7 +33,7 @@ export default function HowItWorksPage() {
               How NurseDex works
             </h1>
             <p className="text-soft-black-light mx-auto mt-3 max-w-2xl text-center text-base">
-              We&apos;re a hyper local directory of verified nurses on Long
+              We&apos;re a hyper local directory of nurses and aides on Long
               Island. Here&apos;s the journey for both sides.
             </p>
             <div className="mt-6 flex justify-center gap-3 text-sm">
@@ -110,12 +110,12 @@ const NURSE_STEPS: Step[] = [
   {
     icon: <ClipboardList className="size-5" />,
     title: "Build your profile",
-    body: "Add your credentials, license number, primary care type, skills, languages, availability, rate range, and a bio. Free profiles get one photo and a 150 character bio; Featured gets up to three photos and 500 characters.",
+    body: "Add your credentials, license or certification number (if your credential has one), primary care type, skills, languages, availability, rate range, and a bio. Free profiles get one photo and a 150 character bio; Featured gets up to three photos and 500 characters.",
   },
   {
     icon: <UserCheck className="size-5" />,
     title: "Get verified",
-    body: "Our team checks your license against the New York State database. Free profiles have a 72 hour SLA, Featured nurses get priority at 24 hours. Once verified, your profile becomes visible to families and you get a verified badge.",
+    body: "Our team reviews your credentials, checking your license or certification against New York State records when applicable. Free profiles have a 72 hour SLA, Featured nurses get priority at 24 hours. Once verified, your profile becomes visible to families and you get a verified badge.",
   },
   {
     icon: <Search className="size-5" />,

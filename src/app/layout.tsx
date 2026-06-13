@@ -29,12 +29,12 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://nursedex.com"),
   title: "NurseDex | New York's Trusted Nurse Directory",
   description:
-    "Find verified, trusted nurses across New York. NurseDex connects families with the nurses they need, with real reviews and direct contact.",
+    "Find trusted nurses and aides across New York. NurseDex connects families with the nurses they need, with real reviews and direct contact.",
   manifest: "/site.webmanifest",
   openGraph: {
     title: "NurseDex | New York's Trusted Nurse Directory",
     description:
-      "Find verified, trusted nurses across New York, with real reviews and direct contact.",
+      "Find trusted nurses and aides across New York, with real reviews and direct contact.",
     url: "https://nursedex.com",
     siteName: "NurseDex",
     type: "website",
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "NurseDex | New York's Trusted Nurse Directory",
     description:
-      "Find verified, trusted nurses across New York, with real reviews and direct contact.",
+      "Find trusted nurses and aides across New York, with real reviews and direct contact.",
   },
 };
 

@@ -83,7 +83,7 @@ export default async function Image() {
           lineHeight: 1.5,
         }}
       >
-        New York&apos;s trusted directory for verified nurses and caregivers.
+        New York&apos;s trusted directory for nurses and caregivers.
       </div>
 
       {/* Badge */}
