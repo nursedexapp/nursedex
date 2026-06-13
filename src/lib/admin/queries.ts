@@ -322,18 +322,23 @@ export interface AccountRow {
 export async function getAccounts(args: {
   query?: string;
   role?: "nurse" | "family";
+  /**
+   * false (default) lists live accounts; true lists soft-deleted accounts for
+   * the admin Removed tab. The seeded demo accounts are excluded either way.
+   */
+  deleted?: boolean;
 }): Promise<AccountRow[]> {
   const supabase = await createClient();
 
-  // Hide the seeded demo nurses (noreply+seed-*, also nurse_profiles.is_seed)
-  // and soft-deleted accounts so the list shows only real, live users. The
-  // seed rows exist to populate the public directory, not to be managed here.
+  // Always hide the seeded demo nurses (noreply+seed-*, also
+  // nurse_profiles.is_seed); they exist to populate the public directory, not
+  // to be managed here. is_deleted selects the live list or the Removed view.
   let q = supabase
     .from("users")
     .select(
       "id, email, first_name, last_name, role, is_suspended, is_deleted, created_at",
     )
-    .eq("is_deleted", false)
+    .eq("is_deleted", args.deleted ?? false)
     .not("email", "ilike", SEED_EMAIL_PATTERN)
     .order("created_at", { ascending: false })
     .limit(100);

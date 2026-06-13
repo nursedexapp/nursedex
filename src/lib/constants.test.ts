@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PRICING, TIER_LIMITS, RATE_LIMITS } from "./constants";
+import { PRICING, TIER_LIMITS, RATE_LIMITS, SOCIAL_LINKS } from "./constants";
 
 describe("constants", () => {
   it("has correct pricing", () => {
@@ -31,5 +31,30 @@ describe("constants", () => {
     expect(RATE_LIMITS.REVEALS_CAPTCHA_THRESHOLD).toBeLessThan(
       RATE_LIMITS.REVEALS_HARD_CAP,
     );
+  });
+});
+
+describe("SOCIAL_LINKS", () => {
+  it("includes the official LinkedIn company profile", () => {
+    expect(SOCIAL_LINKS.linkedin).toBe(
+      "https://www.linkedin.com/company/nursedex/",
+    );
+  });
+
+  it("lists the facebook, instagram, and linkedin profiles", () => {
+    expect(Object.keys(SOCIAL_LINKS).sort()).toEqual([
+      "facebook",
+      "instagram",
+      "linkedin",
+    ]);
+  });
+
+  it("uses canonical https URLs with no tracking or fragment params", () => {
+    for (const url of Object.values(SOCIAL_LINKS)) {
+      const parsed = new URL(url);
+      expect(parsed.protocol).toBe("https:");
+      expect(parsed.searchParams.has("utm_source")).toBe(false);
+      expect(url).not.toContain("#");
+    }
   });
 });

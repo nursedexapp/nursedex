@@ -118,4 +118,5 @@ export const BUSINESS_ADDRESS = {
 export const SOCIAL_LINKS = {
   facebook: "https://www.facebook.com/profile.php?id=61575387869793",
   instagram: "https://www.instagram.com/nursedexcommunity",
+  linkedin: "https://www.linkedin.com/company/nursedex/",
 } as const;
