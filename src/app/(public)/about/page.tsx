@@ -4,10 +4,10 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "About | NurseDex",
   description:
-    "NurseDex is a hyper local directory of verified nurses across New York, built to make finding (and being found by) trusted care simpler.",
+    "NurseDex is a hyper local directory of nurses and aides across New York, built to make finding (and being found by) trusted care simpler.",
   openGraph: {
     title: "About NurseDex",
-    description: "Hyper local directory of verified nurses across New York.",
+    description: "Hyper local directory of nurses and aides across New York.",
     type: "website",
     url: "https://nursedex.com/about",
   },
@@ -22,7 +22,7 @@ export default function AboutPage() {
             About NurseDex
           </h1>
           <p className="text-soft-black-light mt-3 text-lg">
-            A hyper local directory of verified nurses across New York.
+            A hyper local directory of nurses and aides across New York.
           </p>
         </header>
 
@@ -32,16 +32,17 @@ export default function AboutPage() {
             care marketplaces give you thousands of profiles you can&apos;t
             verify, and word-of-mouth referrals only help if you happen to know
             the right people. We built NurseDex to fill the gap in New York
-            specifically: a directory of nurses we&apos;ve license-checked, with
-            real reviews from real local families.
+            specifically: a directory of nurses and aides whose credentials we
+            review, with real reviews from real local families.
           </p>
 
           <h2 className="font-heading text-soft-black pt-2 text-xl font-semibold">
             What we do
           </h2>
           <p>
-            We verify every nurse&apos;s license against the New York State
-            database before their profile becomes visible to families. We keep
+            We review each nurse&apos;s credentials, checking licenses and
+            certifications against New York State records when applicable, before
+            their profile becomes visible to families. We keep
             the directory limited to Suffolk, Nassau, and Queens so search
             results stay relevant. We make reviews come from email-verified
             families and run them through moderation, so what you read is

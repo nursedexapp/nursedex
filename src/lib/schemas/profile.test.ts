@@ -126,6 +126,55 @@ describe("step2Schema", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("requires a license number for non-HHA credentials", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "rn",
+      license_number: "",
+      care_types: ["elderly"],
+      primary_care_type: null,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(
+        result.error.issues.some((i) => i.path[0] === "license_number"),
+      ).toBe(true);
+    }
+  });
+
+  it("allows HHAs to omit the license number", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "hha",
+      license_number: "",
+      care_types: ["elderly"],
+      primary_care_type: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("still accepts a license number from an HHA who has one", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "hha",
+      license_number: "HHA-12345",
+      care_types: ["elderly"],
+      primary_care_type: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("treats a whitespace-only license number as missing", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "cna",
+      license_number: "   ",
+      care_types: ["elderly"],
+      primary_care_type: null,
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("step3Schema", () => {

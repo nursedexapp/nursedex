@@ -10,11 +10,11 @@ import {
 export const metadata: Metadata = {
   title: "FAQ | NurseDex",
   description:
-    "Common questions from families and nurses about NurseDex. License verification, pricing, reviews, cancellations, and more.",
+    "Common questions from families and nurses about NurseDex. Credential verification, pricing, reviews, cancellations, and more.",
   openGraph: {
     title: "Frequently asked questions | NurseDex",
     description:
-      "Answers about license verification, pricing, reviews, and cancellations.",
+      "Answers about credential verification, pricing, reviews, and cancellations.",
     type: "website",
     url: "https://nursedex.com/faq",
   },
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 const FAMILY_FAQS = [
   {
     q: "How does NurseDex verify nurses?",
-    a: "Every nurse on NurseDex has had their license number checked against the New York State database before their profile becomes visible to families. We re-verify if a nurse changes their name or credential. The verified badge on a profile means we've actually pulled their record.",
+    a: "Before a profile becomes visible to families, our team reviews the nurse's credentials, checking their license or certification against New York State records when applicable. We re-check if a nurse changes their name or credential. The verified badge on a profile means we've reviewed their record.",
   },
   {
     q: "Why do I have to pay to see contact info?",
@@ -46,15 +46,15 @@ const FAMILY_FAQS = [
 const NURSE_FAQS = [
   {
     q: "Is NurseDex free for nurses?",
-    a: "Yes. Free profiles get one photo, a 150-character bio, up to two care types, and standard 72-hour license verification. Featured ($29/month) bumps you to top placement, three photos, 500-character bio, unlimited care types, 24-hour priority verification, and analytics.",
+    a: "Yes. Free profiles get one photo, a 150-character bio, up to two care types, and standard 72-hour credential verification. Featured ($29/month) bumps you to top placement, three photos, 500-character bio, unlimited care types, 24-hour priority verification, and analytics.",
   },
   {
     q: "How long does verification take?",
-    a: "Free profiles are verified within 72 hours. Featured nurses have a 24-hour SLA. We pull your license against the NY State database; if there's a mismatch we'll email you with a specific reason and you can resubmit.",
+    a: "Free profiles are verified within 72 hours. Featured nurses have a 24-hour SLA. We check your credentials against New York State records (your license or certification, when applicable); if there's a mismatch we'll email you with a specific reason and you can resubmit.",
   },
   {
-    q: "What if my license verification is rejected?",
-    a: "You'll get an email with the exact reason (e.g., 'License number not found,' 'Name does not match license records'). Update your profile to correct the issue and resubmit; there's no limit on resubmissions, and Featured nurses keep their priority placement on resubmission.",
+    q: "What if my credential verification is rejected?",
+    a: "You'll get an email with the exact reason (e.g., 'Credential not found in state records,' 'Name does not match our records'). Update your profile to correct the issue and resubmit; there's no limit on resubmissions, and Featured nurses keep their priority placement on resubmission.",
   },
   {
     q: "How do I get reviews?",

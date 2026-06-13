@@ -60,24 +60,38 @@ vi.mock("./upsell", () => ({
   markUpsellShown: vi.fn(),
 }));
 
-import { updateNurseProfile } from "./actions";
+import { updateNurseProfile, saveOnboardingStep } from "./actions";
 
-// Names and credential match the existing slug so the edit stays on the
-// simple update path (no slug regeneration, no credential change).
+// A complete, schema-valid payload (matches what the edit form sends after
+// fullProfileSchema validation). Names and credential match the existing slug
+// so the edit stays on the simple update path (no slug regen, no credential
+// change).
 const editData = {
   first_name: "Test",
   last_name: "Nurse",
-  contact_phone: "",
-  zip_code: "10001",
-  communication_preference: "email",
-  credential: "cna",
-  license_number: "12345",
-  care_types: ["companionship"],
   gender: "female",
   years_experience: 3,
   languages: ["english"],
-  bio: "A bio long enough to pass.",
+  credential: "cna",
+  license_number: "12345",
+  care_types: ["elderly"],
+  primary_care_type: null,
+  skills: [],
+  availability_commitment: [],
+  time_slots: [],
+  rate_min: null,
+  rate_max: null,
   has_transportation: true,
+  covid_vaccinated: null,
+  care_philosophy: null,
+  additional_certs: [],
+  bio: "A bio long enough to pass.",
+  photos: ["photos/nurse-1/a.jpg"],
+  contact_email: "test@example.com",
+  contact_phone: "",
+  communication_preference: "email",
+  zip_code: "10001",
+  travel_radius_miles: 25,
 };
 
 function seedSingles(verificationStatus: string) {
@@ -119,5 +133,51 @@ describe("updateNurseProfile resubmission", () => {
         "verification_status",
       );
     }
+  });
+});
+
+describe("updateNurseProfile server-side validation", () => {
+  it("rejects a non-HHA credential with no license number and writes nothing", async () => {
+    seedSingles("verified");
+    const res = await updateNurseProfile({
+      ...editData,
+      credential: "rn",
+      license_number: "",
+    });
+    expect(res.error).toBeTruthy();
+    expect(res.success).toBeFalsy();
+    expect(h.calls.profileUpdates).toHaveLength(0);
+  });
+});
+
+describe("saveOnboardingStep server-side validation (step 2 credentials)", () => {
+  const step2 = {
+    credential: "rn",
+    license_number: "12345",
+    care_types: ["elderly"],
+    primary_care_type: null,
+  };
+
+  it("rejects a non-HHA credential with no license number and writes nothing", async () => {
+    // One single for the getNurseTier lookup before validation runs.
+    h.state.singles = [{ tier: "free" }];
+    const res = await saveOnboardingStep(2, {
+      ...step2,
+      credential: "rn",
+      license_number: "",
+    });
+    expect(res.error).toBeTruthy();
+    expect(h.calls.profileUpdates).toHaveLength(0);
+  });
+
+  it("accepts an HHA with no license number and stores null", async () => {
+    h.state.singles = [{ tier: "free" }];
+    const res = await saveOnboardingStep(2, {
+      ...step2,
+      credential: "hha",
+      license_number: "",
+    });
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({ license_number: null });
   });
 });

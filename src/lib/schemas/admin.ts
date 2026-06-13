@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 export const REJECT_REASONS = [
-  "License number not found",
-  "License expired",
-  "Name does not match license records",
-  "License suspended or revoked",
+  "Credential not found in state records",
+  "Credential expired",
+  "Name does not match our records",
+  "Credential suspended or revoked",
   "Other",
 ] as const;
 export type RejectReason = (typeof REJECT_REASONS)[number];
