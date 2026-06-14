@@ -9,7 +9,11 @@ export function initPostHog() {
   if (!key || !host) return;
 
   posthog.init(key, {
-    api_host: host,
+    // Send events to our same-origin reverse proxy (see next.config.ts) so ad
+    // blockers don't drop them. ui_host keeps toolbar/links pointing at the
+    // real PostHog app (us.i.posthog.com -> us.posthog.com).
+    api_host: "/ingest",
+    ui_host: host.replace(".i.posthog.com", ".posthog.com"),
     person_profiles: "identified_only",
     capture_pageview: false, // we handle this manually in the app
     capture_pageleave: true,
