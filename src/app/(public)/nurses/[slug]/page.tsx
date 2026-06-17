@@ -15,6 +15,12 @@ import { createClient } from "@/lib/supabase/server";
 import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
 import { hasRevealedNurse } from "@/lib/reveals/actions";
 import {
+  canSeeNurseIdentity,
+  redactNurseIdentity,
+  publicNurseMetaTitle,
+  publicNurseMetaDescription,
+} from "@/lib/profile/identity";
+import {
   getFamilyReviewForNurse,
   getApprovedReviews,
 } from "@/lib/reviews/queries";
@@ -64,10 +70,12 @@ export async function generateMetadata({
     CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
   // Public metadata is visible to anyone (including crawlers), so it never
   // includes the last name. Identity is gated behind a subscription.
-  const title = `${nurse.first_name}, ${credentialLabel} | NurseDex`;
-  const description = nurse.bio
-    ? nurse.bio.slice(0, 160)
-    : `${nurse.first_name} is a ${credentialLabel} on NurseDex, New York's trusted nurse directory.`;
+  const title = publicNurseMetaTitle(nurse.first_name, credentialLabel);
+  const description = publicNurseMetaDescription(
+    nurse.first_name,
+    credentialLabel,
+    nurse.bio,
+  );
 
   return {
     title,
@@ -125,18 +133,15 @@ export default async function NurseProfilePage({
   // themselves, and any family with an active subscription. A family in the
   // post-cancellation grace window keeps access to nurses they already
   // revealed, so an existing reveal also unlocks identity for that nurse.
-  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
-  const isSelf = user?.id === nurse.user_id;
-  let canSeeIdentity = isAdmin || isSelf;
+  let hasSub = false;
+  let hasReveal = false;
 
   if (user) {
     if (user.role === "family") {
-      const [hasSub, hasReveal] = await Promise.all([
+      [hasSub, hasReveal] = await Promise.all([
         hasActiveFamilyAccess(user.id),
         hasRevealedNurse(nurse.user_id),
       ]);
-
-      canSeeIdentity = canSeeIdentity || hasSub || hasReveal;
 
       if (hasReveal) {
         viewMode = "subscribed"; // contact info will be server-rendered
@@ -169,14 +174,16 @@ export default async function NurseProfilePage({
     revealMode = "anon";
   }
 
-  // Whether a license number exists is not sensitive, but the number itself
-  // is. Capture its presence before redacting so the License Information
-  // section can still render a "subscribe to unlock" hint.
-  const hasLicenseNumber = !!nurse.license_number;
-  if (!canSeeIdentity) {
-    nurse.last_name = "";
-    nurse.license_number = null;
-  }
+  const canSeeIdentity = canSeeNurseIdentity(nurse.user_id, {
+    role: user?.role,
+    viewerId: user?.id,
+    hasSubscription: hasSub,
+    hasReveal,
+  });
+  // Capture whether a license number exists before redacting, so the License
+  // Information section can still render a "subscribe to unlock" hint without
+  // exposing the number itself.
+  const { hasLicenseNumber } = redactNurseIdentity(nurse, canSeeIdentity);
 
   // Fetch photo URLs, license verify URL, and approved reviews in parallel
   const [photoUrls, licenseVerifyUrl, approvedReviews] = await Promise.all([
