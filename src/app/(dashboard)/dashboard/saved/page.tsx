@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/helpers";
 import { UserRole } from "@/types/enums";
 import { NurseCard } from "@/components/nurses/NurseCard";
 import { getSavedNurses } from "@/lib/nurses/saves";
+import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
 
 export const metadata: Metadata = {
   title: "Saved Nurses | NurseDex",
@@ -12,7 +13,10 @@ export const metadata: Metadata = {
 
 export default async function SavedNursesPage() {
   const user = await requireRole(UserRole.FAMILY);
-  const saved = await getSavedNurses(user.id);
+  const [saved, hasSub] = await Promise.all([
+    getSavedNurses(user.id),
+    hasActiveFamilyAccess(user.id),
+  ]);
 
   const available = saved.filter((n) => n.is_available);
   const unavailable = saved.filter((n) => !n.is_available);
@@ -43,6 +47,7 @@ export default async function SavedNursesPage() {
                   <NurseCard
                     key={nurse.user_id}
                     nurse={nurse}
+                    showLastName={hasSub}
                     saveState={{ isSaved: true }}
                   />
                 ))}
@@ -63,6 +68,7 @@ export default async function SavedNursesPage() {
                   <NurseCard
                     key={nurse.user_id}
                     nurse={nurse}
+                    showLastName={hasSub}
                     saveState={{ isSaved: true }}
                   />
                 ))}

@@ -50,6 +50,14 @@ interface NurseProfilePublicProps {
   distanceMiles: number | null;
   viewMode: ViewMode;
   revealMode?: RevealMode;
+  /** Whether the viewer may see identity details (last name + license
+   *  number): families with an active subscription, the nurse themselves,
+   *  or admins. When false, the last name is already blanked upstream and
+   *  the license number is masked behind a reveal hint. */
+  canSeeIdentity?: boolean;
+  /** Whether this nurse has a license number on file. Drives the License
+   *  Information section even when the number itself is masked. */
+  hasLicenseNumber?: boolean;
   /** The viewer's existing platform review for this nurse, if any. Only
    *  meaningful when viewMode === "subscribed". */
   viewerReview?: Review | null;
@@ -68,6 +76,8 @@ export function NurseProfilePublic({
   distanceMiles,
   viewMode,
   revealMode = null,
+  canSeeIdentity = false,
+  hasLicenseNumber = false,
   viewerReview = null,
   viewerFirstName = "",
   approvedReviews = [],
@@ -75,6 +85,11 @@ export function NurseProfilePublic({
 }: NurseProfilePublicProps) {
   const credentialLabel =
     CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
+  // last_name is blanked upstream when the viewer isn't entitled, so this
+  // collapses to the first name only in that case.
+  const displayName = nurse.last_name
+    ? `${nurse.first_name} ${nurse.last_name}`
+    : nurse.first_name;
 
   return (
     <div className="space-y-6">
@@ -84,7 +99,7 @@ export function NurseProfilePublic({
           {photoUrl ? (
             <Image
               src={photoUrl}
-              alt={`${nurse.first_name} ${nurse.last_name}, ${credentialLabel}`}
+              alt={`${displayName}, ${credentialLabel}`}
               fill
               sizes="(min-width: 640px) 128px, 112px"
               className="object-cover"
@@ -99,7 +114,7 @@ export function NurseProfilePublic({
         <div className="flex-1">
           <div className="flex items-center gap-2">
             <h1 className="font-heading text-2xl font-semibold sm:text-3xl">
-              {nurse.first_name} {nurse.last_name}
+              {displayName}
             </h1>
             {nurse.tier === "featured" && (
               <Badge className="bg-teal text-white">Featured</Badge>
@@ -303,8 +318,10 @@ export function NurseProfilePublic({
             </>
           )}
 
-          {/* License info */}
-          {nurse.license_number && (
+          {/* License info. The credential and state are always shown, but the
+              license number itself is gated: only subscribers (and the nurse /
+              admins) see the real number and the NY verification link. */}
+          {hasLicenseNumber && (
             <>
               <Separator className="bg-sage/20" />
               <div className="text-sm">
@@ -316,19 +333,31 @@ export function NurseProfilePublic({
                   <p>
                     <strong>State:</strong> New York
                   </p>
-                  <p>
-                    <strong>License Number:</strong> {nurse.license_number}
-                  </p>
-                  {licenseVerifyUrl && (
-                    <a
-                      href={licenseVerifyUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-teal inline-flex items-center gap-1 hover:underline"
-                    >
-                      Verify this license on the NY State database
-                      <ExternalLink className="size-3" />
-                    </a>
+                  {canSeeIdentity && nurse.license_number ? (
+                    <>
+                      <p>
+                        <strong>License Number:</strong> {nurse.license_number}
+                      </p>
+                      {licenseVerifyUrl && (
+                        <a
+                          href={licenseVerifyUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-teal inline-flex items-center gap-1 hover:underline"
+                        >
+                          Verify this license on the NY State database
+                          <ExternalLink className="size-3" />
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    <p className="inline-flex items-center gap-1.5">
+                      <strong>License Number:</strong>
+                      <span className="inline-flex items-center gap-1">
+                        <Lock className="size-3.5" aria-hidden="true" />
+                        Unlocks with a subscription
+                      </span>
+                    </p>
                   )}
                   <p className="text-muted-foreground/70 mt-2 text-xs">
                     NurseDex does not verify or monitor licenses. Families are

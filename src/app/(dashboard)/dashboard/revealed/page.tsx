@@ -46,7 +46,7 @@ export default async function RevealedPage() {
             return (
               <div key={nurse.user_id} className="space-y-3">
                 <div className="relative">
-                  <NurseCard nurse={nurse} />
+                  <NurseCard nurse={nurse} showLastName />
                   {nurse.access_expires_at && (
                     <div className="absolute top-2 right-2 z-10">
                       <Badge

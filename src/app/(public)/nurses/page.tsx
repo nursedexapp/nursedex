@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth/helpers";
 import { searchNurses } from "@/lib/nurses/search";
 import { getSavedNurseIds } from "@/lib/nurses/saves";
 import { getRevealedNurseIds } from "@/lib/reveals/queries";
+import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
 import { logSearchGap } from "@/lib/nurses/search-gap";
 import {
   parseSearchParams,
@@ -45,12 +46,16 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
   // Save/reveal state only applies to family viewers.
   const showSaves = user?.role === "family";
 
-  // The reveal lookup only annotates results (it doesn't change the query), so
-  // run it alongside the search instead of waiting for it first.
-  const [viewerRevealedIds, result] = await Promise.all([
+  // The reveal lookup and subscription check only annotate results (they
+  // don't change the query), so run them alongside the search instead of
+  // waiting first. A subscribed family sees every nurse's last name.
+  const [viewerRevealedIds, hasSub, result] = await Promise.all([
     showSaves && user
       ? getRevealedNurseIds(user.id)
       : Promise.resolve(undefined),
+    showSaves && user
+      ? hasActiveFamilyAccess(user.id)
+      : Promise.resolve(false),
     searchNurses({ filters, viewerZip, viewerCommPref }),
   ]);
 
@@ -115,6 +120,7 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
                       <NurseCard
                         key={nurse.user_id}
                         nurse={nurse}
+                        showLastName={hasSub}
                         saveState={
                           showSaves
                             ? { isSaved: savedIds.has(nurse.user_id) }
@@ -142,6 +148,7 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
                           key={`partial-${nurse.user_id}`}
                           nurse={nurse}
                           dimmed
+                          showLastName={hasSub}
                           saveState={
                             showSaves
                               ? { isSaved: savedIds.has(nurse.user_id) }
