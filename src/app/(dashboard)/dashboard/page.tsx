@@ -97,7 +97,7 @@ export default async function DashboardPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {recentReveals.map((nurse) => (
-                  <NurseCard key={nurse.user_id} nurse={nurse} />
+                  <NurseCard key={nurse.user_id} nurse={nurse} showLastName />
                 ))}
               </div>
             </section>
@@ -118,7 +118,11 @@ export default async function DashboardPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {featuredNurses.map((nurse) => (
-                  <NurseCard key={nurse.user_id} nurse={nurse} />
+                  <NurseCard
+                    key={nurse.user_id}
+                    nurse={nurse}
+                    showLastName={familySub !== null}
+                  />
                 ))}
               </div>
             </section>

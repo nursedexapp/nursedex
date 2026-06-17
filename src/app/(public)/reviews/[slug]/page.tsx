@@ -93,7 +93,6 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
     : null;
 
   const firstName = nurse.users.first_name ?? "this caregiver";
-  const lastName = nurse.users.last_name ?? "";
 
   return (
     <div className="flex flex-1 flex-col">
@@ -108,7 +107,7 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
             </Link>
           </p>
           <h1 className="font-heading text-soft-black mt-2 text-2xl font-semibold sm:text-3xl">
-            Review {firstName} {lastName}
+            Review {firstName}
             {credentialLabel ? `, ${credentialLabel}` : ""}
           </h1>
           <p className="text-soft-black-light mt-2 text-sm">

@@ -62,10 +62,12 @@ export async function generateMetadata({
 
   const credentialLabel =
     CREDENTIAL_LABELS[nurse.credential as Credential] || nurse.credential;
-  const title = `${nurse.first_name} ${nurse.last_name}, ${credentialLabel} | NurseDex`;
+  // Public metadata is visible to anyone (including crawlers), so it never
+  // includes the last name. Identity is gated behind a subscription.
+  const title = `${nurse.first_name}, ${credentialLabel} | NurseDex`;
   const description = nurse.bio
     ? nurse.bio.slice(0, 160)
-    : `${nurse.first_name} ${nurse.last_name} is a ${credentialLabel} on NurseDex, New York's trusted nurse directory.`;
+    : `${nurse.first_name} is a ${credentialLabel} on NurseDex, New York's trusted nurse directory.`;
 
   return {
     title,
@@ -119,12 +121,22 @@ export default async function NurseProfilePage({
   let viewerReview: Review | null = null;
   let viewerHire: Hire | null = null;
 
+  // Identity (last name + license number) is shown to admins, the nurse
+  // themselves, and any family with an active subscription. A family in the
+  // post-cancellation grace window keeps access to nurses they already
+  // revealed, so an existing reveal also unlocks identity for that nurse.
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const isSelf = user?.id === nurse.user_id;
+  let canSeeIdentity = isAdmin || isSelf;
+
   if (user) {
     if (user.role === "family") {
       const [hasSub, hasReveal] = await Promise.all([
         hasActiveFamilyAccess(user.id),
         hasRevealedNurse(nurse.user_id),
       ]);
+
+      canSeeIdentity = canSeeIdentity || hasSub || hasReveal;
 
       if (hasReveal) {
         viewMode = "subscribed"; // contact info will be server-rendered
@@ -157,6 +169,15 @@ export default async function NurseProfilePage({
     revealMode = "anon";
   }
 
+  // Whether a license number exists is not sensitive, but the number itself
+  // is. Capture its presence before redacting so the License Information
+  // section can still render a "subscribe to unlock" hint.
+  const hasLicenseNumber = !!nurse.license_number;
+  if (!canSeeIdentity) {
+    nurse.last_name = "";
+    nurse.license_number = null;
+  }
+
   // Fetch photo URLs, license verify URL, and approved reviews in parallel
   const [photoUrls, licenseVerifyUrl, approvedReviews] = await Promise.all([
     getPublicPhotoUrls(nurse.photos),
@@ -184,7 +205,7 @@ export default async function NurseProfilePage({
     <div className="flex flex-1 flex-col">
       <NurseJsonLd
         firstName={nurse.first_name}
-        lastName={nurse.last_name}
+        lastName=""
         credentialLabel={credentialLabel}
         slug={nurse.slug}
         bio={nurse.bio}
@@ -200,6 +221,8 @@ export default async function NurseProfilePage({
           distanceMiles={distanceMiles}
           viewMode={viewMode}
           revealMode={revealMode}
+          canSeeIdentity={canSeeIdentity}
+          hasLicenseNumber={hasLicenseNumber}
           viewerReview={viewerReview}
           viewerFirstName={user?.first_name ?? ""}
           viewerHire={viewerHire}

@@ -16,6 +16,10 @@ interface NurseCardProps {
   dimmed?: boolean;
   // Anon survey-results mode: hide last name, suppress save button, no profile link.
   anonymousMode?: boolean;
+  // Reveal the nurse's last name. Only true for viewers entitled to see it
+  // (families with an active subscription, or already-revealed nurse lists).
+  // Without it, the card shows the first name only.
+  showLastName?: boolean;
   // In anonymousMode, show the hover/pointer affordance because an ancestor
   // (e.g. a dialog trigger) handles the click. Does not add a link itself.
   interactive?: boolean;
@@ -27,6 +31,7 @@ export function NurseCard({
   dimmed,
   anonymousMode,
   interactive,
+  showLastName,
 }: NurseCardProps) {
   const credentialLabel =
     CREDENTIAL_LABELS[nurse.credential as Credential] ?? nurse.credential;
@@ -40,7 +45,7 @@ export function NurseCard({
 
   const showUnavailable = !nurse.is_available;
   const displayName =
-    !anonymousMode && nurse.last_name
+    showLastName && !anonymousMode && nurse.last_name
       ? `${nurse.first_name} ${nurse.last_name}`
       : nurse.first_name;
 
