@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { TurnstileWidget } from "./TurnstileWidget";
+import { ProvisioningNotice } from "./ProvisioningNotice";
 import { posthog } from "@/lib/posthog";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { revealNurse } from "@/lib/reveals/actions";
@@ -36,6 +37,7 @@ interface RevealCTAProps {
 
 export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [captchaOpen, setCaptchaOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -127,7 +129,13 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
     );
   }
 
-  // mode === "no_sub", show paywall modal
+  // mode === "no_sub". Right after checkout, our webhook may not have
+  // granted access yet even though the family already paid; showing the
+  // paywall again here would be confusing, so show a working state instead
+  // until access catches up (#426).
+  if (searchParams.get("provisioning") === "pending") {
+    return <ProvisioningNotice />;
+  }
   return <PaywallTrigger returnTo={returnTo} />;
 }
 
