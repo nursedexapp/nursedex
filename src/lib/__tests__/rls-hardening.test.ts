@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import * as dotenv from "dotenv";
-import path from "path";
-
-dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
+import {
+  getLiveSupabaseEnv,
+  assertLocalSupabaseUrl,
+  createTestUser as createLiveTestUser,
+} from "./helpers/live-supabase";
 
 // Regression guard for the P0/P1 RLS write-policy findings (issues #384-389):
 // several owner-scoped INSERT/UPDATE policies had no WITH CHECK, so a plain
@@ -13,16 +14,9 @@ dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
 // Supabase instance and attempt the exact escalations described in those
 // issues, so they must NEVER run against anything but a local/CI throwaway
 // stack (they mutate auth.users and public.users).
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
+const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceKey: SERVICE_KEY } = getLiveSupabaseEnv();
 
-if (SUPABASE_URL && !/^https?:\/\/(127\.0\.0\.1|localhost)([:/]|$)/.test(SUPABASE_URL)) {
-  throw new Error(
-    `Refusing to run RLS hardening tests against a non-local Supabase URL (${SUPABASE_URL}). ` +
-      "These tests attempt privilege-escalation writes and must only run against a local/CI throwaway stack.",
-  );
-}
+assertLocalSupabaseUrl(SUPABASE_URL, "RLS hardening tests");
 
 let service: SupabaseClient;
 const stamp = Date.now();
@@ -32,37 +26,16 @@ async function createTestUser(
   role: "nurse" | "family",
   emailPrefix: string,
 ): Promise<{ id: string; client: SupabaseClient }> {
-  const email = `rls-hardening-${emailPrefix}-${stamp}@example.com`;
-  const password = "rls-hardening-test-password-1234";
-
-  const { data: created, error: createErr } = await service.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
+  const { id, client } = await createLiveTestUser({
+    service,
+    url: SUPABASE_URL!,
+    anonKey: ANON_KEY!,
+    role,
+    emailPrefix: `rls-hardening-${emailPrefix}`,
+    stamp,
   });
-  if (createErr || !created.user) {
-    throw new Error(`Failed to create test user: ${createErr?.message}`);
-  }
-  createdUserIds.push(created.user.id);
-
-  const { error: upsertErr } = await service
-    .from("users")
-    .update({ role })
-    .eq("id", created.user.id);
-  if (upsertErr) {
-    throw new Error(`Failed to set role on test user: ${upsertErr.message}`);
-  }
-
-  const client = createClient(SUPABASE_URL!, ANON_KEY!);
-  const { error: signInErr } = await client.auth.signInWithPassword({
-    email,
-    password,
-  });
-  if (signInErr) {
-    throw new Error(`Failed to sign in test user: ${signInErr.message}`);
-  }
-
-  return { id: created.user.id, client };
+  createdUserIds.push(id);
+  return { id, client };
 }
 
 beforeAll(() => {

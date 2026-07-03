@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import * as dotenv from "dotenv";
-import path from "path";
-
-dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
+import {
+  getLiveSupabaseEnv,
+  assertLocalSupabaseUrl,
+  createTestUser as createLiveTestUser,
+} from "./helpers/live-supabase";
 
 // Regression guard for issue #387: migration 042 granted anon/authenticated
 // ALL privileges on every public table, so RLS was the *only* thing standing
@@ -12,16 +13,9 @@ dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
 // grants migration is meant to close off at the grant layer (independent of
 // RLS), so they must NEVER run against anything but a local/CI throwaway
 // stack.
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
+const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceKey: SERVICE_KEY } = getLiveSupabaseEnv();
 
-if (SUPABASE_URL && !/^https?:\/\/(127\.0\.0\.1|localhost)([:/]|$)/.test(SUPABASE_URL)) {
-  throw new Error(
-    `Refusing to run Data API grants tests against a non-local Supabase URL (${SUPABASE_URL}). ` +
-      "These tests attempt writes gated only by grants and must only run against a local/CI throwaway stack.",
-  );
-}
+assertLocalSupabaseUrl(SUPABASE_URL, "Data API grants tests");
 
 let service: SupabaseClient;
 let anon: SupabaseClient;
@@ -32,34 +26,16 @@ async function createTestUser(
   role: "nurse" | "family" | "admin",
   emailPrefix: string,
 ): Promise<{ id: string; client: SupabaseClient }> {
-  const email = `grants-${emailPrefix}-${stamp}@example.com`;
-  const password = "grants-test-password-1234";
-
-  const { data: created, error: createErr } = await service.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
+  const { id, client } = await createLiveTestUser({
+    service,
+    url: SUPABASE_URL!,
+    anonKey: ANON_KEY!,
+    role,
+    emailPrefix: `grants-${emailPrefix}`,
+    stamp,
   });
-  if (createErr || !created.user) {
-    throw new Error(`Failed to create test user: ${createErr?.message}`);
-  }
-  createdUserIds.push(created.user.id);
-
-  const { error: updateErr } = await service
-    .from("users")
-    .update({ role })
-    .eq("id", created.user.id);
-  if (updateErr) {
-    throw new Error(`Failed to set role on test user: ${updateErr.message}`);
-  }
-
-  const client = createClient(SUPABASE_URL!, ANON_KEY!);
-  const { error: signInErr } = await client.auth.signInWithPassword({ email, password });
-  if (signInErr) {
-    throw new Error(`Failed to sign in test user: ${signInErr.message}`);
-  }
-
-  return { id: created.user.id, client };
+  createdUserIds.push(id);
+  return { id, client };
 }
 
 beforeAll(() => {
