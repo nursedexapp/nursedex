@@ -387,24 +387,43 @@ async function upsertSubscription(
     item.price?.recurring?.interval === "year" ? "year" : "month";
 
   // Upsert by stripe_subscription_id so retries don't create duplicates.
-  assertNoWriteError(
-    await supabase.from("subscriptions").upsert(
-      {
-        user_id: userId,
-        stripe_customer_id: customerId,
-        stripe_subscription_id: subscription.id,
-        plan_type: planType,
-        status,
-        billing_interval: billingInterval,
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-        cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-        last_event_at: new Date(eventCreated * 1000).toISOString(),
-      },
-      { onConflict: "stripe_subscription_id" },
-    ),
-    "subscriptions upsert",
+  const upsertResult = await supabase.from("subscriptions").upsert(
+    {
+      user_id: userId,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscription.id,
+      plan_type: planType,
+      status,
+      billing_interval: billingInterval,
+      current_period_start: periodStart,
+      current_period_end: periodEnd,
+      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+      last_event_at: new Date(eventCreated * 1000).toISOString(),
+    },
+    { onConflict: "stripe_subscription_id" },
   );
+  if (upsertResult.error?.code === "23505") {
+    // A concurrent checkout already landed an active/past_due subscription
+    // for this user+plan (uniq_subscriptions_active_per_plan, #417). This is
+    // a genuine race, not a transient failure: retrying would hit the same
+    // conflict forever. Cancel the newly-created duplicate on Stripe's side
+    // so it doesn't keep billing, and skip the write.
+    console.warn(
+      "[stripe-webhook] duplicate active subscription rejected, cancelling",
+      { subId: subscription.id, userId, planType },
+    );
+    try {
+      await getStripe().subscriptions.cancel(subscription.id);
+    } catch (err) {
+      console.error(
+        "[stripe-webhook] failed to cancel duplicate subscription",
+        subscription.id,
+        err,
+      );
+    }
+    return false;
+  }
+  assertNoWriteError(upsertResult, "subscriptions upsert");
 
   // Tier sync for nurses: any active or trialing sub flips them to featured.
   if (planType === "nurse_featured") {
