@@ -28,6 +28,7 @@ const handleAccessExpiry = withCronAlerting(
 
     const summary: Record<number, number> = {};
     let skipped = 0;
+    const failedWindows: number[] = [];
 
     for (const days of REMINDER_DAYS) {
       const targetDate = new Date(now + days * DAY_MS);
@@ -53,6 +54,10 @@ const handleAccessExpiry = withCronAlerting(
 
       if (error) {
         console.error("[cron access-expiry] query failed:", error.message);
+        // Keep trying the other windows (a bad query for one day shouldn't
+        // block reminders for the others), but still surface the failure
+        // so it isn't silently lost (#397 follow-up).
+        failedWindows.push(days);
         continue;
       }
 
@@ -102,6 +107,16 @@ const handleAccessExpiry = withCronAlerting(
         });
         summary[days]++;
       }
+    }
+
+    if (failedWindows.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Query failed for one or more reminder windows",
+          failedWindows,
+        },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true, sentByDay: summary, skipped });
