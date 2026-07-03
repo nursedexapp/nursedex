@@ -2,20 +2,21 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 
 interface ErrorProps {
   error: Error & { digest?: string };
 }
 
 /**
- * Root error boundary. Logs the error (Sentry will pick it up via the
- * existing project-level instrumentation) and renders a minimal branded
+ * Root error boundary. Reports to Sentry and renders a minimal branded
  * screen with a Go Home link. Per the launch UX call we don't surface a
  * Try Again button to avoid loops on persistent errors.
  */
 export default function RootError({ error }: ErrorProps) {
   useEffect(() => {
     console.error("[root-error-boundary]", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
