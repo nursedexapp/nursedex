@@ -400,6 +400,69 @@ describe("AUD-006 (#389): reviews self-write column guards", () => {
   });
 });
 
+describe("AUD-006 (#389): reviews insert column guards", () => {
+  it("an authenticated user cannot insert a pre-approved review", async () => {
+    const { id: reviewerId, client } = await createTestUser(
+      "family",
+      "review-insert-preapproved",
+    );
+    const { id: nurseId } = await createTestUser("nurse", "review-insert-target-1");
+
+    const { error } = await client.from("reviews").insert({
+      nurse_user_id: nurseId,
+      reviewer_user_id: reviewerId,
+      reviewer_name: "Forged Approval",
+      rating: 5,
+      text: "Should not be approved on insert",
+      status: "approved",
+    });
+
+    expect(error).not.toBeNull();
+    const { data: rows } = await service
+      .from("reviews")
+      .select("id")
+      .eq("nurse_user_id", nurseId)
+      .eq("status", "approved");
+    expect(rows?.length ?? 0).toBe(0);
+  });
+
+  it("a user cannot submit a review under another user's identity", async () => {
+    const { client } = await createTestUser("family", "review-insert-impersonator");
+    const { id: victimId } = await createTestUser("family", "review-insert-victim");
+    const { id: nurseId } = await createTestUser("nurse", "review-insert-target-2");
+
+    const { error } = await client.from("reviews").insert({
+      nurse_user_id: nurseId,
+      reviewer_user_id: victimId,
+      reviewer_name: "Impersonated Reviewer",
+      rating: 1,
+      text: "Forged under someone else's account",
+      status: "pending",
+    });
+
+    expect(error).not.toBeNull();
+  });
+
+  it("a family can still submit a pending review under their own identity", async () => {
+    const { id: reviewerId, client } = await createTestUser(
+      "family",
+      "review-insert-legit",
+    );
+    const { id: nurseId } = await createTestUser("nurse", "review-insert-target-3");
+
+    const { error } = await client.from("reviews").insert({
+      nurse_user_id: nurseId,
+      reviewer_user_id: reviewerId,
+      reviewer_name: "Legit Reviewer",
+      rating: 5,
+      text: "Great nurse",
+      status: "pending",
+    });
+
+    expect(error).toBeNull();
+  });
+});
+
 describe("AUD-006 (#389): family_profiles self-write hijack", () => {
   it("a family cannot reassign their family_profile to another user_id", async () => {
     const { id: familyId, client } = await createTestUser(
@@ -555,6 +618,63 @@ describe("AUD-006 (#389): hires self-write column guards", () => {
       .from("hires")
       .update({ status: "rejected" })
       .eq("id", hire!.id);
+
+    expect(error).toBeNull();
+  });
+});
+
+describe("AUD-006 (#389): hires insert column guards", () => {
+  it("a nurse cannot directly insert a pre-confirmed hire for themselves", async () => {
+    const { id: familyId } = await createTestUser("family", "hires-insert-nurse-block-fam");
+    const { id: nurseId, client } = await createTestUser(
+      "nurse",
+      "hires-insert-nurse-block",
+    );
+
+    const { error } = await client.from("hires").insert({
+      family_user_id: familyId,
+      nurse_user_id: nurseId,
+      status: "confirmed",
+      claimed_by: "nurse",
+      confirmed_at: new Date().toISOString(),
+    });
+
+    expect(error).not.toBeNull();
+  });
+
+  it("a family cannot record a hire for a nurse they have not revealed", async () => {
+    const { id: familyId, client } = await createTestUser(
+      "family",
+      "hires-insert-no-reveal",
+    );
+    const { id: nurseId } = await createTestUser("nurse", "hires-insert-no-reveal-nurse");
+
+    const { error } = await client.from("hires").insert({
+      family_user_id: familyId,
+      nurse_user_id: nurseId,
+      status: "confirmed",
+      claimed_by: "family",
+      confirmed_at: new Date().toISOString(),
+    });
+
+    expect(error).not.toBeNull();
+  });
+
+  it("a family can still record a hire for a nurse they have revealed", async () => {
+    const { id: familyId, client } = await createTestUser(
+      "family",
+      "hires-insert-legit",
+    );
+    const { id: nurseId } = await createTestUser("nurse", "hires-insert-legit-nurse");
+    await service.from("reveals").insert({ family_user_id: familyId, nurse_user_id: nurseId });
+
+    const { error } = await client.from("hires").insert({
+      family_user_id: familyId,
+      nurse_user_id: nurseId,
+      status: "confirmed",
+      claimed_by: "family",
+      confirmed_at: new Date().toISOString(),
+    });
 
     expect(error).toBeNull();
   });
