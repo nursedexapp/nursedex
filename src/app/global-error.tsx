@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 
 interface GlobalErrorProps {
   error: Error & { digest?: string };
@@ -16,6 +17,7 @@ interface GlobalErrorProps {
 export default function GlobalError({ error }: GlobalErrorProps) {
   useEffect(() => {
     console.error("[global-error-boundary]", error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
