@@ -19,6 +19,10 @@ const h = vi.hoisted(() => {
       state.writes[`${table}.upsert`] = payload;
       return makeBuilder(table, "upsert");
     };
+    b.insert = (payload: unknown) => {
+      state.writes[`${table}.insert`] = payload;
+      return makeBuilder(table, "insert");
+    };
     b.update = (payload: unknown) => {
       state.writes[`${table}.update`] = payload;
       return makeBuilder(table, "update");
@@ -45,6 +49,8 @@ const h = vi.hoisted(() => {
     from: (table: string) => makeBuilder(table, "select"),
     subscriptionsRetrieve: vi.fn(),
     subscriptionsCancel: vi.fn(async () => {}),
+    captureException: vi.fn(),
+    slackPost: vi.fn(async () => ({ ok: true })),
   };
 });
 
@@ -72,6 +78,13 @@ vi.mock("@/lib/email/send", () => ({
   sendSubscriptionConfirmedEmail: vi.fn(async () => {}),
   sendRenewalSuccessEmail: vi.fn(async () => {}),
   sendCancellationConfirmationEmail: vi.fn(async () => {}),
+}));
+vi.mock("@sentry/nextjs", () => ({
+  captureException: h.captureException,
+}));
+vi.mock("@/lib/slack/client", () => ({
+  slackPost: h.slackPost,
+  OPS_CHANNEL_ID: "C_TEST_OPS",
 }));
 
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
@@ -465,5 +478,156 @@ describe("stripe webhook: duplicate active subscription handling (#417)", () => 
 
     expect(res.status).toBe(500);
     expect(h.subscriptionsCancel).not.toHaveBeenCalled();
+  });
+});
+
+describe("stripe webhook: failure alerting (#396)", () => {
+  it("captures the exception to Sentry with the event type and id", async () => {
+    h.state.event = {
+      id: "evt_123",
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+
+    await POST(fakeRequest());
+
+    expect(h.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          action: "stripe-webhook",
+          event_type: "checkout.session.completed",
+        }),
+        extra: expect.objectContaining({ event_id: "evt_123" }),
+      }),
+    );
+  });
+
+  it("posts a Slack ops alert naming the event type and id", async () => {
+    h.state.event = {
+      id: "evt_456",
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+
+    await POST(fakeRequest());
+
+    expect(h.slackPost).toHaveBeenCalledWith(
+      "chat.postMessage",
+      expect.objectContaining({
+        channel: "C_TEST_OPS",
+        text: expect.stringContaining("checkout.session.completed"),
+      }),
+    );
+    expect(h.slackPost).toHaveBeenCalledWith(
+      "chat.postMessage",
+      expect.objectContaining({ text: expect.stringContaining("evt_456") }),
+    );
+  });
+
+  it("still returns 500 (so Stripe retries) even if the Slack alert itself fails", async () => {
+    h.slackPost.mockRejectedValueOnce(new Error("slack down"));
+    h.state.event = {
+      id: "evt_789",
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(500);
+  });
+
+  it("does not alert Sentry or Slack on a successful webhook", async () => {
+    h.state.event = {
+      id: "evt_ok",
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.captureException).not.toHaveBeenCalled();
+    expect(h.slackPost).not.toHaveBeenCalled();
+  });
+
+  it("does not repost to Slack when the same event id already alerted (Stripe retry)", async () => {
+    h.state.event = {
+      id: "evt_retry",
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.reads["webhook_alert_log"] = { event_id: "evt_retry" };
+
+    await POST(fakeRequest());
+
+    expect(h.slackPost).not.toHaveBeenCalled();
+  });
+
+  it("still captures to Sentry even when the alert was already sent for this event", async () => {
+    h.state.event = {
+      id: "evt_retry2",
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.reads["webhook_alert_log"] = { event_id: "evt_retry2" };
+
+    await POST(fakeRequest());
+
+    expect(h.captureException).toHaveBeenCalled();
   });
 });
