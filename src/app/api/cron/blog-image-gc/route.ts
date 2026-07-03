@@ -1,10 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronAlerting } from "@/lib/cron/alerting";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import {
-  collectReferencedPaths,
-  listAllBlogImages,
-} from "@/lib/blog/image-gc";
+import { collectReferencedPaths, listAllBlogImages } from "@/lib/blog/image-gc";
 import { selectOrphanedPaths, removeBlogImagePaths } from "@/lib/blog/images";
 
 export const runtime = "nodejs";
@@ -21,30 +19,39 @@ const GRACE_MS = 24 * 60 * 60 * 1000;
  * cover, or a removed inline image. If we cannot read the posts we abort
  * (better to leak storage than delete a live post's image).
  */
+const handleBlogImageGc = withCronAlerting(
+  "blog-image-gc",
+  async (_request: NextRequest) => {
+    let referenced: Set<string>;
+    try {
+      referenced = await collectReferencedPaths();
+    } catch (err) {
+      console.error("[cron] blog-image-gc aborted:", err);
+      return NextResponse.json({ error: "read_failed" }, { status: 500 });
+    }
+
+    const objects = await listAllBlogImages();
+    const orphans = selectOrphanedPaths(
+      objects,
+      referenced,
+      Date.now(),
+      GRACE_MS,
+    );
+
+    if (orphans.length > 0) {
+      const supabase = createServiceRoleClient();
+      await removeBlogImagePaths(supabase, orphans);
+    }
+
+    return NextResponse.json({
+      scanned: objects.length,
+      removed: orphans.length,
+    });
+  },
+);
+
 export async function GET(request: NextRequest) {
   const unauth = verifyCronAuth(request);
   if (unauth) return unauth;
-
-  let referenced: Set<string>;
-  try {
-    referenced = await collectReferencedPaths();
-  } catch (err) {
-    console.error("[cron] blog-image-gc aborted:", err);
-    return NextResponse.json({ error: "read_failed" }, { status: 500 });
-  }
-
-  const objects = await listAllBlogImages();
-  const orphans = selectOrphanedPaths(
-    objects,
-    referenced,
-    Date.now(),
-    GRACE_MS,
-  );
-
-  if (orphans.length > 0) {
-    const supabase = createServiceRoleClient();
-    await removeBlogImagePaths(supabase, orphans);
-  }
-
-  return NextResponse.json({ scanned: objects.length, removed: orphans.length });
+  return handleBlogImageGc(request);
 }
