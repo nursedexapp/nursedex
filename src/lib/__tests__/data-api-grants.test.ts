@@ -52,6 +52,22 @@ afterAll(async () => {
   }
 });
 
+describe("waitlist keeps its anon/authenticated INSERT after the #387 grant tightening", () => {
+  it("anon can still insert into the waitlist (pre-launch signup)", async () => {
+    const email = `grants-waitlist-${stamp}@example.com`;
+
+    const { error } = await anon.from("waitlist").insert({ email, role: "family" });
+
+    expect(error).toBeNull();
+  });
+
+  it("anon cannot read the waitlist back (service-role only)", async () => {
+    const { data, error } = await anon.from("waitlist").select("id").limit(1);
+    expect(error).not.toBeNull();
+    expect(data).toBeNull();
+  });
+});
+
 describe("#387: newsletter_subscribers is not reachable via the Data API", () => {
   it("anon cannot insert despite the table's own RLS policy allowing it", async () => {
     const email = `grants-newsletter-${stamp}@example.com`;
