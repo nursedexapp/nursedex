@@ -25,6 +25,7 @@ import {
 } from "./photos";
 import { sendProfileSetupEmail } from "@/lib/email/send";
 import { shouldShowFeaturedUpsell, markUpsellShown } from "./upsell";
+import { cancelActiveStripeSubscriptions } from "@/lib/stripe/cancel-subscriptions";
 
 export type ProfileActionResult = {
   error?: string;
@@ -561,6 +562,9 @@ export async function toggleAvailability(
 export async function softDeleteAccount(): Promise<void> {
   const user = await requireAuth();
   const supabase = await createClient();
+
+  // Cancel Stripe first so a deleted account never keeps billing (#413).
+  await cancelActiveStripeSubscriptions(supabase, user.id);
 
   await supabase.from("users").update({ is_deleted: true }).eq("id", user.id);
 

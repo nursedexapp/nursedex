@@ -180,20 +180,26 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
     .single();
   if (!row) return;
 
-  await supabase
-    .from("subscriptions")
-    .update({
-      status: "cancelled",
-      cancel_at_period_end: false,
-    })
-    .eq("stripe_subscription_id", sub.id);
+  assertNoWriteError(
+    await supabase
+      .from("subscriptions")
+      .update({
+        status: "cancelled",
+        cancel_at_period_end: false,
+      })
+      .eq("stripe_subscription_id", sub.id),
+    "subscriptions update (subscription deleted)",
+  );
 
   // Tier sync: if a featured nurse's sub goes away, drop them to free.
   if (row.plan_type === "nurse_featured") {
-    await supabase
-      .from("nurse_profiles")
-      .update({ tier: "free" })
-      .eq("user_id", row.user_id);
+    assertNoWriteError(
+      await supabase
+        .from("nurse_profiles")
+        .update({ tier: "free" })
+        .eq("user_id", row.user_id),
+      "nurse_profiles tier downgrade (subscription deleted)",
+    );
   }
 
   // Family cancellation: set 60-day access window on existing reveals so
@@ -203,11 +209,14 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
     expires.setUTCDate(
       expires.getUTCDate() + GRACE_PERIODS.CANCELLED_ACCESS_DAYS,
     );
-    await supabase
-      .from("reveals")
-      .update({ access_expires_at: expires.toISOString() })
-      .eq("family_user_id", row.user_id)
-      .is("access_expires_at", null);
+    assertNoWriteError(
+      await supabase
+        .from("reveals")
+        .update({ access_expires_at: expires.toISOString() })
+        .eq("family_user_id", row.user_id)
+        .is("access_expires_at", null),
+      "reveals access window (subscription deleted)",
+    );
   }
 
   await captureServerEvent({
@@ -221,10 +230,13 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
   const supabase = createServiceRoleClient();
-  await supabase
-    .from("subscriptions")
-    .update({ status: "active" })
-    .eq("stripe_subscription_id", subId);
+  assertNoWriteError(
+    await supabase
+      .from("subscriptions")
+      .update({ status: "active" })
+      .eq("stripe_subscription_id", subId),
+    "subscriptions status update (invoice paid)",
+  );
 
   // Renewal email: fire only on recurring renewals, not the initial
   // subscription_create invoice (the welcome email handles that).
@@ -251,13 +263,31 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
   const supabase = createServiceRoleClient();
-  await supabase
-    .from("subscriptions")
-    .update({ status: "past_due" })
-    .eq("stripe_subscription_id", subId);
+  assertNoWriteError(
+    await supabase
+      .from("subscriptions")
+      .update({ status: "past_due" })
+      .eq("stripe_subscription_id", subId),
+    "subscriptions status update (payment failed)",
+  );
 }
 
 // ── Helpers ───────────────────────────────────────────────────
+
+/**
+ * A Supabase write returning {error} does not throw, so an unchecked write
+ * failure here would return {received:true} 200 and Stripe would never
+ * retry, silently diverging billing state from the DB. Throwing sends the
+ * error through POST's catch, which returns 500 so Stripe retries.
+ */
+function assertNoWriteError(
+  result: { error: { message: string } | null },
+  context: string,
+): void {
+  if (result.error) {
+    throw new Error(`${context} failed: ${result.error.message}`);
+  }
+}
 
 interface UpsertArgs {
   userId: string;
@@ -284,29 +314,32 @@ async function upsertSubscription(args: UpsertArgs) {
     item.price?.recurring?.interval === "year" ? "year" : "month";
 
   // Upsert by stripe_subscription_id so retries don't create duplicates.
-  await supabase.from("subscriptions").upsert(
-    {
-      user_id: userId,
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      plan_type: planType,
-      status,
-      billing_interval: billingInterval,
-      current_period_start: periodStart,
-      current_period_end: periodEnd,
-      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-    },
-    { onConflict: "stripe_subscription_id" },
+  assertNoWriteError(
+    await supabase.from("subscriptions").upsert(
+      {
+        user_id: userId,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: subscription.id,
+        plan_type: planType,
+        status,
+        billing_interval: billingInterval,
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+        cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+      },
+      { onConflict: "stripe_subscription_id" },
+    ),
+    "subscriptions upsert",
   );
 
   // Tier sync for nurses: any active or trialing sub flips them to featured.
   if (planType === "nurse_featured") {
     const tier =
       status === "active" || status === "past_due" ? "featured" : "free";
-    await supabase
-      .from("nurse_profiles")
-      .update({ tier })
-      .eq("user_id", userId);
+    assertNoWriteError(
+      await supabase.from("nurse_profiles").update({ tier }).eq("user_id", userId),
+      "nurse_profiles tier sync",
+    );
   }
 }
 
