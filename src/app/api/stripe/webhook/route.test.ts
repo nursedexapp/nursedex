@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const h = vi.hoisted(() => {
   const state = {
     event: null as unknown,
-    errors: {} as Record<string, { message: string } | null>,
+    errors: {} as Record<string, { message: string; code?: string } | null>,
     reads: {} as Record<string, unknown>,
     writes: {} as Record<string, unknown>,
   };
@@ -44,6 +44,7 @@ const h = vi.hoisted(() => {
     calls,
     from: (table: string) => makeBuilder(table, "select"),
     subscriptionsRetrieve: vi.fn(),
+    subscriptionsCancel: vi.fn(async () => {}),
   };
 });
 
@@ -57,6 +58,7 @@ vi.mock("@/lib/stripe/server", () => ({
     },
     subscriptions: {
       retrieve: h.subscriptionsRetrieve,
+      cancel: h.subscriptionsCancel,
     },
   }),
 }));
@@ -389,5 +391,79 @@ describe("stripe webhook: invoice.paid refreshes period dates (#423)", () => {
       current_period_start: new Date(1800000000 * 1000).toISOString(),
       current_period_end: new Date(1802592000 * 1000).toISOString(),
     });
+  });
+});
+
+describe("stripe webhook: duplicate active subscription handling (#417)", () => {
+  it("cancels the newly-created Stripe subscription when the DB rejects a second active row for the same plan", async () => {
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_2", // a second, distinct subscription id
+        },
+      },
+    };
+    h.subscriptionsRetrieve.mockResolvedValue(fakeSubscription({ id: "sub_2" }));
+    h.state.errors["subscriptions.upsert"] = {
+      message:
+        'duplicate key value violates unique constraint "uniq_subscriptions_active_per_plan"',
+      code: "23505",
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.subscriptionsCancel).toHaveBeenCalledWith("sub_2");
+  });
+
+  it("does not run the nurse tier sync when the duplicate is cancelled", async () => {
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "nurse_featured" },
+          customer: "cus_1",
+          subscription: "sub_2",
+        },
+      },
+    };
+    h.subscriptionsRetrieve.mockResolvedValue(fakeSubscription({ id: "sub_2" }));
+    h.state.errors["subscriptions.upsert"] = {
+      message: "duplicate key value violates unique constraint",
+      code: "23505",
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).not.toContain("nurse_profiles.update");
+  });
+
+  it("still fails loudly (500) on an unrelated upsert error, not the duplicate-handling path", async () => {
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(500);
+    expect(h.subscriptionsCancel).not.toHaveBeenCalled();
   });
 });
