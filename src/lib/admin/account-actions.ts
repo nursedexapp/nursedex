@@ -6,7 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requireAdmin } from "@/lib/auth/helpers";
-import { getStripe } from "@/lib/stripe/server";
+import { cancelActiveStripeSubscriptions } from "@/lib/stripe/cancel-subscriptions";
 import {
   sendAccountSuspendedEmail,
   sendAccountRemovedEmail,
@@ -133,14 +133,9 @@ export async function unsuspendAccount(
 
 /**
  * Remove (soft delete) an account. Cancels any active Stripe
- * subscriptions, marks the user as deleted, and adds the email to
- * blocked_emails so the same address can't sign up again.
- *
- * Stripe cancellation runs through service-role + Stripe SDK directly.
- * Each subscription cancel is best-effort: if Stripe is unavailable we
- * still mark the user deleted so the account is hidden, and surface a
- * server log for follow-up. Webhook handlers will sync state if Stripe
- * eventually emits cancellation events.
+ * subscriptions (shared with the self-serve delete path, see
+ * cancelActiveStripeSubscriptions), marks the user as deleted, and adds
+ * the email to blocked_emails so the same address can't sign up again.
  */
 export async function removeAccount(
   raw: unknown,
@@ -167,29 +162,7 @@ export async function removeAccount(
   if (target.is_deleted) return { success: false, error: "wrong_state" };
 
   // Cancel any active Stripe subscriptions.
-  const { data: subs } = await service
-    .from("subscriptions")
-    .select("stripe_subscription_id, status")
-    .eq("user_id", parsed.data.user_id);
-  const stripe = getStripe();
-  for (const sub of (subs ?? []) as Array<{
-    stripe_subscription_id: string | null;
-    status: string;
-  }>) {
-    if (!sub.stripe_subscription_id) continue;
-    if (sub.status === "canceled" || sub.status === "incomplete_expired") {
-      continue;
-    }
-    try {
-      await stripe.subscriptions.cancel(sub.stripe_subscription_id);
-    } catch (err) {
-      console.error(
-        "[admin] stripe cancel failed for",
-        sub.stripe_subscription_id,
-        err,
-      );
-    }
-  }
+  await cancelActiveStripeSubscriptions(service, parsed.data.user_id);
 
   // Soft delete the user and block the email.
   const { error: updateErr } = await service

@@ -10,23 +10,28 @@ const h = vi.hoisted(() => {
   const calls = {
     profileUpdates: [] as Record<string, unknown>[],
   };
+  const cancelActiveStripeSubscriptions = vi.fn(async () => {});
   function client() {
     return {
       from(table: string) {
         const b: Record<string, unknown> = {};
+        let updatingUsers = false;
         b.select = () => b;
-        b.eq = () => b;
+        b.eq = () =>
+          updatingUsers ? Promise.resolve({ error: null }) : b;
         b.update = (payload: Record<string, unknown>) => {
           if (table === "nurse_profiles") calls.profileUpdates.push(payload);
+          if (table === "users") updatingUsers = true;
           return b;
         };
         b.single = () =>
           Promise.resolve({ data: state.singles.shift() ?? null, error: null });
         return b;
       },
+      auth: { signOut: vi.fn() },
     };
   }
-  return { state, calls, client };
+  return { state, calls, client, cancelActiveStripeSubscriptions };
 });
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -42,6 +47,9 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client(),
+}));
+vi.mock("@/lib/stripe/cancel-subscriptions", () => ({
+  cancelActiveStripeSubscriptions: h.cancelActiveStripeSubscriptions,
 }));
 vi.mock("./photos", () => ({
   getSignedUploadUrl: vi.fn(),
@@ -60,7 +68,7 @@ vi.mock("./upsell", () => ({
   markUpsellShown: vi.fn(),
 }));
 
-import { updateNurseProfile, saveOnboardingStep } from "./actions";
+import { updateNurseProfile, saveOnboardingStep, softDeleteAccount } from "./actions";
 
 // A complete, schema-valid payload (matches what the edit form sends after
 // fullProfileSchema validation). Names and credential match the existing slug
@@ -179,5 +187,16 @@ describe("saveOnboardingStep server-side validation (step 2 credentials)", () =>
     });
     expect(res.success).toBeTruthy();
     expect(h.calls.profileUpdates[0]).toMatchObject({ license_number: null });
+  });
+});
+
+describe("softDeleteAccount", () => {
+  it("cancels active Stripe subscriptions before marking the account deleted", async () => {
+    await softDeleteAccount();
+
+    expect(h.cancelActiveStripeSubscriptions).toHaveBeenCalledWith(
+      expect.anything(),
+      "nurse-1",
+    );
   });
 });
