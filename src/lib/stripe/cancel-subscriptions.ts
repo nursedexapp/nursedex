@@ -14,10 +14,15 @@ export async function cancelActiveStripeSubscriptions(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<void> {
-  const { data: subs } = await supabase
+  const { data: subs, error } = await supabase
     .from("subscriptions")
     .select("stripe_subscription_id, status")
     .eq("user_id", userId);
+  // A failed read must not be mistaken for "nothing to cancel" — that would
+  // let account removal/deletion proceed while a subscription keeps billing.
+  if (error) {
+    throw new Error(`Failed to read subscriptions for cancellation: ${error.message}`);
+  }
 
   const stripe = getStripe();
   for (const sub of (subs ?? []) as Array<{

@@ -12,11 +12,14 @@ vi.mock("./server", () => ({
 
 import { cancelActiveStripeSubscriptions } from "./cancel-subscriptions";
 
-function fakeSupabase(subs: Array<Record<string, unknown>>) {
+function fakeSupabase(
+  subs: Array<Record<string, unknown>>,
+  error: { message: string } | null = null,
+) {
   return {
     from: () => ({
       select: () => ({
-        eq: () => Promise.resolve({ data: subs, error: null }),
+        eq: () => Promise.resolve({ data: subs, error }),
       }),
     }),
   } as unknown as Parameters<typeof cancelActiveStripeSubscriptions>[0];
@@ -79,5 +82,14 @@ describe("cancelActiveStripeSubscriptions", () => {
     ).resolves.not.toThrow();
     expect(h.cancel).toHaveBeenCalledWith("sub_1");
     expect(h.cancel).toHaveBeenCalledWith("sub_2");
+  });
+
+  it("throws instead of silently continuing when reading the user's subscriptions fails", async () => {
+    const supabase = fakeSupabase([], { message: "db unavailable" });
+
+    await expect(
+      cancelActiveStripeSubscriptions(supabase, "user_1"),
+    ).rejects.toThrow(/db unavailable/);
+    expect(h.cancel).not.toHaveBeenCalled();
   });
 });
