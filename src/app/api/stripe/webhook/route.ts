@@ -48,14 +48,14 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object);
+        await handleCheckoutCompleted(event.data.object, event.created);
         break;
       case "customer.subscription.created":
       case "customer.subscription.updated":
-        await handleSubscriptionUpserted(event.data.object);
+        await handleSubscriptionUpserted(event.data.object, event.created);
         break;
       case "customer.subscription.deleted":
-        await handleSubscriptionDeleted(event.data.object);
+        await handleSubscriptionDeleted(event.data.object, event.created);
         break;
       case "invoice.paid":
         await handleInvoicePaid(event.data.object);
@@ -81,7 +81,10 @@ export async function POST(request: NextRequest) {
 
 // ── Handlers ──────────────────────────────────────────────────
 
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+async function handleCheckoutCompleted(
+  session: Stripe.Checkout.Session,
+  eventCreated: number,
+) {
   // We rely on the Stripe-hosted Checkout to attach the user id as
   // client_reference_id and the plan_type via metadata.
   const userId = session.client_reference_id;
@@ -110,7 +113,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const stripe = getStripe();
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
-  await upsertSubscription({ userId, planType, customerId, subscription: sub });
+  await upsertSubscription(
+    { userId, planType, customerId, subscription: sub },
+    eventCreated,
+  );
 
   // Welcome email, dedup by subscription id so a retried webhook
   // doesn't fire it twice.
@@ -132,7 +138,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   });
 }
 
-async function handleSubscriptionUpserted(sub: Stripe.Subscription) {
+async function handleSubscriptionUpserted(
+  sub: Stripe.Subscription,
+  eventCreated: number,
+) {
   // sub.metadata may carry user_id + plan_type if we created it via
   // Checkout (see createCheckoutSession). For older subs we may need to
   // look up by stripe_subscription_id.
@@ -159,7 +168,13 @@ async function handleSubscriptionUpserted(sub: Stripe.Subscription) {
 
   const customerId =
     typeof sub.customer === "string" ? sub.customer : sub.customer.id;
-  await upsertSubscription({ userId, planType, customerId, subscription: sub });
+  const applied = await upsertSubscription(
+    { userId, planType, customerId, subscription: sub },
+    eventCreated,
+  );
+  // An out-of-order event that was ignored didn't change stored state, so
+  // its cancel_at_period_end can't be trusted as a real transition either.
+  if (!applied) return;
 
   // Cancellation confirmation: fires the moment cancel_at_period_end
   // transitions from false (or undefined for a brand new row) to true.
@@ -171,14 +186,37 @@ async function handleSubscriptionUpserted(sub: Stripe.Subscription) {
   }
 }
 
-async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
+async function handleSubscriptionDeleted(
+  sub: Stripe.Subscription,
+  eventCreated: number,
+) {
   const supabase = createServiceRoleClient();
   const { data: row } = await supabase
     .from("subscriptions")
-    .select("user_id, plan_type")
+    .select("user_id, plan_type, last_event_at")
     .eq("stripe_subscription_id", sub.id)
-    .single();
-  if (!row) return;
+    .maybeSingle();
+
+  // Fall back to the event's own metadata when no row exists yet (e.g. a
+  // delete delivered before its create), so cleanup can proceed regardless
+  // of event order rather than silently skipping (#428).
+  const userId =
+    row?.user_id ?? (sub.metadata?.user_id as string | undefined);
+  const planType =
+    row?.plan_type ??
+    (sub.metadata?.plan_type as "nurse_featured" | "family_access" | undefined);
+  if (!userId || !planType) {
+    console.warn(
+      "[stripe-webhook] subscription.deleted without user_id/plan_type",
+      { subId: sub.id },
+    );
+    return;
+  }
+
+  if (row?.last_event_at && eventCreated <= toUnixSeconds(row.last_event_at)) {
+    // Stale/out-of-order delete: a newer event already superseded it.
+    return;
+  }
 
   assertNoWriteError(
     await supabase
@@ -186,25 +224,26 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
       .update({
         status: "cancelled",
         cancel_at_period_end: false,
+        last_event_at: new Date(eventCreated * 1000).toISOString(),
       })
       .eq("stripe_subscription_id", sub.id),
     "subscriptions update (subscription deleted)",
   );
 
   // Tier sync: if a featured nurse's sub goes away, drop them to free.
-  if (row.plan_type === "nurse_featured") {
+  if (planType === "nurse_featured") {
     assertNoWriteError(
       await supabase
         .from("nurse_profiles")
         .update({ tier: "free" })
-        .eq("user_id", row.user_id),
+        .eq("user_id", userId),
       "nurse_profiles tier downgrade (subscription deleted)",
     );
   }
 
   // Family cancellation: set 60-day access window on existing reveals so
   // they can still see contact info for nurses they revealed before.
-  if (row.plan_type === "family_access") {
+  if (planType === "family_access") {
     const expires = new Date();
     expires.setUTCDate(
       expires.getUTCDate() + GRACE_PERIODS.CANCELLED_ACCESS_DAYS,
@@ -213,16 +252,16 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
       await supabase
         .from("reveals")
         .update({ access_expires_at: expires.toISOString() })
-        .eq("family_user_id", row.user_id)
+        .eq("family_user_id", userId)
         .is("access_expires_at", null),
       "reveals access window (subscription deleted)",
     );
   }
 
   await captureServerEvent({
-    distinctId: row.user_id,
+    distinctId: userId,
     event: ANALYTICS_EVENTS.SUBSCRIPTION_CANCELLED,
-    properties: { plan: row.plan_type, source: "stripe_webhook" },
+    properties: { plan: planType, source: "stripe_webhook" },
   });
 }
 
@@ -230,10 +269,24 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
   const supabase = createServiceRoleClient();
+
+  // Retrieve up front (not just on the renewal-email path below) so the
+  // period dates refresh on every paid invoice, not only once a separate
+  // customer.subscription.updated event happens to arrive (#423).
+  const stripe = getStripe();
+  const sub = await stripe.subscriptions.retrieve(subId);
+  const item = sub.items.data[0];
+
   assertNoWriteError(
     await supabase
       .from("subscriptions")
-      .update({ status: "active" })
+      .update({
+        status: "active",
+        current_period_start: new Date(
+          item.current_period_start * 1000,
+        ).toISOString(),
+        current_period_end: new Date(item.current_period_end * 1000).toISOString(),
+      })
       .eq("stripe_subscription_id", subId),
     "subscriptions status update (invoice paid)",
   );
@@ -249,8 +302,6 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     .maybeSingle();
   if (!row) return;
 
-  const stripe = getStripe();
-  const sub = await stripe.subscriptions.retrieve(subId);
   await maybeNotifyRenewal({
     userId: row.user_id,
     planType: row.plan_type as "nurse_featured" | "family_access",
@@ -289,6 +340,11 @@ function assertNoWriteError(
   }
 }
 
+/** Stripe event timestamps are unix seconds; last_event_at is stored as an ISO string. */
+function toUnixSeconds(iso: string): number {
+  return Math.floor(new Date(iso).getTime() / 1000);
+}
+
 interface UpsertArgs {
   userId: string;
   planType: "nurse_featured" | "family_access";
@@ -296,9 +352,26 @@ interface UpsertArgs {
   subscription: Stripe.Subscription;
 }
 
-async function upsertSubscription(args: UpsertArgs) {
+/**
+ * Returns whether the write was applied. Stripe gives no ordering guarantee
+ * on webhook delivery, so an older event arriving after a newer one has
+ * already been applied is ignored rather than reverting state (#414).
+ */
+async function upsertSubscription(
+  args: UpsertArgs,
+  eventCreated: number,
+): Promise<boolean> {
   const { userId, planType, customerId, subscription } = args;
   const supabase = createServiceRoleClient();
+
+  const { data: current } = await supabase
+    .from("subscriptions")
+    .select("last_event_at")
+    .eq("stripe_subscription_id", subscription.id)
+    .maybeSingle();
+  if (current?.last_event_at && eventCreated <= toUnixSeconds(current.last_event_at)) {
+    return false;
+  }
 
   const status = mapStripeStatus(subscription.status);
   // In Stripe API 2025-x, current_period_start/end moved from the
@@ -326,6 +399,7 @@ async function upsertSubscription(args: UpsertArgs) {
         current_period_start: periodStart,
         current_period_end: periodEnd,
         cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+        last_event_at: new Date(eventCreated * 1000).toISOString(),
       },
       { onConflict: "stripe_subscription_id" },
     ),
@@ -341,6 +415,8 @@ async function upsertSubscription(args: UpsertArgs) {
       "nurse_profiles tier sync",
     );
   }
+
+  return true;
 }
 
 function mapStripeStatus(
