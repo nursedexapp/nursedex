@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronAlerting } from "@/lib/cron/alerting";
 import { generateAndPostInvoice } from "@/lib/slack/invoice";
 
 export const runtime = "nodejs";
@@ -21,22 +22,20 @@ function previousMonth(): string {
  *   curl "https://nursedex.com/api/cron/consulting-invoice?month=2026-06" \
  *     -H "x-admin-secret: $ADMIN_SECRET"
  */
+const handleConsultingInvoice = withCronAlerting(
+  "consulting-invoice",
+  async (request: NextRequest) => {
+    const month = request.nextUrl.searchParams.get("month") || previousMonth();
+    const result = await generateAndPostInvoice(month);
+    return NextResponse.json({ ok: true, month, ...result });
+  },
+);
+
 export async function GET(request: NextRequest) {
   const cronUnauth = verifyCronAuth(request);
   const isAdmin =
     !!process.env.ADMIN_SECRET &&
     request.headers.get("x-admin-secret") === process.env.ADMIN_SECRET;
   if (cronUnauth && !isAdmin) return cronUnauth;
-
-  const month = request.nextUrl.searchParams.get("month") || previousMonth();
-  try {
-    const result = await generateAndPostInvoice(month);
-    return NextResponse.json({ ok: true, month, ...result });
-  } catch (err) {
-    console.error("Consulting invoice failed:", err);
-    return NextResponse.json(
-      { error: "Invoice generation failed" },
-      { status: 500 },
-    );
-  }
+  return handleConsultingInvoice(request);
 }

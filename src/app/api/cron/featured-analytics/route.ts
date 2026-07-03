@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
+import { withCronAlerting } from "@/lib/cron/alerting";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
@@ -23,91 +24,97 @@ interface WeekSums {
  * don't ship a "0 vs 0" email. Dedup keyed by ISO week so retries
  * within Monday don't fan out duplicates.
  */
-export async function GET(request: NextRequest) {
-  const unauth = verifyCronAuth(request);
-  if (unauth) return unauth;
+const handleFeaturedAnalytics = withCronAlerting(
+  "featured-analytics",
+  async (_request: NextRequest) => {
+    const supabase = createServiceRoleClient();
+    const now = Date.now();
+    const thisWeekStart = new Date(now - 7 * DAY_MS);
+    const lastWeekStart = new Date(now - 14 * DAY_MS);
+    const lastWeekEnd = thisWeekStart;
 
-  const supabase = createServiceRoleClient();
-  const now = Date.now();
-  const thisWeekStart = new Date(now - 7 * DAY_MS);
-  const lastWeekStart = new Date(now - 14 * DAY_MS);
-  const lastWeekEnd = thisWeekStart;
-
-  const nurseQuery = supabase
-    .from("nurse_profiles")
-    .select(
-      `
+    const nurseQuery = supabase
+      .from("nurse_profiles")
+      .select(
+        `
       user_id,
       users!inner (email, first_name, is_deleted, is_suspended)
     `,
-    )
-    .eq("tier", "featured");
-  const { data: featured, error } = await applyVisibleNurseFilter(nurseQuery);
+      )
+      .eq("tier", "featured");
+    const { data: featured, error } = await applyVisibleNurseFilter(nurseQuery);
 
-  if (error) {
-    console.error("[cron featured-analytics] query failed:", error.message);
-    return NextResponse.json({ error: "Query failed" }, { status: 500 });
-  }
+    if (error) {
+      console.error("[cron featured-analytics] query failed:", error.message);
+      return NextResponse.json({ error: "Query failed" }, { status: 500 });
+    }
 
-  type Row = {
-    user_id: string;
-    users: {
-      email: string;
-      first_name: string | null;
-      is_deleted: boolean;
-      is_suspended: boolean;
+    type Row = {
+      user_id: string;
+      users: {
+        email: string;
+        first_name: string | null;
+        is_deleted: boolean;
+        is_suspended: boolean;
+      };
     };
-  };
 
-  const todayBucket = new Date().toISOString().slice(0, 10);
-  let sent = 0;
-  let skipped = 0;
+    const todayBucket = new Date().toISOString().slice(0, 10);
+    let sent = 0;
+    let skipped = 0;
 
-  for (const row of (featured ?? []) as unknown as Row[]) {
-    const thisWeek = await sumAnalytics(
-      supabase,
-      row.user_id,
-      thisWeekStart,
-      new Date(now),
-    );
-    const lastWeek = await sumAnalytics(
-      supabase,
-      row.user_id,
-      lastWeekStart,
-      lastWeekEnd,
-    );
-    const total =
-      thisWeek.profileViews +
-      thisWeek.saves +
-      thisWeek.reveals +
-      lastWeek.profileViews +
-      lastWeek.saves +
-      lastWeek.reveals;
-    if (total === 0) {
-      skipped++;
-      continue;
+    for (const row of (featured ?? []) as unknown as Row[]) {
+      const thisWeek = await sumAnalytics(
+        supabase,
+        row.user_id,
+        thisWeekStart,
+        new Date(now),
+      );
+      const lastWeek = await sumAnalytics(
+        supabase,
+        row.user_id,
+        lastWeekStart,
+        lastWeekEnd,
+      );
+      const total =
+        thisWeek.profileViews +
+        thisWeek.saves +
+        thisWeek.reveals +
+        lastWeek.profileViews +
+        lastWeek.saves +
+        lastWeek.reveals;
+      if (total === 0) {
+        skipped++;
+        continue;
+      }
+
+      const ok = await shouldSendOnce(supabase, {
+        recipientUserId: row.user_id,
+        emailType: "featured_analytics",
+        dedupKey: `week_${todayBucket}`,
+      });
+      if (!ok) {
+        skipped++;
+        continue;
+      }
+
+      await sendFeaturedAnalyticsEmail({
+        to: row.users.email,
+        firstName: row.users.first_name ?? undefined,
+        thisWeek,
+        lastWeek,
+      });
+      sent++;
     }
 
-    const ok = await shouldSendOnce(supabase, {
-      recipientUserId: row.user_id,
-      emailType: "featured_analytics",
-      dedupKey: `week_${todayBucket}`,
-    });
-    if (!ok) {
-      skipped++;
-      continue;
-    }
+    return NextResponse.json({ success: true, sent, skipped });
+  },
+);
 
-    await sendFeaturedAnalyticsEmail({
-      to: row.users.email,
-      firstName: row.users.first_name ?? undefined,
-      thisWeek,
-      lastWeek,
-    });
-    sent++;
-  }
-
-  return NextResponse.json({ success: true, sent, skipped });
+export async function GET(request: NextRequest) {
+  const unauth = verifyCronAuth(request);
+  if (unauth) return unauth;
+  return handleFeaturedAnalytics(request);
 }
 
 async function sumAnalytics(
