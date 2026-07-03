@@ -400,6 +400,166 @@ describe("AUD-006 (#389): reviews self-write column guards", () => {
   });
 });
 
+describe("AUD-006 (#389): family_profiles self-write hijack", () => {
+  it("a family cannot reassign their family_profile to another user_id", async () => {
+    const { id: familyId, client } = await createTestUser(
+      "family",
+      "family-profile-hijack",
+    );
+    const { id: otherFamilyId } = await createTestUser(
+      "family",
+      "family-profile-hijack-target",
+    );
+    await client.from("family_profiles").insert({ user_id: familyId, zip_code: "10001" });
+
+    const { error } = await client
+      .from("family_profiles")
+      .update({ user_id: otherFamilyId })
+      .eq("user_id", familyId);
+
+    expect(error).not.toBeNull();
+    const { data: row } = await service
+      .from("family_profiles")
+      .select("user_id")
+      .eq("user_id", familyId)
+      .single();
+    expect(row?.user_id).toBe(familyId);
+  });
+
+  it("a family can still update their own zip_code", async () => {
+    const { id: familyId, client } = await createTestUser(
+      "family",
+      "family-profile-legit-update",
+    );
+    await client.from("family_profiles").insert({ user_id: familyId, zip_code: "10001" });
+
+    const { error } = await client
+      .from("family_profiles")
+      .update({ zip_code: "10002" })
+      .eq("user_id", familyId);
+
+    expect(error).toBeNull();
+    const { data: row } = await service
+      .from("family_profiles")
+      .select("zip_code")
+      .eq("user_id", familyId)
+      .single();
+    expect(row?.zip_code).toBe("10002");
+  });
+});
+
+describe("AUD-006 (#389): hires self-write column guards", () => {
+  it("a nurse cannot directly confirm their own claimed hire", async () => {
+    const { id: familyId } = await createTestUser("family", "hires-nurse-block-family");
+    const { id: nurseId, client } = await createTestUser("nurse", "hires-nurse-block-nurse");
+    const { data: hire } = await service
+      .from("hires")
+      .insert({
+        family_user_id: familyId,
+        nurse_user_id: nurseId,
+        status: "claimed",
+        claimed_by: "nurse",
+      })
+      .select("id")
+      .single();
+
+    const { error } = await client
+      .from("hires")
+      .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+      .eq("id", hire!.id);
+
+    expect(error).not.toBeNull();
+    const { data: row } = await service
+      .from("hires")
+      .select("status")
+      .eq("id", hire!.id)
+      .single();
+    expect(row?.status).toBe("claimed");
+  });
+
+  it("a family cannot reassign a claimed hire to a different nurse", async () => {
+    const { id: familyId, client } = await createTestUser("family", "hires-family-hijack");
+    const { id: nurseId } = await createTestUser("nurse", "hires-family-hijack-nurse-1");
+    const { id: otherNurseId } = await createTestUser(
+      "nurse",
+      "hires-family-hijack-nurse-2",
+    );
+    const { data: hire } = await service
+      .from("hires")
+      .insert({
+        family_user_id: familyId,
+        nurse_user_id: nurseId,
+        status: "claimed",
+        claimed_by: "nurse",
+      })
+      .select("id")
+      .single();
+
+    const { error } = await client
+      .from("hires")
+      .update({ nurse_user_id: otherNurseId })
+      .eq("id", hire!.id);
+
+    expect(error).not.toBeNull();
+    const { data: row } = await service
+      .from("hires")
+      .select("nurse_user_id")
+      .eq("id", hire!.id)
+      .single();
+    expect(row?.nurse_user_id).toBe(nurseId);
+  });
+
+  it("a family can still confirm a nurse-initiated claimed hire", async () => {
+    const { id: familyId, client } = await createTestUser(
+      "family",
+      "hires-family-confirm-ok",
+    );
+    const { id: nurseId } = await createTestUser("nurse", "hires-family-confirm-ok-nurse");
+    const { data: hire } = await service
+      .from("hires")
+      .insert({
+        family_user_id: familyId,
+        nurse_user_id: nurseId,
+        status: "claimed",
+        claimed_by: "nurse",
+      })
+      .select("id")
+      .single();
+
+    const { error } = await client
+      .from("hires")
+      .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+      .eq("id", hire!.id);
+
+    expect(error).toBeNull();
+  });
+
+  it("a family can still reject a nurse-initiated claimed hire", async () => {
+    const { id: familyId, client } = await createTestUser(
+      "family",
+      "hires-family-reject-ok",
+    );
+    const { id: nurseId } = await createTestUser("nurse", "hires-family-reject-ok-nurse");
+    const { data: hire } = await service
+      .from("hires")
+      .insert({
+        family_user_id: familyId,
+        nurse_user_id: nurseId,
+        status: "claimed",
+        claimed_by: "nurse",
+      })
+      .select("id")
+      .single();
+
+    const { error } = await client
+      .from("hires")
+      .update({ status: "rejected" })
+      .eq("id", hire!.id);
+
+    expect(error).toBeNull();
+  });
+});
+
 describe("#515: first-time role selection during onboarding", () => {
   it("a freshly signed-up user (role NULL) can set their own role to nurse", async () => {
     const { id, client } = await createUnroledTestUser("onboard-nurse");
