@@ -213,7 +213,7 @@ async function handleSubscriptionDeleted(
     return;
   }
 
-  if (row?.last_event_at && eventCreated <= toUnixSeconds(row.last_event_at)) {
+  if (row?.last_event_at && eventCreated < toUnixSeconds(row.last_event_at)) {
     // Stale/out-of-order delete: a newer event already superseded it.
     return;
   }
@@ -369,7 +369,7 @@ async function upsertSubscription(
     .select("last_event_at")
     .eq("stripe_subscription_id", subscription.id)
     .maybeSingle();
-  if (current?.last_event_at && eventCreated <= toUnixSeconds(current.last_event_at)) {
+  if (current?.last_event_at && eventCreated < toUnixSeconds(current.last_event_at)) {
     return false;
   }
 

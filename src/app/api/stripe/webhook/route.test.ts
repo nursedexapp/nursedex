@@ -276,6 +276,29 @@ describe("stripe webhook: event ordering (#414)", () => {
     expect(h.calls).toContain("subscriptions.upsert");
   });
 
+  it("still applies an event whose created timestamp exactly matches what was last applied", async () => {
+    // Stripe's `created` is unix seconds, not guaranteed unique across
+    // distinct events for the same object; treating "equal" as stale would
+    // risk silently dropping a legitimate second event from the same
+    // second, not just a harmless exact-duplicate redelivery.
+    h.state.event = {
+      type: "customer.subscription.updated",
+      created: 1700000900,
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "family_access",
+      cancel_at_period_end: false,
+      last_event_at: new Date(1700000900 * 1000).toISOString(),
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).toContain("subscriptions.upsert");
+  });
+
   it("ignores an out-of-order customer.subscription.deleted event older than what was last applied", async () => {
     h.state.event = {
       type: "customer.subscription.deleted",
