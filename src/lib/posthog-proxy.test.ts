@@ -6,7 +6,10 @@ let nextConfig: NextConfig;
 beforeAll(async () => {
   // next.config.ts derives the upstream hosts from this at import time.
   process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
-  nextConfig = (await import("../../next.config")).default;
+  // Named export, not the wrapped default: withSentryConfig does
+  // build-time work (source-map upload prep) that hangs in a plain
+  // vitest import.
+  nextConfig = (await import("../../next.config")).nextConfig;
 });
 
 describe("PostHog reverse proxy", () => {

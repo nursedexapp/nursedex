@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Upstream PostHog hosts for the reverse proxy below. Derived from the public
 // host so US/EU clouds both work: us.i.posthog.com -> us-assets.i.posthog.com.
@@ -9,7 +10,10 @@ const posthogAssetsHost = posthogHost.replace(
   "-assets.i.posthog.com",
 );
 
-const nextConfig: NextConfig = {
+// Named export so tests can read the plain config without triggering
+// withSentryConfig's build-time work (network calls for source-map
+// upload); only the wrapped default export matters to Next.js itself.
+export const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
@@ -39,4 +43,13 @@ const nextConfig: NextConfig = {
   skipTrailingSlashRedirect: true,
 };
 
-export default nextConfig;
+// Wraps the config with a build-time plugin that uploads source maps
+// (when SENTRY_AUTH_TOKEN is set) and injects Next.js instrumentation.
+// Without this, sentry.server.config.ts/sentry.edge.config.ts are never
+// loaded and every server/edge Sentry.captureException call no-ops (#394).
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+});
