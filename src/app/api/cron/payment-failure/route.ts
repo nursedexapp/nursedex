@@ -91,86 +91,107 @@ export async function GET(request: NextRequest) {
     const isNurse = row.plan_type === "nurse_featured";
     const planLabel = isNurse ? "Featured" : "Family Access";
 
-    if (daysPast === 1) {
+    if (daysPast < 1) {
+      // Stripe is still queuing the first retry. Nothing to do.
+      skipped++;
+      continue;
+    }
+
+    // Each dunning step is gated independently on "is this day threshold
+    // met AND not yet sent" rather than an exact daysPast match, so a
+    // missed cron run (Vercel outage, deploy window) still catches up on
+    // every step it skipped instead of losing it permanently (#421).
+    let sentAny = false;
+
+    if (daysPast >= 1) {
       const ok = await shouldSendOnce(supabase, {
         recipientUserId: row.user_id,
         emailType: "payment_failure_warning",
         dedupKey: `${row.id}:pf_day1`,
       });
-      if (!ok) {
-        skipped++;
-        continue;
+      if (ok) {
+        await sendPaymentFailureWarningEmail({
+          to: row.users.email,
+          firstName: row.users.first_name ?? undefined,
+          dayNumber: 1,
+          planLabel,
+          consequenceLabel: isNurse
+            ? "If we can't charge by day 3, your Featured badge will end and you'll go back to the free plan."
+            : "If we can't charge by day 3, your access to revealed nurse contact info will end.",
+          portalUrl: PORTAL_URL,
+        });
+        day1++;
+        sentAny = true;
       }
-      await sendPaymentFailureWarningEmail({
-        to: row.users.email,
-        firstName: row.users.first_name ?? undefined,
-        dayNumber: 1,
-        planLabel,
-        consequenceLabel: isNurse
-          ? "If we can't charge by day 3, your Featured badge will end and you'll go back to the free plan."
-          : "If we can't charge by day 3, your access to revealed nurse contact info will end.",
-        portalUrl: PORTAL_URL,
-      });
-      day1++;
-    } else if (daysPast === 2) {
+    }
+
+    if (daysPast >= 2) {
       const ok = await shouldSendOnce(supabase, {
         recipientUserId: row.user_id,
         emailType: "payment_failure_warning",
         dedupKey: `${row.id}:pf_day2`,
       });
-      if (!ok) {
-        skipped++;
-        continue;
+      if (ok) {
+        await sendPaymentFailureWarningEmail({
+          to: row.users.email,
+          firstName: row.users.first_name ?? undefined,
+          dayNumber: 2,
+          planLabel,
+          consequenceLabel: isNurse
+            ? "Tomorrow your Featured badge ends and you go back to the free plan unless we can charge."
+            : "Tomorrow your access to revealed nurse contact info ends unless we can charge.",
+          portalUrl: PORTAL_URL,
+        });
+        day2++;
+        sentAny = true;
       }
-      await sendPaymentFailureWarningEmail({
-        to: row.users.email,
-        firstName: row.users.first_name ?? undefined,
-        dayNumber: 2,
-        planLabel,
-        consequenceLabel: isNurse
-          ? "Tomorrow your Featured badge ends and you go back to the free plan unless we can charge."
-          : "Tomorrow your access to revealed nurse contact info ends unless we can charge.",
-        portalUrl: PORTAL_URL,
-      });
-      day2++;
-    } else if (daysPast >= 3) {
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: row.user_id,
-        emailType: "payment_failure_final",
-        dedupKey: `${row.id}:pf_final`,
-      });
-      if (!ok) {
-        skipped++;
-        continue;
-      }
-
-      // Downgrade.
-      if (isNurse) {
-        await supabase
-          .from("nurse_profiles")
-          .update({ tier: "free" })
-          .eq("user_id", row.user_id);
-      } else {
-        await supabase
-          .from("subscriptions")
-          .update({ access_expires_at: new Date().toISOString() })
-          .eq("id", row.id);
-      }
-
-      await sendPaymentFailureFinalEmail({
-        to: row.users.email,
-        firstName: row.users.first_name ?? undefined,
-        planLabel,
-        consequenceSummary: isNurse
-          ? "After three days of unsuccessful billing attempts, your Featured badge has been removed and your profile is back on the free plan."
-          : "After three days of unsuccessful billing attempts, your access to revealed nurse contact info has ended.",
-        portalUrl: PORTAL_URL,
-      });
-      finalAndDowngrade++;
-    } else {
-      // 0 days past, Stripe is still queuing the first retry. Nothing to do.
-      skipped++;
     }
+
+    if (daysPast >= 3) {
+      // Downgrade first and check its error; only record pf_final as sent
+      // (via shouldSendOnce) once the downgrade actually succeeded. The old
+      // order recorded "sent" before the write, so a failed downgrade was
+      // never retried and an already-emailed user could keep paid access
+      // forever (#416).
+      const downgradeResult = isNurse
+        ? await supabase
+            .from("nurse_profiles")
+            .update({ tier: "free" })
+            .eq("user_id", row.user_id)
+        : await supabase
+            .from("subscriptions")
+            .update({ access_expires_at: new Date().toISOString() })
+            .eq("id", row.id);
+
+      if (downgradeResult.error) {
+        console.error(
+          "[cron payment-failure] downgrade failed for",
+          row.id,
+          downgradeResult.error.message,
+        );
+      } else {
+        const ok = await shouldSendOnce(supabase, {
+          recipientUserId: row.user_id,
+          emailType: "payment_failure_final",
+          dedupKey: `${row.id}:pf_final`,
+        });
+        if (ok) {
+          await sendPaymentFailureFinalEmail({
+            to: row.users.email,
+            firstName: row.users.first_name ?? undefined,
+            planLabel,
+            consequenceSummary: isNurse
+              ? "After three days of unsuccessful billing attempts, your Featured badge has been removed and your profile is back on the free plan."
+              : "After three days of unsuccessful billing attempts, your access to revealed nurse contact info has ended.",
+            portalUrl: PORTAL_URL,
+          });
+          finalAndDowngrade++;
+          sentAny = true;
+        }
+      }
+    }
+
+    if (!sentAny) skipped++;
   }
 
   return NextResponse.json({
