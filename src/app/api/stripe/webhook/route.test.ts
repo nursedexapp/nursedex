@@ -19,6 +19,10 @@ const h = vi.hoisted(() => {
       state.writes[`${table}.upsert`] = payload;
       return makeBuilder(table, "upsert");
     };
+    b.insert = (payload: unknown) => {
+      state.writes[`${table}.insert`] = payload;
+      return makeBuilder(table, "insert");
+    };
     b.update = (payload: unknown) => {
       state.writes[`${table}.update`] = payload;
       return makeBuilder(table, "update");
@@ -581,5 +585,49 @@ describe("stripe webhook: failure alerting (#396)", () => {
     expect(res.status).toBe(200);
     expect(h.captureException).not.toHaveBeenCalled();
     expect(h.slackPost).not.toHaveBeenCalled();
+  });
+
+  it("does not repost to Slack when the same event id already alerted (Stripe retry)", async () => {
+    h.state.event = {
+      id: "evt_retry",
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.reads["webhook_alert_log"] = { event_id: "evt_retry" };
+
+    await POST(fakeRequest());
+
+    expect(h.slackPost).not.toHaveBeenCalled();
+  });
+
+  it("still captures to Sentry even when the alert was already sent for this event", async () => {
+    h.state.event = {
+      id: "evt_retry2",
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.reads["webhook_alert_log"] = { event_id: "evt_retry2" };
+
+    await POST(fakeRequest());
+
+    expect(h.captureException).toHaveBeenCalled();
   });
 });

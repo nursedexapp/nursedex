@@ -91,11 +91,24 @@ export async function POST(request: NextRequest) {
 }
 
 async function alertOpsSlack(event: Stripe.Event, err: unknown): Promise<void> {
+  // Stripe retries a failing event repeatedly over hours to days; only
+  // alert once per event id so a stuck webhook doesn't flood the channel
+  // with the same failure. Sentry capture (above) isn't deduped here since
+  // Sentry already groups identical errors into one issue by fingerprint.
+  const supabase = createServiceRoleClient();
+  const { data: alreadyAlerted } = await supabase
+    .from("webhook_alert_log")
+    .select("event_id")
+    .eq("event_id", event.id)
+    .maybeSingle();
+  if (alreadyAlerted) return;
+
   const message = err instanceof Error ? err.message : String(err);
   await slackPost("chat.postMessage", {
     channel: OPS_CHANNEL_ID,
     text: `🚨 Stripe webhook failed: \`${event.type}\` (event \`${event.id}\`)\n${message}`,
   });
+  await supabase.from("webhook_alert_log").insert({ event_id: event.id });
 }
 
 // ── Handlers ──────────────────────────────────────────────────
