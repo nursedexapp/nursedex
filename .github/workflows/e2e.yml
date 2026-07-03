@@ -69,6 +69,14 @@ jobs:
             echo "NEXT_PUBLIC_SITE_URL=http://localhost:3000"
           } >> "$GITHUB_ENV"
 
+      # RLS regression guards: anon-role read/write checks (rls-policies)
+      # plus the write-policy hardening checks for issues #384-389 (self-
+      # escalation, paywall bypass). Only needs the local Supabase already
+      # started above; runs fast, so it fails before the slower Playwright
+      # suite boots.
+      - name: Run RLS regression tests
+        run: npm run test:rls
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
