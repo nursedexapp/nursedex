@@ -38,6 +38,37 @@ async function createTestUser(
   return { id, client };
 }
 
+/**
+ * A freshly signed-up user, as handle_new_user() creates them: role is
+ * NULL until onboarding's role-selection step sets it. createTestUser
+ * always sets a role up front, which is why the existing self-escalation
+ * tests below never exercised the NULL -> role transition (#515).
+ */
+async function createUnroledTestUser(
+  emailPrefix: string,
+): Promise<{ id: string; client: SupabaseClient }> {
+  const email = `rls-hardening-${emailPrefix}-${stamp}@example.com`;
+  const password = "rls-hardening-test-password-1234";
+
+  const { data: created, error: createErr } = await service.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (createErr || !created.user) {
+    throw new Error(`Failed to create test user: ${createErr?.message}`);
+  }
+  createdUserIds.push(created.user.id);
+
+  const client = createClient(SUPABASE_URL!, ANON_KEY!);
+  const { error: signInErr } = await client.auth.signInWithPassword({ email, password });
+  if (signInErr) {
+    throw new Error(`Failed to sign in test user: ${signInErr.message}`);
+  }
+
+  return { id: created.user.id, client };
+}
+
 beforeAll(() => {
   expect(SUPABASE_URL).toBeTruthy();
   expect(ANON_KEY).toBeTruthy();
@@ -366,5 +397,49 @@ describe("AUD-006 (#389): reviews self-write column guards", () => {
       .eq("id", review!.id);
 
     expect(error).toBeNull();
+  });
+});
+
+describe("#515: first-time role selection during onboarding", () => {
+  it("a freshly signed-up user (role NULL) can set their own role to nurse", async () => {
+    const { id, client } = await createUnroledTestUser("onboard-nurse");
+
+    const { error } = await client.from("users").update({ role: "nurse" }).eq("id", id);
+
+    expect(error).toBeNull();
+    const { data: row } = await service.from("users").select("role").eq("id", id).single();
+    expect(row?.role).toBe("nurse");
+  });
+
+  it("a freshly signed-up user (role NULL) can set their own role to family", async () => {
+    const { id, client } = await createUnroledTestUser("onboard-family");
+
+    const { error } = await client.from("users").update({ role: "family" }).eq("id", id);
+
+    expect(error).toBeNull();
+  });
+
+  it("cannot set role to super_admin on first selection", async () => {
+    const { id, client } = await createUnroledTestUser("onboard-escalate");
+
+    const { error } = await client
+      .from("users")
+      .update({ role: "super_admin" })
+      .eq("id", id);
+
+    expect(error).not.toBeNull();
+    const { data: row } = await service.from("users").select("role").eq("id", id).single();
+    expect(row?.role).toBeNull();
+  });
+
+  it("cannot change role again once it has already been set once", async () => {
+    const { id, client } = await createUnroledTestUser("onboard-once");
+    await client.from("users").update({ role: "nurse" }).eq("id", id);
+
+    const { error } = await client.from("users").update({ role: "family" }).eq("id", id);
+
+    expect(error).not.toBeNull();
+    const { data: row } = await service.from("users").select("role").eq("id", id).single();
+    expect(row?.role).toBe("nurse");
   });
 });
