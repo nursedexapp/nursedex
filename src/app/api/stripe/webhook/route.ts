@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
+import * as Sentry from "@sentry/nextjs";
 import { getStripe } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { GRACE_PERIODS } from "@/lib/constants";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { captureServerEvent } from "@/lib/analytics/server";
 import { shouldSendOnce } from "@/lib/cron/email-log";
+import { slackPost, OPS_CHANNEL_ID } from "@/lib/slack/client";
 import {
   sendSubscriptionConfirmedEmail,
   sendRenewalSuccessEmail,
@@ -72,11 +74,28 @@ export async function POST(request: NextRequest) {
     // Returning a non-2xx tells Stripe to retry. We log and rethrow only
     // for genuinely transient issues; everything else should be acked.
     console.error("[stripe-webhook]", event.type, err);
+    Sentry.captureException(err, {
+      tags: { action: "stripe-webhook", event_type: event.type },
+      extra: { event_id: event.id },
+    });
+    // Best-effort: a failed alert must not mask the real 500, which is
+    // what actually tells Stripe to retry (#396).
+    await alertOpsSlack(event, err).catch((slackErr) =>
+      console.error("[stripe-webhook] slack alert failed:", slackErr),
+    );
     return NextResponse.json(
       { error: "Internal error processing webhook" },
       { status: 500 },
     );
   }
+}
+
+async function alertOpsSlack(event: Stripe.Event, err: unknown): Promise<void> {
+  const message = err instanceof Error ? err.message : String(err);
+  await slackPost("chat.postMessage", {
+    channel: OPS_CHANNEL_ID,
+    text: `🚨 Stripe webhook failed: \`${event.type}\` (event \`${event.id}\`)\n${message}`,
+  });
 }
 
 // ── Handlers ──────────────────────────────────────────────────
