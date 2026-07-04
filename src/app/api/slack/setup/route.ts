@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OPS_CHANNEL_ID, slackPost } from "@/lib/slack/client";
 import { newRequestButtonBlocks } from "@/lib/slack/views";
+import { verifySecretHeader } from "@/lib/security/shared-secret";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,8 +15,12 @@ export const runtime = "nodejs";
  *     -H "x-admin-secret: $ADMIN_SECRET"
  */
 export async function POST(request: NextRequest) {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret || request.headers.get("x-admin-secret") !== secret) {
+  if (
+    !verifySecretHeader(
+      request.headers.get("x-admin-secret"),
+      process.env.ADMIN_SECRET,
+    )
+  ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

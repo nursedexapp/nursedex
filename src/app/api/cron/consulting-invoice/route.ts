@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
 import { generateAndPostInvoice } from "@/lib/slack/invoice";
+import { verifySecretHeader } from "@/lib/security/shared-secret";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -33,9 +34,10 @@ const handleConsultingInvoice = withCronAlerting(
 
 export async function GET(request: NextRequest) {
   const cronUnauth = verifyCronAuth(request);
-  const isAdmin =
-    !!process.env.ADMIN_SECRET &&
-    request.headers.get("x-admin-secret") === process.env.ADMIN_SECRET;
+  const isAdmin = verifySecretHeader(
+    request.headers.get("x-admin-secret"),
+    process.env.ADMIN_SECRET,
+  );
   if (cronUnauth && !isAdmin) return cronUnauth;
   return handleConsultingInvoice(request);
 }

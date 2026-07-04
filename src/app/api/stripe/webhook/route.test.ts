@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const h = vi.hoisted(() => {
   const state = {
     event: null as unknown,
+    signatureError: null as string | null,
     errors: {} as Record<string, { message: string; code?: string } | null>,
     reads: {} as Record<string, unknown>,
     writes: {} as Record<string, unknown>,
@@ -60,7 +61,10 @@ vi.mock("@/lib/supabase/service-role", () => ({
 vi.mock("@/lib/stripe/server", () => ({
   getStripe: () => ({
     webhooks: {
-      constructEvent: () => h.state.event,
+      constructEvent: () => {
+        if (h.state.signatureError) throw new Error(h.state.signatureError);
+        return h.state.event;
+      },
     },
     subscriptions: {
       retrieve: h.subscriptionsRetrieve,
@@ -90,10 +94,16 @@ vi.mock("@/lib/slack/client", () => ({
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
 
 import { POST } from "./route";
+import { shouldSendOnce } from "@/lib/cron/email-log";
+import {
+  sendSubscriptionConfirmedEmail,
+  sendRenewalSuccessEmail,
+  sendCancellationConfirmationEmail,
+} from "@/lib/email/send";
 
-function fakeRequest(): Parameters<typeof POST>[0] {
+function fakeRequest(signature: string | null = "sig_test"): Parameters<typeof POST>[0] {
   return {
-    headers: { get: () => "sig_test" },
+    headers: { get: () => signature },
     text: async () => "{}",
   } as unknown as Parameters<typeof POST>[0];
 }
@@ -126,6 +136,7 @@ const EVENT_CREATED = 1700000500;
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.event = null;
+  h.state.signatureError = null;
   h.state.errors = {};
   h.state.reads = {};
   h.state.writes = {};
@@ -629,5 +640,355 @@ describe("stripe webhook: failure alerting (#396)", () => {
     await POST(fakeRequest());
 
     expect(h.captureException).toHaveBeenCalled();
+  });
+});
+
+describe("stripe webhook: request-level verification (#473)", () => {
+  it("returns 400 when the stripe-signature header is missing", async () => {
+    const res = await POST(fakeRequest(null));
+
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 500 when STRIPE_WEBHOOK_SECRET is not configured", async () => {
+    const original = process.env.STRIPE_WEBHOOK_SECRET;
+    delete process.env.STRIPE_WEBHOOK_SECRET;
+    try {
+      const res = await POST(fakeRequest());
+      expect(res.status).toBe(500);
+    } finally {
+      process.env.STRIPE_WEBHOOK_SECRET = original;
+    }
+  });
+
+  it("returns 400 when Stripe signature verification fails", async () => {
+    h.state.signatureError = "No signatures found matching the expected signature";
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("stripe webhook: unhandled event types (#473)", () => {
+  it("acks with 200 and performs no writes for an event type we don't handle", async () => {
+    h.state.event = {
+      id: "evt_unhandled",
+      type: "customer.subscription.trial_will_end",
+      created: EVENT_CREATED,
+      data: { object: {} },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).toHaveLength(0);
+    expect(h.captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe("stripe webhook: checkout.session.completed missing fields (#473)", () => {
+  it("returns early without an upsert when client_reference_id is missing", async () => {
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: null,
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).not.toContain("subscriptions.upsert");
+    expect(h.subscriptionsRetrieve).not.toHaveBeenCalled();
+  });
+
+  it("returns early without an upsert when metadata.plan_type is missing", async () => {
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: {},
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).not.toContain("subscriptions.upsert");
+    expect(h.subscriptionsRetrieve).not.toHaveBeenCalled();
+  });
+
+  it("returns early without an upsert when customer is missing", async () => {
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: null,
+          subscription: "sub_1",
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).not.toContain("subscriptions.upsert");
+  });
+
+  it("returns early without an upsert when subscription is missing", async () => {
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: null,
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).not.toContain("subscriptions.upsert");
+  });
+});
+
+describe("stripe webhook: subscription.deleted grants and revocations (#473)", () => {
+  it("drops a featured nurse's tier to free", async () => {
+    h.state.event = {
+      type: "customer.subscription.deleted",
+      created: EVENT_CREATED,
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "nurse_featured",
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.state.writes["nurse_profiles.update"]).toMatchObject({
+      tier: "free",
+    });
+  });
+
+  it("sets a 60-day access_expires_at grace window on a family account's reveals", async () => {
+    h.state.event = {
+      type: "customer.subscription.deleted",
+      created: EVENT_CREATED,
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "family_access",
+    };
+
+    const before = Date.now();
+    const res = await POST(fakeRequest());
+    const after = Date.now();
+
+    expect(res.status).toBe(200);
+    const write = h.state.writes["reveals.update"] as {
+      access_expires_at: string;
+    };
+    expect(write).toBeDefined();
+    const expiresMs = new Date(write.access_expires_at).getTime();
+    const sixtyDaysMs = 60 * 24 * 60 * 60 * 1000;
+    // Allow a few seconds of slack for test execution time around `new Date()`.
+    expect(expiresMs).toBeGreaterThanOrEqual(before + sixtyDaysMs - 5000);
+    expect(expiresMs).toBeLessThanOrEqual(after + sixtyDaysMs + 5000);
+  });
+
+  it("does not touch nurse_profiles for a family_access cancellation", async () => {
+    h.state.event = {
+      type: "customer.subscription.deleted",
+      created: EVENT_CREATED,
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "family_access",
+    };
+
+    await POST(fakeRequest());
+
+    expect(h.calls).not.toContain("nurse_profiles.update");
+  });
+
+  it("does not touch reveals for a nurse_featured cancellation", async () => {
+    h.state.event = {
+      type: "customer.subscription.deleted",
+      created: EVENT_CREATED,
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "nurse_featured",
+    };
+
+    await POST(fakeRequest());
+
+    expect(h.calls).not.toContain("reveals.update");
+  });
+});
+
+describe("stripe webhook: invoice.payment_failed marks past_due (#473)", () => {
+  it("writes status past_due on the subscription", async () => {
+    h.state.event = {
+      type: "invoice.payment_failed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          id: "in_1",
+          parent: {
+            subscription_details: { subscription: "sub_1" },
+          },
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.state.writes["subscriptions.update"]).toMatchObject({
+      status: "past_due",
+    });
+  });
+});
+
+describe("stripe webhook: lifecycle email dedup gating (#473)", () => {
+  it("sends the subscription-confirmed email only when shouldSendOnce allows it", async () => {
+    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
+    h.state.reads["users"] = { email: "family@example.com", first_name: "Robin" };
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(sendSubscriptionConfirmedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "family@example.com", planType: "family_access" }),
+    );
+  });
+
+  it("does not send the subscription-confirmed email when shouldSendOnce denies it (retry dedup)", async () => {
+    vi.mocked(shouldSendOnce).mockResolvedValueOnce(false);
+    h.state.reads["users"] = { email: "family@example.com", first_name: "Robin" };
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+
+    await POST(fakeRequest());
+
+    expect(sendSubscriptionConfirmedEmail).not.toHaveBeenCalled();
+  });
+
+  it("sends the renewal-success email only on subscription_cycle invoices when shouldSendOnce allows it", async () => {
+    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
+    h.state.reads["users"] = { email: "renew@example.com", first_name: "Sam" };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "nurse_featured",
+    };
+    h.state.event = {
+      type: "invoice.paid",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          id: "in_2",
+          billing_reason: "subscription_cycle",
+          parent: {
+            subscription_details: { subscription: "sub_1" },
+          },
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(sendRenewalSuccessEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "renew@example.com" }),
+    );
+  });
+
+  it("does not send the renewal-success email on the initial subscription_create invoice", async () => {
+    h.state.event = {
+      type: "invoice.paid",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          id: "in_1",
+          billing_reason: "subscription_create",
+          parent: {
+            subscription_details: { subscription: "sub_1" },
+          },
+        },
+      },
+    };
+
+    await POST(fakeRequest());
+
+    expect(sendRenewalSuccessEmail).not.toHaveBeenCalled();
+  });
+
+  it("sends the cancellation-confirmation email when a subscription transitions to cancel_at_period_end", async () => {
+    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
+    h.state.reads["users"] = { email: "cancel@example.com", first_name: "Jamie" };
+    h.state.event = {
+      type: "customer.subscription.updated",
+      created: EVENT_CREATED,
+      data: { object: fakeSubscription({ cancel_at_period_end: true }) },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "family_access",
+      cancel_at_period_end: false,
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(sendCancellationConfirmationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "cancel@example.com", isFamily: true }),
+    );
   });
 });

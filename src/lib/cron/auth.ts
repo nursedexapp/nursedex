@@ -1,5 +1,6 @@
 import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
+import { verifyBearerSecret } from "@/lib/security/shared-secret";
 
 /**
  * Verify that a request to /api/cron/* came from Vercel's cron runner
@@ -11,7 +12,7 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 export function verifyCronAuth(request: NextRequest): NextResponse | null {
   const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyBearerSecret(auth, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return null;
