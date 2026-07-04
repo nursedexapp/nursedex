@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
+import { verifyBearerSecret } from "@/lib/security/shared-secret";
 
 const schema = z.object({
   subject: z.string().min(1),
@@ -18,7 +19,7 @@ const schema = z.object({
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!verifyBearerSecret(authHeader, process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const parsed = schema.safeParse(await request.json());
