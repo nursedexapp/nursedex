@@ -34,27 +34,45 @@ const h = vi.hoisted(() => {
   };
 
   // The "hires" table is fetched via a fresh `.from("hires")` builder for
-  // each query, so a per-call `pendingUpdate` flag distinguishes an .eq()
-  // used as a select filter (chain) from one that follows .update() (the
-  // await point), without a table-wide "then" sentinel.
+  // each query. A per-call `pendingUpdate` flag distinguishes the initial
+  // `.select().eq().maybeSingle()` read from an `.update().eq().eq().select()`
+  // write, and the write only applies (and returns a row) when every
+  // accumulated .eq() filter, including the status precondition, still
+  // matches the current state — modeling Postgres's atomic
+  // UPDATE ... WHERE id = ? AND status = ? guard against a concurrent writer.
   function hiresServerBuilder() {
     let pendingUpdate: Record<string, unknown> | null = null;
+    let updateFilters: Record<string, unknown> = {};
     return createQueryBuilder({
       maybeSingle: () => ({
         data: state.tokenHireRow ? { ...state.tokenHireRow } : null,
       }),
       update: (payload) => {
         pendingUpdate = payload as Record<string, unknown>;
+        updateFilters = {};
         return "chain";
       },
       eq: (...args) => {
-        const val = args[1];
+        const [col, val] = args as [string, unknown];
+        if (pendingUpdate) updateFilters[col] = val;
+        return "chain";
+      },
+      select: () => {
         if (!pendingUpdate) return "chain";
-        calls.hireUpdate.push({ id: val, payload: pendingUpdate });
-        if (state.tokenHireRow && state.tokenHireRow.id === val) {
-          Object.assign(state.tokenHireRow, pendingUpdate);
+        const payload = pendingUpdate;
+        const filters = updateFilters;
+        pendingUpdate = null;
+        calls.hireUpdate.push({ filters, payload });
+        const row = state.tokenHireRow;
+        const matches =
+          !!row &&
+          Object.entries(filters).every(([col, val]) => row[col] === val);
+        if (state.hireUpdateError) {
+          return { data: null, error: state.hireUpdateError };
         }
-        return { error: state.hireUpdateError };
+        if (!matches) return { data: [], error: null };
+        Object.assign(row as Record<string, unknown>, payload);
+        return { data: [{ id: (row as { id: string }).id }], error: null };
       },
     });
   }
@@ -169,6 +187,7 @@ import {
   rejectHireFromToken,
   claimHireByEmail,
 } from "./actions";
+import { sendHireConfirmedEmail } from "@/lib/email/send";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -226,10 +245,35 @@ describe("confirmHireFromToken", () => {
     expect(res).toEqual({ success: true, hireId: "hire-1" });
     expect(h.calls.hireUpdate).toEqual([
       {
-        id: "hire-1",
+        filters: { id: "hire-1", status: "claimed" },
         payload: expect.objectContaining({ status: "confirmed" }),
       },
     ]);
+  });
+
+  it("only lets one of two concurrent confirmations succeed", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "claimed",
+      family_user_id: FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
+    h.state.nurseLookup = { email: "nurse@example.com", first_name: "Nia" };
+
+    const [first, second] = await Promise.all([
+      confirmHireFromToken({ token: TOKEN }),
+      confirmHireFromToken({ token: TOKEN }),
+    ]);
+
+    const results = [first, second];
+    expect(results.filter((r) => r.success)).toHaveLength(1);
+    expect(results.filter((r) => !r.success)).toEqual([
+      { success: false, error: "wrong_state" },
+    ]);
+    // Both requests attempt the guarded UPDATE; only one row-matching
+    // attempt is allowed to actually flip the status.
+    expect(h.calls.hireUpdate).toHaveLength(2);
+    expect(sendHireConfirmedEmail).toHaveBeenCalledTimes(1);
   });
 
   it("blocks a second confirm attempt on an already-confirmed hire (single-use token)", async () => {
@@ -282,8 +326,31 @@ describe("rejectHireFromToken", () => {
     const res = await rejectHireFromToken({ token: TOKEN });
     expect(res).toEqual({ success: true, hireId: "hire-1" });
     expect(h.calls.hireUpdate).toEqual([
-      { id: "hire-1", payload: { status: "rejected" } },
+      {
+        filters: { id: "hire-1", status: "claimed" },
+        payload: { status: "rejected" },
+      },
     ]);
+  });
+
+  it("only lets one of two concurrent rejections succeed", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "claimed",
+      family_user_id: FAMILY_ID,
+    };
+
+    const [first, second] = await Promise.all([
+      rejectHireFromToken({ token: TOKEN }),
+      rejectHireFromToken({ token: TOKEN }),
+    ]);
+
+    const results = [first, second];
+    expect(results.filter((r) => r.success)).toHaveLength(1);
+    expect(results.filter((r) => !r.success)).toEqual([
+      { success: false, error: "wrong_state" },
+    ]);
+    expect(h.calls.hireUpdate).toHaveLength(2);
   });
 });
 
