@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createQueryBuilder } from "../../../test/supabase-mock";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -9,31 +10,9 @@ const h = vi.hoisted(() => {
     updateError: null as unknown,
   };
   const calls = { upsert: [] as unknown[], update: [] as unknown[] };
-  function builder() {
-    const b: Record<string, unknown> = {};
-    b.select = () => b;
-    b.eq = () => b;
-    b.is = () => b;
-    b.gte = () => b;
-    b.maybeSingle = () => Promise.resolve({ data: state.row });
-    b.upsert = (payload: unknown) => {
-      calls.upsert.push(payload);
-      return Promise.resolve({ error: state.upsertError });
-    };
-    b.update = (payload: unknown) => {
-      calls.update.push(payload);
-      return b;
-    };
-    // Awaited directly by the count query and the confirm update; each
-    // destructures the field it needs.
-    b.then = (resolve: (v: unknown) => void) =>
-      resolve({ count: state.count, error: state.updateError });
-    return b;
-  }
   return {
     state,
     calls,
-    builder,
     sendConfirm: vi.fn(),
     sendWelcome: vi.fn(),
     sendBatch: vi.fn(),
@@ -41,12 +20,29 @@ const h = vi.hoisted(() => {
   };
 });
 
+function builder() {
+  return createQueryBuilder({
+    maybeSingle: () => ({ data: h.state.row }),
+    upsert: (payload) => {
+      h.calls.upsert.push(payload);
+      return { error: h.state.upsertError };
+    },
+    update: (payload) => {
+      h.calls.update.push(payload);
+      return "chain";
+    },
+    // Awaited directly by the count query and the confirm update; each
+    // destructures the field it needs.
+    then: () => ({ count: h.state.count, error: h.state.updateError }),
+  });
+}
+
 vi.mock("next/headers", () => ({
   headers: async () => ({ get: () => "1.2.3.4" }),
 }));
 vi.mock("@/lib/auth/helpers", () => ({ requireAdmin: async () => ({ id: "a" }) }));
 vi.mock("@/lib/supabase/service-role", () => ({
-  createServiceRoleClient: () => ({ from: () => h.builder() }),
+  createServiceRoleClient: () => ({ from: () => builder() }),
 }));
 vi.mock("./queries", () => ({ getConfirmedSubscribers: h.getConfirmed }));
 vi.mock("@/lib/email/send", () => ({
