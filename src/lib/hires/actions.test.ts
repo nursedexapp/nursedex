@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createQueryBuilder } from "../../../test/supabase-mock";
 
 const h = vi.hoisted(() => {
   const FAMILY_ID = "11111111-1111-4111-8111-111111111111";
@@ -32,23 +33,30 @@ const h = vi.hoisted(() => {
     cooldownQuery: [] as unknown[],
   };
 
+  // The "hires" table is fetched via a fresh `.from("hires")` builder for
+  // each query, so a per-call `pendingUpdate` flag distinguishes an .eq()
+  // used as a select filter (chain) from one that follows .update() (the
+  // await point), without a table-wide "then" sentinel.
   function hiresServerBuilder() {
-    const b: Record<string, unknown> = {};
-    b.select = () => b;
-    b.eq = () => b;
-    b.maybeSingle = async () => ({
-      data: state.tokenHireRow ? { ...state.tokenHireRow } : null,
-    });
-    b.update = (payload: Record<string, unknown>) => ({
-      eq: async (_col: string, val: unknown) => {
-        calls.hireUpdate.push({ id: val, payload });
+    let pendingUpdate: Record<string, unknown> | null = null;
+    return createQueryBuilder({
+      maybeSingle: () => ({
+        data: state.tokenHireRow ? { ...state.tokenHireRow } : null,
+      }),
+      update: (payload) => {
+        pendingUpdate = payload as Record<string, unknown>;
+        return "chain";
+      },
+      eq: (...args) => {
+        const val = args[1];
+        if (!pendingUpdate) return "chain";
+        calls.hireUpdate.push({ id: val, payload: pendingUpdate });
         if (state.tokenHireRow && state.tokenHireRow.id === val) {
-          Object.assign(state.tokenHireRow, payload);
+          Object.assign(state.tokenHireRow, pendingUpdate);
         }
         return { error: state.hireUpdateError };
       },
     });
-    return b;
   }
 
   const serverClient = {
@@ -60,63 +68,59 @@ const h = vi.hoisted(() => {
 
   function usersServiceBuilder() {
     const filters: Record<string, unknown> = {};
-    const b: Record<string, unknown> = {};
-    b.select = () => b;
-    b.eq = (col: string, val: unknown) => {
-      filters[col] = val;
-      return b;
-    };
-    b.maybeSingle = async () => {
-      if ("email" in filters) return { data: state.family };
-      return { data: state.nurseLookup };
-    };
-    return b;
+    return createQueryBuilder({
+      eq: (...args) => {
+        const [col, val] = args as [string, unknown];
+        filters[col] = val;
+        return "chain";
+      },
+      maybeSingle: () => ({
+        data: "email" in filters ? state.family : state.nurseLookup,
+      }),
+    });
   }
 
   function revealsServiceBuilder() {
-    const b: Record<string, unknown> = {};
-    b.select = () => b;
-    b.eq = () => b;
-    b.maybeSingle = async () => ({ data: state.reveal });
-    return b;
+    return createQueryBuilder({ maybeSingle: () => ({ data: state.reveal }) });
   }
 
   function hiresServiceBuilder() {
-    const b: Record<string, unknown> = {};
-    b.select = () => b;
-    b.eq = () => b;
-    b.maybeSingle = async () => ({ data: state.existingHire });
-    b.insert = (payload: Record<string, unknown>) => {
-      calls.hireInsert.push(payload);
-      return {
-        select: () => ({
-          single: async () => ({
-            data: state.hireInsertError ? null : { id: state.newHireId },
-            error: state.hireInsertError,
-          }),
-        }),
-      };
-    };
-    b.update = (payload: Record<string, unknown>) => {
-      calls.claimTokenUpdate.push(payload);
-      return { eq: async () => ({ error: null }) };
-    };
-    return b;
+    let pendingUpdate: Record<string, unknown> | null = null;
+    return createQueryBuilder({
+      maybeSingle: () => ({ data: state.existingHire }),
+      insert: (payload) => {
+        calls.hireInsert.push(payload as Record<string, unknown>);
+        return "chain";
+      },
+      single: () => ({
+        data: state.hireInsertError ? null : { id: state.newHireId },
+        error: state.hireInsertError,
+      }),
+      update: (payload) => {
+        pendingUpdate = payload as Record<string, unknown>;
+        return "chain";
+      },
+      eq: () => {
+        if (!pendingUpdate) return "chain";
+        calls.claimTokenUpdate.push(pendingUpdate);
+        pendingUpdate = null;
+        return { error: null };
+      },
+    });
   }
 
   function emailLogServiceBuilder() {
-    const b: Record<string, unknown> = {};
-    b.select = () => b;
-    b.eq = () => b;
-    b.gte = async (col: string, val: unknown) => {
-      calls.cooldownQuery.push({ col, val });
-      return { count: state.recentEmailCount };
-    };
-    b.insert = async (payload: Record<string, unknown>) => {
-      calls.emailLogInsert.push(payload);
-      return { error: null };
-    };
-    return b;
+    return createQueryBuilder({
+      gte: (...args) => {
+        const [col, val] = args as [string, unknown];
+        calls.cooldownQuery.push({ col, val });
+        return { count: state.recentEmailCount };
+      },
+      insert: (payload) => {
+        calls.emailLogInsert.push(payload as Record<string, unknown>);
+        return { error: null };
+      },
+    });
   }
 
   const serviceClient = {
