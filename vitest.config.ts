@@ -9,7 +9,7 @@ export default defineConfig({
     // the worker pool in this repo (see memory feedback_vitest_jsdom).
     environment: "node",
     setupFiles: [],
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
     exclude: ["src/lib/__tests__/**"],
     pool: "threads",
   },

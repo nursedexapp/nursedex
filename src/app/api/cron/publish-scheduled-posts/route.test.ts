@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createQueryBuilder } from "../../../../../test/supabase-mock";
 
 const h = vi.hoisted(() => {
   const revalidatePath = vi.fn();
@@ -9,27 +10,27 @@ const h = vi.hoisted(() => {
   };
   // Records the filters the route applied so we can assert the query.
   const calls: { eq: unknown[][]; lte: unknown[][] } = { eq: [], lte: [] };
-  function builder() {
-    const b: Record<string, unknown> = {};
-    b.update = () => b;
-    b.eq = (...a: unknown[]) => {
-      calls.eq.push(a);
-      return b;
-    };
-    b.lte = (...a: unknown[]) => {
-      calls.lte.push(a);
-      return b;
-    };
-    b.select = () => Promise.resolve(state.result);
-    return b;
-  }
-  return { revalidatePath, verifyCronAuth, state, calls, builder };
+  return { revalidatePath, verifyCronAuth, state, calls };
 });
+
+function builder() {
+  return createQueryBuilder({
+    eq: (...a) => {
+      h.calls.eq.push(a);
+      return "chain";
+    },
+    lte: (...a) => {
+      h.calls.lte.push(a);
+      return "chain";
+    },
+    select: () => h.state.result,
+  });
+}
 
 vi.mock("next/cache", () => ({ revalidatePath: h.revalidatePath }));
 vi.mock("@/lib/cron/auth", () => ({ verifyCronAuth: h.verifyCronAuth }));
 vi.mock("@/lib/supabase/service-role", () => ({
-  createServiceRoleClient: () => ({ from: () => h.builder() }),
+  createServiceRoleClient: () => ({ from: () => builder() }),
 }));
 
 import { GET } from "./route";

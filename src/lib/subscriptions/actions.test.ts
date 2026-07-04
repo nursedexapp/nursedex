@@ -1,24 +1,11 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createQueryBuilder } from "../../../test/supabase-mock";
 
 const h = vi.hoisted(() => {
   const state = { customerId: "cus_123" as string | null };
   const calls = { portal: [] as Array<{ customer: string; return_url: string }> };
-  function builder() {
-    const b: Record<string, unknown> = {};
-    b.select = () => b;
-    b.eq = () => b;
-    b.order = () => b;
-    b.limit = () => b;
-    b.maybeSingle = () =>
-      Promise.resolve({
-        data: state.customerId
-          ? { stripe_customer_id: state.customerId }
-          : null,
-      });
-    return b;
-  }
-  return { state, calls, builder, captureException: vi.fn() };
+  return { state, calls, captureException: vi.fn() };
 });
 
 vi.mock("next/navigation", () => ({
@@ -56,7 +43,16 @@ vi.mock("@/lib/auth/helpers", () => ({
   getCurrentUser: async () => ({ id: "u1", email: "u@x.com" }),
 }));
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ from: () => h.builder() }),
+  createClient: async () => ({
+    from: () =>
+      createQueryBuilder({
+        maybeSingle: () => ({
+          data: h.state.customerId
+            ? { stripe_customer_id: h.state.customerId }
+            : null,
+        }),
+      }),
+  }),
 }));
 vi.mock("./queries", () => ({ getActiveSubscription: async () => null }));
 
