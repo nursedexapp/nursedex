@@ -1,0 +1,358 @@
+// @vitest-environment node
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const h = vi.hoisted(() => {
+  const FAMILY_ID = "11111111-1111-4111-8111-111111111111";
+  const OTHER_FAMILY_ID = "44444444-4444-4444-8444-444444444444";
+  const NURSE_ID = "22222222-2222-4222-8222-222222222222";
+  const FAMILY_EMAIL = "family@example.com";
+
+  const state = {
+    actor: { id: FAMILY_ID, role: "family", first_name: "Fam" } as {
+      id: string;
+      role: string;
+      first_name?: string;
+    },
+    tokenHireRow: null as Record<string, unknown> | null,
+    hireUpdateError: null as unknown,
+    family: null as Record<string, unknown> | null,
+    nurseLookup: null as Record<string, unknown> | null,
+    reveal: null as Record<string, unknown> | null,
+    existingHire: null as Record<string, unknown> | null,
+    recentEmailCount: 0,
+    newHireId: "new-hire-1",
+    hireInsertError: null as unknown,
+  };
+
+  const calls = {
+    hireUpdate: [] as unknown[],
+    hireInsert: [] as unknown[],
+    claimTokenUpdate: [] as unknown[],
+    emailLogInsert: [] as unknown[],
+    cooldownQuery: [] as unknown[],
+  };
+
+  function hiresServerBuilder() {
+    const b: Record<string, unknown> = {};
+    b.select = () => b;
+    b.eq = () => b;
+    b.maybeSingle = async () => ({
+      data: state.tokenHireRow ? { ...state.tokenHireRow } : null,
+    });
+    b.update = (payload: Record<string, unknown>) => ({
+      eq: async (_col: string, val: unknown) => {
+        calls.hireUpdate.push({ id: val, payload });
+        if (state.tokenHireRow && state.tokenHireRow.id === val) {
+          Object.assign(state.tokenHireRow, payload);
+        }
+        return { error: state.hireUpdateError };
+      },
+    });
+    return b;
+  }
+
+  const serverClient = {
+    from: (table: string) => {
+      if (table === "hires") return hiresServerBuilder();
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+
+  function usersServiceBuilder() {
+    const filters: Record<string, unknown> = {};
+    const b: Record<string, unknown> = {};
+    b.select = () => b;
+    b.eq = (col: string, val: unknown) => {
+      filters[col] = val;
+      return b;
+    };
+    b.maybeSingle = async () => {
+      if ("email" in filters) return { data: state.family };
+      return { data: state.nurseLookup };
+    };
+    return b;
+  }
+
+  function revealsServiceBuilder() {
+    const b: Record<string, unknown> = {};
+    b.select = () => b;
+    b.eq = () => b;
+    b.maybeSingle = async () => ({ data: state.reveal });
+    return b;
+  }
+
+  function hiresServiceBuilder() {
+    const b: Record<string, unknown> = {};
+    b.select = () => b;
+    b.eq = () => b;
+    b.maybeSingle = async () => ({ data: state.existingHire });
+    b.insert = (payload: Record<string, unknown>) => {
+      calls.hireInsert.push(payload);
+      return {
+        select: () => ({
+          single: async () => ({
+            data: state.hireInsertError ? null : { id: state.newHireId },
+            error: state.hireInsertError,
+          }),
+        }),
+      };
+    };
+    b.update = (payload: Record<string, unknown>) => {
+      calls.claimTokenUpdate.push(payload);
+      return { eq: async () => ({ error: null }) };
+    };
+    return b;
+  }
+
+  function emailLogServiceBuilder() {
+    const b: Record<string, unknown> = {};
+    b.select = () => b;
+    b.eq = () => b;
+    b.gte = async (col: string, val: unknown) => {
+      calls.cooldownQuery.push({ col, val });
+      return { count: state.recentEmailCount };
+    };
+    b.insert = async (payload: Record<string, unknown>) => {
+      calls.emailLogInsert.push(payload);
+      return { error: null };
+    };
+    return b;
+  }
+
+  const serviceClient = {
+    from: (table: string) => {
+      if (table === "users") return usersServiceBuilder();
+      if (table === "reveals") return revealsServiceBuilder();
+      if (table === "hires") return hiresServiceBuilder();
+      if (table === "email_log") return emailLogServiceBuilder();
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+
+  return {
+    state,
+    calls,
+    serverClient,
+    serviceClient,
+    FAMILY_ID,
+    OTHER_FAMILY_ID,
+    NURSE_ID,
+    FAMILY_EMAIL,
+  };
+});
+
+const { FAMILY_ID, OTHER_FAMILY_ID, NURSE_ID, FAMILY_EMAIL } = h;
+const TOKEN = "33333333-3333-4333-8333-333333333333";
+
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/server", () => ({ after: (fn: () => unknown) => fn() }));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => h.serverClient,
+}));
+vi.mock("@/lib/supabase/service-role", () => ({
+  createServiceRoleClient: () => h.serviceClient,
+}));
+vi.mock("@/lib/auth/helpers", () => ({
+  requireRole: async () => h.state.actor,
+}));
+vi.mock("@/lib/email/send", () => ({
+  sendHireConfirmRequestEmail: vi.fn(async () => {}),
+  sendHireConfirmedEmail: vi.fn(async () => {}),
+}));
+
+import {
+  confirmHireFromToken,
+  rejectHireFromToken,
+  claimHireByEmail,
+} from "./actions";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  h.state.actor = { id: FAMILY_ID, role: "family", first_name: "Fam" };
+  h.state.tokenHireRow = null;
+  h.state.hireUpdateError = null;
+  h.state.family = null;
+  h.state.nurseLookup = null;
+  h.state.reveal = null;
+  h.state.existingHire = null;
+  h.state.recentEmailCount = 0;
+  h.state.newHireId = "new-hire-1";
+  h.state.hireInsertError = null;
+  h.calls.hireUpdate = [];
+  h.calls.hireInsert = [];
+  h.calls.claimTokenUpdate = [];
+  h.calls.emailLogInsert = [];
+  h.calls.cooldownQuery = [];
+});
+
+describe("confirmHireFromToken", () => {
+  it("returns not_found when the token belongs to a different family", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "claimed",
+      family_user_id: OTHER_FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
+    const res = await confirmHireFromToken({ token: TOKEN });
+    expect(res).toEqual({ success: false, error: "not_found" });
+    expect(h.calls.hireUpdate).toHaveLength(0);
+  });
+
+  it("returns wrong_state when the hire is not in claimed status", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "confirmed",
+      family_user_id: FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
+    const res = await confirmHireFromToken({ token: TOKEN });
+    expect(res).toEqual({ success: false, error: "wrong_state" });
+    expect(h.calls.hireUpdate).toHaveLength(0);
+  });
+
+  it("confirms a claimed hire and notifies the nurse", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "claimed",
+      family_user_id: FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
+    h.state.nurseLookup = { email: "nurse@example.com", first_name: "Nia" };
+    const res = await confirmHireFromToken({ token: TOKEN });
+    expect(res).toEqual({ success: true, hireId: "hire-1" });
+    expect(h.calls.hireUpdate).toEqual([
+      {
+        id: "hire-1",
+        payload: expect.objectContaining({ status: "confirmed" }),
+      },
+    ]);
+  });
+
+  it("blocks a second confirm attempt on an already-confirmed hire (single-use token)", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "claimed",
+      family_user_id: FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
+    h.state.nurseLookup = { email: "nurse@example.com", first_name: "Nia" };
+
+    const first = await confirmHireFromToken({ token: TOKEN });
+    expect(first.success).toBe(true);
+
+    const second = await confirmHireFromToken({ token: TOKEN });
+    expect(second).toEqual({ success: false, error: "wrong_state" });
+    expect(h.calls.hireUpdate).toHaveLength(1);
+  });
+});
+
+describe("rejectHireFromToken", () => {
+  it("returns not_found when the token belongs to a different family", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "claimed",
+      family_user_id: OTHER_FAMILY_ID,
+    };
+    const res = await rejectHireFromToken({ token: TOKEN });
+    expect(res).toEqual({ success: false, error: "not_found" });
+    expect(h.calls.hireUpdate).toHaveLength(0);
+  });
+
+  it("returns wrong_state when the hire is not in claimed status", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "rejected",
+      family_user_id: FAMILY_ID,
+    };
+    const res = await rejectHireFromToken({ token: TOKEN });
+    expect(res).toEqual({ success: false, error: "wrong_state" });
+    expect(h.calls.hireUpdate).toHaveLength(0);
+  });
+
+  it("rejects a claimed hire", async () => {
+    h.state.tokenHireRow = {
+      id: "hire-1",
+      status: "claimed",
+      family_user_id: FAMILY_ID,
+    };
+    const res = await rejectHireFromToken({ token: TOKEN });
+    expect(res).toEqual({ success: true, hireId: "hire-1" });
+    expect(h.calls.hireUpdate).toEqual([
+      { id: "hire-1", payload: { status: "rejected" } },
+    ]);
+  });
+});
+
+describe("claimHireByEmail", () => {
+  beforeEach(() => {
+    h.state.actor = { id: NURSE_ID, role: "nurse", first_name: "Nia" };
+    h.state.family = {
+      id: FAMILY_ID,
+      email: FAMILY_EMAIL,
+      first_name: "Fam",
+      role: "family",
+      is_deleted: false,
+      is_suspended: false,
+    };
+    h.state.reveal = { id: "reveal-1" };
+  });
+
+  it("blocks a resend within the cooldown window", async () => {
+    h.state.existingHire = {
+      id: "hire-1",
+      status: "claimed",
+      claimed_by: "nurse",
+      claim_token: TOKEN,
+    };
+    h.state.recentEmailCount = 1;
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+    expect(res).toEqual({ success: false, error: "too_soon" });
+    expect(h.calls.emailLogInsert).toHaveLength(0);
+    expect(h.calls.claimTokenUpdate).toHaveLength(0);
+  });
+
+  it("resends the existing claim token outside the cooldown window", async () => {
+    h.state.existingHire = {
+      id: "hire-1",
+      status: "claimed",
+      claimed_by: "nurse",
+      claim_token: TOKEN,
+    };
+    h.state.recentEmailCount = 0;
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+    expect(res).toEqual({ success: true, hireId: "hire-1", resent: true });
+    expect(h.calls.claimTokenUpdate).toHaveLength(0);
+    expect(h.calls.emailLogInsert).toEqual([
+      expect.objectContaining({
+        recipient_user_id: FAMILY_ID,
+        email_type: "hire_confirm_request",
+        dedup_key: "hire-1",
+      }),
+    ]);
+  });
+
+  it("inserts a new claim with a token and logs the send on the happy path", async () => {
+    h.state.existingHire = null;
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+    expect(res.success).toBe(true);
+    expect(res.hireId).toBe(h.state.newHireId);
+    expect(h.calls.hireInsert).toEqual([
+      expect.objectContaining({
+        family_user_id: FAMILY_ID,
+        nurse_user_id: NURSE_ID,
+        status: "claimed",
+        claimed_by: "nurse",
+        claim_token: expect.stringMatching(
+          /^[0-9a-f-]{36}$/i,
+        ) as unknown as string,
+      }),
+    ]);
+    expect(h.calls.emailLogInsert).toEqual([
+      expect.objectContaining({
+        recipient_user_id: FAMILY_ID,
+        email_type: "hire_confirm_request",
+        dedup_key: h.state.newHireId,
+      }),
+    ]);
+  });
+});
