@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { PASSWORD_RECOVERY } from "@/lib/constants";
+import { isSafeRedirectPath } from "@/lib/auth/safe-redirect";
 
 const OTP_TYPES = new Set<EmailOtpType>([
   "signup",
@@ -20,8 +21,12 @@ export async function GET(request: NextRequest) {
   // Distinguish "caller said next=/foo" from "no next provided." When the
   // caller is explicit (e.g. password recovery sets next=/reset-password),
   // we always honor it — otherwise role-having users were getting bounced
-  // straight to /dashboard and skipping the password change.
-  const explicitNext = searchParams.get("next");
+  // straight to /dashboard and skipping the password change. A next that
+  // isn't a same-origin relative path is dropped (falls through to the
+  // role/dashboard redirect below) rather than honored, since it's appended
+  // directly to origin and could otherwise send the user off-site.
+  const rawNext = searchParams.get("next");
+  const explicitNext = isSafeRedirectPath(rawNext) ? rawNext : null;
 
   const supabase = await createClient();
   let exchanged = false;

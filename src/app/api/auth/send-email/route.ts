@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
+import { isSafeRedirectPath } from "@/lib/auth/safe-redirect";
 
 interface SupabaseEmailHookPayload {
   user: {
@@ -82,7 +83,7 @@ function verifySignature(
   return false;
 }
 
-function buildConfirmUrl(payload: SupabaseEmailHookPayload): string {
+export function buildConfirmUrl(payload: SupabaseEmailHookPayload): string {
   const { email_data } = payload;
   const base = process.env.NEXT_PUBLIC_SITE_URL || "https://nursedex.com";
   const params = new URLSearchParams({
@@ -99,7 +100,7 @@ function buildConfirmUrl(payload: SupabaseEmailHookPayload): string {
     try {
       const redirectUrl = new URL(email_data.redirect_to);
       const nextParam = redirectUrl.searchParams.get("next");
-      if (nextParam) {
+      if (isSafeRedirectPath(nextParam)) {
         params.set("next", nextParam);
       }
     } catch {
