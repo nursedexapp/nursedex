@@ -171,36 +171,14 @@ test.describe("Unauthenticated redirects", () => {
   test("dashboard redirects to login when not authenticated", async ({ page }) => {
     await page.goto("/dashboard");
 
-    // Proxy should redirect unauthenticated users to login
-    await page.waitForURL(/\/(login|dashboard)/, { timeout: 5000 });
-    const url = page.url();
-    expect(url).toMatch(/\/(login|dashboard)/);
+    await page.waitForURL(/\/login/, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test("role-select redirects to login when not authenticated", async ({ page }) => {
     await page.goto("/role-select");
 
-    await page.waitForURL(/\/(login|role-select)/, { timeout: 5000 });
-    const url = page.url();
-    expect(url).toMatch(/\/(login|role-select)/);
-  });
-});
-
-test.describe("Role select page", () => {
-  test("role-select page renders with both options", async ({ page }) => {
-    await page.goto("/role-select");
-
-    // May redirect if not authed, but if it loads, check the UI
-    const heading = page.getByRole("heading", {
-      name: "How will you use NurseDex?",
-    });
-
-    if (await heading.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(page.getByText("I am a nurse")).toBeVisible();
-      await expect(page.getByText("I need care")).toBeVisible();
-      await expect(
-        page.getByRole("button", { name: "Continue" })
-      ).toBeDisabled();
-    }
+    await page.waitForURL(/\/login/, { timeout: 5000 });
+    await expect(page).toHaveURL(/\/login/);
   });
 });
