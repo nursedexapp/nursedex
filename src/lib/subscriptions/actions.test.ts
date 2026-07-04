@@ -3,7 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQueryBuilder } from "../../../test/supabase-mock";
 
 const h = vi.hoisted(() => {
-  const state = { customerId: "cus_123" as string | null };
+  const state = {
+    customerId: "cus_123" as string | null,
+    activeSubscription: null as Record<string, unknown> | null,
+  };
   const calls = {
     portal: [] as Array<{ customer: string; return_url: string }>,
     checkout: [] as Array<Record<string, unknown>>,
@@ -68,7 +71,9 @@ vi.mock("@/lib/supabase/server", () => ({
       }),
   }),
 }));
-vi.mock("./queries", () => ({ getActiveSubscription: async () => null }));
+vi.mock("./queries", () => ({
+  getActiveSubscription: async () => h.state.activeSubscription,
+}));
 
 import {
   getCustomerPortalUrl,
@@ -79,6 +84,7 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.customerId = "cus_123";
+  h.state.activeSubscription = null;
   h.calls.portal = [];
   h.calls.checkout = [];
 });
@@ -153,6 +159,16 @@ describe("createFamilyAccessCheckout", () => {
     const next = new URL(successUrl).searchParams.get("next")!;
     expect(next).toBe("/nurses/abc?subscribed=family");
   });
+
+  it("blocks a second checkout when the user already has an active family_access subscription", async () => {
+    h.state.activeSubscription = { id: "sub_1", plan_type: "family_access" };
+    const res = await createFamilyAccessCheckout({});
+    expect(res.error).toBe(
+      "You already have an active subscription. Visit the billing portal to manage it.",
+    );
+    expect(res.url).toBeUndefined();
+    expect(h.calls.checkout).toHaveLength(0);
+  });
 });
 
 describe("createNurseFeaturedCheckout", () => {
@@ -171,5 +187,15 @@ describe("createNurseFeaturedCheckout", () => {
     });
     expect(call.discounts).toBeUndefined();
     expect(call.allow_promotion_codes).toBe(true);
+  });
+
+  it("blocks a second checkout when the user already has an active nurse_featured subscription", async () => {
+    h.state.activeSubscription = { id: "sub_2", plan_type: "nurse_featured" };
+    const res = await createNurseFeaturedCheckout();
+    expect(res.error).toBe(
+      "You already have an active subscription. Visit the billing portal to manage it.",
+    );
+    expect(res.url).toBeUndefined();
+    expect(h.calls.checkout).toHaveLength(0);
   });
 });
