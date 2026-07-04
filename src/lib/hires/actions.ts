@@ -278,17 +278,24 @@ export async function confirmHireFromToken(
   }
 
   // Keep claim_token so re-opening the link shows "Already handled" rather
-  // than "Link not valid"; the status guard above prevents re-confirmation.
-  const { error } = await supabase
+  // than "Link not valid". The status guard above is a stale read; the
+  // .eq("status", "claimed") here is what actually enforces single-use
+  // against a concurrent confirm/reject on the same row.
+  const { data: updated, error } = await supabase
     .from("hires")
     .update({
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
     })
-    .eq("id", row.id);
+    .eq("id", row.id)
+    .eq("status", "claimed")
+    .select("id");
   if (error) {
     console.error("[hires] confirm failed:", error.message);
     return { success: false, error: "unknown" };
+  }
+  if (!updated || updated.length === 0) {
+    return { success: false, error: "wrong_state" };
   }
 
   // Notify the nurse.
@@ -342,13 +349,20 @@ export async function rejectHireFromToken(
 
   // Keep claim_token (re-opening shows "Already handled", not "Link not
   // valid"), and skip revalidatePath so it doesn't fight the inline result.
-  const { error } = await supabase
+  // The .eq("status", "claimed") enforces single-use against a concurrent
+  // confirm/reject on the same row; the earlier status check is a stale read.
+  const { data: updated, error } = await supabase
     .from("hires")
     .update({ status: "rejected" })
-    .eq("id", row.id);
+    .eq("id", row.id)
+    .eq("status", "claimed")
+    .select("id");
   if (error) {
     console.error("[hires] reject failed:", error.message);
     return { success: false, error: "unknown" };
+  }
+  if (!updated || updated.length === 0) {
+    return { success: false, error: "wrong_state" };
   }
 
   return { success: true, hireId: row.id };
