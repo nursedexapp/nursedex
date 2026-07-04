@@ -4,13 +4,16 @@ import { closeIssue } from "@/lib/github";
 import { slackPost } from "@/lib/slack/client";
 import { completionBlocks, RATES, type RequestType } from "@/lib/slack/views";
 import { getRequest, postReply, refreshRoot } from "@/lib/slack/requests";
+import { verifySecretHeader } from "@/lib/security/shared-secret";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 function authorized(request: NextRequest): boolean {
-  const secret = process.env.ADMIN_SECRET;
-  return !!secret && request.headers.get("x-admin-secret") === secret;
+  return verifySecretHeader(
+    request.headers.get("x-admin-secret"),
+    process.env.ADMIN_SECRET,
+  );
 }
 
 // GET /api/slack/track?request_id=14

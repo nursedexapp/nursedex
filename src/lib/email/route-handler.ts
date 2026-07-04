@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ReactElement } from "react";
 import type { z } from "zod/v4";
+import { verifyBearerSecret } from "@/lib/security/shared-secret";
 
 export interface EmailMessage {
   from: string;
@@ -24,7 +25,10 @@ export async function handleEmailRoute<T>(
   label: string,
 ): Promise<NextResponse> {
   if (
-    request.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`
+    !verifyBearerSecret(
+      request.headers.get("authorization"),
+      process.env.CRON_SECRET,
+    )
   ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
