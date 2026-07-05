@@ -8,8 +8,12 @@ import {
 } from "./search-params";
 import { Skill, Gender } from "@/types/enums";
 
+let cardCounter = 0;
+
 function card(overrides: Partial<RankableNurse>): RankableNurse {
+  cardCounter += 1;
   return {
+    user_id: `nurse-${cardCounter}`,
     tier: "free",
     has_photo: false,
     communication_preference: null,

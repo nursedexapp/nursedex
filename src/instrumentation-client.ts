@@ -14,6 +14,10 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
   integrations: [Sentry.replayIntegration()],
+  // These originate from the host app's own injected script (e.g. Instagram's
+  // in-app browser tearing down its native bridge on page unload), not our
+  // code, and aren't actionable (NURSEDEX-SITE-5).
+  ignoreErrors: [/Java object is gone/],
 });
 
 // Required by the SDK to instrument App Router navigations for tracing.
