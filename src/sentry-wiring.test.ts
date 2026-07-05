@@ -52,4 +52,10 @@ describe("Sentry wiring (#394, #395, #400)", () => {
       expect(source).not.toMatch(/tracesSampleRate:\s*1\.0,?\s*\n/);
     }
   });
+
+  it("ignores the Android in-app-browser bridge teardown error (NURSEDEX-SITE-5)", () => {
+    const source = read("src/instrumentation-client.ts");
+    expect(source).toMatch(/ignoreErrors/);
+    expect(source).toMatch(/Java object is gone/);
+  });
 });
