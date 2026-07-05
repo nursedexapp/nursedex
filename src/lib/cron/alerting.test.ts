@@ -14,7 +14,7 @@ vi.mock("@sentry/nextjs", () => ({
 }));
 vi.mock("@/lib/slack/client", () => ({
   slackPost: h.slackPost,
-  OPS_CHANNEL_ID: "C_TEST_OPS",
+  ALERTS_CHANNEL_ID: "C_TEST_ALERTS",
 }));
 
 import { withCronAlerting } from "./alerting";
@@ -54,7 +54,7 @@ describe("withCronAlerting", () => {
     expect(h.slackPost).toHaveBeenCalledWith(
       "chat.postMessage",
       expect.objectContaining({
-        channel: "C_TEST_OPS",
+        channel: "C_TEST_ALERTS",
         text: expect.stringContaining("test-job"),
       }),
     );
@@ -73,7 +73,7 @@ describe("withCronAlerting", () => {
     );
     expect(h.slackPost).toHaveBeenCalledWith(
       "chat.postMessage",
-      expect.objectContaining({ channel: "C_TEST_OPS" }),
+      expect.objectContaining({ channel: "C_TEST_ALERTS" }),
     );
   });
 

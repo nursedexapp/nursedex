@@ -2,7 +2,7 @@ import "server-only";
 import crypto from "node:crypto";
 
 // Re-exported for existing imports from "@/lib/slack/client".
-export { OPS_CHANNEL_ID } from "./constants";
+export { OPS_CHANNEL_ID, ALERTS_CHANNEL_ID } from "./constants";
 
 const SLACK_API = "https://slack.com/api";
 
