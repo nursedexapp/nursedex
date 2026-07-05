@@ -1,4 +1,5 @@
 export interface RankableNurse {
+  user_id: string;
   tier: "free" | "featured";
   has_photo: boolean;
   communication_preference: string | null;
@@ -44,6 +45,11 @@ export function rankNurses<T extends RankableNurse>(
     for (let i = 0; i < sa.length; i++) {
       if (sa[i] !== sb[i]) return sb[i] - sa[i];
     }
-    return 0;
+    // Full tie on every ranking criterion. The raw query has no ORDER BY,
+    // so Postgres doesn't guarantee row order between executions; without
+    // this, ties fall back to whatever order the DB happened to return,
+    // which can differ between the page's initial render and a later
+    // re-render and produce a hydration mismatch (NURSEDEX-SITE-4).
+    return a.user_id < b.user_id ? -1 : a.user_id > b.user_id ? 1 : 0;
   });
 }
