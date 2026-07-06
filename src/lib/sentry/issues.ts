@@ -10,7 +10,7 @@ import "server-only";
 // src/lib/cron/alerting.ts / the Stripe webhook route, so they're
 // excluded here by the same tags those call sites set.
 const NEEDS_REVIEW_QUERY =
-  "is:for_review level:error !action:cron !action:stripe-webhook";
+  "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook";
 
 const API = "https://sentry.io/api/0";
 
@@ -21,6 +21,10 @@ const MAX_PAGES = 5;
 
 export interface SentryIssue {
   id: string;
+  // Sentry's human-readable reference (e.g. "NURSEDEX-SITE-6"). Referencing
+  // it as "Fixes NURSEDEX-SITE-6" in a commit message auto-closes the issue
+  // in Sentry once that commit merges.
+  shortId: string;
   title: string;
   culprit: string;
   level: string;
@@ -75,6 +79,7 @@ export async function getIssuesNeedingReview(): Promise<SentryIssue[]> {
 
     const data = (await res.json()) as Array<{
       id: string;
+      shortId: string;
       title: string;
       culprit: string;
       level: string;
@@ -83,6 +88,7 @@ export async function getIssuesNeedingReview(): Promise<SentryIssue[]> {
     issues.push(
       ...data.map((issue) => ({
         id: issue.id,
+        shortId: issue.shortId,
         title: issue.title,
         culprit: issue.culprit,
         level: issue.level,

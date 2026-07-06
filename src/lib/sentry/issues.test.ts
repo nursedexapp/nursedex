@@ -38,7 +38,7 @@ describe("getIssuesNeedingReview", () => {
       "/api/0/projects/nursedex/nursedex-site/issues/",
     );
     expect(parsed.searchParams.get("query")).toBe(
-      "is:for_review level:error !action:cron !action:stripe-webhook",
+      "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook",
     );
     expect((init?.headers as Record<string, string>).Authorization).toBe(
       "Bearer test-token",
@@ -52,6 +52,7 @@ describe("getIssuesNeedingReview", () => {
         jsonResponse([
           {
             id: "123",
+            shortId: "NURSEDEX-SITE-6",
             title: "TypeError: x is not a function",
             culprit: "app/nurses/page",
             level: "error",
@@ -67,6 +68,7 @@ describe("getIssuesNeedingReview", () => {
     expect(issues).toEqual([
       {
         id: "123",
+        shortId: "NURSEDEX-SITE-6",
         title: "TypeError: x is not a function",
         culprit: "app/nurses/page",
         level: "error",

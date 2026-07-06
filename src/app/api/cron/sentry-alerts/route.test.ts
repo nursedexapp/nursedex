@@ -49,6 +49,7 @@ const req = {} as Parameters<typeof GET>[0];
 function issue(id: string) {
   return {
     id,
+    shortId: `NURSEDEX-SITE-${id}`,
     title: `Error ${id}`,
     culprit: `app/route-${id}`,
     level: "error",
@@ -96,6 +97,14 @@ describe("sentry-alerts cron", () => {
       expect.objectContaining({
         channel: "C_TEST_ALERTS",
         text: expect.stringContaining("Error 1"),
+      }),
+    );
+    // Includes the Sentry short ID so a fix commit can reference
+    // "Fixes NURSEDEX-SITE-1" to auto-close the issue in Sentry.
+    expect(h.slackPost).toHaveBeenCalledWith(
+      "chat.postMessage",
+      expect.objectContaining({
+        text: expect.stringContaining("NURSEDEX-SITE-1"),
       }),
     );
     expect(h.calls.insert).toEqual([{ issue_id: "1" }]);

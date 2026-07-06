@@ -44,7 +44,7 @@ const handleSentryAlerts = withCronAlerting(
       try {
         await slackPost("chat.postMessage", {
           channel: ALERTS_CHANNEL_ID,
-          text: `Sentry issue needs review: ${issue.title}\n${issue.culprit}\n${issue.permalink}`,
+          text: `Sentry issue needs review: [${issue.shortId}] ${issue.title}\n${issue.culprit}\n${issue.permalink}`,
         });
         await supabase
           .from("sentry_issue_alert_log")
