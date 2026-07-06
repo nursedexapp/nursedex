@@ -67,9 +67,15 @@ describe("withCronAlerting", () => {
     const res = await withCronAlerting("test-job", handler)(fakeRequest());
 
     expect(res).toBe(failed);
+    // Tagged the same way as the throw path (action: "cron", job) so the
+    // Sentry-to-Slack issue poller can recognize this was already alerted
+    // here and skip it, instead of posting a duplicate Slack message.
     expect(h.captureMessage).toHaveBeenCalledWith(
       expect.stringContaining("test-job"),
-      "error",
+      expect.objectContaining({
+        level: "error",
+        tags: expect.objectContaining({ action: "cron", job: "test-job" }),
+      }),
     );
     expect(h.slackPost).toHaveBeenCalledWith(
       "chat.postMessage",

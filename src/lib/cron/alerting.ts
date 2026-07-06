@@ -25,7 +25,10 @@ export function withCronAlerting(jobName: string, handler: CronHandler): CronHan
       if (!res.ok) {
         const message = `cron "${jobName}" returned status ${res.status}`;
         console.error(`[cron ${jobName}]`, message);
-        Sentry.captureMessage(message, "error");
+        Sentry.captureMessage(message, {
+          level: "error",
+          tags: { action: "cron", job: jobName },
+        });
         await alertOpsSlack(jobName, message).catch((slackErr) =>
           console.error(`[cron ${jobName}] slack alert failed:`, slackErr),
         );
