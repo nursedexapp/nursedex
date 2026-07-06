@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { slackPost, OPS_CHANNEL_ID } from "@/lib/slack/client";
+import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
 
 type CronHandler = (request: NextRequest) => Promise<NextResponse>;
 
@@ -46,7 +46,7 @@ export function withCronAlerting(jobName: string, handler: CronHandler): CronHan
 
 async function alertOpsSlack(jobName: string, message: string): Promise<void> {
   await slackPost("chat.postMessage", {
-    channel: OPS_CHANNEL_ID,
+    channel: ALERTS_CHANNEL_ID,
     text: `🚨 Cron failed: \`${jobName}\`\n${message}`,
   });
 }

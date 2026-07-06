@@ -7,7 +7,7 @@ import { GRACE_PERIODS } from "@/lib/constants";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { captureServerEvent } from "@/lib/analytics/server";
 import { shouldSendOnce } from "@/lib/cron/email-log";
-import { slackPost, OPS_CHANNEL_ID } from "@/lib/slack/client";
+import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
 import {
   sendSubscriptionConfirmedEmail,
   sendRenewalSuccessEmail,
@@ -105,7 +105,7 @@ async function alertOpsSlack(event: Stripe.Event, err: unknown): Promise<void> {
 
   const message = err instanceof Error ? err.message : String(err);
   await slackPost("chat.postMessage", {
-    channel: OPS_CHANNEL_ID,
+    channel: ALERTS_CHANNEL_ID,
     text: `🚨 Stripe webhook failed: \`${event.type}\` (event \`${event.id}\`)\n${message}`,
   });
   await supabase.from("webhook_alert_log").insert({ event_id: event.id });

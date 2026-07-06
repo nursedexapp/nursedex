@@ -88,7 +88,7 @@ vi.mock("@sentry/nextjs", () => ({
 }));
 vi.mock("@/lib/slack/client", () => ({
   slackPost: h.slackPost,
-  OPS_CHANNEL_ID: "C_TEST_OPS",
+  ALERTS_CHANNEL_ID: "C_TEST_ALERTS",
 }));
 
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
@@ -544,7 +544,7 @@ describe("stripe webhook: failure alerting (#396)", () => {
     expect(h.slackPost).toHaveBeenCalledWith(
       "chat.postMessage",
       expect.objectContaining({
-        channel: "C_TEST_OPS",
+        channel: "C_TEST_ALERTS",
         text: expect.stringContaining("checkout.session.completed"),
       }),
     );
