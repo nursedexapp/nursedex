@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { guardedStatusUpdate } from "@/lib/db/guarded-status-update";
 import { requireRole } from "@/lib/auth/helpers";
 import { UserRole } from "@/types/enums";
 import {
@@ -279,22 +280,22 @@ export async function confirmHireFromToken(
 
   // Keep claim_token so re-opening the link shows "Already handled" rather
   // than "Link not valid". The status guard above is a stale read; the
-  // .eq("status", "claimed") here is what actually enforces single-use
-  // against a concurrent confirm/reject on the same row.
-  const { data: updated, error } = await supabase
-    .from("hires")
-    .update({
+  // guarded update is what actually enforces single-use against a concurrent
+  // confirm/reject on the same row.
+  const result = await guardedStatusUpdate(supabase, {
+    table: "hires",
+    id: row.id,
+    expectedStatus: "claimed",
+    patch: {
       status: "confirmed",
       confirmed_at: new Date().toISOString(),
-    })
-    .eq("id", row.id)
-    .eq("status", "claimed")
-    .select("id");
-  if (error) {
-    console.error("[hires] confirm failed:", error.message);
+    },
+  });
+  if (result.outcome === "error") {
+    console.error("[hires] confirm failed:", result.message);
     return { success: false, error: "unknown" };
   }
-  if (!updated || updated.length === 0) {
+  if (result.outcome === "already_resolved") {
     return { success: false, error: "wrong_state" };
   }
 
@@ -349,19 +350,19 @@ export async function rejectHireFromToken(
 
   // Keep claim_token (re-opening shows "Already handled", not "Link not
   // valid"), and skip revalidatePath so it doesn't fight the inline result.
-  // The .eq("status", "claimed") enforces single-use against a concurrent
+  // The guarded update enforces single-use against a concurrent
   // confirm/reject on the same row; the earlier status check is a stale read.
-  const { data: updated, error } = await supabase
-    .from("hires")
-    .update({ status: "rejected" })
-    .eq("id", row.id)
-    .eq("status", "claimed")
-    .select("id");
-  if (error) {
-    console.error("[hires] reject failed:", error.message);
+  const result = await guardedStatusUpdate(supabase, {
+    table: "hires",
+    id: row.id,
+    expectedStatus: "claimed",
+    patch: { status: "rejected" },
+  });
+  if (result.outcome === "error") {
+    console.error("[hires] reject failed:", result.message);
     return { success: false, error: "unknown" };
   }
-  if (!updated || updated.length === 0) {
+  if (result.outcome === "already_resolved") {
     return { success: false, error: "wrong_state" };
   }
 

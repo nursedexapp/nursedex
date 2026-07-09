@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { guardedStatusUpdate } from "@/lib/db/guarded-status-update";
 import { estimateRequest } from "@/lib/ai/estimate";
 import { OPS_CHANNEL_ID, slackPost, verifySlackRequest } from "@/lib/slack/client";
 import { OPS_NOTIFY_USER_ID } from "@/lib/slack/constants";
@@ -324,18 +325,24 @@ async function handleDecision(
   const existing = await getRequest(id);
   if (!existing || existing.status !== "triaged") return; // already decided
 
-  const supabase = createServiceRoleClient();
-  const update = approve
-    ? { status: "approved", approved_at: new Date().toISOString(), approved_by: userId }
-    : { status: "rejected", approved_by: userId };
-  const { error } = await supabase
-    .from("consulting_requests")
-    .update(update)
-    .eq("id", id);
-  if (error) {
-    console.error(`Decision on request ${id} failed:`, error);
+  // The read above is a stale check, not a guard. The expected status lives
+  // inside the UPDATE so the database serializes a double-clicked Approve, or
+  // an Approve racing a Reject: exactly one caller matches the row. Unlike
+  // hires, consulting_requests has no status-transition trigger, so nothing
+  // else would catch a duplicate GitHub issue or Slack reply.
+  const result = await guardedStatusUpdate(createServiceRoleClient(), {
+    table: "consulting_requests",
+    id,
+    expectedStatus: "triaged",
+    patch: approve
+      ? { status: "approved", approved_at: new Date().toISOString(), approved_by: userId }
+      : { status: "rejected", approved_by: userId },
+  });
+  if (result.outcome === "error") {
+    console.error(`Decision on request ${id} failed:`, result.message);
     return;
   }
+  if (result.outcome === "already_resolved") return; // lost the race
 
   const req = await getRequest(id);
   if (req) {
