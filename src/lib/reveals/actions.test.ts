@@ -2,11 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const h = vi.hoisted(() => {
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterdayDate = new Date();
-  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
-  const yesterday = yesterdayDate.toISOString().slice(0, 10);
-
   const state = {
     user: { id: "fam-1", role: "family" } as {
       id: string;
@@ -23,6 +18,19 @@ const h = vi.hoisted(() => {
       current_count: number | null;
       needs_captcha: boolean | null;
     } | null,
+    // Result of the atomic consume RPC. `allowed: false` means the row was
+    // already at the hard cap, so the upsert's WHERE guard skipped the
+    // increment.
+    consumeRow: {
+      allowed: true,
+      current_count: 1,
+      needs_captcha: false,
+    } as {
+      allowed: boolean | null;
+      current_count: number | null;
+      needs_captcha: boolean | null;
+    } | null,
+    consumeError: null as unknown,
     revealInsertError: null as unknown,
     contact: {
       email: "nurse@example.com",
@@ -34,25 +42,27 @@ const h = vi.hoisted(() => {
       communication_preference: string | null;
     },
     captchaOk: true,
-    rateLimitToday: null as {
-      reveal_count: number;
-      captcha_triggered: boolean;
-      consecutive_captcha_days: number;
-    } | null,
-    rateLimitYesterday: null as {
-      captcha_triggered: boolean;
-      consecutive_captcha_days: number;
-    } | null,
   };
 
   const calls = {
     revealInsert: [] as unknown[],
     rateLimitRpc: [] as unknown[],
+    consumeRpc: [] as unknown[],
     analyticsRpc: [] as unknown[],
-    rateLimitUpdate: [] as unknown[],
-    rateLimitInsert: [] as unknown[],
+    // Any direct table access from the service-role client. The atomic fix
+    // means the counter is only ever touched through the RPC, so this must
+    // stay empty.
+    serviceRoleTables: [] as string[],
     verifyTurnstile: [] as unknown[],
   };
+
+  function chainStub() {
+    const b: Record<string, unknown> = {};
+    for (const m of ["select", "eq", "insert", "update", "maybeSingle"]) {
+      b[m] = () => b;
+    }
+    return b;
+  }
 
   function revealsBuilder() {
     const b: Record<string, unknown> = {};
@@ -62,30 +72,6 @@ const h = vi.hoisted(() => {
     b.insert = async (payload: unknown) => {
       calls.revealInsert.push(payload);
       return { error: state.revealInsertError };
-    };
-    return b;
-  }
-
-  function rateLimitBuilder() {
-    const filters: Record<string, unknown> = {};
-    const b: Record<string, unknown> = {};
-    b.select = () => b;
-    b.eq = (col: string, val: unknown) => {
-      filters[col] = val;
-      return b;
-    };
-    b.maybeSingle = async () => {
-      const row =
-        filters.date === today ? state.rateLimitToday : state.rateLimitYesterday;
-      return { data: row };
-    };
-    b.update = (payload: unknown) => {
-      calls.rateLimitUpdate.push({ ...filters, payload });
-      return { eq: () => ({ eq: async () => ({ error: null }) }) };
-    };
-    b.insert = async (payload: unknown) => {
-      calls.rateLimitInsert.push(payload);
-      return { error: null };
     };
     return b;
   }
@@ -110,14 +96,24 @@ const h = vi.hoisted(() => {
 
   const serviceRoleClient = {
     from: (table: string) => {
-      if (table === "rate_limit_reveals") return rateLimitBuilder();
-      throw new Error(`unexpected table ${table}`);
+      calls.serviceRoleTables.push(table);
+      return chainStub();
+    },
+    rpc: (fn: string, params: unknown) => {
+      if (fn === "consume_reveal_rate_limit") {
+        calls.consumeRpc.push(params);
+        return {
+          single: async () => ({
+            data: state.consumeRow,
+            error: state.consumeError,
+          }),
+        };
+      }
+      throw new Error(`unexpected rpc ${fn}`);
     },
   };
 
   return {
-    today,
-    yesterday,
     state,
     calls,
     serverClient,
@@ -166,6 +162,8 @@ beforeEach(() => {
   h.state.hasAccess = true;
   h.state.existingReveal = null;
   h.state.rateRow = { allowed: true, current_count: 0, needs_captcha: false };
+  h.state.consumeRow = { allowed: true, current_count: 1, needs_captcha: false };
+  h.state.consumeError = null;
   h.state.revealInsertError = null;
   h.state.contact = {
     email: "nurse@example.com",
@@ -173,13 +171,11 @@ beforeEach(() => {
     communication_preference: "email",
   };
   h.state.captchaOk = true;
-  h.state.rateLimitToday = null;
-  h.state.rateLimitYesterday = null;
   h.calls.revealInsert = [];
   h.calls.rateLimitRpc = [];
+  h.calls.consumeRpc = [];
   h.calls.analyticsRpc = [];
-  h.calls.rateLimitUpdate = [];
-  h.calls.rateLimitInsert = [];
+  h.calls.serviceRoleTables = [];
   h.calls.verifyTurnstile = [];
 });
 
@@ -207,30 +203,29 @@ describe("revealNurse gating", () => {
 });
 
 describe("revealNurse idempotent re-reveal", () => {
-  it("returns contact without bumping the rate limit or re-inserting", async () => {
+  it("returns contact without consuming a rate-limit slot or re-inserting", async () => {
     h.state.existingReveal = { id: "reveal-1" };
     const res = await revealNurse(NURSE_ID);
     expect(res).toEqual({ success: true, contact: h.state.contact });
     expect(h.calls.revealInsert).toHaveLength(0);
     expect(h.calls.rateLimitRpc).toHaveLength(0);
-    expect(h.calls.rateLimitUpdate).toHaveLength(0);
-    expect(h.calls.rateLimitInsert).toHaveLength(0);
+    expect(h.calls.consumeRpc).toHaveLength(0);
     expect(h.revalidatePath).not.toHaveBeenCalled();
   });
 });
 
-describe("revealNurse rate-limit RPC coercion", () => {
+describe("revealNurse advisory rate-limit check", () => {
   it("coerces a NULL rate-limit row to allowed with count 0 (regression: past NULL-coercion bug)", async () => {
     h.state.rateRow = null;
     const res = await revealNurse(NURSE_ID);
     expect(res.success).toBe(true);
     expect(h.calls.revealInsert).toHaveLength(1);
-    expect(h.calls.rateLimitInsert).toEqual([
-      expect.objectContaining({ reveal_count: 1, captcha_triggered: false }),
+    expect(h.calls.consumeRpc).toEqual([
+      { p_family_user_id: "fam-1", p_triggered_captcha: false },
     ]);
   });
 
-  it("blocks when the rate limit reports not allowed", async () => {
+  it("blocks early when the advisory check reports not allowed", async () => {
     h.state.rateRow = {
       allowed: false,
       current_count: 25,
@@ -239,6 +234,7 @@ describe("revealNurse rate-limit RPC coercion", () => {
     const res = await revealNurse(NURSE_ID);
     expect(res).toEqual({ success: false, error: "rate_limited" });
     expect(h.calls.revealInsert).toHaveLength(0);
+    expect(h.calls.consumeRpc).toHaveLength(0);
   });
 });
 
@@ -258,23 +254,82 @@ describe("revealNurse captcha gate", () => {
     expect(h.verifyTurnstileToken).not.toHaveBeenCalled();
   });
 
-  it("rejects a failed captcha verification", async () => {
+  it("rejects a failed captcha verification without consuming a slot", async () => {
     h.state.captchaOk = false;
     const res = await revealNurse(NURSE_ID, "bad-token");
     expect(res).toEqual({ success: false, error: "captcha_failed" });
     expect(h.calls.revealInsert).toHaveLength(0);
+    // A failed captcha must not burn quota: consume runs only after verify.
+    expect(h.calls.consumeRpc).toHaveLength(0);
   });
 
-  it("proceeds and bumps the captcha flag when verification succeeds", async () => {
+  it("passes the captcha trigger through to the consume RPC", async () => {
     const res = await revealNurse(NURSE_ID, "good-token");
     expect(res.success).toBe(true);
     expect(h.verifyTurnstileToken).toHaveBeenCalledWith(
       "good-token",
       "1.2.3.4",
     );
-    expect(h.calls.rateLimitInsert).toEqual([
-      expect.objectContaining({ captcha_triggered: true }),
+    expect(h.calls.consumeRpc).toEqual([
+      { p_family_user_id: "fam-1", p_triggered_captcha: true },
     ]);
+  });
+});
+
+describe("revealNurse atomic rate-limit consume (issue #563)", () => {
+  it("consumes the slot through the RPC and never touches rate_limit_reveals directly", async () => {
+    const res = await revealNurse(NURSE_ID);
+    expect(res.success).toBe(true);
+    expect(h.calls.consumeRpc).toEqual([
+      { p_family_user_id: "fam-1", p_triggered_captcha: false },
+    ]);
+    // Read-modify-write is the bug. No direct table access at all.
+    expect(h.calls.serviceRoleTables).toEqual([]);
+  });
+
+  it("denies the reveal when the atomic consume reports the cap is reached", async () => {
+    // The advisory check passed (a concurrent request had not yet landed),
+    // but the atomic upsert's WHERE guard refused to increment past the cap.
+    h.state.consumeRow = {
+      allowed: false,
+      current_count: 25,
+      needs_captcha: true,
+    };
+    const res = await revealNurse(NURSE_ID);
+    expect(res).toEqual({ success: false, error: "rate_limited" });
+    expect(h.calls.consumeRpc).toHaveLength(1);
+    // Critical: the reveal must not be inserted once the cap is hit.
+    expect(h.calls.revealInsert).toHaveLength(0);
+    expect(h.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("consumes the slot before inserting the reveal", async () => {
+    h.state.consumeRow = {
+      allowed: false,
+      current_count: 25,
+      needs_captcha: false,
+    };
+    await revealNurse(NURSE_ID);
+    // A denied consume proves ordering: had the insert run first, it would
+    // have been recorded before the deny short-circuited.
+    expect(h.calls.revealInsert).toHaveLength(0);
+  });
+
+  it("fails loud and inserts nothing when the consume RPC errors", async () => {
+    h.state.consumeRow = null;
+    h.state.consumeError = { message: "db unavailable" };
+    const res = await revealNurse(NURSE_ID);
+    expect(res).toEqual({ success: false, error: "unknown" });
+    expect(h.calls.revealInsert).toHaveLength(0);
+    expect(h.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("fails loud when the consume RPC returns no row", async () => {
+    h.state.consumeRow = null;
+    h.state.consumeError = null;
+    const res = await revealNurse(NURSE_ID);
+    expect(res).toEqual({ success: false, error: "unknown" });
+    expect(h.calls.revealInsert).toHaveLength(0);
   });
 });
 
@@ -283,12 +338,14 @@ describe("revealNurse reveal insert failure", () => {
     h.state.revealInsertError = { message: "db error" };
     const res = await revealNurse(NURSE_ID);
     expect(res).toEqual({ success: false, error: "unknown" });
-    expect(h.calls.rateLimitInsert).toHaveLength(0);
+    // Fail-closed: the slot is consumed before the insert, so a failed
+    // insert burns quota rather than reopening the cap-bypass race.
+    expect(h.calls.consumeRpc).toHaveLength(1);
   });
 });
 
 describe("revealNurse happy path", () => {
-  it("inserts the reveal, bumps the rate limit, revalidates, and returns contact", async () => {
+  it("inserts the reveal, consumes the limit, revalidates, and returns contact", async () => {
     const res = await revealNurse(NURSE_ID);
     expect(res).toEqual({ success: true, contact: h.state.contact });
     expect(h.calls.revealInsert).toEqual([
@@ -309,61 +366,6 @@ describe("revealNurse happy path", () => {
     };
     const res = await revealNurse(NURSE_ID);
     expect(res).toEqual({ success: false, error: "unknown" });
-  });
-});
-
-describe("bumpRateLimit accounting (exercised via revealNurse)", () => {
-  it("increments an existing today row instead of inserting a new one", async () => {
-    h.state.rateLimitToday = {
-      reveal_count: 3,
-      captcha_triggered: false,
-      consecutive_captcha_days: 0,
-    };
-    await revealNurse(NURSE_ID);
-    expect(h.calls.rateLimitInsert).toHaveLength(0);
-    expect(h.calls.rateLimitUpdate).toEqual([
-      expect.objectContaining({
-        payload: { reveal_count: 4, captcha_triggered: false },
-      }),
-    ]);
-  });
-
-  it("carries the consecutive-captcha streak forward from yesterday", async () => {
-    h.state.rateRow = {
-      allowed: true,
-      current_count: 10,
-      needs_captcha: true,
-    };
-    h.state.rateLimitYesterday = {
-      captcha_triggered: true,
-      consecutive_captcha_days: 2,
-    };
-    await revealNurse(NURSE_ID, "good-token");
-    expect(h.calls.rateLimitInsert).toEqual([
-      expect.objectContaining({
-        captcha_triggered: true,
-        consecutive_captcha_days: 3,
-      }),
-    ]);
-  });
-
-  it("starts the streak at 1 when yesterday had no captcha trigger", async () => {
-    h.state.rateRow = {
-      allowed: true,
-      current_count: 10,
-      needs_captcha: true,
-    };
-    h.state.rateLimitYesterday = {
-      captcha_triggered: false,
-      consecutive_captcha_days: 0,
-    };
-    await revealNurse(NURSE_ID, "good-token");
-    expect(h.calls.rateLimitInsert).toEqual([
-      expect.objectContaining({
-        captcha_triggered: true,
-        consecutive_captcha_days: 1,
-      }),
-    ]);
   });
 });
 

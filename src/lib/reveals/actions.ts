@@ -99,15 +99,21 @@ export async function revealNurse(
     if (!ok) return { success: false, error: "captcha_failed" };
   }
 
-  // Insert the reveal.
+  // Atomically consume a slot. This, not the advisory check above, is the
+  // real cap gate: it increments and enforces the cap in one statement, so a
+  // burst of concurrent reveals can neither lose an increment nor slip past
+  // REVEALS_HARD_CAP between the check and the insert.
+  const consumed = await consumeRateLimit(user.id, rl.needs_captcha);
+  if (!consumed) return { success: false, error: "unknown" };
+  if (!consumed.allowed) return { success: false, error: "rate_limited" };
+
+  // Insert the reveal. Consuming first means a failed insert burns a slot
+  // rather than reopening the race; over-counting is the safe direction.
   const { error: revealErr } = await supabase.from("reveals").insert({
     family_user_id: user.id,
     nurse_user_id: nurseUserId,
   });
   if (revealErr) return { success: false, error: "unknown" };
-
-  // Bump today's counter + flag captcha day if applicable.
-  await bumpRateLimit(user.id, rl.needs_captcha);
 
   // Best-effort analytics increment.
   await supabase
@@ -141,68 +147,37 @@ async function fetchContactResult(nurseUserId: string): Promise<RevealResult> {
 }
 
 /**
- * Upsert today's rate_limit_reveals row: increment count, set
- * captcha_triggered, and bump consecutive_captcha_days when this is the
- * first captcha-trigger of the day.
+ * Atomically claim one reveal against today's cap.
+ *
+ * Delegates the whole read-increment-guard sequence to the
+ * consume_reveal_rate_limit RPC, which performs it as a single upsert. Doing
+ * the increment in JavaScript was a lost-update race, and checking the cap
+ * before the insert was a check-then-act race (issue #563).
+ *
+ * Returns null when the RPC fails, so the caller can fail loud rather than
+ * treating an unknown counter state as a granted reveal.
  */
-async function bumpRateLimit(
+async function consumeRateLimit(
   familyUserId: string,
   triggeredCaptcha: boolean,
-): Promise<void> {
+): Promise<{ allowed: boolean } | null> {
   // The daily counter is system-managed: rate_limit_reveals has no INSERT
-  // RLS policy (families must not be able to write their own limit), so use
-  // the service role here. Otherwise the insert is silently blocked and the
-  // cap is never enforced.
+  // RLS policy (families must not be able to write their own limit), and the
+  // RPC only grants EXECUTE to service_role, so go through that client.
   const supabase = createServiceRoleClient();
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
 
-  const { data: existing } = await supabase
-    .from("rate_limit_reveals")
-    .select("reveal_count, captcha_triggered, consecutive_captcha_days")
-    .eq("family_user_id", familyUserId)
-    .eq("date", today)
-    .maybeSingle();
+  const { data, error } = await supabase
+    .rpc("consume_reveal_rate_limit", {
+      p_family_user_id: familyUserId,
+      p_triggered_captcha: triggeredCaptcha,
+    })
+    .single();
 
-  if (existing) {
-    // Existing row: just bump count, set captcha flag if needed. Don't
-    // re-bump consecutive_captcha_days within the same day.
-    await supabase
-      .from("rate_limit_reveals")
-      .update({
-        reveal_count: existing.reveal_count + 1,
-        captcha_triggered: existing.captcha_triggered || triggeredCaptcha,
-      })
-      .eq("family_user_id", familyUserId)
-      .eq("date", today);
-    return;
-  }
+  if (error || !data) return null;
 
-  // No row for today, first reveal of the day.
-  let consecutive = 0;
-  if (triggeredCaptcha) {
-    // Look at yesterday's row. If it had a captcha trigger, carry the
-    // streak forward; otherwise this is day 1.
-    const yesterday = new Date();
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const yesterdayDate = yesterday.toISOString().slice(0, 10);
-    const { data: prior } = await supabase
-      .from("rate_limit_reveals")
-      .select("captcha_triggered, consecutive_captcha_days")
-      .eq("family_user_id", familyUserId)
-      .eq("date", yesterdayDate)
-      .maybeSingle();
-    consecutive = prior?.captcha_triggered
-      ? (prior.consecutive_captcha_days ?? 0) + 1
-      : 1;
-  }
-
-  await supabase.from("rate_limit_reveals").insert({
-    family_user_id: familyUserId,
-    date: today,
-    reveal_count: 1,
-    captcha_triggered: triggeredCaptcha,
-    consecutive_captcha_days: consecutive,
-  });
+  // Fail closed: an unexpectedly NULL `allowed` denies the reveal rather
+  // than granting it.
+  return { allowed: (data as { allowed: boolean | null }).allowed ?? false };
 }
 
 /**
