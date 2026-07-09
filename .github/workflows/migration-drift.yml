@@ -1,0 +1,64 @@
+name: Migration Drift
+
+# Merging a PR with a new migration does not deploy it. Migration 043, which
+# blocked a user from promoting themselves to super-admin, sat merged but
+# unapplied in production until it was found by accident (#518). Nothing
+# signalled the gap.
+#
+# This job compares the migrations committed to git against those actually
+# applied to production, and fails loudly when they diverge. It is read-only
+# by design: it never runs `db push`. Applying migrations stays a deliberate
+# human step (the gated auto-push is tracked separately in #542).
+
+on:
+  # Right after a merge, when a migration is most likely to have been
+  # forgotten. Runs on every push to main, not only migration-touching ones,
+  # so drift introduced elsewhere is still caught.
+  push:
+    branches: [main]
+  # A daily backstop: drift can appear without any push, for example when a
+  # migration is applied by hand or a push silently fails.
+  schedule:
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: migration-drift
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: Check production migration drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+          # Resolving "latest" hits the GitHub API; without a token it uses the
+          # unauthenticated 60/hr limit and intermittently fails.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Read-only: lists what production has applied. No schema is changed.
+      # A missing secret makes the CLI fail, which fails the job, rather than
+      # silently reporting "in sync".
+      - name: Compare local migrations against production
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$PROJECT_REF"
+          supabase migration list --linked --output-format json \
+            | npx tsx scripts/check-migration-drift.ts

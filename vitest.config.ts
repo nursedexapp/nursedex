@@ -9,7 +9,14 @@ export default defineConfig({
     // the worker pool in this repo (see memory feedback_vitest_jsdom).
     environment: "node",
     setupFiles: [],
-    include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
+    // scripts/ holds CI-only tooling (e.g. the migration drift detector). It
+    // lives outside src/ so it never enters the app bundle, but it still has
+    // logic worth testing.
+    include: [
+      "src/**/*.test.{ts,tsx}",
+      "test/**/*.test.{ts,tsx}",
+      "scripts/**/*.test.ts",
+    ],
     exclude: ["src/lib/__tests__/**"],
     pool: "threads",
   },
