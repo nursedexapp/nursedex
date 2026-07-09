@@ -225,7 +225,7 @@ async function handleSubscriptionDeleted(
   const supabase = createServiceRoleClient();
   const { data: row } = await supabase
     .from("subscriptions")
-    .select("user_id, plan_type, last_event_at")
+    .select("user_id, plan_type")
     .eq("stripe_subscription_id", sub.id)
     .maybeSingle();
 
@@ -245,22 +245,28 @@ async function handleSubscriptionDeleted(
     return;
   }
 
-  if (row?.last_event_at && eventCreated < toUnixSeconds(row.last_event_at)) {
-    // Stale/out-of-order delete: a newer event already superseded it.
-    return;
-  }
-
-  assertNoWriteError(
-    await supabase
+  // When a row exists, the ordering guard rides on the UPDATE's own filter
+  // rather than a prior read, so a delete racing a newer event at the same
+  // instant loses in the database instead of both passing a JS check (#528).
+  // Zero rows back means a newer event already superseded this delete, and
+  // the cascading cleanup below must not run off a write that lost.
+  if (row) {
+    const incoming = new Date(eventCreated * 1000).toISOString();
+    const result = await supabase
       .from("subscriptions")
       .update({
         status: "cancelled",
         cancel_at_period_end: false,
-        last_event_at: new Date(eventCreated * 1000).toISOString(),
+        last_event_at: incoming,
       })
-      .eq("stripe_subscription_id", sub.id),
-    "subscriptions update (subscription deleted)",
-  );
+      .eq("stripe_subscription_id", sub.id)
+      .or(`last_event_at.is.null,last_event_at.lte.${incoming}`)
+      .select("id");
+    assertNoWriteError(result, "subscriptions update (subscription deleted)");
+    if (!result.data || result.data.length === 0) return;
+  }
+  // No row at all (a delete delivered before its create) falls through to the
+  // metadata-driven cleanup below, preserving #428.
 
   // Tier sync: if a featured nurse's sub goes away, drop them to free.
   if (planType === "nurse_featured") {
@@ -372,11 +378,6 @@ function assertNoWriteError(
   }
 }
 
-/** Stripe event timestamps are unix seconds; last_event_at is stored as an ISO string. */
-function toUnixSeconds(iso: string): number {
-  return Math.floor(new Date(iso).getTime() / 1000);
-}
-
 interface UpsertArgs {
   userId: string;
   planType: "nurse_featured" | "family_access";
@@ -396,15 +397,6 @@ async function upsertSubscription(
   const { userId, planType, customerId, subscription } = args;
   const supabase = createServiceRoleClient();
 
-  const { data: current } = await supabase
-    .from("subscriptions")
-    .select("last_event_at")
-    .eq("stripe_subscription_id", subscription.id)
-    .maybeSingle();
-  if (current?.last_event_at && eventCreated < toUnixSeconds(current.last_event_at)) {
-    return false;
-  }
-
   const status = mapStripeStatus(subscription.status);
   // In Stripe API 2025-x, current_period_start/end moved from the
   // Subscription onto each SubscriptionItem. Our subscriptions have one
@@ -418,22 +410,23 @@ async function upsertSubscription(
   const billingInterval =
     item.price?.recurring?.interval === "year" ? "year" : "month";
 
-  // Upsert by stripe_subscription_id so retries don't create duplicates.
-  const upsertResult = await supabase.from("subscriptions").upsert(
-    {
-      user_id: userId,
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      plan_type: planType,
-      status,
-      billing_interval: billingInterval,
-      current_period_start: periodStart,
-      current_period_end: periodEnd,
-      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-      last_event_at: new Date(eventCreated * 1000).toISOString(),
-    },
-    { onConflict: "stripe_subscription_id" },
-  );
+  // Upsert by stripe_subscription_id so retries don't create duplicates. The
+  // ordering guard lives in the function's own WHERE clause rather than in a
+  // read-then-compare here, so two events delivered at the same instant
+  // serialize on the unique index instead of both deciding they are newer
+  // (#528). It returns false when a stored newer event supersedes this one.
+  const upsertResult = await supabase.rpc("apply_subscription_event", {
+    p_user_id: userId,
+    p_stripe_customer_id: customerId,
+    p_stripe_subscription_id: subscription.id,
+    p_plan_type: planType,
+    p_status: status,
+    p_billing_interval: billingInterval,
+    p_current_period_start: periodStart,
+    p_current_period_end: periodEnd,
+    p_cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+    p_last_event_at: new Date(eventCreated * 1000).toISOString(),
+  });
   if (upsertResult.error?.code === "23505") {
     // A concurrent checkout already landed an active/past_due subscription
     // for this user+plan (uniq_subscriptions_active_per_plan, #417). This is
@@ -456,6 +449,10 @@ async function upsertSubscription(
     return false;
   }
   assertNoWriteError(upsertResult, "subscriptions upsert");
+
+  // The DB refused the write because a newer event already landed. Returning
+  // early keeps this stale event's status from leaking into the tier sync.
+  if (upsertResult.data === false) return false;
 
   // Tier sync for nurses: any active or trialing sub flips them to featured.
   if (planType === "nurse_featured") {
