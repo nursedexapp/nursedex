@@ -8,14 +8,27 @@ const h = vi.hoisted(() => {
     errors: {} as Record<string, { message: string; code?: string } | null>,
     reads: {} as Record<string, unknown>,
     writes: {} as Record<string, unknown>,
+    // Rows a write's terminal .select() hands back. An empty array models a
+    // guarded UPDATE whose WHERE matched nothing (superseded by a newer
+    // event).
+    rows: {} as Record<string, unknown[] | null>,
+    // What apply_subscription_event returns: true = the write applied,
+    // false = an already-stored newer event superseded this one.
+    rpcResults: {} as Record<string, unknown>,
   };
   const calls: string[] = [];
 
   function makeBuilder(table: string, op: string) {
     const b: Record<string, unknown> = {};
-    b.select = () => makeBuilder(table, "select");
+    // A .select() after a write keeps the write's op so its terminal await
+    // resolves to that write's rows, matching PostgREST's UPDATE ... RETURNING.
+    b.select = () => makeBuilder(table, op === "select" ? "select" : op);
     b.eq = () => b;
     b.is = () => b;
+    b.or = (expr: unknown) => {
+      state.writes[`${table}.or`] = expr;
+      return b;
+    };
     b.upsert = (payload: unknown) => {
       state.writes[`${table}.upsert`] = payload;
       return makeBuilder(table, "upsert");
@@ -33,12 +46,14 @@ const h = vi.hoisted(() => {
     b.single = () =>
       Promise.resolve({ data: state.reads[table] ?? null, error: null });
     b.then = (
-      resolve: (v: { error: unknown }) => unknown,
+      resolve: (v: { data: unknown; error: unknown }) => unknown,
       reject: (e: unknown) => unknown,
     ) => {
-      calls.push(`${table}.${op}`);
+      const key = `${table}.${op}`;
+      calls.push(key);
       return Promise.resolve({
-        error: state.errors[`${table}.${op}`] ?? null,
+        data: key in state.rows ? state.rows[key] : null,
+        error: state.errors[key] ?? null,
       }).then(resolve, reject);
     };
     return b;
@@ -48,6 +63,14 @@ const h = vi.hoisted(() => {
     state,
     calls,
     from: (table: string) => makeBuilder(table, "select"),
+    rpc: (fn: string, params: unknown) => {
+      calls.push(`rpc.${fn}`);
+      state.writes[`rpc.${fn}`] = params;
+      return Promise.resolve({
+        data: fn in state.rpcResults ? state.rpcResults[fn] : true,
+        error: state.errors[`rpc.${fn}`] ?? null,
+      });
+    },
     subscriptionsRetrieve: vi.fn(),
     subscriptionsCancel: vi.fn(async () => {}),
     captureException: vi.fn(),
@@ -56,7 +79,7 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("@/lib/supabase/service-role", () => ({
-  createServiceRoleClient: () => ({ from: h.from }),
+  createServiceRoleClient: () => ({ from: h.from, rpc: h.rpc }),
 }));
 vi.mock("@/lib/stripe/server", () => ({
   getStripe: () => ({
@@ -140,6 +163,9 @@ beforeEach(() => {
   h.state.errors = {};
   h.state.reads = {};
   h.state.writes = {};
+  h.state.rpcResults = {};
+  // Default: the guarded UPDATE matched its row, so cleanup proceeds.
+  h.state.rows = { "subscriptions.update": [{ id: "sub-row" }] };
   h.calls.length = 0;
   h.subscriptionsRetrieve.mockResolvedValue(fakeSubscription());
 });
@@ -158,7 +184,7 @@ describe("stripe webhook: write-failure propagation (#412)", () => {
         },
       },
     };
-    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
 
     const res = await POST(fakeRequest());
 
@@ -263,30 +289,40 @@ describe("stripe webhook: write-failure propagation (#412)", () => {
   });
 });
 
-describe("stripe webhook: event ordering (#414)", () => {
-  it("ignores an out-of-order customer.subscription.updated event older than what was last applied", async () => {
+describe("stripe webhook: event ordering (#414, #528)", () => {
+  // The ordering decision now lives inside apply_subscription_event's own
+  // WHERE clause, so the route no longer reads last_event_at and compares it
+  // in JS. Reading and then writing was a check-then-act pair: two events for
+  // the same subscription delivered at the same instant could both pass the
+  // "am I newer" check before either wrote (#528). These tests pin the route
+  // half of that contract; migration 055's guard is pinned in
+  // subscription-ordering-sql.test.ts.
+  it("hands the event's created timestamp to the database as p_last_event_at", async () => {
     h.state.event = {
       type: "customer.subscription.updated",
-      created: 1700000000, // older than the stored last_event_at below
-      data: { object: fakeSubscription({ cancel_at_period_end: false }) },
+      created: 1700001000,
+      data: { object: fakeSubscription() },
     };
     h.state.reads["subscriptions"] = {
       user_id: "user_1",
       plan_type: "family_access",
-      cancel_at_period_end: true,
-      last_event_at: new Date(1700000900 * 1000).toISOString(),
+      cancel_at_period_end: false,
     };
 
     const res = await POST(fakeRequest());
 
     expect(res.status).toBe(200);
-    expect(h.calls).not.toContain("subscriptions.upsert");
+    expect(h.calls).toContain("rpc.apply_subscription_event");
+    expect(h.state.writes["rpc.apply_subscription_event"]).toMatchObject({
+      p_stripe_subscription_id: "sub_1",
+      p_last_event_at: new Date(1700001000 * 1000).toISOString(),
+    });
   });
 
-  it("applies a customer.subscription.updated event newer than what was last applied", async () => {
+  it("never compares last_event_at in JavaScript before writing", async () => {
     h.state.event = {
       type: "customer.subscription.updated",
-      created: 1700001000, // newer than the stored last_event_at below
+      created: 1700000000, // older than anything the DB may hold
       data: { object: fakeSubscription() },
     };
     h.state.reads["subscriptions"] = {
@@ -298,41 +334,59 @@ describe("stripe webhook: event ordering (#414)", () => {
 
     const res = await POST(fakeRequest());
 
+    // The route always delegates: a stale event still reaches the RPC, which
+    // is what refuses it. Short-circuiting here would restore the race.
     expect(res.status).toBe(200);
-    expect(h.calls).toContain("subscriptions.upsert");
+    expect(h.calls).toContain("rpc.apply_subscription_event");
   });
 
-  it("still applies an event whose created timestamp exactly matches what was last applied", async () => {
-    // Stripe's `created` is unix seconds, not guaranteed unique across
-    // distinct events for the same object; treating "equal" as stale would
-    // risk silently dropping a legitimate second event from the same
-    // second, not just a harmless exact-duplicate redelivery.
+  it("skips the nurse tier sync when the database reports the event was superseded", async () => {
+    h.state.rpcResults["apply_subscription_event"] = false;
     h.state.event = {
       type: "customer.subscription.updated",
-      created: 1700000900,
-      data: { object: fakeSubscription() },
-    };
-    h.state.reads["subscriptions"] = {
-      user_id: "user_1",
-      plan_type: "family_access",
-      cancel_at_period_end: false,
-      last_event_at: new Date(1700000900 * 1000).toISOString(),
-    };
-
-    const res = await POST(fakeRequest());
-
-    expect(res.status).toBe(200);
-    expect(h.calls).toContain("subscriptions.upsert");
-  });
-
-  it("ignores an out-of-order customer.subscription.deleted event older than what was last applied", async () => {
-    h.state.event = {
-      type: "customer.subscription.deleted",
       created: 1700000000,
       data: { object: fakeSubscription() },
     };
     h.state.reads["subscriptions"] = {
       user_id: "user_1",
+      plan_type: "nurse_featured",
+      cancel_at_period_end: false,
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    // A superseded write must not drag stale tier state along with it.
+    expect(h.calls).not.toContain("nurse_profiles.update");
+  });
+
+  it("runs the nurse tier sync when the database applies the event", async () => {
+    h.state.rpcResults["apply_subscription_event"] = true;
+    h.state.event = {
+      type: "customer.subscription.updated",
+      created: 1700001000,
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "nurse_featured",
+      cancel_at_period_end: false,
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).toContain("nurse_profiles.update");
+  });
+
+  it("puts the ordering guard in the delete UPDATE's own filter", async () => {
+    h.state.event = {
+      type: "customer.subscription.deleted",
+      created: 1700000000, // older than the stored last_event_at
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
       plan_type: "family_access",
       last_event_at: new Date(1700000900 * 1000).toISOString(),
     };
@@ -340,7 +394,55 @@ describe("stripe webhook: event ordering (#414)", () => {
     const res = await POST(fakeRequest());
 
     expect(res.status).toBe(200);
-    expect(h.calls).not.toContain("subscriptions.update");
+    // The database, not a prior read, decides whether this stale delete wins.
+    const incoming = new Date(1700000000 * 1000).toISOString();
+    expect(h.state.writes["subscriptions.or"]).toBe(
+      `last_event_at.is.null,last_event_at.lte.${incoming}`,
+    );
+  });
+
+  it("fires no cascading writes when a concurrent newer event supersedes the delete", async () => {
+    // The stale read says this delete is current, but by the time the write
+    // lands a newer event has moved last_event_at forward, so the guarded
+    // UPDATE matches zero rows. Cleanup must not run off a write that lost.
+    h.state.rows["subscriptions.update"] = [];
+    h.state.event = {
+      type: "customer.subscription.deleted",
+      created: 1700001000,
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "nurse_featured",
+      last_event_at: new Date(1700000900 * 1000).toISOString(),
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).toContain("subscriptions.update");
+    expect(h.calls).not.toContain("nurse_profiles.update");
+  });
+
+  it("guards the delete UPDATE on last_event_at rather than trusting the prior read", async () => {
+    h.state.event = {
+      type: "customer.subscription.deleted",
+      created: 1700001000,
+      data: { object: fakeSubscription() },
+    };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "family_access",
+      last_event_at: new Date(1700000900 * 1000).toISOString(),
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.state.writes["subscriptions.update"]).toMatchObject({
+      status: "cancelled",
+      last_event_at: new Date(1700001000 * 1000).toISOString(),
+    });
   });
 });
 
@@ -433,7 +535,7 @@ describe("stripe webhook: duplicate active subscription handling (#417)", () => 
       },
     };
     h.subscriptionsRetrieve.mockResolvedValue(fakeSubscription({ id: "sub_2" }));
-    h.state.errors["subscriptions.upsert"] = {
+    h.state.errors["rpc.apply_subscription_event"] = {
       message:
         'duplicate key value violates unique constraint "uniq_subscriptions_active_per_plan"',
       code: "23505",
@@ -459,7 +561,7 @@ describe("stripe webhook: duplicate active subscription handling (#417)", () => 
       },
     };
     h.subscriptionsRetrieve.mockResolvedValue(fakeSubscription({ id: "sub_2" }));
-    h.state.errors["subscriptions.upsert"] = {
+    h.state.errors["rpc.apply_subscription_event"] = {
       message: "duplicate key value violates unique constraint",
       code: "23505",
     };
@@ -483,7 +585,7 @@ describe("stripe webhook: duplicate active subscription handling (#417)", () => 
         },
       },
     };
-    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
 
     const res = await POST(fakeRequest());
 
@@ -507,7 +609,7 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
 
     await POST(fakeRequest());
 
@@ -537,7 +639,7 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
 
     await POST(fakeRequest());
 
@@ -569,7 +671,7 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
 
     const res = await POST(fakeRequest());
 
@@ -612,7 +714,7 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
     h.state.reads["webhook_alert_log"] = { event_id: "evt_retry" };
 
     await POST(fakeRequest());
@@ -634,7 +736,7 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["subscriptions.upsert"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
     h.state.reads["webhook_alert_log"] = { event_id: "evt_retry2" };
 
     await POST(fakeRequest());
@@ -705,7 +807,7 @@ describe("stripe webhook: checkout.session.completed missing fields (#473)", () 
     const res = await POST(fakeRequest());
 
     expect(res.status).toBe(200);
-    expect(h.calls).not.toContain("subscriptions.upsert");
+    expect(h.calls).not.toContain("rpc.apply_subscription_event");
     expect(h.subscriptionsRetrieve).not.toHaveBeenCalled();
   });
 
@@ -726,7 +828,7 @@ describe("stripe webhook: checkout.session.completed missing fields (#473)", () 
     const res = await POST(fakeRequest());
 
     expect(res.status).toBe(200);
-    expect(h.calls).not.toContain("subscriptions.upsert");
+    expect(h.calls).not.toContain("rpc.apply_subscription_event");
     expect(h.subscriptionsRetrieve).not.toHaveBeenCalled();
   });
 
@@ -747,7 +849,7 @@ describe("stripe webhook: checkout.session.completed missing fields (#473)", () 
     const res = await POST(fakeRequest());
 
     expect(res.status).toBe(200);
-    expect(h.calls).not.toContain("subscriptions.upsert");
+    expect(h.calls).not.toContain("rpc.apply_subscription_event");
   });
 
   it("returns early without an upsert when subscription is missing", async () => {
@@ -767,7 +869,7 @@ describe("stripe webhook: checkout.session.completed missing fields (#473)", () 
     const res = await POST(fakeRequest());
 
     expect(res.status).toBe(200);
-    expect(h.calls).not.toContain("subscriptions.upsert");
+    expect(h.calls).not.toContain("rpc.apply_subscription_event");
   });
 });
 
