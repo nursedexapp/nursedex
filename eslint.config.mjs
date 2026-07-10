@@ -7,19 +7,18 @@ import noDirectSecretComparison from "./eslint-rules/no-direct-secret-comparison
 export default [
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{ts,tsx}"],
+    // Security and hygiene rules apply to ALL first-party TypeScript, not just
+    // src/. scripts/ (migration drift check, seed, launch cleanup), e2e/, and
+    // the root config files run in CI and touch production credentials, so the
+    // secret-comparison guard has to see them too (#584); scoping it to src/
+    // left a whole directory of credential-handling code unguarded.
+    files: ["**/*.{ts,tsx}"],
     plugins: {
-      "@next/next": nextPlugin,
-      react: reactPlugin,
-      "react-hooks": hooksPlugin,
       local: {
         rules: { "no-direct-secret-comparison": noDirectSecretComparison },
       },
     },
     rules: {
-      ...nextPlugin.configs.recommended.rules,
-      ...nextPlugin.configs["core-web-vitals"].rules,
-      "react/no-unescaped-entities": "off",
       // Shared secrets must go through the constant-time, fail-closed verifier
       // in src/lib/security/shared-secret.ts. Three routes shipped a plain
       // `===` against a secret (#391, #390, #406) and a fourth was missed by
@@ -29,6 +28,20 @@ export default [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+    },
+  },
+  {
+    // Next.js and React rules are only meaningful for the app itself.
+    files: ["src/**/*.{ts,tsx}"],
+    plugins: {
+      "@next/next": nextPlugin,
+      react: reactPlugin,
+      "react-hooks": hooksPlugin,
+    },
+    rules: {
+      ...nextPlugin.configs.recommended.rules,
+      ...nextPlugin.configs["core-web-vitals"].rules,
+      "react/no-unescaped-entities": "off",
       // Our dropdown menu wraps @base-ui, whose Menu.Item only fires onClick.
       // onSelect is a Radix prop that Base UI silently ignores, so an item
       // wired with it does nothing. Ban it so the mistake fails CI, not prod.

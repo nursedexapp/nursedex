@@ -121,7 +121,9 @@ export function formatAuditReport(report: AuditReport): string {
 
   const notable = report.advisories
     .filter((a) => a.severity === "critical" || a.severity === "high")
-    .sort((a, b) => (a.severity === "critical" ? -1 : 1));
+    .sort((a, b) =>
+      a.severity === b.severity ? 0 : a.severity === "critical" ? -1 : 1,
+    );
 
   if (notable.length > 0) {
     lines.push("", "High and critical:");
