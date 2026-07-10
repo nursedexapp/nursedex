@@ -50,6 +50,6 @@ export function withCronAlerting(jobName: string, handler: CronHandler): CronHan
 async function alertOpsSlack(jobName: string, message: string): Promise<void> {
   await slackPost("chat.postMessage", {
     channel: ALERTS_CHANNEL_ID,
-    text: `🚨 Cron failed: \`${jobName}\`\n${message}`,
+    text: `Cron failed: \`${jobName}\`\n${message}`,
   });
 }

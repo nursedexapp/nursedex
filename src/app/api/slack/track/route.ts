@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
         console.error(`Closing issue #${issueNumber} failed:`, err);
         await postReply(
           req,
-          `⚠️ Could not auto-close GitHub issue #${issueNumber}. Close it manually.`,
+          `Could not auto-close GitHub issue #${issueNumber}. Close it manually.`,
         );
       }
     });

@@ -100,7 +100,7 @@ export async function ensureIssue(req: RequestRow): Promise<void> {
     // Surface the failure in the thread so a missing issue is not silent.
     await postReply(
       req,
-      `⚠️ Could not create a GitHub issue for request #${req.id} automatically. Create one manually and link it here.`,
+      `Could not create a GitHub issue for request #${req.id} automatically. Create one manually and link it here.`,
     );
     return;
   }
@@ -119,7 +119,7 @@ export async function ensureIssue(req: RequestRow): Promise<void> {
     await refreshRoot(fresh);
     await postReply(
       fresh,
-      `📌 GitHub issue created: <${issue.html_url}|#${issue.number}>`,
+      `GitHub issue created: <${issue.html_url}|#${issue.number}>`,
     );
   }
 }
