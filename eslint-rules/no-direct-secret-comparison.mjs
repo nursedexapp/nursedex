@@ -23,8 +23,36 @@
  *   - constant-time helpers that compare buffers derived from the secret
  */
 
-/** Matches every secret env var in this repo, incl. *_SECRET_KEY. */
-const SECRET_NAME = /SECRET/;
+/**
+ * Names that read as a credential: a shared SECRET, a bearer TOKEN, an API
+ * KEY, or a shared PASSWORD. #547 shipped with just /SECRET/, which covered
+ * the seven secrets that existed then. #585 audited every `process.env.*` name
+ * and found the pattern missed six real credentials (GITHUB_TOKEN,
+ * SLACK_BOT_TOKEN, SENTRY_AUTH_TOKEN, ANTHROPIC_API_KEY, RESEND_API_KEY,
+ * POSTHOG_PERSONAL_API_KEY) plus SITE_PASSWORD, which was being compared with
+ * a plain `===` in two live routes. TOKEN and KEY are broad, so the public
+ * carve-out below keeps genuinely public keys from tripping the rule.
+ */
+const SECRET_NAME = /SECRET|TOKEN|PASSWORD|KEY/;
+
+/**
+ * Public values that match SECRET_NAME but are safe to compare loosely.
+ * Anything Next.js exposes to the browser (NEXT_PUBLIC_*) is public by
+ * definition: a publishable Supabase key, a Turnstile site key, a PostHog
+ * client key. Flagging these would push people to silence the rule on code
+ * that has no timing oracle to protect. No non-prefixed public key exists in
+ * the repo today; PUBLIC_ALLOWLIST is the explicit escape hatch if one appears
+ * (e.g. a bare *_PUBLISHABLE_KEY).
+ */
+const PUBLIC_ALLOWLIST = new Set();
+function isPublicName(name) {
+  return name.startsWith("NEXT_PUBLIC_") || PUBLIC_ALLOWLIST.has(name);
+}
+
+/** A credential env var name worth guarding: matches the shape, not public. */
+function isSecretName(name) {
+  return SECRET_NAME.test(name) && !isPublicName(name);
+}
 
 /** `process.env`, however it is spelled. */
 function isProcessEnv(node) {
@@ -53,7 +81,7 @@ function isSecretEnvAccess(node) {
     return false;
   }
   const name = propertyName(node);
-  return name !== null && SECRET_NAME.test(name);
+  return name !== null && isSecretName(name);
 }
 
 /** Climb the scope chain for a variable by name. */
@@ -95,7 +123,7 @@ function isSecretVariable(variable) {
     if (isSecretEnvAccess(def.node.init)) return true;
     if (isProcessEnv(def.node.init)) {
       const key = destructuredKey(def.node.id, def.name);
-      return key !== null && SECRET_NAME.test(key);
+      return key !== null && isSecretName(key);
     }
     return false;
   });

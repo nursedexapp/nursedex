@@ -88,6 +88,19 @@ describe("evasions", () => {
     expectRejected(`if (k === process.env.TURNSTILE_SECRET_KEY) {}`);
     expectRejected(`if (k === process.env.SLACK_SIGNING_SECRET) {}`);
   });
+
+  // #585 widened the pattern past *_SECRET: a bearer TOKEN, an API _KEY or a
+  // shared PASSWORD is the same bug class as a SECRET. Each name below is a
+  // real credential env var in the repo that the old /SECRET/ pattern missed.
+  it("covers TOKEN, KEY and PASSWORD credential env vars (#585)", () => {
+    expectRejected(`if (t === process.env.GITHUB_TOKEN) {}`);
+    expectRejected(`if (t === process.env.SLACK_BOT_TOKEN) {}`);
+    expectRejected(`if (t === process.env.SENTRY_AUTH_TOKEN) {}`);
+    expectRejected(`if (k === process.env.ANTHROPIC_API_KEY) {}`);
+    expectRejected(`if (k === process.env.RESEND_API_KEY) {}`);
+    expectRejected(`if (k === process.env.POSTHOG_PERSONAL_API_KEY) {}`);
+    expectRejected(`if (p === process.env.SITE_PASSWORD) {}`);
+  });
 });
 
 // A guard that cries wolf gets disabled. These are all real, correct patterns
@@ -141,6 +154,19 @@ describe("legitimate patterns that must not be flagged", () => {
   it("ignores non-secret env vars", () => {
     expectClean(`if (process.env.NODE_ENV === "production") {}`);
     expectClean(`if (process.env.VERCEL_ENV === branch) {}`);
+  });
+
+  // The widened TOKEN|KEY pattern (#585) must not trip on genuinely public
+  // keys. Every one below is exposed to the browser (NEXT_PUBLIC_) or is a
+  // non-secret id, so comparing it is not a timing oracle worth guarding.
+  it("ignores public NEXT_PUBLIC_* keys and non-secret ids", () => {
+    expectClean(
+      `if (k === process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) {}`,
+    );
+    expectClean(`if (k === process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {}`);
+    expectClean(`if (k === process.env.NEXT_PUBLIC_POSTHOG_KEY) {}`);
+    expectClean(`if (id === process.env.STRIPE_FAMILY_ACCESS_PRICE_ID) {}`);
+    expectClean(`if (id === process.env.POSTHOG_PROJECT_ID) {}`);
   });
 
   // A grep would trip on this. An AST rule does not see comments at all.

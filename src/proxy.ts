@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { constantTimeEqual } from "@/lib/security/constant-time";
 
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
 
@@ -79,7 +80,10 @@ export async function proxy(request: NextRequest) {
   if (isGated && path !== "/brand-login") {
     if (SITE_PASSWORD) {
       const authCookie = request.cookies.get("site-auth");
-      if (authCookie?.value !== SITE_PASSWORD) {
+      // Constant-time so the cookie value can't be recovered a character at a
+      // time via response timing. constantTimeEqual (not the node:crypto
+      // verifier) because this runs on the edge runtime.
+      if (!constantTimeEqual(authCookie?.value ?? "", SITE_PASSWORD)) {
         const loginUrl = new URL("/brand-login", request.url);
         loginUrl.searchParams.set("from", path);
         return applySecurityHeaders(NextResponse.redirect(loginUrl), csp);
