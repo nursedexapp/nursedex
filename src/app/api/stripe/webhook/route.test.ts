@@ -1094,3 +1094,99 @@ describe("stripe webhook: lifecycle email dedup gating (#473)", () => {
     );
   });
 });
+
+// Stripe delivers webhooks at least once, so the same event arriving twice is
+// normal, not an attack. shouldSendOnce is the email idempotency gate: it
+// returns true on the first delivery of a dedup key and false thereafter, so a
+// retry must not re-send. Each case below dispatches the identical event twice
+// and asserts exactly one email and a 200 on both (so Stripe stops retrying).
+describe("stripe webhook: duplicate delivery is idempotent (#491)", () => {
+  const checkoutEvent = {
+    type: "checkout.session.completed",
+    created: EVENT_CREATED,
+    data: {
+      object: {
+        client_reference_id: "user_1",
+        metadata: { plan_type: "family_access" },
+        customer: "cus_1",
+        subscription: "sub_1",
+      },
+    },
+  };
+
+  it("sends the confirmation email once across a duplicate checkout.session.completed", async () => {
+    // First delivery proceeds; the retry gets shouldSendOnce=false (default).
+    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
+    h.state.reads["users"] = { email: "family@example.com", first_name: "Robin" };
+    h.state.event = checkoutEvent;
+
+    const first = await POST(fakeRequest());
+    const second = await POST(fakeRequest());
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(sendSubscriptionConfirmedEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps delegating the write to the idempotent RPC on the retry, never duplicating a row itself", async () => {
+    // The route never inserts a subscription row directly; it hands every
+    // delivery to apply_subscription_event, whose upsert on the unique
+    // stripe_subscription_id is what collapses the duplicate. The route's job
+    // is only to keep delegating rather than short-circuiting the second call.
+    h.state.event = checkoutEvent;
+
+    await POST(fakeRequest());
+    await POST(fakeRequest());
+
+    const rpcCalls = h.calls.filter((c) => c === "rpc.apply_subscription_event");
+    expect(rpcCalls).toHaveLength(2);
+    expect(h.calls).not.toContain("subscriptions.upsert");
+    expect(h.calls).not.toContain("subscriptions.insert");
+  });
+
+  it("sends the renewal email once across a duplicate invoice.paid renewal", async () => {
+    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
+    h.state.reads["users"] = { email: "renew@example.com", first_name: "Sam" };
+    h.state.reads["subscriptions"] = { user_id: "user_1", plan_type: "nurse_featured" };
+    h.state.event = {
+      type: "invoice.paid",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          id: "in_2",
+          billing_reason: "subscription_cycle",
+          parent: { subscription_details: { subscription: "sub_1" } },
+        },
+      },
+    };
+
+    const first = await POST(fakeRequest());
+    const second = await POST(fakeRequest());
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(sendRenewalSuccessEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends the cancellation email once across a duplicate subscription.updated cancellation", async () => {
+    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
+    h.state.reads["users"] = { email: "cancel@example.com", first_name: "Jamie" };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "family_access",
+      cancel_at_period_end: false,
+    };
+    h.state.event = {
+      type: "customer.subscription.updated",
+      created: EVENT_CREATED,
+      data: { object: fakeSubscription({ cancel_at_period_end: true }) },
+    };
+
+    const first = await POST(fakeRequest());
+    const second = await POST(fakeRequest());
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(sendCancellationConfirmationEmail).toHaveBeenCalledTimes(1);
+  });
+});
