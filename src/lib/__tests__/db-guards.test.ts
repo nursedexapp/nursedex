@@ -260,6 +260,70 @@ describe("consume_reveal_rate_limit (migration 054, issue #563)", () => {
       .eq("family_user_id", family)
       .eq("date", yesterday.toISOString().slice(0, 10));
   });
+
+  it("does not re-bump the streak on a second captcha reveal the same day", async () => {
+    // The ON CONFLICT DO UPDATE path increments reveal_count but deliberately
+    // leaves consecutive_captcha_days alone, so a single day counts once toward
+    // the streak no matter how many captcha reveals happen within it.
+    await service.from("rate_limit_reveals").upsert(
+      {
+        family_user_id: family,
+        date: today(),
+        reveal_count: 5,
+        captcha_triggered: true,
+        consecutive_captcha_days: 2,
+      },
+      { onConflict: "family_user_id,date" },
+    );
+
+    const res = await consume(family, true);
+    expect(res.current_count).toBe(6);
+
+    const { data } = await service
+      .from("rate_limit_reveals")
+      .select("consecutive_captcha_days")
+      .eq("family_user_id", family)
+      .eq("date", today())
+      .single();
+    // Still 2, not re-bumped to 3, even though this reveal also triggered captcha.
+    expect(data!.consecutive_captcha_days).toBe(2);
+  });
+
+  it("resets the streak to 1 when yesterday existed but did not trigger captcha", async () => {
+    // A gap day (reveals happened, but never enough to trip captcha) breaks the
+    // streak: the carry-forward only adds to yesterday's streak when yesterday
+    // itself triggered captcha, so today starts fresh at 1.
+    const yesterday = new Date();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yDate = yesterday.toISOString().slice(0, 10);
+    const { error } = await service.from("rate_limit_reveals").upsert(
+      {
+        family_user_id: family,
+        date: yDate,
+        reveal_count: 4,
+        captcha_triggered: false,
+        consecutive_captcha_days: 5,
+      },
+      { onConflict: "family_user_id,date" },
+    );
+    if (error) throw error;
+
+    await consume(family, true);
+
+    const { data } = await service
+      .from("rate_limit_reveals")
+      .select("consecutive_captcha_days")
+      .eq("family_user_id", family)
+      .eq("date", today())
+      .single();
+    expect(data!.consecutive_captcha_days).toBe(1);
+
+    await service
+      .from("rate_limit_reveals")
+      .delete()
+      .eq("family_user_id", family)
+      .eq("date", yDate);
+  });
 });
 
 describe("apply_subscription_event (migration 055, issue #528)", () => {
