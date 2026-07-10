@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// happy-dom (not jsdom — see vitest.config.ts) gives us a window so
+// happy-dom (not jsdom, see vitest.config.ts) gives us a window so
 // initPostHog doesn't bail on its server-side guard.
 vi.mock("posthog-js", () => ({
   default: { __loaded: false, init: vi.fn() },

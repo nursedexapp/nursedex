@@ -5,7 +5,7 @@
 export const OPS_CHANNEL_ID = "C0B8VPN6DMG";
 
 // Dedicated channel for automated failure alerts (cron jobs, Stripe
-// webhook failures, and future Sentry issue alerts) — deliberately
+// webhook failures, and future Sentry issue alerts), deliberately
 // separate from OPS_CHANNEL_ID so these don't mix into the client-facing
 // consulting/billing thread.
 export const ALERTS_CHANNEL_ID = "C0BF7SEJ4J2";

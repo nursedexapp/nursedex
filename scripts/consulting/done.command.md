@@ -1,5 +1,5 @@
 ---
-description: Complete a NurseDex consulting request — compute hours, gather merged PRs, summarize, and post the completion report to its Slack thread
+description: Complete a NurseDex consulting request: compute hours, gather merged PRs, summarize, and post the completion report to its Slack thread
 ---
 
 <!--

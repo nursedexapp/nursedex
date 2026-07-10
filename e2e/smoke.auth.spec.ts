@@ -41,7 +41,7 @@ const PUBLIC_ROUTES = [
 
 // Text rendered by the error boundaries (src/app/error.tsx and
 // src/app/(admin)/admin/error.tsx). The boundary returns a 200, so a status
-// check alone would miss a caught render crash — assert the markers are absent.
+// check alone would miss a caught render crash. Assert the markers are absent.
 const ERROR_MARKERS = [
   "We hit a snag", // root error boundary
   "That admin view didn't load", // admin error boundary

@@ -136,7 +136,7 @@ describe("sentry-alerts cron", () => {
     const json = await res.json();
 
     expect(json).toEqual({ success: true, alerted: 1, failed: 1, cleared: 0 });
-    // Only the issue whose Slack post succeeded gets recorded — a Slack
+    // Only the issue whose Slack post succeeded gets recorded, a Slack
     // hiccup must not silently mark a never-delivered alert as handled.
     expect(h.calls.insert).toEqual([{ issue_id: "2" }]);
   });

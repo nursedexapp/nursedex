@@ -18,7 +18,7 @@ export async function cancelActiveStripeSubscriptions(
     .from("subscriptions")
     .select("stripe_subscription_id, status")
     .eq("user_id", userId);
-  // A failed read must not be mistaken for "nothing to cancel" — that would
+  // A failed read must not be mistaken for "nothing to cancel", that would
   // let account removal/deletion proceed while a subscription keeps billing.
   if (error) {
     throw new Error(`Failed to read subscriptions for cancellation: ${error.message}`);
@@ -31,7 +31,7 @@ export async function cancelActiveStripeSubscriptions(
   }>) {
     if (!sub.stripe_subscription_id) continue;
     // App-stored enum values ('cancelled'/'expired'), not Stripe's own
-    // spelling ('canceled') — see #424.
+    // spelling ('canceled'), see #424.
     if (sub.status === "cancelled" || sub.status === "expired") continue;
     try {
       await stripe.subscriptions.cancel(sub.stripe_subscription_id);

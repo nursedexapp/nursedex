@@ -27,7 +27,7 @@ export default async function OnboardingPage() {
   // the shared getOnboardingStatus so this page agrees with the
   // dashboard's redirect rule. Earlier this page used a narrower check
   // (just years_experience + non-HHA credential + license), which fired
-  // true after Step 2 — and the dashboard then redirected back here,
+  // true after Step 2, and the dashboard then redirected back here,
   // causing an infinite loop with /dashboard/onboarding?step=3.
   const onboardingStatus = getOnboardingStatus(profile, user);
   if (onboardingStatus.complete) {

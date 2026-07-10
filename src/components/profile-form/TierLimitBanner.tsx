@@ -10,7 +10,7 @@ interface TierLimitBannerProps {
 /**
  * Inline notice that shows when a free-tier nurse hits a profile limit
  * (max care types, max skills, etc.). Always pairs the explanation with
- * an actionable Upgrade CTA pointing at /pricing — earlier the banner
+ * an actionable Upgrade CTA pointing at /pricing. Earlier the banner
  * said "Upgrade to Featured for unlimited" but gave the user no way to
  * actually do so.
  */

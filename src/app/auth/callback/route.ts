@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const tokenType = searchParams.get("type");
   // Distinguish "caller said next=/foo" from "no next provided." When the
   // caller is explicit (e.g. password recovery sets next=/reset-password),
-  // we always honor it — otherwise role-having users were getting bounced
+  // we always honor it, otherwise role-having users were getting bounced
   // straight to /dashboard and skipping the password change. A next that
   // isn't a same-origin relative path is dropped (falls through to the
   // role/dashboard redirect below) rather than honored, since it's appended

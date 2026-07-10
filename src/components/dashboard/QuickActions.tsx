@@ -15,7 +15,7 @@ interface QuickActionsProps {
  * Day-to-day availability toggle. Used to also include "Share my
  * profile" and "Invite past clients to review" buttons, but the hero
  * already has a Copy my profile link CTA and ReviewLinkCard sits
- * directly below — those duplicates have been removed.
+ * directly below. Those duplicates have been removed.
  */
 export function QuickActions({
   isAvailable: initialAvailable,
