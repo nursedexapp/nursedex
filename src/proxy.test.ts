@@ -142,4 +142,13 @@ describe("proxy security headers (#393)", () => {
     expect(res.status).not.toBe(307);
     expect(h.updateSession).toHaveBeenCalled();
   });
+
+  it("redirects a request whose site-auth cookie is present but wrong", async () => {
+    const res = await proxy(
+      fakeRequest("/brand", { cookies: { "site-auth": "wrong" } }),
+    );
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/brand-login");
+    expect(h.updateSession).not.toHaveBeenCalled();
+  });
 });
