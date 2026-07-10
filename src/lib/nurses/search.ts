@@ -47,6 +47,24 @@ interface InternalCard extends NurseSearchCard {
   photos: string[];
 }
 
+/**
+ * Blank out last_name on cards for a viewer not entitled to nurse identity.
+ *
+ * A card is a client-component prop, so every field on it ships in the RSC
+ * payload the browser downloads, whether or not NurseCard renders it. Hiding
+ * the name with a `showLastName` prop is presentational only; the raw value is
+ * still in the page source. #381: gate it in the data, not just the markup.
+ * Returns new objects rather than mutating, so a caller cannot accidentally
+ * strip a list it still needs unredacted.
+ */
+export function gateCardIdentity<T extends { last_name: string }>(
+  cards: T[],
+  canSeeIdentity: boolean,
+): T[] {
+  if (canSeeIdentity) return cards;
+  return cards.map((card) => ({ ...card, last_name: "" }));
+}
+
 export interface SearchResult {
   items: NurseSearchCard[];
   partials: NurseSearchCard[];
@@ -63,6 +81,10 @@ export interface SearchOptions {
   // Nurse user_ids the viewing family has already revealed. When set, those
   // cards are marked revealed and sorted below the un-revealed ones.
   viewerRevealedIds?: Set<string>;
+  // Whether the viewer may see nurse identity (last name). Defaults to false so
+  // a caller that forgets to pass it leaks nothing (#381). The profile page's
+  // per-nurse license gating is separate; cards never carry license_number.
+  viewerCanSeeIdentity?: boolean;
 }
 
 // ── Public entry point ────────────────────────────────────────
@@ -70,7 +92,13 @@ export interface SearchOptions {
 export async function searchNurses(
   options: SearchOptions,
 ): Promise<SearchResult> {
-  const { filters, viewerZip, viewerCommPref, viewerRevealedIds } = options;
+  const {
+    filters,
+    viewerZip,
+    viewerCommPref,
+    viewerRevealedIds,
+    viewerCanSeeIdentity = false,
+  } = options;
 
   const fullRaw = await runQuery(filters);
   const fullWithDistance = await enrichWithDistance(fullRaw, viewerZip ?? null);
@@ -114,8 +142,11 @@ export async function searchNurses(
   await Promise.all([attachPhotoUrls(items), attachPhotoUrls(partials)]);
 
   return {
-    items: items.map(toPublicCard),
-    partials: partials.map(toPublicCard),
+    items: gateCardIdentity(items.map(toPublicCard), viewerCanSeeIdentity),
+    partials: gateCardIdentity(
+      partials.map(toPublicCard),
+      viewerCanSeeIdentity,
+    ),
     totalFull,
     page,
     totalPages,
@@ -170,10 +201,8 @@ async function runQuery(
   // nurses are returned) and cards never render contact fields.
   const supabase = createServiceRoleClient();
 
-  let query = supabase
-    .from("nurse_profiles")
-    .select(
-      `
+  let query = supabase.from("nurse_profiles").select(
+    `
       user_id,
       slug,
       credential,
@@ -197,7 +226,7 @@ async function runQuery(
         is_suspended
       )
     `,
-    );
+  );
   query = applyVisibleNurseFilter(query);
 
   // Availability visibility:

@@ -46,18 +46,25 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
   // Save/reveal state only applies to family viewers.
   const showSaves = user?.role === "family";
 
-  // The reveal lookup and subscription check only annotate results (they
-  // don't change the query), so run them alongside the search instead of
-  // waiting first. A subscribed family sees every nurse's last name.
-  const [viewerRevealedIds, hasSub, result] = await Promise.all([
+  // Subscription state gates whether last names are even present in the
+  // cards (#381), so it must be known before the search runs, not alongside
+  // it: searchNurses strips last_name unless the viewer is entitled, and a
+  // stripped card cannot be un-stripped afterward. The reveal-id lookup only
+  // annotates results, so it stays parallel with the (cheap, indexed) sub
+  // check. A subscribed family sees every nurse's last name.
+  const [viewerRevealedIds, hasSub] = await Promise.all([
     showSaves && user
       ? getRevealedNurseIds(user.id)
       : Promise.resolve(undefined),
-    showSaves && user
-      ? hasActiveFamilyAccess(user.id)
-      : Promise.resolve(false),
-    searchNurses({ filters, viewerZip, viewerCommPref }),
+    showSaves && user ? hasActiveFamilyAccess(user.id) : Promise.resolve(false),
   ]);
+
+  const result = await searchNurses({
+    filters,
+    viewerZip,
+    viewerCommPref,
+    viewerCanSeeIdentity: hasSub,
+  });
 
   if (viewerRevealedIds && viewerRevealedIds.size > 0) {
     for (const c of result.items) c.revealed = viewerRevealedIds.has(c.user_id);
