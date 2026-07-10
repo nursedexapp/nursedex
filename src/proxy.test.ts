@@ -48,15 +48,21 @@ describe("proxy security headers (#393)", () => {
   it("generates a different nonce on each invocation", async () => {
     const res1 = await proxy(fakeRequest("/nurses"));
     const res2 = await proxy(fakeRequest("/nurses"));
-    const nonce1 = res1.headers.get("Content-Security-Policy")?.match(/'nonce-([^']+)'/)?.[1];
-    const nonce2 = res2.headers.get("Content-Security-Policy")?.match(/'nonce-([^']+)'/)?.[1];
+    const nonce1 = res1.headers
+      .get("Content-Security-Policy")
+      ?.match(/'nonce-([^']+)'/)?.[1];
+    const nonce2 = res2.headers
+      .get("Content-Security-Policy")
+      ?.match(/'nonce-([^']+)'/)?.[1];
     expect(nonce1).toBeTruthy();
     expect(nonce1).not.toBe(nonce2);
   });
 
   it("forwards the same nonce to the downstream request", async () => {
     const res = await proxy(fakeRequest("/nurses"));
-    const cspNonce = res.headers.get("Content-Security-Policy")?.match(/'nonce-([^']+)'/)?.[1];
+    const cspNonce = res.headers
+      .get("Content-Security-Policy")
+      ?.match(/'nonce-([^']+)'/)?.[1];
     const forwardedRequest = h.updateSession.mock.calls[0][0] as NextRequest;
     expect(forwardedRequest.headers.get("x-nonce")).toBe(cspNonce);
   });
@@ -88,6 +94,22 @@ describe("proxy security headers (#393)", () => {
     expect(csp).toMatch(/frame-src[^;]*https:\/\/www\.youtube\.com/);
     expect(csp).toMatch(/frame-src[^;]*https:\/\/player\.vimeo\.com/);
     expect(csp).toContain("frame-ancestors 'none'");
+  });
+
+  it("points the CSP at the violation report endpoint (#537)", async () => {
+    const res = await proxy(fakeRequest("/nurses"));
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
+    expect(csp).toContain("report-uri /api/csp-report");
+    expect(csp).toContain("report-to csp-endpoint");
+    expect(res.headers.get("Reporting-Endpoints")).toBe(
+      'csp-endpoint="/api/csp-report"',
+    );
+  });
+
+  it("skips the session refresh for a posted CSP report but keeps the headers", async () => {
+    const res = await proxy(fakeRequest("/api/csp-report"));
+    expect(res.headers.get("Content-Security-Policy")).toBeTruthy();
+    expect(h.updateSession).not.toHaveBeenCalled();
   });
 
   it("still applies security headers on the stripe webhook skip path", async () => {

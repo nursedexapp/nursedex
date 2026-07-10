@@ -13,6 +13,12 @@ const SENTRY_INGEST_HOST = "https://o4511116810584064.ingest.us.sentry.io";
 // 'strict-dynamic': Cloudflare Turnstile's script (src/components/reveals/
 // TurnstileWidget.tsx) is trusted by its own origin instead, which avoids
 // threading a nonce prop through the client components that render it.
+// Where the browser posts CSP violation reports (#537). report-uri is the
+// widely supported (if deprecated) directive; report-to is the modern one and
+// needs the Reporting-Endpoints header set below. Both point at the same
+// route, which filters noise and records real gaps in Sentry.
+const CSP_REPORT_PATH = "/api/csp-report";
+
 function buildCsp(nonce: string): string {
   return [
     "default-src 'self'",
@@ -25,11 +31,21 @@ function buildCsp(nonce: string): string {
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
+    `report-uri ${CSP_REPORT_PATH}`,
+    "report-to csp-endpoint",
   ].join("; ");
 }
 
-function applySecurityHeaders(response: NextResponse, csp: string): NextResponse {
+function applySecurityHeaders(
+  response: NextResponse,
+  csp: string,
+): NextResponse {
   response.headers.set("Content-Security-Policy", csp);
+  // Names the report-to group referenced in the CSP above.
+  response.headers.set(
+    "Reporting-Endpoints",
+    `csp-endpoint="${CSP_REPORT_PATH}"`,
+  );
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("X-Frame-Options", "DENY");
@@ -51,7 +67,9 @@ export async function proxy(request: NextRequest) {
   if (
     path.startsWith("/api/stripe/webhook") ||
     path.startsWith("/api/cron") ||
-    path === "/api/auth/send-email"
+    path === "/api/auth/send-email" ||
+    // Browser-posted CSP violation reports carry no session; skip the refresh.
+    path === "/api/csp-report"
   ) {
     return applySecurityHeaders(NextResponse.next(), csp);
   }
@@ -73,7 +91,9 @@ export async function proxy(request: NextRequest) {
   // headers().get("x-nonce") if a third-party script ever needs it directly.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
-  const requestWithNonce = new NextRequest(request, { headers: requestHeaders });
+  const requestWithNonce = new NextRequest(request, {
+    headers: requestHeaders,
+  });
 
   // Supabase session refresh for all other routes
   const response = await updateSession(requestWithNonce);
