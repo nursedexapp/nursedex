@@ -24,7 +24,7 @@ const STATUS_STYLES: Record<BlogPostStatus, string> = {
 };
 
 function formatDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "Not set";
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",

@@ -79,7 +79,7 @@ export default async function RevisionsPage({ params }: RevisionsPageProps) {
                     </div>
                     <p className="text-soft-black-light mt-1 truncate text-sm">
                       {rev.title}
-                      {snippet ? ` — ${snippet}` : ""}
+                      {snippet ? `: ${snippet}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

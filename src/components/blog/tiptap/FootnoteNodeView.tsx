@@ -18,7 +18,7 @@ export function FootnoteNodeView({ node, updateAttributes }: NodeViewProps) {
         contentEditable={false}
         title={
           empty
-            ? "Empty footnote (hidden on the published post) — click to add text"
+            ? "Empty footnote (hidden on the published post). Click to add text."
             : `${text}\n\nClick to edit`
         }
         onClick={() => {

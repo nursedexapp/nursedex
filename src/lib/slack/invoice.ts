@@ -67,7 +67,7 @@ export async function generateAndPostInvoice(
   const blocks: Json[] = [
     {
       type: "header",
-      text: { type: "plain_text", text: `🧾 Invoice — ${monthLabel}` },
+      text: { type: "plain_text", text: `Invoice for ${monthLabel}` },
     },
   ];
 
@@ -106,13 +106,13 @@ export async function generateAndPostInvoice(
   if (mentions) {
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: `${mentions} — invoice ready to send.` },
+      text: { type: "mrkdwn", text: `${mentions} invoice ready to send.` },
     });
   }
 
   await slackPost("chat.postMessage", {
     channel: OPS_CHANNEL_ID,
-    text: `Invoice — ${monthLabel}: ${money(total)}`,
+    text: `Invoice for ${monthLabel}: ${money(total)}`,
     blocks,
   });
 
