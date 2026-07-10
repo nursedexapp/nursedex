@@ -7,6 +7,13 @@ const h = vi.hoisted(() => {
     customerId: "cus_123" as string | null,
     activeSubscription: null as Record<string, unknown> | null,
     checkoutError: null as Error | null,
+    // Resolved price IDs, read live by the config mock so a test can blank one
+    // out to exercise the missing-price-id guard.
+    prices: {
+      nurse_featured: "price_nurse_featured",
+      family_monthly: "price_family_monthly",
+      family_annual: "price_family_annual",
+    },
   };
   const calls = {
     portal: [] as Array<{ customer: string; return_url: string }>,
@@ -50,12 +57,20 @@ vi.mock("@/lib/stripe/server", () => ({
   }),
 }));
 vi.mock("@/lib/stripe/config", () => ({
+  // Getters so the resolved price ID is read at call time; a test can blank
+  // h.state.prices to hit the missing-price-id guard.
   STRIPE_PLANS: {
-    nurse_featured: { priceId: "price_nurse_featured" },
-    family_access: { priceId: "price_family_monthly" },
+    get nurse_featured() {
+      return { priceId: h.state.prices.nurse_featured };
+    },
+    get family_access() {
+      return { priceId: h.state.prices.family_monthly };
+    },
   },
   familyAccessPriceId: (interval: string) =>
-    interval === "year" ? "price_family_annual" : "price_family_monthly",
+    interval === "year"
+      ? h.state.prices.family_annual
+      : h.state.prices.family_monthly,
   STRIPE_FAMILY_ACCESS_ANNUAL_COUPON_ID: "promo_annual_first_year",
 }));
 vi.mock("@/lib/auth/helpers", () => ({
@@ -88,6 +103,11 @@ beforeEach(() => {
   h.state.customerId = "cus_123";
   h.state.activeSubscription = null;
   h.state.checkoutError = null;
+  h.state.prices = {
+    nurse_featured: "price_nurse_featured",
+    family_monthly: "price_family_monthly",
+    family_annual: "price_family_annual",
+  };
   h.calls.portal = [];
   h.calls.checkout = [];
 });
@@ -191,6 +211,28 @@ describe("createCheckoutSession customer branch", () => {
     const call = h.calls.checkout[0];
     expect(call.customer).toBeUndefined();
     expect(call.customer_email).toBe("u@x.com");
+  });
+});
+
+describe("createCheckoutSession missing price ID", () => {
+  it("returns the configuration error and never calls Stripe when the family price ID is blank", async () => {
+    h.state.prices.family_monthly = "";
+    const res = await createFamilyAccessCheckout({});
+    expect(res.error).toBe(
+      "Stripe price ID is not configured for family_access.",
+    );
+    expect(res.url).toBeUndefined();
+    expect(h.calls.checkout).toHaveLength(0);
+  });
+
+  it("returns the configuration error and never calls Stripe when the nurse_featured price ID is blank", async () => {
+    h.state.prices.nurse_featured = "";
+    const res = await createNurseFeaturedCheckout();
+    expect(res.error).toBe(
+      "Stripe price ID is not configured for nurse_featured.",
+    );
+    expect(res.url).toBeUndefined();
+    expect(h.calls.checkout).toHaveLength(0);
   });
 });
 
