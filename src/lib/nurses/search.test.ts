@@ -6,7 +6,65 @@ import {
   isEmptyFilterSet,
   GENDER_FILTER_ANY,
 } from "./search-params";
+import { gateCardIdentity, type NurseSearchCard } from "./search";
 import { Skill, Gender } from "@/types/enums";
+
+function searchCard(overrides: Partial<NurseSearchCard> = {}): NurseSearchCard {
+  return {
+    user_id: "nurse-1",
+    slug: "jane-r",
+    first_name: "Jane",
+    last_name: "Rodriguez",
+    credential: "rn",
+    primary_care_type: null,
+    care_types: [],
+    tier: "free",
+    has_photo: false,
+    photo_url: null,
+    avg_rating: null,
+    review_count: 0,
+    is_available: true,
+    unavailable_visibility: null,
+    profile_completeness: 0,
+    zip_code: null,
+    distance_miles: null,
+    communication_preference: null,
+    years_experience: null,
+    ...overrides,
+  };
+}
+
+// Issue #381. Search cards are client-component props, so any field on them is
+// in the RSC payload the browser receives, whether or not NurseCard renders it.
+// last_name must be stripped from the card for viewers who are not entitled to
+// a nurse's identity, not merely hidden with a prop.
+describe("gateCardIdentity", () => {
+  it("strips last_name from every card when the viewer is not entitled", () => {
+    const cards = [
+      searchCard({ user_id: "a", last_name: "Rodriguez" }),
+      searchCard({ user_id: "b", last_name: "Okafor" }),
+    ];
+    const gated = gateCardIdentity(cards, false);
+    expect(gated.map((c) => c.last_name)).toEqual(["", ""]);
+    // first_name is public and must survive.
+    expect(gated.map((c) => c.first_name)).toEqual(["Jane", "Jane"]);
+  });
+
+  it("keeps last_name when the viewer is entitled", () => {
+    const cards = [searchCard({ last_name: "Rodriguez" })];
+    expect(gateCardIdentity(cards, true)[0].last_name).toBe("Rodriguez");
+  });
+
+  it("does not mutate the caller's card objects", () => {
+    const card = searchCard({ last_name: "Rodriguez" });
+    gateCardIdentity([card], false);
+    expect(card.last_name).toBe("Rodriguez");
+  });
+
+  it("returns an empty list unchanged", () => {
+    expect(gateCardIdentity([], false)).toEqual([]);
+  });
+});
 
 let cardCounter = 0;
 
