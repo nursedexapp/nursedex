@@ -94,7 +94,7 @@ export function CredentialsFields({
         )}
       </div>
 
-      {/* License/certification number — emphasized because incorrect numbers
+      {/* License/certification number, emphasized because incorrect numbers
           will fail verification, which is one of the few places this wizard
           can fail in a way that's annoying to recover from. Optional for HHAs,
           who don't carry a number. */}

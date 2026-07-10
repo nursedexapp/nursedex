@@ -11,16 +11,16 @@ export type OnboardingStatus =
  * The dashboard's previous check looked at only years_experience and
  * (for HHA) license_number, so a nurse who bailed on Step 3, 4, or 5
  * landed on the steady-state dashboard with the "We're reviewing your
- * license" hero — even though they hadn't submitted. This helper checks
+ * license" hero, even though they hadn't submitted. This helper checks
  * each step's required fields in order and reports the first one that's
  * missing.
  *
  * Steps map directly to the wizard's step indicator:
- *   1 Basics    – name, gender, years_experience, languages
- *   2 Credentials – credential type, license# (HHA only), care types
- *   3 Skills    – skills, availability, time slots
- *   4 Bio & Photos – bio, at least one photo
- *   5 Contact   – zip code, travel radius
+ *   1 Basics: name, gender, years_experience, languages
+ *   2 Credentials: credential type, license# (HHA only), care types
+ *   3 Skills: skills, availability, time slots
+ *   4 Bio and Photos: bio, at least one photo
+ *   5 Contact: zip code, travel radius
  */
 export function getOnboardingStatus(
   profile: NurseProfile,

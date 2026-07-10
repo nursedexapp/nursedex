@@ -1,15 +1,18 @@
 // @vitest-environment node
 //
-// Regression guard for the writing-style rule: no em dashes or en dashes in
-// copy anyone reads. Slack messages, admin UI strings, and editor placeholders
-// all count as output.
+// Regression guard for the writing-style rule: no em dashes or en dashes
+// anywhere we maintain. The rule covers copy people read (Slack messages, admin
+// UI strings, editor placeholders) and code comments alike.
 //
-// Scoped to files whose dashes were real copy rather than code comments. The
-// pre-push style hook already blocks a dash on any NEW line; this catches a
-// dash reintroduced into these files by an edit that never reaches the hook
-// (a rebase, a revert, an editor autocorrect turning "--" into an em dash).
+// The pre-push style hook already blocks a dash on any NEW line. This catches
+// one reintroduced by an edit that never reaches the hook: a rebase, a revert,
+// or an editor autocorrecting "--" into an em dash.
+//
+// supabase/migrations is deliberately excluded. Those files are an applied
+// historical record; rewriting their comments would churn migrations that have
+// already run against production.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 // Built from code points so this file contains neither character itself, which
@@ -37,6 +40,36 @@ describe("copy contains no em or en dashes", () => {
       .map((line, i) => ({ line, n: i + 1 }))
       .filter(({ line }) => DASHES.test(line))
       .map(({ line, n }) => `${file}:${n} ${line.trim()}`);
+
+    expect(offenders).toEqual([]);
+  });
+});
+
+const SCANNED_DIRS = ["src", "scripts", "e2e", "test"];
+const SCANNED_EXTENSIONS = [".ts", ".tsx", ".md"];
+
+function walk(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules" || entry.startsWith(".")) continue;
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (SCANNED_EXTENSIONS.some((e) => full.endsWith(e))) out.push(full);
+  }
+  return out;
+}
+
+describe("code comments contain no em or en dashes", () => {
+  it.each(SCANNED_DIRS)("%s/ is free of dash punctuation", (dir) => {
+    const offenders: string[] = [];
+
+    for (const file of walk(join(process.cwd(), dir))) {
+      const lines = readFileSync(file, "utf8").split("\n");
+      lines.forEach((line, i) => {
+        if (DASHES.test(line)) {
+          offenders.push(`${file.replace(process.cwd() + "/", "")}:${i + 1}`);
+        }
+      });
+    }
 
     expect(offenders).toEqual([]);
   });

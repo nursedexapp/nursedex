@@ -17,7 +17,7 @@ function nurse(overrides: Partial<RankableNurse> & { user_id: string }): Rankabl
 
 describe("rankNurses", () => {
   it("breaks full ties on ranking criteria deterministically by user_id", () => {
-    // Two nurses identical on every ranking criterion — only their
+    // Two nurses identical on every ranking criterion, only their
     // user_id differs. Postgres makes no ordering guarantee without an
     // ORDER BY, so the raw query can return these in either order on
     // different executions of the same request. rankNurses must not

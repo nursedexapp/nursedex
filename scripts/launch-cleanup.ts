@@ -140,7 +140,7 @@ async function deleteTestAccounts() {
 }
 
 async function main() {
-  console.log(`Launch cleanup — mode: ${mode}${RESTORE ? " (RESTORE)" : ""}`);
+  console.log(`Launch cleanup, mode: ${mode}${RESTORE ? " (RESTORE)" : ""}`);
   console.log(`Target: ${SUPABASE_URL}`);
   await hideOrRestoreSeedNurses();
   await deleteTestAccounts();

@@ -1,7 +1,7 @@
 import "server-only";
 
 // Sentry's free plan has no native Slack/webhook alerting (that requires
-// the paid Team tier — confirmed by the "Alert Rule Action" toggle being
+// the paid Team tier, confirmed by the "Alert Rule Action" toggle being
 // locked on a Custom Integration's webhook config on this account). This
 // polls the Issues API instead. Query is a live "needs review" snapshot
 // (not a first-seen time window) so a delayed/skipped poll can't lose

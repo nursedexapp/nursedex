@@ -20,7 +20,7 @@ export function formatPhone(raw: string): string {
  *
  * Rules:
  * - Must be exactly 10 digits once stripped.
- * - Middle three digits ("the prefix") cannot be 555 — that's
+ * - Middle three digits ("the prefix") cannot be 555, that's
  *   reserved for fictional numbers.
  * - Cannot be a single digit repeated (5555555555, 0000000000).
  * - Cannot be sequential ascending or descending across the full

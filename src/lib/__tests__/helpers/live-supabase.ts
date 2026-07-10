@@ -7,7 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, "../../../../.env.local") });
 /**
  * Shared setup for tests that write to a live Supabase instance (RLS
  * policies, Data API grants). Centralized so the local-only guard and test
- * user creation aren't duplicated per file — see .claude/CLAUDE.md's
+ * user creation aren't duplicated per file. See .claude/CLAUDE.md's
  * "consolidate from the start" rule.
  */
 

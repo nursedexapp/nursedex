@@ -38,7 +38,7 @@ const h = vi.hoisted(() => {
   // `.select().eq().maybeSingle()` read from an `.update().eq().eq().select()`
   // write, and the write only applies (and returns a row) when every
   // accumulated .eq() filter, including the status precondition, still
-  // matches the current state — modeling Postgres's atomic
+  // matches the current state, modeling Postgres's atomic
   // UPDATE ... WHERE id = ? AND status = ? guard against a concurrent writer.
   function hiresServerBuilder() {
     let pendingUpdate: Record<string, unknown> | null = null;

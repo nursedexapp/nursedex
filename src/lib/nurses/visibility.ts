@@ -13,7 +13,7 @@
  */
 export function applyVisibleNurseFilter<T>(query: T): T {
   // Chain through a fixed local builder type rather than a recursive generic
-  // bound to the (very deep) Supabase builder type — the latter trips
+  // bound to the (very deep) Supabase builder type, the latter trips
   // "Type instantiation is excessively deep" (TS2589) on some call sites.
   type Chainable = { eq(column: string, value: unknown): Chainable };
   return (query as unknown as Chainable)
