@@ -1,0 +1,91 @@
+name: Apply Migrations
+
+# Applies pending database migrations to production after a migration lands on
+# main, so a merged schema change cannot silently never reach production
+# (#542). The companion Migration Drift workflow (#518) is the alarm; this is
+# the fix.
+#
+# SAFETY: this is the only thing in the repo with write access to the
+# production schema. Two things hold it back:
+#
+#   1. `environment: production-db`, whose GitHub protection rule requires a
+#      human to click Approve before the job starts. Without that rule the job
+#      would run unattended on every merge.
+#   2. A verification step afterwards. A zero exit from the push is not proof
+#      that production matches git; re-running the drift checker is.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+  workflow_dispatch:
+
+# Never cancel a run mid-push: a half-applied migration set is worse than a
+# queued one. Serialize instead.
+concurrency:
+  group: apply-migrations
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    name: Apply pending migrations to production
+    runs-on: ubuntu-latest
+    # The approval gate. Configured in repo Settings, not here.
+    environment: production-db
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Link the production project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$PROJECT_REF"
+
+      # Printed for the audit trail, so the approver can see in the run log
+      # exactly which migrations this push is about to apply. Never fails the
+      # job: drift here is the expected reason the job is running.
+      - name: Show what will be applied
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -uo pipefail
+          supabase migration list --linked --output-format json \
+            | npx tsx scripts/check-migration-drift.ts || true
+
+      - name: Apply pending migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          supabase db push --include-all --yes
+
+      # A zero exit from the push is not proof. This fails the job if anything
+      # is still unapplied, or if a migration was applied that is not in git.
+      - name: Verify production now matches git
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          supabase migration list --linked --output-format json \
+            | npx tsx scripts/check-migration-drift.ts
