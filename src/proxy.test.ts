@@ -96,6 +96,24 @@ describe("proxy security headers (#393)", () => {
     expect(csp).toContain("frame-ancestors 'none'");
   });
 
+  it("nonces style elements while keeping inline style attributes (#538)", async () => {
+    const res = await proxy(fakeRequest("/nurses"));
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
+    const nonce = csp.match(/script-src[^;]*'nonce-([^']+)'/)?.[1];
+    expect(nonce).toBeTruthy();
+
+    // Modern browsers: <style> elements must be nonced (no unsafe-inline), so
+    // an injected <style> block is blocked. Inline style attributes stay
+    // allowed for our dynamic components.
+    expect(csp).toContain(`style-src-elem 'self' 'nonce-${nonce}'`);
+    expect(csp).not.toMatch(/style-src-elem[^;]*'unsafe-inline'/);
+    expect(csp).toContain("style-src-attr 'unsafe-inline'");
+
+    // Fallback for browsers without the granular directives keeps today's
+    // behavior, so nothing regresses there.
+    expect(csp).toMatch(/style-src 'self' 'unsafe-inline'/);
+  });
+
   it("points the CSP at the violation report endpoint (#537)", async () => {
     const res = await proxy(fakeRequest("/nurses"));
     const csp = res.headers.get("Content-Security-Policy") ?? "";

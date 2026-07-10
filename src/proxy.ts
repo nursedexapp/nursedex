@@ -23,7 +23,16 @@ function buildCsp(nonce: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com`,
+    // Split so an injected <style> block is blocked while our dynamic inline
+    // style attributes (14 files, mostly the brand pages and per-item computed
+    // values) keep working (#538). style-src-elem nonces framework <style>
+    // tags and allows the external stylesheet; style-src-attr allows inline
+    // style="" attributes, which a nonce cannot cover. The plain style-src is
+    // the fallback for browsers without the granular directives, kept at
+    // today's value so nothing regresses there.
     "style-src 'self' 'unsafe-inline'",
+    `style-src-elem 'self' 'nonce-${nonce}'`,
+    "style-src-attr 'unsafe-inline'",
     "img-src 'self' https://*.supabase.co data:",
     "font-src 'self' data:",
     `connect-src 'self' https://*.supabase.co wss://*.supabase.co ${SENTRY_INGEST_HOST}`,
