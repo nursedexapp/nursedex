@@ -148,6 +148,46 @@ describe("formatAuditReport", () => {
     expect(out).toMatch(/left-pad/);
   });
 
+  it("lists critical advisories before high ones", () => {
+    const out = formatAuditReport(parseAudit(auditJson()));
+    // left-pad is critical, transitive is high; critical sorts first.
+    expect(out.indexOf("left-pad")).toBeLessThan(out.indexOf("transitive"));
+  });
+
+  it("keeps every equal-severity advisory when sorting (no drops)", () => {
+    const twoCriticals = auditJson({
+      vulnerabilities: {
+        "crit-a": {
+          name: "crit-a",
+          severity: "critical",
+          isDirect: true,
+          via: [{ title: "A", url: "https://example/a", severity: "critical" }],
+          fixAvailable: false,
+        },
+        "crit-b": {
+          name: "crit-b",
+          severity: "critical",
+          isDirect: true,
+          via: [{ title: "B", url: "https://example/b", severity: "critical" }],
+          fixAvailable: false,
+        },
+      },
+      metadata: {
+        vulnerabilities: {
+          info: 0,
+          low: 0,
+          moderate: 0,
+          high: 0,
+          critical: 2,
+          total: 2,
+        },
+      },
+    });
+    const out = formatAuditReport(parseAudit(twoCriticals));
+    expect(out).toMatch(/crit-a/);
+    expect(out).toMatch(/crit-b/);
+  });
+
   it("states the tree is clean when there are no advisories", () => {
     const clean = parseAudit(
       JSON.stringify({
