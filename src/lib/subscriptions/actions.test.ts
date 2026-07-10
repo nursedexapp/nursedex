@@ -6,6 +6,7 @@ const h = vi.hoisted(() => {
   const state = {
     customerId: "cus_123" as string | null,
     activeSubscription: null as Record<string, unknown> | null,
+    checkoutError: null as Error | null,
   };
   const calls = {
     portal: [] as Array<{ customer: string; return_url: string }>,
@@ -40,6 +41,7 @@ vi.mock("@/lib/stripe/server", () => ({
     checkout: {
       sessions: {
         create: async (args: Record<string, unknown>) => {
+          if (h.state.checkoutError) throw h.state.checkoutError;
           h.calls.checkout.push(args);
           return { url: "https://checkout.stripe.test/session" };
         },
@@ -85,6 +87,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.state.customerId = "cus_123";
   h.state.activeSubscription = null;
+  h.state.checkoutError = null;
   h.calls.portal = [];
   h.calls.checkout = [];
 });
@@ -188,6 +191,32 @@ describe("createCheckoutSession customer branch", () => {
     const call = h.calls.checkout[0];
     expect(call.customer).toBeUndefined();
     expect(call.customer_email).toBe("u@x.com");
+  });
+});
+
+describe("createCheckoutSession Stripe failure handling", () => {
+  it("returns a friendly error and reports to Sentry when Stripe throws", async () => {
+    h.state.checkoutError = new Error("Stripe is down");
+    const res = await createFamilyAccessCheckout({});
+    expect(res.error).toBe("Couldn't start checkout. Please try again.");
+    expect(res.url).toBeUndefined();
+    expect(h.captureException).toHaveBeenCalledTimes(1);
+    const [err, ctx] = h.captureException.mock.calls[0];
+    expect(err).toBe(h.state.checkoutError);
+    expect(ctx).toMatchObject({
+      tags: { action: "createCheckoutSession", plan_type: "family_access" },
+    });
+  });
+
+  it("tags the Sentry report with the nurse_featured plan when that checkout fails", async () => {
+    h.state.checkoutError = new Error("Stripe is down");
+    const res = await createNurseFeaturedCheckout();
+    expect(res.error).toBe("Couldn't start checkout. Please try again.");
+    expect(res.url).toBeUndefined();
+    expect(h.captureException).toHaveBeenCalledTimes(1);
+    expect(h.captureException.mock.calls[0][1]).toMatchObject({
+      tags: { action: "createCheckoutSession", plan_type: "nurse_featured" },
+    });
   });
 });
 
