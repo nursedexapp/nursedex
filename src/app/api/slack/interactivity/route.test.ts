@@ -86,7 +86,12 @@ import { POST } from "./route";
 import { APPROVE_ACTION, REJECT_ACTION } from "@/lib/slack/views";
 import type { NextRequest } from "next/server";
 
-function decisionRequest(actionId: string, id = 7, userId = "U123") {
+function decisionRequest(
+  actionId: string,
+  id = 7,
+  userId = "U123",
+  headers?: Record<string, string>,
+) {
   const payload = {
     type: "block_actions",
     user: { id: userId },
@@ -98,6 +103,7 @@ function decisionRequest(actionId: string, id = 7, userId = "U123") {
   return new Request("https://nursedex.com/api/slack/interactivity", {
     method: "POST",
     body,
+    headers,
   }) as unknown as NextRequest;
 }
 
@@ -122,11 +128,36 @@ beforeEach(() => {
 });
 
 describe("slack interactivity signature check", () => {
-  it("rejects a request with an invalid signature", async () => {
+  it("rejects a request with an invalid signature and fires no side effect", async () => {
     h.verifySlackRequest.mockReturnValue(false);
     const res = await POST(decisionRequest(APPROVE_ACTION));
     expect(res.status).toBe(401);
     expect(h.calls.updates).toHaveLength(0);
+    // A spoofed admin action must not reach Slack either, not just the DB.
+    expect(h.slackPost).not.toHaveBeenCalled();
+  });
+
+  it("rejects a request with no signature header, without acting", async () => {
+    h.verifySlackRequest.mockReturnValue(false);
+    const res = await POST(decisionRequest(APPROVE_ACTION));
+    expect(res.status).toBe(401);
+    expect(h.slackPost).not.toHaveBeenCalled();
+    expect(h.calls.updates).toHaveLength(0);
+  });
+
+  it("passes the raw body and the signature headers through to the verifier", async () => {
+    h.verifySlackRequest.mockReturnValue(false);
+    await POST(
+      decisionRequest(APPROVE_ACTION, 7, "U123", {
+        "x-slack-signature": "v0=abc",
+        "x-slack-request-timestamp": "1700000000",
+      }),
+    );
+    expect(h.verifySlackRequest).toHaveBeenCalledWith(
+      expect.stringContaining("payload="),
+      "v0=abc",
+      "1700000000",
+    );
   });
 });
 
