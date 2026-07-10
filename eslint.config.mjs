@@ -2,6 +2,7 @@ import nextPlugin from "@next/eslint-plugin-next";
 import reactPlugin from "eslint-plugin-react";
 import hooksPlugin from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
+import noDirectSecretComparison from "./eslint-rules/no-direct-secret-comparison.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -11,11 +12,19 @@ export default [
       "@next/next": nextPlugin,
       react: reactPlugin,
       "react-hooks": hooksPlugin,
+      local: {
+        rules: { "no-direct-secret-comparison": noDirectSecretComparison },
+      },
     },
     rules: {
       ...nextPlugin.configs.recommended.rules,
       ...nextPlugin.configs["core-web-vitals"].rules,
       "react/no-unescaped-entities": "off",
+      // Shared secrets must go through the constant-time, fail-closed verifier
+      // in src/lib/security/shared-secret.ts. Three routes shipped a plain
+      // `===` against a secret (#391, #390, #406) and a fourth was missed by
+      // the first sweep (#546). Comparing by hand again fails CI (#547).
+      "local/no-direct-secret-comparison": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
