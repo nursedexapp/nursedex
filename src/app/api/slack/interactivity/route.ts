@@ -216,7 +216,7 @@ async function handleNewRequest(
       await slackPost("chat.postMessage", {
         channel: OPS_CHANNEL_ID,
         thread_ts: ts,
-        text: `🔔 <@${OPS_NOTIFY_USER_ID}> new request #${data.id} ready to triage.`,
+        text: `<@${OPS_NOTIFY_USER_ID}> new request #${data.id} ready to triage.`,
       });
     }
 
@@ -302,8 +302,8 @@ async function handleTriage(
       await postReply(
         req,
         type === "ad_hoc"
-          ? `🟠 Triaged as *Ad Hoc* at $75/hr, estimate ${estimate} hrs (~${cost}). Awaiting approval before work starts.`
-          : `🟢 Triaged as *Maintenance* at $25/hr, estimate ${estimate} hrs (~${cost}). Cleared to start.`,
+          ? `Triaged as *Ad Hoc* at $75/hr, estimate ${estimate} hrs (~${cost}). Awaiting approval before work starts.`
+          : `Triaged as *Maintenance* at $25/hr, estimate ${estimate} hrs (~${cost}). Cleared to start.`,
       );
       // Maintenance is cleared on triage, so open its GitHub issue. Run it
       // after the response so a slow GitHub call cannot stick the modal.
@@ -350,8 +350,8 @@ async function handleDecision(
     await postReply(
       req,
       approve
-        ? `✅ Approved by <@${userId}>. Cleared to start.`
-        : `⛔ Rejected by <@${userId}>.`,
+        ? `Approved by <@${userId}>. Cleared to start.`
+        : `Rejected by <@${userId}>.`,
     );
     // Open the GitHub issue once an ad hoc request is approved. Run it after
     // the response so a slow GitHub call cannot stick the button.

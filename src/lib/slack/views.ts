@@ -335,7 +335,7 @@ export function completionBlocks(opts: {
       type: "header",
       text: {
         type: "plain_text",
-        text: `✅ Request #${opts.id} done: ${opts.title}`.slice(0, 150),
+        text: `Request #${opts.id} done: ${opts.title}`.slice(0, 150),
       },
     },
   ];
@@ -463,7 +463,7 @@ export function triageModalView(req: {
       elements: [
         {
           type: "mrkdwn",
-          text: `✨ *Suggested by Claude:* ${req.suggested_rationale}`,
+          text: `*Suggested estimate:* ${req.suggested_rationale}`,
         },
       ],
     });

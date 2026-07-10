@@ -106,7 +106,7 @@ async function alertOpsSlack(event: Stripe.Event, err: unknown): Promise<void> {
   const message = err instanceof Error ? err.message : String(err);
   await slackPost("chat.postMessage", {
     channel: ALERTS_CHANNEL_ID,
-    text: `🚨 Stripe webhook failed: \`${event.type}\` (event \`${event.id}\`)\n${message}`,
+    text: `Stripe webhook failed: \`${event.type}\` (event \`${event.id}\`)\n${message}`,
   });
   await supabase.from("webhook_alert_log").insert({ event_id: event.id });
 }
