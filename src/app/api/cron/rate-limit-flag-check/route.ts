@@ -4,6 +4,7 @@ import { withCronAlerting } from "@/lib/cron/alerting";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendRateLimitFlaggedAdminEmail } from "@/lib/email/send";
+import { RATE_LIMITS } from "@/lib/constants";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -20,11 +21,11 @@ const handleRateLimitFlagCheck = withCronAlerting(
   async (_request: NextRequest) => {
     const supabase = createServiceRoleClient();
 
-    // Latest row per family with consecutive_captcha_days >= 3.
+    // Latest row per family at or over the captcha-day flag threshold.
     const { data: rows } = await supabase
       .from("rate_limit_reveals")
       .select("family_user_id, consecutive_captcha_days, date")
-      .gte("consecutive_captcha_days", 3)
+      .gte("consecutive_captcha_days", RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG)
       .order("date", { ascending: false });
 
     type Row = {

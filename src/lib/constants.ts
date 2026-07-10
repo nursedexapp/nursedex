@@ -23,11 +23,20 @@ export const TIER_LIMITS = {
   },
 } as const;
 
-// Rate limits
+// Rate limits.
+//
+// The cap and captcha threshold are ENFORCED IN THE DATABASE, by
+// consume_reveal_rate_limit (migration 054). Changing a number here does not
+// change what the database allows; it needs a matching migration. The
+// live-database tests in src/lib/__tests__/db-guards.test.ts assert the two
+// agree, so a change to one without the other fails CI rather than silently
+// doing nothing.
+//
+// Reveals reset at midnight UTC (the functions key on CURRENT_DATE), not on a
+// rolling 24-hour window.
 export const RATE_LIMITS = {
   REVEALS_CAPTCHA_THRESHOLD: 10,
   REVEALS_HARD_CAP: 25,
-  REVEALS_WINDOW_HOURS: 24,
   CONSECUTIVE_CAPTCHA_DAYS_FLAG: 3,
 } as const;
 
