@@ -5,6 +5,7 @@ import {
   assertLocalSupabaseUrl,
   createTestUser as createLiveTestUser,
 } from "./helpers/live-supabase";
+import { RATE_LIMITS } from "@/lib/constants";
 
 // Behavioural guards for the two correctness rules that now live inside the
 // database rather than in application code:
@@ -30,8 +31,10 @@ const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceKey: SERVICE_KEY } = getLiv
 // never point at production; .env.local holds production credentials.
 assertLocalSupabaseUrl(SUPABASE_URL, "Database guard tests");
 
-const REVEALS_HARD_CAP = 25;
-const REVEALS_CAPTCHA_THRESHOLD = 10;
+// Imported, not redeclared: these tests are what bind constants.ts to the
+// numbers the database actually enforces (issue #576). Editing a constant
+// without a matching migration fails here instead of silently doing nothing.
+const { REVEALS_HARD_CAP, REVEALS_CAPTCHA_THRESHOLD } = RATE_LIMITS;
 
 let service: SupabaseClient;
 const stamp = Date.now();
@@ -159,6 +162,17 @@ describe("consume_reveal_rate_limit (migration 054, issue #563)", () => {
     const res = await consume(family);
     expect(res.current_count).toBe(REVEALS_CAPTCHA_THRESHOLD);
     expect(res.needs_captcha).toBe(true);
+  });
+
+  it("does not flag captcha one reveal below the threshold", async () => {
+    // The pair of boundary assertions is what pins the database's threshold to
+    // RATE_LIMITS.REVEALS_CAPTCHA_THRESHOLD. Asserting only "flags at the
+    // threshold" would still pass if the constant were raised without a
+    // matching migration (#576).
+    await setRevealCount(family, REVEALS_CAPTCHA_THRESHOLD - 2);
+    const res = await consume(family);
+    expect(res.current_count).toBe(REVEALS_CAPTCHA_THRESHOLD - 1);
+    expect(res.needs_captcha).toBe(false);
   });
 
   it("loses no increment when many reveals are consumed concurrently", async () => {

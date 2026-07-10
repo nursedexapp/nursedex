@@ -34,9 +34,13 @@ export interface RevealResult {
  * Idempotent: re-revealing an already-revealed nurse just returns the
  * contact info without bumping the rate-limit counter.
  *
- * Rate limiting:
- * - Hard cap at RATE_LIMITS.REVEALS_HARD_CAP per UTC day
- * - Turnstile CAPTCHA required at RATE_LIMITS.REVEALS_CAPTCHA_THRESHOLD
+ * Rate limiting. The cap and captcha threshold are enforced by the
+ * consume_reveal_rate_limit function, not by this file. The numbers in
+ * RATE_LIMITS mirror it and are pinned to it by the live-database tests, so
+ * changing one without a matching migration fails CI.
+ * - Hard cap per UTC day (reveals reset at midnight UTC, not on a rolling
+ *   24-hour window)
+ * - Turnstile CAPTCHA required once the day's count reaches the threshold
  * - Accounts with RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG consecutive
  *   captcha-trigger days get flagged for admin review
  */
