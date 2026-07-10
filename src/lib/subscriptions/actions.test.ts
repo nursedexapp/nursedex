@@ -171,6 +171,26 @@ describe("createFamilyAccessCheckout", () => {
   });
 });
 
+describe("createCheckoutSession customer branch", () => {
+  it("reuses the existing Stripe customer and omits customer_email", async () => {
+    h.state.customerId = "cus_123";
+    const res = await createFamilyAccessCheckout({});
+    expect(res.url).toBe("https://checkout.stripe.test/session");
+    const call = h.calls.checkout[0];
+    expect(call.customer).toBe("cus_123");
+    expect(call.customer_email).toBeUndefined();
+  });
+
+  it("passes customer_email and no customer for a brand-new customer", async () => {
+    h.state.customerId = null;
+    const res = await createFamilyAccessCheckout({});
+    expect(res.url).toBe("https://checkout.stripe.test/session");
+    const call = h.calls.checkout[0];
+    expect(call.customer).toBeUndefined();
+    expect(call.customer_email).toBe("u@x.com");
+  });
+});
+
 describe("createNurseFeaturedCheckout", () => {
   it("creates a session with the nurse_featured price, metadata, and client_reference_id", async () => {
     const res = await createNurseFeaturedCheckout();
