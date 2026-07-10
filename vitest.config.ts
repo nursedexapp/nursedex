@@ -16,6 +16,10 @@ export default defineConfig({
       "src/**/*.test.{ts,tsx}",
       "test/**/*.test.{ts,tsx}",
       "scripts/**/*.test.ts",
+      // eslint-rules/ holds custom lint rules loaded by eslint.config.mjs.
+      // They are .mjs because tsconfig includes **/*.ts repo-wide, so a .ts
+      // test importing an untyped rule module would fail `tsc --noEmit`.
+      "eslint-rules/**/*.test.mjs",
     ],
     exclude: ["src/lib/__tests__/**"],
     pool: "threads",
