@@ -1,0 +1,45 @@
+name: Dependency Audit
+
+# The repo had no npm audit step and no Dependabot config (#405), so a known-
+# vulnerable package could sit in the tree unnoticed in a live payments app.
+#
+# This job runs `npm audit` on a schedule and writes a severity summary to the
+# run's step summary. It is non-blocking by design: the tree already carries
+# transitive advisories, and failing on every one would train everyone to
+# ignore the signal. A severity gate can be switched on later (hasAtOrAbove in
+# scripts/dependency-audit.ts already supports it). Dependabot (.github/
+# dependabot.yml) opens the actual upgrade PRs; this job is the visibility.
+
+on:
+  schedule:
+    # Mondays 13:00 UTC, a fresh advisory list at the start of the week.
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: dependency-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # npm audit exits non-zero when advisories exist. Capture to a file and
+      # neutralize that exit so the runner (not npm) decides the outcome; a
+      # genuinely failed audit produces no parseable JSON and the runner exits
+      # non-zero on it.
+      - name: Run npm audit
+        run: |
+          npm audit --json > audit.json || true
+          npx tsx scripts/check-dependency-audit.ts < audit.json

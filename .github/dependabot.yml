@@ -1,0 +1,32 @@
+version: 2
+
+# Dependabot opens upgrade PRs so vulnerable or stale dependencies get patched
+# rather than sitting unnoticed (#405). The scheduled npm audit
+# (.github/workflows/dependency-audit.yml) is the visibility; this is the fix
+# path. Weekly, grouped, and PR-limited so the queue stays reviewable.
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for the routine minor and patch bumps, so review is not death by
+      # a thousand single-package PRs. Majors still come as individual PRs,
+      # since they are likelier to need a real look.
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
