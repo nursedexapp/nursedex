@@ -19,14 +19,48 @@ import {
 // superseded definitions the database no longer enforces.
 
 /**
- * Policies that are genuinely fine without a WITH CHECK. Every entry needs a
- * written reason. An entry that stops matching a real policy fails the test,
- * so an exemption cannot outlive the policy it was written for.
+ * Policies reviewed and found safe without an explicit WITH CHECK. Every entry
+ * carries the reason. An entry that stops matching a real policy fails the
+ * test, so an exemption cannot outlive the policy it was written for.
+ *
+ * PR #511 hardened this bug class with BEFORE UPDATE triggers rather than by
+ * adding WITH CHECK, which is why these read as "missing" but are not holes.
+ * The trigger, not the policy, is what pins the protected columns. Each
+ * trigger's behaviour is covered by rls-hardening.test.ts.
  */
 const ALLOWED_WITHOUT_WITH_CHECK: readonly string[] = [
-  // (empty) PR #511 and #512 added an explicit WITH CHECK to every owner-scoped
-  // UPDATE policy. If CI reports a violation here, add it with a justification
-  // rather than deleting the assertion.
+  // guard_users_protected_columns (BEFORE UPDATE ON users) rejects any change
+  // to role, is_suspended or is_deleted from a non-admin, non-service caller.
+  "public.users.users_update_own",
+  // USING (is_admin()) already restricts this to admins, and the trigger above
+  // still governs what an admin may change.
+  "public.users.users_update_admin",
+
+  // guard_nurse_profiles_protected_columns (BEFORE UPDATE ON nurse_profiles).
+  "public.nurse_profiles.nurse_profiles_update_own",
+  "public.nurse_profiles.nurse_profiles_update_admin",
+
+  // guard_hires_self_write (BEFORE INSERT OR UPDATE ON hires) blocks a nurse
+  // confirming their own hire and blocks reassigning a hire to another nurse.
+  "public.hires.hires_update_family",
+  "public.hires.hires_update_nurse",
+
+  // guard_reviews_self_write (BEFORE UPDATE ON reviews) blocks self-approval
+  // and blocks submitting under another user's identity.
+  "public.reviews.reviews_update_reviewer",
+  "public.reviews.reviews_update_nurse_response",
+  "public.reviews.reviews_update_admin",
+
+  // No trigger, and none needed. USING (user_id = auth.uid()) is reused as the
+  // new-row check, so user_id itself cannot be reassigned. The only other
+  // columns are zip_code, communication_preference and survey_completed, all of
+  // which are the owner's own preferences and theirs to set.
+  "public.family_profiles.family_profiles_update_own",
+
+  // USING (public.is_admin()) restricts this to admins, whose intended use is
+  // exactly to set is_read and admin_notes. The INSERT shape was hardened in
+  // #523 so a submitter cannot pre-set those columns.
+  "public.contact_submissions.contact_update_admin",
 ];
 
 // Never read this from .env.local: that file holds PRODUCTION credentials for
@@ -72,14 +106,14 @@ afterAll(async () => {
   }
 });
 
-describe("every owner-scoped UPDATE/ALL policy has an explicit WITH CHECK", () => {
-  it("finds no unguarded policies in the applied schema", () => {
+describe("every UPDATE/ALL policy has a WITH CHECK or a reviewed exemption", () => {
+  it("finds no unreviewed policies in the applied schema", () => {
     const violations = findPoliciesMissingWithCheck(
       policies,
       ALLOWED_WITHOUT_WITH_CHECK,
     );
     expect(formatViolations(violations)).toBe(
-      "Every owner-scoped UPDATE/ALL policy has an explicit WITH CHECK.",
+      "Every UPDATE/ALL policy has an explicit WITH CHECK or a reviewed exemption.",
     );
   });
 

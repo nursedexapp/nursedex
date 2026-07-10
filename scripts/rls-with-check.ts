@@ -1,16 +1,27 @@
 /**
- * Detect owner-scoped RLS policies that can rewrite any column on a row.
+ * Flag RLS UPDATE/ALL policies that have no explicit `WITH CHECK`.
  *
- * PR #511 fixed three findings (#384, #385, #386, #388, #389) that all traced
- * to one omission: a `FOR UPDATE` policy with `USING (owner = auth.uid())` and
- * no `WITH CHECK`. Postgres then reuses the USING expression as the check, so
- * the owner may rewrite ANY column on their own row, not just the intended
- * one. Issue #512 found a fourth instance (`hires`) the audit had missed.
- * Nothing stopped a new migration from reintroducing it (#513).
+ * What omitting it actually does, precisely: for an UPDATE policy, `USING`
+ * tests the row as it exists and `WITH CHECK` tests the row as it will be.
+ * When `WITH CHECK` is omitted, Postgres reuses the `USING` expression as the
+ * new-row check. So the policy is only as good as `USING` is at constraining
+ * every sensitive column.
  *
- * Scope note: only UPDATE and ALL can exhibit this. Postgres rejects `USING`
- * on a `FOR INSERT` policy, so an INSERT policy always carries an explicit
- * WITH CHECK. SELECT and DELETE have no WITH CHECK clause at all.
+ * That is the #384/#385/#386 bug class. `users_update_own` was
+ * `USING (id = auth.uid())` with no WITH CHECK, and a row with a rewritten
+ * `role` still satisfies `id = auth.uid()`, so the owner could promote
+ * themselves. PR #511 fixed those. #512 found a fourth instance in `hires`.
+ * Nothing stopped a new migration from reintroducing the pattern (#513).
+ *
+ * A missing WITH CHECK is therefore a SMELL, not a proven hole:
+ * `family_profiles_update_own` is `USING (user_id = auth.uid())`, whose only
+ * sensitive column is the one the predicate already pins. This check exists to
+ * force that judgement to be made and written down, once, per policy, instead
+ * of being rediscovered by another security audit. Hence the allowlist.
+ *
+ * Scope: only UPDATE and ALL can exhibit this. Postgres rejects `USING` on a
+ * `FOR INSERT` policy, so an INSERT policy always carries an explicit WITH
+ * CHECK. SELECT and DELETE have no WITH CHECK clause at all.
  *
  * This reads the APPLIED policies out of `pg_policies`, not the text of
  * supabase/migrations/*.sql. The migrations contain 93 CREATE POLICY and 28
@@ -76,14 +87,16 @@ export function findPoliciesMissingWithCheck(
 
 export function formatViolations(violations: PolicyRow[]): string {
   if (violations.length === 0) {
-    return "Every owner-scoped UPDATE/ALL policy has an explicit WITH CHECK.";
+    return "Every UPDATE/ALL policy has an explicit WITH CHECK or a reviewed exemption.";
   }
 
   const lines = [
-    `${violations.length} RLS ${violations.length === 1 ? "policy" : "policies"} can rewrite any column on a row.`,
+    `${violations.length} RLS ${violations.length === 1 ? "policy has" : "policies have"} no explicit WITH CHECK.`,
     "",
-    "Postgres reuses USING as the check when WITH CHECK is omitted, so the row's",
-    "owner may change any column on it, not just the intended one.",
+    "Postgres reuses USING as the new-row check when WITH CHECK is omitted, so",
+    "each policy below is only as strong as its USING clause. Confirm that USING",
+    "constrains every column a caller must not be able to rewrite (role, prices,",
+    "approval flags, ownership columns).",
     "",
   ];
 
@@ -94,8 +107,9 @@ export function formatViolations(violations: PolicyRow[]): string {
 
   lines.push(
     "",
-    "Add an explicit WITH CHECK to each, or add it to ALLOWED_WITHOUT_WITH_CHECK",
-    "in src/lib/__tests__/rls-with-check.test.ts with a written justification.",
+    "Add an explicit WITH CHECK to each, or, if USING already covers every",
+    "sensitive column, add it to ALLOWED_WITHOUT_WITH_CHECK in",
+    "src/lib/__tests__/rls-with-check.test.ts with a written justification.",
   );
 
   return lines.join("\n");
