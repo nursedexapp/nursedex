@@ -17,7 +17,7 @@
     "test:e2e": "playwright test",
     "test:e2e:auth": "E2E_AUTH=1 playwright test",
     "test:health": "vitest run --config vitest.health.config.ts",
-    "test:rls": "vitest run --config vitest.health.config.ts src/lib/__tests__/rls-policies.test.ts src/lib/__tests__/rls-hardening.test.ts src/lib/__tests__/data-api-grants.test.ts src/lib/__tests__/routine-execute-grants.test.ts",
+    "test:rls": "vitest run --config vitest.health.config.ts src/lib/__tests__/rls-policies.test.ts src/lib/__tests__/rls-hardening.test.ts src/lib/__tests__/data-api-grants.test.ts src/lib/__tests__/routine-execute-grants.test.ts src/lib/__tests__/db-guards.test.ts",
     "test:rls:local": "./scripts/test-rls-local.sh"
   },
   "keywords": [],
