@@ -28,6 +28,7 @@ const h = vi.hoisted(() => {
   const calls = {
     hireUpdate: [] as unknown[],
     hireInsert: [] as unknown[],
+    familyHireInsert: [] as unknown[],
     claimTokenUpdate: [] as unknown[],
     emailLogInsert: [] as unknown[],
     cooldownQuery: [] as unknown[],
@@ -44,8 +45,25 @@ const h = vi.hoisted(() => {
     let pendingUpdate: Record<string, unknown> | null = null;
     let updateFilters: Record<string, unknown> = {};
     return createQueryBuilder({
+      // Token flows (confirm/reject) set tokenHireRow; recordFamilyHire's
+      // duplicate check sets existingHire. The two flows never set both, so a
+      // single builder serves both by preferring tokenHireRow.
       maybeSingle: () => ({
-        data: state.tokenHireRow ? { ...state.tokenHireRow } : null,
+        data: state.tokenHireRow
+          ? { ...state.tokenHireRow }
+          : state.existingHire
+            ? { ...state.existingHire }
+            : null,
+      }),
+      // recordFamilyHire inserts a confirmed hire; select("id") then single()
+      // return the new row (pendingUpdate stays null so select just chains).
+      insert: (payload) => {
+        calls.familyHireInsert.push(payload as Record<string, unknown>);
+        return "chain";
+      },
+      single: () => ({
+        data: state.hireInsertError ? null : { id: state.newHireId },
+        error: state.hireInsertError,
       }),
       update: (payload) => {
         pendingUpdate = payload as Record<string, unknown>;
@@ -80,6 +98,10 @@ const h = vi.hoisted(() => {
   const serverClient = {
     from: (table: string) => {
       if (table === "hires") return hiresServerBuilder();
+      if (table === "reveals")
+        return createQueryBuilder({
+          maybeSingle: () => ({ data: state.reveal }),
+        });
       throw new Error(`unexpected table ${table}`);
     },
   };
@@ -186,6 +208,7 @@ import {
   confirmHireFromToken,
   rejectHireFromToken,
   claimHireByEmail,
+  recordFamilyHire,
 } from "./actions";
 import { sendHireConfirmedEmail } from "@/lib/email/send";
 
@@ -203,6 +226,7 @@ beforeEach(() => {
   h.state.hireInsertError = null;
   h.calls.hireUpdate = [];
   h.calls.hireInsert = [];
+  h.calls.familyHireInsert = [];
   h.calls.claimTokenUpdate = [];
   h.calls.emailLogInsert = [];
   h.calls.cooldownQuery = [];
@@ -425,5 +449,75 @@ describe("claimHireByEmail", () => {
         dedup_key: h.state.newHireId,
       }),
     ]);
+  });
+});
+
+describe("recordFamilyHire", () => {
+  it("returns invalid for a malformed nurse_user_id without touching the DB", async () => {
+    const res = await recordFamilyHire({ nurse_user_id: "not-a-uuid" });
+    expect(res).toEqual({ success: false, error: "invalid" });
+    expect(h.calls.familyHireInsert).toHaveLength(0);
+  });
+
+  it("returns not_revealed when the family never revealed this nurse", async () => {
+    h.state.reveal = null;
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+    expect(res).toEqual({ success: false, error: "not_revealed" });
+    expect(h.calls.familyHireInsert).toHaveLength(0);
+  });
+
+  it("returns already_recorded on an existing confirmed hire", async () => {
+    h.state.reveal = { id: "reveal-1" };
+    h.state.existingHire = { id: "hire-1", status: "confirmed" };
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+    expect(res).toEqual({ success: false, error: "already_recorded" });
+    expect(h.calls.familyHireInsert).toHaveLength(0);
+  });
+
+  it("allows re-recording after a prior rejected hire", async () => {
+    h.state.reveal = { id: "reveal-1" };
+    h.state.existingHire = { id: "hire-1", status: "rejected" };
+    h.state.nurseLookup = { email: "nurse@example.com", first_name: "Nia" };
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+    expect(res).toEqual({ success: true, hireId: h.state.newHireId });
+    expect(h.calls.familyHireInsert).toHaveLength(1);
+  });
+
+  it("inserts a confirmed family-claimed hire and queues the nurse email on the happy path", async () => {
+    h.state.reveal = { id: "reveal-1" };
+    h.state.existingHire = null;
+    h.state.nurseLookup = { email: "nurse@example.com", first_name: "Nia" };
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+    expect(res).toEqual({ success: true, hireId: h.state.newHireId });
+    expect(h.calls.familyHireInsert).toEqual([
+      expect.objectContaining({
+        family_user_id: FAMILY_ID,
+        nurse_user_id: NURSE_ID,
+        status: "confirmed",
+        claimed_by: "family",
+      }),
+    ]);
+    expect(sendHireConfirmedEmail).toHaveBeenCalledTimes(1);
+    expect(sendHireConfirmedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "nurse@example.com", firstName: "Nia" }),
+    );
+  });
+
+  it("still succeeds without sending email when the nurse has no email on file", async () => {
+    h.state.reveal = { id: "reveal-1" };
+    h.state.existingHire = null;
+    h.state.nurseLookup = null;
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+    expect(res.success).toBe(true);
+    expect(sendHireConfirmedEmail).not.toHaveBeenCalled();
+  });
+
+  it("returns unknown when the hire insert fails", async () => {
+    h.state.reveal = { id: "reveal-1" };
+    h.state.existingHire = null;
+    h.state.hireInsertError = { message: "insert boom" };
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+    expect(res).toEqual({ success: false, error: "unknown" });
+    expect(sendHireConfirmedEmail).not.toHaveBeenCalled();
   });
 });
