@@ -1,6 +1,9 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createQueryBuilder } from "../../../../../test/supabase-mock";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  createQueryBuilder,
+  createRangeFilterRecorder,
+} from "../../../../../test/supabase-mock";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -17,12 +20,16 @@ const h = vi.hoisted(() => {
     client: {
       from: (table: string) =>
         createQueryBuilder({
-          then: () =>
-            table === "hires" ? h.state.hires : h.state.reveals,
+          // Only the reveals query carries the date window; `filters` is
+          // initialized below and this closure only runs inside a test.
+          ...(table === "reveals" ? filters.handlers : {}),
+          then: () => (table === "hires" ? h.state.hires : h.state.reveals),
         }),
     },
   };
 });
+
+const filters = createRangeFilterRecorder();
 
 vi.mock("@/lib/cron/alerting", () => ({
   withCronAlerting: (_n: string, handler: unknown) => handler,
@@ -63,9 +70,14 @@ const reveal = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  filters.reset();
   h.shouldSendOnce.mockResolvedValue(true);
   h.state.reveals = { data: [], error: null };
   h.state.hires = { data: [], error: null };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("hire-followup cron", () => {
@@ -115,5 +127,38 @@ describe("hire-followup cron", () => {
     h.state.reveals = { data: [], error: { message: "db down" } };
     const res = await GET(req());
     expect(res.status).toBe(500);
+  });
+
+  // Bounds are literal dates, not a recomputation of the route's own DAY_MS
+  // arithmetic, so an off-by-one fails here instead of agreeing with itself.
+  describe("the revealed-at window", () => {
+    it("asks for reveals between 35 and 28 days ago", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-07-11T13:00:00.000Z"));
+
+      await GET(req());
+
+      // 35 days before Jul 11 is Jun 6; 28 days before is Jun 13.
+      expect(filters.bound("gte", "revealed_at")).toBe(
+        "2026-06-06T13:00:00.000Z",
+      );
+      expect(filters.bound("lte", "revealed_at")).toBe(
+        "2026-06-13T13:00:00.000Z",
+      );
+    });
+
+    it("keeps the window seven days wide so daily runs neither gap nor overlap", async () => {
+      // The cron runs daily and dedups, but a window narrower than the gap
+      // between runs would drop families entirely on a missed day.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-07-11T13:00:00.000Z"));
+
+      await GET(req());
+
+      const gte = new Date(filters.bound("gte", "revealed_at") as string);
+      const lte = new Date(filters.bound("lte", "revealed_at") as string);
+      const widthDays = (lte.getTime() - gte.getTime()) / (24 * 60 * 60 * 1000);
+      expect(widthDays).toBe(7);
+    });
   });
 });
