@@ -151,49 +151,131 @@ describe("requireSuperAdmin rejects plain admins", () => {
   });
 });
 
-describe("admin actions reject a non-admin caller with no side effect", () => {
-  it("suspendAccount", async () => {
-    setCaller("family");
-    const { suspendAccount } = await import("./account-actions");
-    await expect(suspendAccount({ user_id: UUID })).rejects.toThrow(
-      /NEXT_REDIRECT/,
-    );
-    expectNoWrites();
-  });
+// Every module that exports an admin server action. The completeness test at the
+// bottom walks these, so a new admin module must be added here too.
+const MODULES = {
+  "./account-actions": () => import("./account-actions"),
+  "./role-actions": () => import("./role-actions"),
+  "./review-actions": () => import("./review-actions"),
+  "./verification-actions": () => import("./verification-actions"),
+} as const;
 
-  it("removeAccount", async () => {
-    setCaller("family");
-    const { removeAccount } = await import("./account-actions");
-    await expect(
-      removeAccount({ user_id: UUID, reason: "spam" }),
-    ).rejects.toThrow(/NEXT_REDIRECT/);
-    expectNoWrites();
-  });
+type ModuleName = keyof typeof MODULES;
 
-  it("adminApproveReview", async () => {
-    setCaller("nurse");
-    const { adminApproveReview } = await import("./review-actions");
-    await expect(adminApproveReview({ review_id: UUID })).rejects.toThrow(
-      /NEXT_REDIRECT/,
-    );
-    expectNoWrites();
-  });
+// One boundary case per admin action: the caller who must be refused, and a
+// VALID input for that action.
+//
+// The input has to be valid. Every action safeParses its argument BEFORE calling
+// requireAdmin, so a malformed one returns { error: "invalid" } and never reaches
+// the guard: the test would then pass against an action with no guard at all.
+const CASES: ReadonlyArray<{
+  module: ModuleName;
+  action: string;
+  caller: string;
+  input: unknown;
+}> = [
+  {
+    module: "./account-actions",
+    action: "suspendAccount",
+    caller: "family",
+    input: { user_id: UUID },
+  },
+  {
+    module: "./account-actions",
+    action: "unsuspendAccount",
+    caller: "family",
+    input: { user_id: UUID },
+  },
+  {
+    module: "./account-actions",
+    action: "removeAccount",
+    caller: "family",
+    input: { user_id: UUID, reason: "spam" },
+  },
+  {
+    module: "./review-actions",
+    action: "adminApproveReview",
+    caller: "nurse",
+    input: { review_id: UUID },
+  },
+  {
+    module: "./review-actions",
+    action: "adminRejectReview",
+    caller: "nurse",
+    input: { review_id: UUID },
+  },
+  {
+    module: "./review-actions",
+    action: "adminResolveRemovalRequest",
+    caller: "family",
+    input: { review_id: UUID, decision: "honor" },
+  },
+  {
+    module: "./review-actions",
+    action: "adminResolveDispute",
+    caller: "family",
+    input: { review_id: UUID, decision: "remove" },
+  },
+  {
+    module: "./verification-actions",
+    action: "approveVerification",
+    caller: "family",
+    input: { user_id: UUID },
+  },
+  {
+    module: "./verification-actions",
+    action: "rejectVerification",
+    caller: "nurse",
+    input: { user_id: UUID, reason: "Credential expired" },
+  },
+  // Super-admin only: a plain admin is a stricter bar than a family or nurse,
+  // and is the caller most likely to slip through a weakened guard.
+  {
+    module: "./role-actions",
+    action: "promoteToAdmin",
+    caller: "admin",
+    input: { email: "victim@example.com", role: "admin" },
+  },
+  {
+    module: "./role-actions",
+    action: "demoteAdmin",
+    caller: "admin",
+    input: { user_id: UUID },
+  },
+];
 
-  it("approveVerification", async () => {
-    setCaller("family");
-    const { approveVerification } = await import("./verification-actions");
-    await expect(approveVerification({ user_id: UUID })).rejects.toThrow(
-      /NEXT_REDIRECT/,
-    );
-    expectNoWrites();
-  });
+describe("admin actions reject an unauthorized caller with no side effect", () => {
+  it.each(CASES)(
+    "$action refuses a $caller caller and writes nothing",
+    async ({ module, action, caller, input }) => {
+      setCaller(caller);
+      const mod = (await MODULES[module]()) as unknown as Record<
+        string,
+        (i: unknown) => Promise<unknown>
+      >;
 
-  it("promoteToAdmin rejects even a plain admin (super_admin only)", async () => {
-    setCaller("admin");
-    const { promoteToAdmin } = await import("./role-actions");
-    await expect(
-      promoteToAdmin({ email: "victim@example.com", role: "admin" }),
-    ).rejects.toThrow(/NEXT_REDIRECT/);
-    expectNoWrites();
+      await expect(mod[action](input)).rejects.toThrow(/NEXT_REDIRECT/);
+
+      expectNoWrites();
+    },
+  );
+});
+
+// A sampled boundary suite silently stops covering the thing it was written for:
+// the six actions added after #493 inherited no case, and nothing said so. This
+// fails when an exported action has no entry in CASES, so a new admin action
+// cannot ship without a boundary test (#633).
+describe("every exported admin action has a boundary case", () => {
+  it.each(Object.keys(MODULES) as ModuleName[])("%s", async (name) => {
+    const mod = await MODULES[name]();
+    const exported = Object.entries(mod)
+      .filter(([, v]) => typeof v === "function")
+      .map(([k]) => k)
+      .sort();
+    const covered = CASES.filter((c) => c.module === name)
+      .map((c) => c.action)
+      .sort();
+
+    expect(exported).toEqual(covered);
   });
 });
