@@ -120,6 +120,7 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
       .from("reviews")
       .select("id", { count: "exact", head: true })
       .eq("status", "approved"),
+    // eslint-disable-next-line local/require-visible-nurse-filter -- counts the admin verification queue, which by definition holds profiles that are not yet verified and so are not publicly visible. This count feeds the admin dashboard, never a public surface.
     supabase
       .from("nurse_profiles")
       .select("user_id", { count: "exact", head: true })

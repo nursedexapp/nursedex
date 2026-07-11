@@ -23,6 +23,7 @@ const handleSlaAlerts = withCronAlerting(
     const supabase = createServiceRoleClient();
     const now = Date.now();
 
+    // eslint-disable-next-line local/require-visible-nurse-filter -- the SLA queue is the set of profiles still awaiting verification, so filtering to publicly visible (verified) nurses would always return zero and the cron would never alert. Nothing here reaches a public surface: it produces counts for an admin email.
     const { data: pending, error: pendingError } = await supabase
       .from("nurse_profiles")
       .select("user_id, tier, updated_at")

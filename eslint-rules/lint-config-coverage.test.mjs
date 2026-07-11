@@ -27,6 +27,55 @@ async function ruleIdsFor(code, filePath) {
   return result.messages.map((m) => m.ruleId);
 }
 
+// #621: applyVisibleNurseFilter was the only thing keeping hidden, suspended,
+// and unverified nurses off public surfaces that use the RLS-bypassing
+// service-role client, and applying it was convention alone. These run the
+// REAL project config, so the guard going missing (or never being wired up)
+// fails here rather than the next time someone adds a public read surface.
+const UNFILTERED_NURSE_READ = `
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+export async function load() {
+  const supabase = createServiceRoleClient();
+  const { data } = await supabase.from("nurse_profiles").select("slug");
+  return data;
+}
+`;
+
+describe("eslint.config.mjs coverage of the visible-nurse-filter guard", () => {
+  it("flags an unfiltered service-role nurse read in a new public read surface", async () => {
+    const ids = await ruleIdsFor(
+      UNFILTERED_NURSE_READ,
+      path.join(repoRoot, "src/app/(public)/nurses/example/page.tsx"),
+    );
+    expect(ids).toContain("local/require-visible-nurse-filter");
+  });
+
+  it("flags an unfiltered service-role nurse read in a cron route", async () => {
+    const ids = await ruleIdsFor(
+      UNFILTERED_NURSE_READ,
+      path.join(repoRoot, "src/app/api/cron/example/route.ts"),
+    );
+    expect(ids).toContain("local/require-visible-nurse-filter");
+  });
+
+  it("does not flag a read that routes through applyVisibleNurseFilter", async () => {
+    const ids = await ruleIdsFor(
+      `
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
+export async function load() {
+  const supabase = createServiceRoleClient();
+  const query = supabase.from("nurse_profiles").select("slug");
+  const { data } = await applyVisibleNurseFilter(query);
+  return data;
+}
+`,
+      path.join(repoRoot, "src/app/(public)/nurses/example/page.tsx"),
+    );
+    expect(ids).not.toContain("local/require-visible-nurse-filter");
+  });
+});
+
 describe("eslint.config.mjs coverage of the secret-comparison guard", () => {
   it("flags a direct secret comparison in scripts/", async () => {
     const ids = await ruleIdsFor(
