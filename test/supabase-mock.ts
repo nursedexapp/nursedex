@@ -17,6 +17,7 @@ const METHODS = [
   "lte",
   "gt",
   "lt",
+  "or",
   "order",
   "limit",
   "maybeSingle",
