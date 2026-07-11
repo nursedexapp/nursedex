@@ -1,6 +1,11 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQueryBuilder } from "../../../../../test/supabase-mock";
+import {
+  cronRequest as req,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -38,18 +43,9 @@ vi.mock("@/lib/nurses/visibility", () => ({
   applyVisibleNurseFilter: (q: unknown) => q,
 }));
 
-process.env.CRON_SECRET = "test-secret";
+process.env.CRON_SECRET = TEST_CRON_SECRET;
 
 import { GET } from "./route";
-
-function req(authed = true) {
-  return {
-    headers: {
-      get: (k: string) =>
-        k === "authorization" && authed ? "Bearer test-secret" : null,
-    },
-  } as unknown as Parameters<typeof GET>[0];
-}
 
 const featuredNurse = () => ({
   user_id: "nurse-1",
@@ -69,23 +65,16 @@ beforeEach(() => {
 });
 
 describe("featured-analytics cron", () => {
-  it("returns 401 without the cron secret", async () => {
-    const res = await GET(req(false));
-    expect(res.status).toBe(401);
-  });
-
-  // Seeded with a featured nurse who has activity to report, and kept separate
-  // from the status assertion above: against an empty result set this would hold
-  // whether or not the guard exists, and folded in after a failing status expect
-  // it would never run at all (#629).
-  it("sends no analytics email when unauthenticated", async () => {
-    h.state.featured = { data: [featuredNurse()], error: null };
-    h.state.analytics = { data: [{ profile_views: 5, saves: 1, reveals: 2 }] };
-
-    await GET(req(false));
-
-    expect(h.shouldSendOnce).not.toHaveBeenCalled();
-    expect(h.sendFeaturedAnalyticsEmail).not.toHaveBeenCalled();
+  describeCronAuthGuard({
+    GET,
+    seedSideEffect: () => {
+      h.state.featured = { data: [featuredNurse()], error: null };
+      h.state.analytics = { data: [{ profile_views: 5, saves: 1, reveals: 2 }] };
+    },
+    sideEffectSpies: {
+      shouldSendOnce: h.shouldSendOnce,
+      sendFeaturedAnalyticsEmail: h.sendFeaturedAnalyticsEmail,
+    },
   });
 
   it("emails a nurse with activity and dedups by ISO week", async () => {

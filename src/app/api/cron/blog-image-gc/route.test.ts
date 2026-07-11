@@ -1,14 +1,17 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  cronRequest,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => ({
-  verifyCronAuth: vi.fn(),
   collectReferencedPaths: vi.fn(),
   listAllBlogImages: vi.fn(),
   remove: vi.fn(),
 }));
 
-vi.mock("@/lib/cron/auth", () => ({ verifyCronAuth: h.verifyCronAuth }));
 vi.mock("@/lib/blog/image-gc", () => ({
   collectReferencedPaths: h.collectReferencedPaths,
   listAllBlogImages: h.listAllBlogImages,
@@ -19,9 +22,11 @@ vi.mock("@/lib/supabase/service-role", () => ({
   }),
 }));
 
+process.env.CRON_SECRET = TEST_CRON_SECRET;
+
 import { GET } from "./route";
 
-const req = {} as Parameters<typeof GET>[0];
+const req = cronRequest();
 // Two objects old enough to clear any grace window.
 const OLD = "2020-01-01T00:00:00.000Z";
 
@@ -31,15 +36,25 @@ beforeEach(() => {
 });
 
 describe("blog-image-gc cron", () => {
-  it("returns the unauthorized response when the bearer is missing", async () => {
-    const unauth = { status: 401 };
-    h.verifyCronAuth.mockReturnValue(unauth);
-    expect(await GET(req)).toBe(unauth);
-    expect(h.remove).not.toHaveBeenCalled();
+  // Previously this test stubbed verifyCronAuth and asserted the route returned
+  // the stub's own 401 object: circular, and blind to the real secret check.
+  describeCronAuthGuard({
+    GET,
+    // An orphan ready to be deleted: this cron destroys storage objects, so an
+    // unauthenticated caller reaching the handler would delete real files.
+    seedSideEffect: () => {
+      h.collectReferencedPaths.mockResolvedValue(new Set<string>());
+      h.listAllBlogImages.mockResolvedValue([
+        { path: "blog/2026/orphan.png", createdAt: OLD },
+      ]);
+    },
+    sideEffectSpies: {
+      listAllBlogImages: h.listAllBlogImages,
+      remove: h.remove,
+    },
   });
 
   it("aborts without deleting if posts cannot be read", async () => {
-    h.verifyCronAuth.mockReturnValue(null);
     h.collectReferencedPaths.mockRejectedValue(new Error("db down"));
     const res = await GET(req);
     expect(res.status).toBe(500);
@@ -47,7 +62,6 @@ describe("blog-image-gc cron", () => {
   });
 
   it("deletes only old unreferenced objects", async () => {
-    h.verifyCronAuth.mockReturnValue(null);
     h.collectReferencedPaths.mockResolvedValue(
       new Set(["blog/2026/keep.png"]),
     );
@@ -64,7 +78,6 @@ describe("blog-image-gc cron", () => {
   });
 
   it("does not call remove when there are no orphans", async () => {
-    h.verifyCronAuth.mockReturnValue(null);
     h.collectReferencedPaths.mockResolvedValue(new Set(["blog/2026/keep.png"]));
     h.listAllBlogImages.mockResolvedValue([
       { path: "blog/2026/keep.png", createdAt: OLD },
