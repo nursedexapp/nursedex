@@ -1,5 +1,8 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Issue #493 (AUD-139). The e2e smoke suite renders admin routes as a
 // super_admin but never asserts that a non-admin is refused. Admin server
@@ -20,6 +23,11 @@ const h = vi.hoisted(() => {
     user: null as Record<string, unknown> | null,
   };
   // Spies on every mutating path. A rejected caller must touch none of them.
+  //
+  // Mail counts as a side effect, not just database writes: these actions tell a
+  // nurse her verification was rejected, or an account it was suspended. The
+  // suite mocks next/server's after() to run inline, so a dropped guard really
+  // would reach these.
   const writes = {
     update: vi.fn(),
     insert: vi.fn(),
@@ -27,6 +35,11 @@ const h = vi.hoisted(() => {
     upsert: vi.fn(),
     updateUserById: vi.fn(),
     deleteUser: vi.fn(),
+    sendAccountSuspendedEmail: vi.fn(),
+    sendAccountRemovedEmail: vi.fn(),
+    sendVerificationApprovedEmail: vi.fn(),
+    sendVerificationRejectedEmail: vi.fn(),
+    sendDisputeDecisionEmail: vi.fn(),
   };
   function builder() {
     const b: Record<string, unknown> = {};
@@ -88,6 +101,13 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client(),
 }));
+vi.mock("@/lib/email/send", () => ({
+  sendAccountSuspendedEmail: h.writes.sendAccountSuspendedEmail,
+  sendAccountRemovedEmail: h.writes.sendAccountRemovedEmail,
+  sendVerificationApprovedEmail: h.writes.sendVerificationApprovedEmail,
+  sendVerificationRejectedEmail: h.writes.sendVerificationRejectedEmail,
+  sendDisputeDecisionEmail: h.writes.sendDisputeDecisionEmail,
+}));
 
 function setCaller(role: string | null) {
   h.state.user =
@@ -96,13 +116,12 @@ function setCaller(role: string | null) {
       : { id: `caller-${role}`, role, is_suspended: false, is_deleted: false };
 }
 
-function expectNoWrites() {
-  expect(h.writes.update).not.toHaveBeenCalled();
-  expect(h.writes.insert).not.toHaveBeenCalled();
-  expect(h.writes.delete).not.toHaveBeenCalled();
-  expect(h.writes.upsert).not.toHaveBeenCalled();
-  expect(h.writes.updateUserById).not.toHaveBeenCalled();
-  expect(h.writes.deleteUser).not.toHaveBeenCalled();
+// Walks the spies rather than listing them, so a side effect added to `writes`
+// is asserted on automatically instead of waiting to be added here too.
+function expectNoSideEffects() {
+  for (const [name, spy] of Object.entries(h.writes)) {
+    expect(spy, `${name} ran for an unauthorized caller`).not.toHaveBeenCalled();
+  }
 }
 
 beforeEach(() => {
@@ -256,15 +275,16 @@ describe("admin actions reject an unauthorized caller with no side effect", () =
 
       await expect(mod[action](input)).rejects.toThrow(/NEXT_REDIRECT/);
 
-      expectNoWrites();
+      expectNoSideEffects();
     },
   );
 });
 
 // A sampled boundary suite silently stops covering the thing it was written for:
-// the six actions added after #493 inherited no case, and nothing said so. This
-// fails when an exported action has no entry in CASES, so a new admin action
-// cannot ship without a boundary test (#633).
+// the six actions added after #493 inherited no case, and nothing said so. These
+// two tests close both ways that can happen (#633).
+
+// 1. A new action added to a module we already watch.
 describe("every exported admin action has a boundary case", () => {
   it.each(Object.keys(MODULES) as ModuleName[])("%s", async (name) => {
     const mod = await MODULES[name]();
@@ -277,5 +297,23 @@ describe("every exported admin action has a boundary case", () => {
       .sort();
 
     expect(exported).toEqual(covered);
+  });
+});
+
+// 2. A whole new admin module. Test 1 only inspects the modules listed in
+// MODULES, so trusting that hand-written list would reopen the same gap one
+// level up: a new admin-actions file would simply never be looked at. Read the
+// directory instead and require every "use server" file in it to be registered.
+describe("every admin server-action module is registered", () => {
+  it("finds no unwatched 'use server' file in src/lib/admin", () => {
+    const dir = dirname(fileURLToPath(import.meta.url));
+
+    const onDisk = readdirSync(dir)
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+      .filter((f) => readFileSync(join(dir, f), "utf8").includes('"use server"'))
+      .map((f) => `./${f.replace(/\.ts$/, "")}`)
+      .sort();
+
+    expect(onDisk).toEqual((Object.keys(MODULES) as string[]).sort());
   });
 });
