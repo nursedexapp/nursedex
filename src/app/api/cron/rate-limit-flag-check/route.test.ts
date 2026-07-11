@@ -2,6 +2,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQueryBuilder } from "../../../../../test/supabase-mock";
 import { RATE_LIMITS } from "@/lib/constants";
+import {
+  cronRequest,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -21,7 +26,6 @@ const h = vi.hoisted(() => {
   return {
     state,
     calls,
-    verifyCronAuth: vi.fn(() => null),
     shouldSendOnce: vi.fn(async () => h.state.shouldSend),
     sendRateLimitFlaggedAdminEmail: vi.fn(async (args: unknown) => {
       h.calls.emails.push(args);
@@ -48,7 +52,7 @@ function builderFor(table: string) {
   throw new Error(`unexpected table ${table}`);
 }
 
-vi.mock("@/lib/cron/auth", () => ({ verifyCronAuth: h.verifyCronAuth }));
+process.env.CRON_SECRET = TEST_CRON_SECRET;
 vi.mock("@/lib/cron/alerting", () => ({
   withCronAlerting: (_name: string, fn: unknown) => fn,
 }));
@@ -61,9 +65,8 @@ vi.mock("@/lib/email/send", () => ({
 }));
 
 import { GET } from "./route";
-import type { NextRequest } from "next/server";
 
-const req = () => ({}) as NextRequest;
+const req = cronRequest;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -126,11 +129,33 @@ describe("rate-limit-flag-check behaviour", () => {
     expect(h.sendRateLimitFlaggedAdminEmail).not.toHaveBeenCalled();
   });
 
-  it("rejects an unauthenticated cron request", async () => {
-    const unauthorized = new Response("Unauthorized", { status: 401 });
-    h.verifyCronAuth.mockReturnValueOnce(unauthorized as never);
-    const res = await GET(req());
-    expect(res.status).toBe(401);
+  // Previously this test stubbed verifyCronAuth and fed it a 401 to return:
+  // circular, and blind to the real secret check.
+  describeCronAuthGuard({
+    GET,
+    // A flagged family and an admin to notify: an unauthenticated caller
+    // reaching the handler would email the admin digest.
+    seedSideEffect: () => {
+      h.state.flaggedRows = [
+        {
+          family_user_id: "fam-1",
+          consecutive_captcha_days: 3,
+          date: "2026-07-09",
+        },
+      ];
+      h.state.admins = [{ id: "admin-1", email: "admin@nursedex.com" }];
+    },
+    sideEffectSpies: {
+      shouldSendOnce: h.shouldSendOnce,
+      sendRateLimitFlaggedAdminEmail: h.sendRateLimitFlaggedAdminEmail,
+    },
+  });
+
+  it("queries nothing when unauthenticated", async () => {
+    // This route's reads are recorded in a plain array rather than a spy, so the
+    // shared helper cannot see them: assert on it directly.
+    await GET(cronRequest(false));
+
     expect(h.calls.gte).toHaveLength(0);
   });
 });

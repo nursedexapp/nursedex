@@ -1,9 +1,13 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQueryBuilder } from "../../../../../test/supabase-mock";
+import {
+  cronRequest,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
-  const verifyCronAuth = vi.fn();
   const getIssuesNeedingReview = vi.fn();
   const slackPost = vi.fn(async () => ({ ok: true }));
   const state: {
@@ -13,7 +17,7 @@ const h = vi.hoisted(() => {
     insert: [],
     deleteIn: [],
   };
-  return { verifyCronAuth, getIssuesNeedingReview, slackPost, state, calls };
+  return { getIssuesNeedingReview, slackPost, state, calls };
 });
 
 function builder() {
@@ -30,7 +34,6 @@ function builder() {
   });
 }
 
-vi.mock("@/lib/cron/auth", () => ({ verifyCronAuth: h.verifyCronAuth }));
 vi.mock("@/lib/sentry/issues", () => ({
   getIssuesNeedingReview: h.getIssuesNeedingReview,
 }));
@@ -42,9 +45,11 @@ vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({ from: () => builder() }),
 }));
 
+process.env.CRON_SECRET = TEST_CRON_SECRET;
+
 import { GET } from "./route";
 
-const req = {} as Parameters<typeof GET>[0];
+const req = cronRequest();
 
 function issue(id: string) {
   return {
@@ -59,18 +64,23 @@ function issue(id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.verifyCronAuth.mockReturnValue(null);
   h.state.loggedRows = [];
   h.calls.insert = [];
   h.calls.deleteIn = [];
 });
 
 describe("sentry-alerts cron", () => {
-  it("returns the unauthorized response when the bearer is missing", async () => {
-    const unauth = { status: 401 };
-    h.verifyCronAuth.mockReturnValue(unauth);
-    expect(await GET(req)).toBe(unauth);
-    expect(h.getIssuesNeedingReview).not.toHaveBeenCalled();
+  // Previously this test stubbed verifyCronAuth and asserted the route returned
+  // the stub's own 401 object: circular, and blind to the real secret check.
+  describeCronAuthGuard({
+    GET,
+    seedSideEffect: () => {
+      h.getIssuesNeedingReview.mockResolvedValue([issue("1")]);
+    },
+    sideEffectSpies: {
+      getIssuesNeedingReview: h.getIssuesNeedingReview,
+      slackPost: h.slackPost,
+    },
   });
 
   it("does nothing when no issues need review", async () => {

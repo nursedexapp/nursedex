@@ -4,6 +4,11 @@ import {
   createQueryBuilder,
   createRangeFilterRecorder,
 } from "../../../../../test/supabase-mock";
+import {
+  cronRequest as req,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -43,18 +48,9 @@ vi.mock("@/lib/nurses/visibility", () => ({
   applyVisibleNurseFilter: (q: unknown) => q,
 }));
 
-process.env.CRON_SECRET = "test-secret";
+process.env.CRON_SECRET = TEST_CRON_SECRET;
 
 import { GET } from "./route";
-
-function req(authed = true) {
-  return {
-    headers: {
-      get: (k: string) =>
-        k === "authorization" && authed ? "Bearer test-secret" : null,
-    },
-  } as unknown as Parameters<typeof GET>[0];
-}
 
 const nurse = () => ({
   user_id: "nurse-1",
@@ -80,22 +76,15 @@ afterEach(() => {
 });
 
 describe("review-invite cron", () => {
-  it("returns 401 without the cron secret", async () => {
-    const res = await GET(req(false));
-    expect(res.status).toBe(401);
-  });
-
-  // Seeded with a nurse due an invite, and kept separate from the status
-  // assertion above: against an empty result set this would hold whether or not
-  // the guard exists, and folded in after a failing status expect it would never
-  // run at all (#629).
-  it("sends no invite when unauthenticated", async () => {
-    h.state.nurses = { data: [nurse()], error: null };
-
-    await GET(req(false));
-
-    expect(h.shouldSendOnce).not.toHaveBeenCalled();
-    expect(h.sendReviewInviteEmail).not.toHaveBeenCalled();
+  describeCronAuthGuard({
+    GET,
+    seedSideEffect: () => {
+      h.state.nurses = { data: [nurse()], error: null };
+    },
+    sideEffectSpies: {
+      shouldSendOnce: h.shouldSendOnce,
+      sendReviewInviteEmail: h.sendReviewInviteEmail,
+    },
   });
 
   it("sends the invite with the nurse's review link and a stable dedup key", async () => {

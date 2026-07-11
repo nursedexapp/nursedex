@@ -1,16 +1,20 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQueryBuilder } from "../../../../../test/supabase-mock";
+import {
+  cronRequest,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
   const revalidatePath = vi.fn();
-  const verifyCronAuth = vi.fn();
   const state: { result: { data: unknown; error: unknown } } = {
     result: { data: [], error: null },
   };
   // Records the filters the route applied so we can assert the query.
   const calls: { eq: unknown[][]; lte: unknown[][] } = { eq: [], lte: [] };
-  return { revalidatePath, verifyCronAuth, state, calls };
+  return { revalidatePath, state, calls };
 });
 
 function builder() {
@@ -28,14 +32,15 @@ function builder() {
 }
 
 vi.mock("next/cache", () => ({ revalidatePath: h.revalidatePath }));
-vi.mock("@/lib/cron/auth", () => ({ verifyCronAuth: h.verifyCronAuth }));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({ from: () => builder() }),
 }));
 
+process.env.CRON_SECRET = TEST_CRON_SECRET;
+
 import { GET } from "./route";
 
-const req = {} as Parameters<typeof GET>[0];
+const req = cronRequest();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,16 +50,19 @@ beforeEach(() => {
 });
 
 describe("publish-scheduled-posts cron", () => {
-  it("returns the unauthorized response when the bearer is missing", async () => {
-    const unauth = { status: 401 };
-    h.verifyCronAuth.mockReturnValue(unauth);
-    const res = await GET(req);
-    expect(res).toBe(unauth);
-    expect(h.revalidatePath).not.toHaveBeenCalled();
+  // Previously this test stubbed verifyCronAuth and asserted the route returned
+  // the stub's own 401 object: circular, and blind to the real secret check.
+  describeCronAuthGuard({
+    GET,
+    // Two posts due to go live: an unauthenticated caller reaching the handler
+    // would publish them to the public blog.
+    seedSideEffect: () => {
+      h.state.result = { data: [{ slug: "a" }, { slug: "b" }], error: null };
+    },
+    sideEffectSpies: { revalidatePath: h.revalidatePath },
   });
 
   it("publishes due posts and revalidates their pages", async () => {
-    h.verifyCronAuth.mockReturnValue(null);
     h.state.result = { data: [{ slug: "a" }, { slug: "b" }], error: null };
 
     const res = await GET(req);
@@ -70,7 +78,6 @@ describe("publish-scheduled-posts cron", () => {
   });
 
   it("does not revalidate when nothing is due", async () => {
-    h.verifyCronAuth.mockReturnValue(null);
     h.state.result = { data: [], error: null };
     const res = await GET(req);
     expect(await res.json()).toEqual({ published: 0 });

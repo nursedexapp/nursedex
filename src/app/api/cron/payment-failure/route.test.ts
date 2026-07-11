@@ -1,5 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  cronRequest as fakeRequest,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
   const sentKeys = new Set<string>();
@@ -59,18 +64,9 @@ vi.mock("@/lib/email/send", () => ({
   sendPaymentFailureFinalEmail: h.finalEmail,
 }));
 
-process.env.CRON_SECRET = "test-secret";
+process.env.CRON_SECRET = TEST_CRON_SECRET;
 
 import { GET } from "./route";
-
-function fakeRequest(authed = true): Parameters<typeof GET>[0] {
-  return {
-    headers: {
-      get: (k: string) =>
-        k === "authorization" && authed ? "Bearer test-secret" : null,
-    },
-  } as unknown as Parameters<typeof GET>[0];
-}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -102,30 +98,33 @@ beforeEach(() => {
 });
 
 describe("payment-failure cron: auth guard", () => {
-  // Seeded three days past due, which is the loudest possible path: an
-  // unauthenticated call that reached the handler would mail the final notice
-  // AND downgrade the plan. Against an empty subscription list these
-  // assertions would pass whether or not the guard exists.
-  const pastDue = () =>
-    fakeSub({
-      current_period_end: new Date(Date.now() - 3 * DAY_MS).toISOString(),
-    });
+  // Seeded three days past due, the loudest possible path: an unauthenticated
+  // call that reached the handler would mail the final notice AND downgrade.
+  const seedPastDue = () => {
+    h.state.subs = [
+      fakeSub({
+        current_period_end: new Date(Date.now() - 3 * DAY_MS).toISOString(),
+      }),
+    ];
+  };
 
-  it("returns 401 without the cron secret", async () => {
-    h.state.subs = [pastDue()];
-
-    const res = await GET(fakeRequest(false));
-
-    expect(res.status).toBe(401);
+  describeCronAuthGuard({
+    GET,
+    seedSideEffect: seedPastDue,
+    sideEffectSpies: {
+      shouldSendOnce: h.shouldSendOnce,
+      warningEmail: h.warningEmail,
+      finalEmail: h.finalEmail,
+    },
   });
 
-  it("sends no dunning mail and downgrades nobody when unauthenticated", async () => {
-    h.state.subs = [pastDue()];
+  it("downgrades nobody when unauthenticated", async () => {
+    // The downgrade writes are recorded in a plain array rather than a spy, so
+    // the shared helper cannot see them: assert on it directly.
+    seedPastDue();
 
     await GET(fakeRequest(false));
 
-    expect(h.warningEmail).not.toHaveBeenCalled();
-    expect(h.finalEmail).not.toHaveBeenCalled();
     expect(h.calls).toEqual([]);
   });
 });

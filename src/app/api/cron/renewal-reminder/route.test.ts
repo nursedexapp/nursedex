@@ -4,6 +4,11 @@ import {
   createQueryBuilder,
   createRangeFilterRecorder,
 } from "../../../../../test/supabase-mock";
+import {
+  cronRequest as req,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -37,18 +42,9 @@ vi.mock("@/lib/email/send", () => ({
   sendRenewalReminderEmail: h.sendRenewalReminderEmail,
 }));
 
-process.env.CRON_SECRET = "test-secret";
+process.env.CRON_SECRET = TEST_CRON_SECRET;
 
 import { GET } from "./route";
-
-function req(authed = true) {
-  return {
-    headers: {
-      get: (k: string) =>
-        k === "authorization" && authed ? "Bearer test-secret" : null,
-    },
-  } as unknown as Parameters<typeof GET>[0];
-}
 
 const sub = (over: Record<string, unknown> = {}) => ({
   id: "sub-1",
@@ -79,10 +75,18 @@ afterEach(() => {
 });
 
 describe("renewal-reminder cron", () => {
-  it("returns 401 without the cron secret", async () => {
-    const res = await GET(req(false));
-    expect(res.status).toBe(401);
-    expect(h.sendRenewalReminderEmail).not.toHaveBeenCalled();
+  // This cron's old guard test asserted "no email sent" against an empty result
+  // set, the same vacuous shape #629 fixed elsewhere but missed here. The helper
+  // requires a seed, so it cannot be written that way again.
+  describeCronAuthGuard({
+    GET,
+    seedSideEffect: () => {
+      h.state.subs = { data: [sub()], error: null };
+    },
+    sideEffectSpies: {
+      shouldSendOnce: h.shouldSendOnce,
+      sendRenewalReminderEmail: h.sendRenewalReminderEmail,
+    },
   });
 
   it("sends a reminder and dedups by subscription id + period end", async () => {

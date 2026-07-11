@@ -4,6 +4,11 @@ import {
   createQueryBuilder,
   createRangeFilterRecorder,
 } from "../../../../../test/supabase-mock";
+import {
+  cronRequest as req,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -42,18 +47,9 @@ vi.mock("@/lib/email/send", () => ({
   sendHireFollowupEmail: h.sendHireFollowupEmail,
 }));
 
-process.env.CRON_SECRET = "test-secret";
+process.env.CRON_SECRET = TEST_CRON_SECRET;
 
 import { GET } from "./route";
-
-function req(authed = true) {
-  return {
-    headers: {
-      get: (k: string) =>
-        k === "authorization" && authed ? "Bearer test-secret" : null,
-    },
-  } as unknown as Parameters<typeof GET>[0];
-}
 
 const reveal = (over: Record<string, unknown> = {}) => ({
   family_user_id: "fam-1",
@@ -81,23 +77,16 @@ afterEach(() => {
 });
 
 describe("hire-followup cron", () => {
-  it("returns 401 without the cron secret", async () => {
-    const res = await GET(req(false));
-    expect(res.status).toBe(401);
-  });
-
-  // Seeded with an unrecorded reveal, the case that mails a family, and kept
-  // separate from the status assertion above: against an empty result set this
-  // would hold whether or not the guard exists, and folded in after a failing
-  // status expect it would never run at all (#629).
-  it("sends no followup when unauthenticated", async () => {
-    h.state.reveals = { data: [reveal()], error: null };
-    h.state.hires = { data: [], error: null };
-
-    await GET(req(false));
-
-    expect(h.shouldSendOnce).not.toHaveBeenCalled();
-    expect(h.sendHireFollowupEmail).not.toHaveBeenCalled();
+  describeCronAuthGuard({
+    GET,
+    seedSideEffect: () => {
+      h.state.reveals = { data: [reveal()], error: null };
+      h.state.hires = { data: [], error: null };
+    },
+    sideEffectSpies: {
+      shouldSendOnce: h.shouldSendOnce,
+      sendHireFollowupEmail: h.sendHireFollowupEmail,
+    },
   });
 
   it("emails a family with an unrecorded reveal and dedups by day bucket", async () => {

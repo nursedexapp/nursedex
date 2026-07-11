@@ -1,5 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  cronRequest as fakeRequest,
+  describeCronAuthGuard,
+  TEST_CRON_SECRET,
+} from "../../../../../test/cron-auth";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -52,18 +57,9 @@ vi.mock("@/lib/email/send", () => ({
   sendAccessExpiryReminderEmail: h.sendAccessExpiryReminderEmail,
 }));
 
-process.env.CRON_SECRET = "test-secret";
+process.env.CRON_SECRET = TEST_CRON_SECRET;
 
 import { GET } from "./route";
-
-function fakeRequest(authed = true): Parameters<typeof GET>[0] {
-  return {
-    headers: {
-      get: (k: string) =>
-        k === "authorization" && authed ? "Bearer test-secret" : null,
-    },
-  } as unknown as Parameters<typeof GET>[0];
-}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -93,24 +89,25 @@ const dueFamily = {
 };
 
 describe("access-expiry cron: auth guard", () => {
-  it("returns 401 without the cron secret", async () => {
-    h.state.results = [dueFamily, dueFamily, dueFamily];
-
-    const res = await GET(fakeRequest(false));
-
-    expect(res.status).toBe(401);
+  describeCronAuthGuard({
+    GET,
+    seedSideEffect: () => {
+      h.state.results = [dueFamily, dueFamily, dueFamily];
+    },
+    sideEffectSpies: {
+      shouldSendOnce: h.shouldSendOnce,
+      sendAccessExpiryReminderEmail: h.sendAccessExpiryReminderEmail,
+    },
   });
 
-  it("touches neither the database nor the mailer when unauthenticated", async () => {
-    // The guard has to short-circuit before the handler, not merely swap the
-    // status code: this is a public endpoint that reads subscriber rows and
-    // mails families.
+  it("queries nothing when unauthenticated", async () => {
+    // This route's reads go through a hand-rolled counter rather than a spy, so
+    // the shared helper cannot see them: assert on it directly.
     h.state.results = [dueFamily, dueFamily, dueFamily];
 
     await GET(fakeRequest(false));
 
     expect(h.state.callCount).toBe(0);
-    expect(h.sendAccessExpiryReminderEmail).not.toHaveBeenCalled();
   });
 });
 
