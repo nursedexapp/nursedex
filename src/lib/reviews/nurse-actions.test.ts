@@ -47,7 +47,12 @@ const h = vi.hoisted(() => {
     },
   };
 
-  return { state, calls, client, containsProfanity: vi.fn(() => false) };
+  return {
+    state,
+    calls,
+    client,
+    containsProfanity: vi.fn((_text: string) => false),
+  };
 });
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
