@@ -63,9 +63,12 @@ process.env.CRON_SECRET = "test-secret";
 
 import { GET } from "./route";
 
-function fakeRequest(): Parameters<typeof GET>[0] {
+function fakeRequest(authed = true): Parameters<typeof GET>[0] {
   return {
-    headers: { get: (k: string) => (k === "authorization" ? "Bearer test-secret" : null) },
+    headers: {
+      get: (k: string) =>
+        k === "authorization" && authed ? "Bearer test-secret" : null,
+    },
   } as unknown as Parameters<typeof GET>[0];
 }
 
@@ -96,6 +99,35 @@ beforeEach(() => {
   h.state.subs = [];
   h.state.downgradeError = null;
   h.calls.length = 0;
+});
+
+describe("payment-failure cron: auth guard", () => {
+  // Seeded three days past due, which is the loudest possible path: an
+  // unauthenticated call that reached the handler would mail the final notice
+  // AND downgrade the plan. Against an empty subscription list these
+  // assertions would pass whether or not the guard exists.
+  const pastDue = () =>
+    fakeSub({
+      current_period_end: new Date(Date.now() - 3 * DAY_MS).toISOString(),
+    });
+
+  it("returns 401 without the cron secret", async () => {
+    h.state.subs = [pastDue()];
+
+    const res = await GET(fakeRequest(false));
+
+    expect(res.status).toBe(401);
+  });
+
+  it("sends no dunning mail and downgrades nobody when unauthenticated", async () => {
+    h.state.subs = [pastDue()];
+
+    await GET(fakeRequest(false));
+
+    expect(h.warningEmail).not.toHaveBeenCalled();
+    expect(h.finalEmail).not.toHaveBeenCalled();
+    expect(h.calls).toEqual([]);
+  });
 });
 
 describe("payment-failure cron: normal daily progression", () => {
