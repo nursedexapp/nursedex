@@ -97,71 +97,99 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-// Every guarded page and layout, and the caller who must be turned away.
+// Every guarded page and layout: the caller who must be turned away, and WHERE
+// the guard sends them.
+//
+// `lands` is not decoration, it is what makes these tests real. Several pages
+// redirect for their own reasons too (a nurse with no profile goes to
+// /dashboard, an unfinished profile goes to /dashboard/onboarding). Asserting
+// only "it redirected somewhere" let three of these pass with their guard
+// DELETED, because the second redirect fired instead and looked identical.
+// Naming the guard's own destination is what tells the two apart.
+//
+// Destinations come from src/lib/auth/helpers.ts: requireAuth sends a signed-out
+// caller to /login, requireRole and requireAdmin send a wrong-role caller to /,
+// and requireSuperAdmin sends a plain admin to /admin.
+//
 // A layout guards everything nested under it, so (admin)/layout.tsx is the gate
 // for the whole admin section.
 const PAGES = {
   "(admin)/layout": {
     load: () => import("./(admin)/layout"),
     refuse: "family",
+    lands: "/",
   },
   "(admin)/admin/admins/page": {
     load: () => import("./(admin)/admin/admins/page"),
     // super-admin only: a plain admin is the stricter bar, and the caller most
     // likely to slip through a weakened guard.
     refuse: "admin",
+    lands: "/admin",
   },
   "(admin)/admin/analytics/page": {
     load: () => import("./(admin)/admin/analytics/page"),
     refuse: "admin",
+    lands: "/admin",
   },
   "(auth)/role-select/layout": {
     load: () => import("./(auth)/role-select/layout"),
     refuse: null,
+    lands: "/login",
   },
   "(dashboard)/dashboard/page": {
     load: () => import("./(dashboard)/dashboard/page"),
     refuse: null,
+    lands: "/login",
   },
   "(dashboard)/dashboard/settings/page": {
     load: () => import("./(dashboard)/dashboard/settings/page"),
     refuse: null,
+    lands: "/login",
   },
   "(dashboard)/dashboard/analytics/page": {
     load: () => import("./(dashboard)/dashboard/analytics/page"),
     refuse: "family",
+    lands: "/",
   },
   "(dashboard)/dashboard/edit/page": {
     load: () => import("./(dashboard)/dashboard/edit/page"),
     refuse: "family",
+    lands: "/",
   },
   "(dashboard)/dashboard/onboarding/page": {
     load: () => import("./(dashboard)/dashboard/onboarding/page"),
     refuse: "family",
+    lands: "/",
   },
   "(dashboard)/dashboard/preview/page": {
     load: () => import("./(dashboard)/dashboard/preview/page"),
     refuse: "family",
+    lands: "/",
   },
   "(dashboard)/dashboard/reviews/page": {
     load: () => import("./(dashboard)/dashboard/reviews/page"),
     refuse: "family",
+    lands: "/",
   },
   "(dashboard)/dashboard/revealed/page": {
     load: () => import("./(dashboard)/dashboard/revealed/page"),
     refuse: "nurse",
+    lands: "/",
   },
   "(dashboard)/dashboard/saved/page": {
     load: () => import("./(dashboard)/dashboard/saved/page"),
     refuse: "nurse",
+    lands: "/",
   },
   "(public)/onboarding/family/page": {
     load: () => import("./(public)/onboarding/family/page"),
     refuse: "nurse",
+    lands: "/",
   },
   "(public)/blog/preview/[id]/page": {
     load: () => import("./(public)/blog/preview/[id]/page"),
     refuse: "family",
+    lands: "/",
   },
 } as const;
 
@@ -176,14 +204,17 @@ const PROPS = {
 
 describe("a guarded page turns away the wrong caller", () => {
   it.each(Object.keys(PAGES) as PageName[])("%s", async (name) => {
-    const { refuse, load } = PAGES[name];
+    const { refuse, load, lands } = PAGES[name];
     setCaller(refuse);
 
     const mod = (await load()) as {
       default: (props: unknown) => Promise<unknown>;
     };
 
-    await expect(mod.default(PROPS)).rejects.toThrow(/NEXT_REDIRECT/);
+    // The exact destination, not merely "a redirect happened": see the note on
+    // PAGES. A page that redirects for its own reasons would otherwise stand in
+    // for the guard and hide its deletion.
+    await expect(mod.default(PROPS)).rejects.toThrow(`NEXT_REDIRECT:${lands}`);
   });
 });
 
