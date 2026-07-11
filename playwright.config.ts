@@ -9,6 +9,10 @@ const ADMIN_STATE = "e2e/.auth/admin.json";
 
 export default defineConfig({
   testDir: "./e2e",
+  // The dev server answers on / long before Turbopack has compiled every
+  // route, and a request that lands early gets a real 404. This warms the
+  // routes the suite uses before any spec runs (#623).
+  globalSetup: "./e2e/global-setup.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
