@@ -65,6 +65,22 @@ describe("sla-alerts cron", () => {
   it("returns 401 without the cron secret", async () => {
     const res = await GET(req(false));
     expect(res.status).toBe(401);
+  });
+
+  // Seeded with an overdue queue and an admin to notify, and kept separate from
+  // the status assertion above: against an empty result set this would hold
+  // whether or not the guard exists, and folded in after a failing status expect
+  // it would never run at all (#629).
+  it("alerts no admin when unauthenticated", async () => {
+    h.state.pending = {
+      data: [{ user_id: "n1", tier: "free", updated_at: "2026-06-01" }],
+    };
+    h.state.slaState = "overdue";
+    h.state.admins = { data: [{ id: "admin-1", email: "admin@example.com" }] };
+
+    await GET(req(false));
+
+    expect(h.shouldSendOnce).not.toHaveBeenCalled();
     expect(h.sendSlaAlertAdminEmail).not.toHaveBeenCalled();
   });
 

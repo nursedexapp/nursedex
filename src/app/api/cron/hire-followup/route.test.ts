@@ -84,6 +84,19 @@ describe("hire-followup cron", () => {
   it("returns 401 without the cron secret", async () => {
     const res = await GET(req(false));
     expect(res.status).toBe(401);
+  });
+
+  // Seeded with an unrecorded reveal, the case that mails a family, and kept
+  // separate from the status assertion above: against an empty result set this
+  // would hold whether or not the guard exists, and folded in after a failing
+  // status expect it would never run at all (#629).
+  it("sends no followup when unauthenticated", async () => {
+    h.state.reveals = { data: [reveal()], error: null };
+    h.state.hires = { data: [], error: null };
+
+    await GET(req(false));
+
+    expect(h.shouldSendOnce).not.toHaveBeenCalled();
     expect(h.sendHireFollowupEmail).not.toHaveBeenCalled();
   });
 
