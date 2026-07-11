@@ -23,10 +23,18 @@ const handleSlaAlerts = withCronAlerting(
     const supabase = createServiceRoleClient();
     const now = Date.now();
 
-    const { data: pending } = await supabase
+    const { data: pending, error: pendingError } = await supabase
       .from("nurse_profiles")
       .select("user_id, tier, updated_at")
       .eq("verification_status", "pending");
+
+    if (pendingError) {
+      console.error(
+        "[cron sla-alerts] pending query failed:",
+        pendingError.message,
+      );
+      return NextResponse.json({ error: "Query failed" }, { status: 500 });
+    }
 
     type PendingRow = {
       user_id: string;
@@ -54,11 +62,19 @@ const handleSlaAlerts = withCronAlerting(
       });
     }
 
-    const { data: admins } = await supabase
+    const { data: admins, error: adminsError } = await supabase
       .from("users")
       .select("id, email")
       .in("role", ["admin", "super_admin"])
       .eq("is_deleted", false);
+
+    if (adminsError) {
+      console.error(
+        "[cron sla-alerts] admin query failed:",
+        adminsError.message,
+      );
+      return NextResponse.json({ error: "Query failed" }, { status: 500 });
+    }
 
     type AdminRow = { id: string; email: string };
 
