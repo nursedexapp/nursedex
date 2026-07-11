@@ -36,6 +36,11 @@ const h = vi.hoisted(() => {
 
 vi.mock("next/cache", () => ({ revalidatePath: h.revalidatePath }));
 vi.mock("@/lib/auth/helpers", () => ({
+  // Happy path only: this stubs the guard so the logic PAST it can be
+  // exercised. The refused direction (wrong role / not signed in, and no
+  // write) is covered for real in src/lib/admin/authz-boundary.test.ts,
+  // which runs the actual guard.
+  // eslint-disable-next-line local/no-mocked-auth-guard -- see above
   requireAdmin: async () => ({ id: "00000000-0000-4000-8000-000000000001" }),
 }));
 vi.mock("./slug", () => ({ ensureUniqueSlug: async () => "my-post" }));

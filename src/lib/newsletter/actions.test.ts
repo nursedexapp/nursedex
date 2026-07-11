@@ -40,6 +40,10 @@ function builder() {
 vi.mock("next/headers", () => ({
   headers: async () => ({ get: () => "1.2.3.4" }),
 }));
+// Happy path only: this stubs the guard so the send logic past it can be
+// exercised. The refused direction (a family caller mails nobody) is covered
+// for real in src/lib/admin/authz-boundary.test.ts, which runs the guard.
+// eslint-disable-next-line local/no-mocked-auth-guard -- see above
 vi.mock("@/lib/auth/helpers", () => ({ requireAdmin: async () => ({ id: "a" }) }));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({ from: () => builder() }),
