@@ -59,7 +59,18 @@ setup("authenticate as admin", async ({ page }) => {
 
   // Confirm the session actually reaches an admin-gated page.
   await page.goto("/admin/blog");
-  await expect(page.getByRole("heading", { name: "Blog" })).toBeVisible();
+
+  // global-setup warms this route, so a 404 here means the dev server lost it
+  // rather than the session failing. Say that outright: this step used to time
+  // out on the missing heading below, which read as an auth problem and sent
+  // people looking in the wrong place (#623).
+  await expect(
+    page.getByRole("heading", { name: "This page took the day off" }),
+  ).toBeHidden();
+
+  await expect(page.getByRole("heading", { name: "Blog" })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await page.context().storageState({ path: ADMIN_STATE });
 });
