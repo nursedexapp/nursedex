@@ -170,82 +170,107 @@ describe("requireSuperAdmin rejects plain admins", () => {
   });
 });
 
-// Every module that exports an admin server action. The completeness test at the
-// bottom walks these, so a new admin module must be added here too.
+// Every module that exports an admin-guarded server action.
+//
+// Admin power is NOT confined to src/lib/admin: publishing and deleting blog
+// posts, moderating comments, and mailing the whole newsletter list all call
+// requireAdmin from their own feature folders, and none of them had a boundary
+// test. The first version of this suite only looked at src/lib/admin, which is
+// the same sampling mistake it exists to prevent, one directory up.
 const MODULES = {
   "./account-actions": () => import("./account-actions"),
   "./role-actions": () => import("./role-actions"),
   "./review-actions": () => import("./review-actions"),
   "./verification-actions": () => import("./verification-actions"),
+  "@/lib/blog/actions": () => import("@/lib/blog/actions"),
+  "@/lib/blog/taxonomy-actions": () => import("@/lib/blog/taxonomy-actions"),
+  "@/lib/comments/actions": () => import("@/lib/comments/actions"),
+  "@/lib/newsletter/actions": () => import("@/lib/newsletter/actions"),
 } as const;
 
 type ModuleName = keyof typeof MODULES;
 
-// One boundary case per admin action: the caller who must be refused, and a
-// VALID input for that action.
+// Exports in those modules that are deliberately NOT admin-guarded: anyone may
+// submit a comment or manage their own newsletter subscription. Listing them
+// explicitly is what lets the completeness test demand that every OTHER export
+// carries a boundary case, in modules that mix public and privileged actions.
+const PUBLIC_EXPORTS: Record<string, readonly string[]> = {
+  "@/lib/comments/actions": ["submitComment"],
+  "@/lib/newsletter/actions": [
+    "subscribeNewsletter",
+    "confirmNewsletter",
+    "unsubscribeByEmail",
+    "unsubscribeNewsletter",
+  ],
+};
+
+// One boundary case per admin-guarded action: the caller who must be refused,
+// and the arguments to call it with.
 //
-// The input has to be valid. Every action safeParses its argument BEFORE calling
-// requireAdmin, so a malformed one returns { error: "invalid" } and never reaches
-// the guard: the test would then pass against an action with no guard at all.
+// For the src/lib/admin actions the arguments must be VALID, because those parse
+// their input BEFORE calling requireAdmin: a malformed one returns
+// { error: "invalid" } and never reaches the guard, so the test would pass
+// against an action with no guard at all. The blog, comment and newsletter
+// actions guard first and parse second, so their arguments only need to exist.
 const CASES: ReadonlyArray<{
   module: ModuleName;
   action: string;
   caller: string;
-  input: unknown;
+  args: unknown[];
 }> = [
   {
     module: "./account-actions",
     action: "suspendAccount",
     caller: "family",
-    input: { user_id: UUID },
+    args: [{ user_id: UUID }],
   },
   {
     module: "./account-actions",
     action: "unsuspendAccount",
     caller: "family",
-    input: { user_id: UUID },
+    args: [{ user_id: UUID }],
   },
   {
     module: "./account-actions",
     action: "removeAccount",
     caller: "family",
-    input: { user_id: UUID, reason: "spam" },
+    args: [{ user_id: UUID, reason: "spam" }],
   },
   {
     module: "./review-actions",
     action: "adminApproveReview",
     caller: "nurse",
-    input: { review_id: UUID },
+    args: [{ review_id: UUID }],
   },
   {
     module: "./review-actions",
     action: "adminRejectReview",
     caller: "nurse",
-    input: { review_id: UUID },
+    args: [{ review_id: UUID }],
   },
   {
     module: "./review-actions",
     action: "adminResolveRemovalRequest",
     caller: "family",
-    input: { review_id: UUID, decision: "honor" },
+    args: [{ review_id: UUID, decision: "honor" }],
   },
   {
     module: "./review-actions",
     action: "adminResolveDispute",
     caller: "family",
-    input: { review_id: UUID, decision: "remove" },
+    args: [{ review_id: UUID, decision: "remove" }],
   },
   {
     module: "./verification-actions",
     action: "approveVerification",
     caller: "family",
-    input: { user_id: UUID },
+    args: [{ user_id: UUID }],
   },
   {
     module: "./verification-actions",
     action: "rejectVerification",
     caller: "nurse",
-    input: { user_id: UUID, reason: "Credential expired" },
+    args: [{ user_id: UUID, reason: "Credential expired" }],
   },
   // Super-admin only: a plain admin is a stricter bar than a family or nurse,
   // and is the caller most likely to slip through a weakened guard.
@@ -253,27 +278,151 @@ const CASES: ReadonlyArray<{
     module: "./role-actions",
     action: "promoteToAdmin",
     caller: "admin",
-    input: { email: "victim@example.com", role: "admin" },
+    args: [{ email: "victim@example.com", role: "admin" }],
   },
   {
     module: "./role-actions",
     action: "demoteAdmin",
     caller: "admin",
-    input: { user_id: UUID },
+    args: [{ user_id: UUID }],
+  },
+
+  // Blog. A dropped guard here lets any signed-in user publish, unpublish, or
+  // permanently delete posts on the public site.
+  {
+    module: "@/lib/blog/actions",
+    action: "savePost",
+    caller: "family",
+    args: [{ title: "t", slug: "s", body_html: "<p>x</p>" }],
+  },
+  {
+    module: "@/lib/blog/actions",
+    action: "autosavePost",
+    caller: "family",
+    args: [{ id: UUID, body_html: "<p>x</p>" }],
+  },
+  {
+    module: "@/lib/blog/actions",
+    action: "restoreRevision",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/blog/actions",
+    action: "unpublishPost",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/blog/actions",
+    action: "publishNow",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/blog/actions",
+    action: "archivePost",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/blog/actions",
+    action: "togglePinned",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/blog/actions",
+    action: "deletePost",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/blog/actions",
+    action: "createCategory",
+    caller: "family",
+    args: ["Nursing"],
+  },
+
+  // Blog taxonomy. Renaming or merging a category rewrites public URLs.
+  {
+    module: "@/lib/blog/taxonomy-actions",
+    action: "renameCategory",
+    caller: "family",
+    args: [UUID, "Renamed"],
+  },
+  {
+    module: "@/lib/blog/taxonomy-actions",
+    action: "renameTag",
+    caller: "family",
+    args: [UUID, "Renamed"],
+  },
+  {
+    module: "@/lib/blog/taxonomy-actions",
+    action: "deleteCategory",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/blog/taxonomy-actions",
+    action: "deleteTag",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/blog/taxonomy-actions",
+    action: "mergeCategory",
+    caller: "family",
+    args: [UUID, UUID],
+  },
+  {
+    module: "@/lib/blog/taxonomy-actions",
+    action: "mergeTag",
+    caller: "family",
+    args: [UUID, UUID],
+  },
+
+  // Comment moderation. Anyone may submit a comment; only an admin decides what
+  // goes live, and approving one emails the commenter.
+  {
+    module: "@/lib/comments/actions",
+    action: "approveComment",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/comments/actions",
+    action: "rejectComment",
+    caller: "family",
+    args: [UUID],
+  },
+  {
+    module: "@/lib/comments/actions",
+    action: "deleteComment",
+    caller: "family",
+    args: [UUID],
+  },
+
+  // The loudest one in the codebase: this mails every confirmed subscriber.
+  {
+    module: "@/lib/newsletter/actions",
+    action: "sendNewsletterIssue",
+    caller: "family",
+    args: [{ subject: "Hi", body_html: "<p>x</p>" }],
   },
 ];
 
 describe("admin actions reject an unauthorized caller with no side effect", () => {
   it.each(CASES)(
     "$action refuses a $caller caller and writes nothing",
-    async ({ module, action, caller, input }) => {
+    async ({ module, action, caller, args }) => {
       setCaller(caller);
       const mod = (await MODULES[module]()) as unknown as Record<
         string,
-        (i: unknown) => Promise<unknown>
+        (...a: unknown[]) => Promise<unknown>
       >;
 
-      await expect(mod[action](input)).rejects.toThrow(/NEXT_REDIRECT/);
+      await expect(mod[action](...args)).rejects.toThrow(/NEXT_REDIRECT/);
 
       expectNoSideEffects();
     },
@@ -284,36 +433,68 @@ describe("admin actions reject an unauthorized caller with no side effect", () =
 // the six actions added after #493 inherited no case, and nothing said so. These
 // two tests close both ways that can happen (#633).
 
-// 1. A new action added to a module we already watch.
-describe("every exported admin action has a boundary case", () => {
+// 1. A new action added to a module we already watch. Every export must be
+// either covered by a case or declared public, so adding one forces a decision
+// rather than defaulting to unguarded-and-unnoticed.
+describe("every exported action is covered or declared public", () => {
   it.each(Object.keys(MODULES) as ModuleName[])("%s", async (name) => {
     const mod = await MODULES[name]();
     const exported = Object.entries(mod)
       .filter(([, v]) => typeof v === "function")
       .map(([k]) => k)
       .sort();
-    const covered = CASES.filter((c) => c.module === name)
-      .map((c) => c.action)
-      .sort();
+    const accountedFor = [
+      ...CASES.filter((c) => c.module === name).map((c) => c.action),
+      ...(PUBLIC_EXPORTS[name] ?? []),
+    ].sort();
 
-    expect(exported).toEqual(covered);
+    expect(exported).toEqual(accountedFor);
   });
 });
 
-// 2. A whole new admin module. Test 1 only inspects the modules listed in
-// MODULES, so trusting that hand-written list would reopen the same gap one
-// level up: a new admin-actions file would simply never be looked at. Read the
-// directory instead and require every "use server" file in it to be registered.
-describe("every admin server-action module is registered", () => {
-  it("finds no unwatched 'use server' file in src/lib/admin", () => {
-    const dir = dirname(fileURLToPath(import.meta.url));
+// 2. A whole new admin-guarded module. Test 1 only inspects the modules listed
+// in MODULES, so trusting that hand-written list reopens the same gap one level
+// up. The first version of this test read src/lib/admin only, and missed the
+// blog, comment and newsletter actions entirely: admin power does not live in
+// one folder. Walk the whole tree instead and require every server-action file
+// that imports an admin guard to be registered.
+describe("every admin-guarded module is registered", () => {
+  it("finds no unwatched requireAdmin caller under src/lib", () => {
+    const libRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-    const onDisk = readdirSync(dir)
-      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
-      .filter((f) => readFileSync(join(dir, f), "utf8").includes('"use server"'))
-      .map((f) => `./${f.replace(/\.ts$/, "")}`)
-      .sort();
+    const guarded: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+        } else if (
+          entry.name.endsWith(".ts") &&
+          !entry.name.endsWith(".test.ts")
+        ) {
+          const src = readFileSync(full, "utf8");
+          if (
+            src.includes('"use server"') &&
+            /require(Super)?Admin/.test(src)
+          ) {
+            guarded.push(full);
+          }
+        }
+      }
+    };
+    walk(libRoot);
 
-    expect(onDisk).toEqual((Object.keys(MODULES) as string[]).sort());
+    // Both spellings the MODULES keys use: "./x" for siblings in src/lib/admin,
+    // "@/lib/…" for everything else.
+    const registered = new Set(
+      (Object.keys(MODULES) as string[]).map((m) =>
+        m.startsWith("./")
+          ? join(libRoot, "admin", `${m.slice(2)}.ts`)
+          : join(libRoot, `${m.replace("@/lib/", "")}.ts`),
+      ),
+    );
+
+    const unwatched = guarded.filter((f) => !registered.has(f));
+    expect(unwatched).toEqual([]);
   });
 });
