@@ -2,10 +2,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQueryBuilder } from "../../../../../test/supabase-mock";
 
+type QueryResult = { data: unknown[] | null; error?: { message: string } };
+
 const h = vi.hoisted(() => {
   const state = {
-    pending: { data: [] as unknown[] },
-    admins: { data: [] as unknown[] },
+    pending: { data: [] as unknown[] } as QueryResult,
+    admins: { data: [] as unknown[] } as QueryResult,
     slaState: "ok" as "ok" | "approaching" | "overdue",
   };
   return {
@@ -106,6 +108,26 @@ describe("sla-alerts cron", () => {
     expect(h.sendSlaAlertAdminEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "admin@example.com", overdueCount: 1 }),
     );
+  });
+
+  it("fails loudly with a 500 when the pending-verification query errors", async () => {
+    h.state.pending = { data: null, error: { message: "connection reset" } };
+    const res = await GET(req());
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ error: "Query failed" });
+    expect(h.sendSlaAlertAdminEmail).not.toHaveBeenCalled();
+  });
+
+  it("fails loudly with a 500 when the admin-recipient query errors", async () => {
+    h.state.pending = {
+      data: [{ user_id: "n1", tier: "free", updated_at: "2026-06-01" }],
+    };
+    h.state.slaState = "overdue";
+    h.state.admins = { data: null, error: { message: "connection reset" } };
+    const res = await GET(req());
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ error: "Query failed" });
+    expect(h.sendSlaAlertAdminEmail).not.toHaveBeenCalled();
   });
 
   it("skips an admin whose digest already went out today", async () => {
