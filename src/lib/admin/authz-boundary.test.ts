@@ -186,6 +186,15 @@ const MODULES = {
   "@/lib/blog/taxonomy-actions": () => import("@/lib/blog/taxonomy-actions"),
   "@/lib/comments/actions": () => import("@/lib/comments/actions"),
   "@/lib/newsletter/actions": () => import("@/lib/newsletter/actions"),
+  // Role-guarded rather than admin-guarded: requireRole is what keeps a family
+  // out of a nurse's profile, photos and review replies, and a nurse out of a
+  // family's hire records. Every test for these mocked requireRole away, so the
+  // wrong-role direction was verified nowhere.
+  "@/lib/profile/actions": () => import("@/lib/profile/actions"),
+  "@/lib/hires/actions": () => import("@/lib/hires/actions"),
+  "@/lib/reviews/nurse-actions": () => import("@/lib/reviews/nurse-actions"),
+  "@/lib/reviews/external-actions": () =>
+    import("@/lib/reviews/external-actions"),
 } as const;
 
 type ModuleName = keyof typeof MODULES;
@@ -202,6 +211,12 @@ const PUBLIC_EXPORTS: Record<string, readonly string[]> = {
     "unsubscribeByEmail",
     "unsubscribeNewsletter",
   ],
+  // An external reviewer is a stranger holding a link, by design: they are not
+  // signed in at all, so these two cannot be role-guarded.
+  "@/lib/reviews/external-actions": [
+    "submitExternalReview",
+    "verifyExternalReview",
+  ],
 };
 
 // One boundary case per admin-guarded action: the caller who must be refused,
@@ -215,7 +230,8 @@ const PUBLIC_EXPORTS: Record<string, readonly string[]> = {
 const CASES: ReadonlyArray<{
   module: ModuleName;
   action: string;
-  caller: string;
+  /** The caller who must be refused. null = signed out entirely. */
+  caller: string | null;
   args: unknown[];
 }> = [
   {
@@ -410,6 +426,127 @@ const CASES: ReadonlyArray<{
     caller: "family",
     args: [{ subject: "Hi", body_html: "<p>x</p>" }],
   },
+
+  // Nurse profile. A family must not read or write a nurse's profile, onboarding
+  // state, availability, or photos. requireRole is the only thing stopping it.
+  {
+    module: "@/lib/profile/actions",
+    action: "getNurseProfile",
+    caller: "family",
+    args: [],
+  },
+  {
+    module: "@/lib/profile/actions",
+    action: "saveOnboardingStep",
+    caller: "family",
+    args: [{ step: 1 }],
+  },
+  {
+    module: "@/lib/profile/actions",
+    action: "completeOnboarding",
+    caller: "family",
+    args: [],
+  },
+  {
+    module: "@/lib/profile/actions",
+    action: "updateNurseProfile",
+    caller: "family",
+    args: [{ headline: "hi" }],
+  },
+  {
+    module: "@/lib/profile/actions",
+    action: "toggleAvailability",
+    caller: "family",
+    args: [true],
+  },
+  {
+    module: "@/lib/profile/actions",
+    action: "requestPhotoUploadUrl",
+    caller: "family",
+    args: ["photo.png"],
+  },
+  {
+    module: "@/lib/profile/actions",
+    action: "confirmPhotoUpload",
+    caller: "family",
+    args: ["photos/x.png"],
+  },
+  {
+    module: "@/lib/profile/actions",
+    action: "deletePhoto",
+    caller: "family",
+    args: ["photos/x.png"],
+  },
+  // The one requireAuth action rather than requireRole: it deletes the caller's
+  // OWN account, so the bar is "signed in at all". A signed-out caller bounces.
+  {
+    module: "@/lib/profile/actions",
+    action: "softDeleteAccount",
+    caller: null,
+    args: [],
+  },
+
+  // Hires. Recording and confirming a hire is the family's side, claiming one is
+  // the nurse's. Each must refuse the other role.
+  {
+    module: "@/lib/hires/actions",
+    action: "recordFamilyHire",
+    caller: "nurse",
+    args: [{ nurse_user_id: UUID }],
+  },
+  {
+    module: "@/lib/hires/actions",
+    action: "claimHireByEmail",
+    caller: "family",
+    args: [{ family_email: "fam@example.com" }],
+  },
+  {
+    module: "@/lib/hires/actions",
+    action: "confirmHireFromToken",
+    caller: "nurse",
+    args: [{ token: UUID }],
+  },
+  {
+    module: "@/lib/hires/actions",
+    action: "rejectHireFromToken",
+    caller: "nurse",
+    args: [{ token: UUID }],
+  },
+
+  // A nurse's replies to her own reviews. A family must not answer or dispute
+  // reviews on someone else's profile.
+  {
+    module: "@/lib/reviews/nurse-actions",
+    action: "saveNurseResponse",
+    caller: "family",
+    args: [{ review_id: UUID, text: "thanks" }],
+  },
+  {
+    module: "@/lib/reviews/nurse-actions",
+    action: "disputeReview",
+    caller: "family",
+    args: [{ review_id: UUID, reason: "Factually inaccurate", text: "no" }],
+  },
+  {
+    module: "@/lib/reviews/nurse-actions",
+    action: "deleteNurseResponse",
+    caller: "family",
+    args: [UUID],
+  },
+
+  // The nurse's own shareable review link.
+  {
+    module: "@/lib/reviews/external-actions",
+    action: "getOrCreateReviewLink",
+    caller: "family",
+    args: [],
+  },
+  {
+    module: "@/lib/reviews/external-actions",
+    action: "regenerateReviewLink",
+    caller: "family",
+    args: [],
+  },
 ];
 
 describe("admin actions reject an unauthorized caller with no side effect", () => {
@@ -458,8 +595,8 @@ describe("every exported action is covered or declared public", () => {
 // blog, comment and newsletter actions entirely: admin power does not live in
 // one folder. Walk the whole tree instead and require every server-action file
 // that imports an admin guard to be registered.
-describe("every admin-guarded module is registered", () => {
-  it("finds no unwatched requireAdmin caller under src/lib", () => {
+describe("every guarded module is registered", () => {
+  it("finds no unwatched guard caller under src/lib", () => {
     const libRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
     const guarded: string[] = [];
@@ -473,9 +610,12 @@ describe("every admin-guarded module is registered", () => {
           !entry.name.endsWith(".test.ts")
         ) {
           const src = readFileSync(full, "utf8");
+          // Any guard, not only the admin ones. requireRole and requireAuth gate
+          // a nurse's profile and a family's hires, and scanning for requireAdmin
+          // alone left all four of those modules unwatched.
           if (
             src.includes('"use server"') &&
-            /require(Super)?Admin/.test(src)
+            /require(Admin|SuperAdmin|Role|Auth)\s*\(/.test(src)
           ) {
             guarded.push(full);
           }
