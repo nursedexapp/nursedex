@@ -44,6 +44,46 @@ export interface QueryBuilder {
  * Supabase methods that are sometimes terminal and sometimes not (e.g.
  * `.update()` before a following `.eq()`).
  */
+/** One range filter the code under test applied, e.g. `.gte("verified_at", iso)`. */
+export interface RangeFilter {
+  method: string;
+  column: string;
+  value: unknown;
+}
+
+const RANGE_METHODS = ["gte", "lte", "gt", "lt"] as const;
+
+/**
+ * Records the range filters a query applies, so a test can assert the date
+ * window a cron computed rather than only the rows it was handed back (#622).
+ * Stubbing the result alone leaves an off-by-one on a boundary invisible.
+ *
+ * Spread `handlers` into createQueryBuilder, then read `calls`, or use
+ * `bound(method, column)` for a single boundary.
+ */
+export function createRangeFilterRecorder() {
+  const calls: RangeFilter[] = [];
+
+  const handlers: QueryBuilderHandlers = {};
+  for (const method of RANGE_METHODS) {
+    handlers[method] = (...args: unknown[]) => {
+      calls.push({ method, column: String(args[0]), value: args[1] });
+      return "chain";
+    };
+  }
+
+  /** The value passed to e.g. `.gte("verified_at", ...)`, or undefined. */
+  function bound(method: string, column: string): unknown {
+    return calls.find((c) => c.method === method && c.column === column)?.value;
+  }
+
+  function reset() {
+    calls.length = 0;
+  }
+
+  return { calls, handlers, bound, reset };
+}
+
 export function createQueryBuilder(
   handlers: QueryBuilderHandlers = {},
 ): QueryBuilder {

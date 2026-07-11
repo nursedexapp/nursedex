@@ -1,6 +1,9 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createQueryBuilder } from "../../../../../test/supabase-mock";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  createQueryBuilder,
+  createRangeFilterRecorder,
+} from "../../../../../test/supabase-mock";
 
 const h = vi.hoisted(() => {
   const state = {
@@ -12,10 +15,16 @@ const h = vi.hoisted(() => {
     sendRenewalReminderEmail: vi.fn(async () => {}),
     client: {
       from: () =>
-        createQueryBuilder({ then: () => h.state.subs }),
+        createQueryBuilder({
+          // `filters` is initialized below; this closure only runs inside a test.
+          ...filters.handlers,
+          then: () => h.state.subs,
+        }),
     },
   };
 });
+
+const filters = createRangeFilterRecorder();
 
 vi.mock("@/lib/cron/alerting", () => ({
   withCronAlerting: (_name: string, handler: unknown) => handler,
@@ -60,8 +69,13 @@ const sub = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  filters.reset();
   h.shouldSendOnce.mockResolvedValue(true);
   h.state.subs = { data: [], error: null };
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("renewal-reminder cron", () => {
@@ -109,5 +123,57 @@ describe("renewal-reminder cron", () => {
     h.state.subs = { data: [], error: { message: "db down" } };
     const res = await GET(req());
     expect(res.status).toBe(500);
+  });
+
+  // The window bounds are written out as literal dates rather than recomputed
+  // from DAY_MS: a test that repeats the implementation's arithmetic agrees
+  // with an off-by-one instead of catching it (#622).
+  describe("the renewal window", () => {
+    it("asks for exactly the UTC day three days out", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-07-11T13:00:00.000Z"));
+
+      await GET(req());
+
+      // Three days from Jul 11 is Jul 14, and the window is that whole UTC day:
+      // from Jul 14 00:00 inclusive up to Jul 15 00:00 exclusive.
+      expect(filters.bound("gte", "current_period_end")).toBe(
+        "2026-07-14T00:00:00.000Z",
+      );
+      expect(filters.bound("lt", "current_period_end")).toBe(
+        "2026-07-15T00:00:00.000Z",
+      );
+    });
+
+    it("covers the same day no matter what time of day the cron runs", async () => {
+      // Late in the UTC day is where a naive `now + 3d` window would slide off
+      // the target day and silently skip everyone renewing that morning.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-07-11T23:59:59.000Z"));
+
+      await GET(req());
+
+      expect(filters.bound("gte", "current_period_end")).toBe(
+        "2026-07-14T00:00:00.000Z",
+      );
+      expect(filters.bound("lt", "current_period_end")).toBe(
+        "2026-07-15T00:00:00.000Z",
+      );
+    });
+
+    it("uses a half-open window so a renewal is never mailed twice", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-07-11T13:00:00.000Z"));
+
+      await GET(req());
+
+      // An inclusive upper bound (lte) would match midnight exactly, which is
+      // also the lower bound of tomorrow's run: two reminders for one renewal.
+      const methods = filters.calls
+        .filter((c) => c.column === "current_period_end")
+        .map((c) => c.method);
+      expect(methods).toContain("lt");
+      expect(methods).not.toContain("lte");
+    });
   });
 });
