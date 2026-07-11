@@ -157,6 +157,7 @@ export async function getNurseBySlugUnfiltered(
 ): Promise<PublicNurseProfile | null> {
   const supabase = createServiceRoleClient();
 
+  // eslint-disable-next-line local/require-visible-nurse-filter -- this function exists to return a profile regardless of verification status (admins reviewing the queue, a nurse previewing their own pending profile), so applying the visible-nurse filter here would defeat its purpose. The caller is responsible for gating who may request the unfiltered view; see the docstring above.
   const { data, error } = await supabase
     .from("nurse_profiles")
     .select(

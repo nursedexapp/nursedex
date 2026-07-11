@@ -3,6 +3,7 @@ import reactPlugin from "eslint-plugin-react";
 import hooksPlugin from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 import noDirectSecretComparison from "./eslint-rules/no-direct-secret-comparison.mjs";
+import requireVisibleNurseFilter from "./eslint-rules/require-visible-nurse-filter.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -15,7 +16,10 @@ export default [
     files: ["**/*.{ts,tsx}"],
     plugins: {
       local: {
-        rules: { "no-direct-secret-comparison": noDirectSecretComparison },
+        rules: {
+          "no-direct-secret-comparison": noDirectSecretComparison,
+          "require-visible-nurse-filter": requireVisibleNurseFilter,
+        },
       },
     },
     rules: {
@@ -24,6 +28,13 @@ export default [
       // `===` against a secret (#391, #390, #406) and a fourth was missed by
       // the first sweep (#546). Comparing by hand again fails CI (#547).
       "local/no-direct-secret-comparison": "error",
+      // The service-role client bypasses RLS, so on those queries
+      // applyVisibleNurseFilter is the only thing keeping unverified, hidden,
+      // deleted, and suspended nurses off public surfaces. Applying it was
+      // convention until #621; forgetting it on a new read surface now fails
+      // CI. The three reads that intentionally see non-public profiles carry
+      // an eslint-disable with the reason at the query.
+      "local/require-visible-nurse-filter": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
