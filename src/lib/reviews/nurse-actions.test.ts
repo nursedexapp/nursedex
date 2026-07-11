@@ -60,6 +60,11 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => h.client,
 }));
 vi.mock("@/lib/auth/helpers", () => ({
+  // Happy path only: this stubs the guard so the logic PAST it can be
+  // exercised. The refused direction (wrong role / not signed in, and no
+  // write) is covered for real in src/lib/admin/authz-boundary.test.ts,
+  // which runs the actual guard.
+  // eslint-disable-next-line local/no-mocked-auth-guard -- see above
   requireRole: async () => h.state.actor,
 }));
 vi.mock("./profanity", () => ({

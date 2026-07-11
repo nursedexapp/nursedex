@@ -28,7 +28,13 @@ const h = vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
+// Happy-path render only: this stubs the guard so the page's rendering can be
+// exercised as a signed-in user. NOTE the signed-out path for dashboard PAGES
+// is genuinely not covered anywhere: the boundary suite covers server actions,
+// and the proxy only gates the brand password, not per-user auth. Tracked as a
+// follow-up; do not read this exemption as a claim of coverage.
 vi.mock("@/lib/auth/helpers", () => ({
+  // eslint-disable-next-line local/no-mocked-auth-guard -- see note above
   requireAuth: async () => ({
     id: "u1",
     role: h.state.role,

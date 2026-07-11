@@ -4,6 +4,7 @@ import hooksPlugin from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 import noDirectSecretComparison from "./eslint-rules/no-direct-secret-comparison.mjs";
 import requireVisibleNurseFilter from "./eslint-rules/require-visible-nurse-filter.mjs";
+import noMockedAuthGuard from "./eslint-rules/no-mocked-auth-guard.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -19,6 +20,10 @@ export default [
         rules: {
           "no-direct-secret-comparison": noDirectSecretComparison,
           "require-visible-nurse-filter": requireVisibleNurseFilter,
+          // Registered here because flat config allows the `local` namespace to
+          // be defined once; the rule itself is switched on for tests only,
+          // below.
+          "no-mocked-auth-guard": noMockedAuthGuard,
         },
       },
     },
@@ -39,6 +44,22 @@ export default [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+    },
+  },
+  {
+    // Only tests can mock, so this rule only has to see them. e2e specs are
+    // included: they drive the real app, and a guard stubbed there would be just
+    // as circular.
+    files: ["**/*.test.{ts,tsx}", "e2e/**/*.{ts,tsx}"],
+    rules: {
+      // A test that mocks away the authorization guard it exists to verify
+      // cannot fail when that guard is deleted, which is the one thing it is
+      // there to catch. Four cron tests stubbed verifyCronAuth and asserted the
+      // route returned the stub's own 401 (#618): removing the real guard failed
+      // no test at all. Happy-path tests that mock requireAdmin carry an
+      // eslint-disable naming the boundary test that covers the negative
+      // direction, so the coupling is explicit rather than assumed (#634).
+      "local/no-mocked-auth-guard": "error",
     },
   },
   {

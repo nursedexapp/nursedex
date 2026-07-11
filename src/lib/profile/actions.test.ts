@@ -39,7 +39,17 @@ vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
 vi.mock("next/server", () => ({ after: (fn: () => unknown) => fn() }));
 vi.mock("@/lib/email/send", () => ({ sendProfileSetupEmail: vi.fn() }));
 vi.mock("@/lib/auth/helpers", () => ({
+  // Happy path only: this stubs the guard so the logic PAST it can be
+  // exercised. The refused direction (wrong role / not signed in, and no
+  // write) is covered for real in src/lib/admin/authz-boundary.test.ts,
+  // which runs the actual guard.
+  // eslint-disable-next-line local/no-mocked-auth-guard -- see above
   requireAuth: async () => ({ id: "nurse-1" }),
+  // Happy path only: this stubs the guard so the logic PAST it can be
+  // exercised. The refused direction (wrong role / not signed in, and no
+  // write) is covered for real in src/lib/admin/authz-boundary.test.ts,
+  // which runs the actual guard.
+  // eslint-disable-next-line local/no-mocked-auth-guard -- see above
   requireRole: async () => ({ id: "nurse-1" }),
 }));
 vi.mock("@/lib/supabase/server", () => ({
