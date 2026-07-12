@@ -1,52 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth/actions";
 import { setSurveyHandoffCookie } from "@/lib/family/actions";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { GoogleSignInButton } from "@/components/ui/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, Eye, EyeOff, Loader2 } from "lucide-react";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  const [loadingMessage, setLoadingMessage] = useState("Joining...");
-
-  // After 1.5s of pending, swap the copy to acknowledge the slow path so a
-  // signup that waits on Supabase + email hook + Resend doesn't read as a
-  // stuck spinner.
-  useEffect(() => {
-    if (!pending) {
-      setLoadingMessage("Joining...");
-      return;
-    }
-    const timer = setTimeout(() => {
-      setLoadingMessage("Almost there...");
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [pending]);
-
-  return (
-    <Button
-      type="submit"
-      className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          {loadingMessage}
-        </>
-      ) : (
-        "Join NurseDex"
-      )}
-    </Button>
-  );
-}
+import { Check, Eye, EyeOff } from "lucide-react";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -100,6 +63,23 @@ export default function SignUpPage() {
     return Object.keys(errors).length === 0;
   }
 
+  // Local flag, not useFormStatus: a component that reads the form's pending
+  // state cannot also hold state, and the moment it does the signal vanishes
+  // mid-request. That is what left this button sitting on "Join NurseDex",
+  // enabled, for the whole of a signup (#665).
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setPending(true);
+    try {
+      await handleSubmit(formData);
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function handleSubmit(formData: FormData) {
     setError(null);
 
@@ -148,7 +128,7 @@ export default function SignUpPage() {
         <div className="bg-sage/20 h-px flex-1" />
       </div>
 
-      <form action={handleSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4">
         {error && (
           <div
             ref={errorRef}
@@ -250,7 +230,17 @@ export default function SignUpPage() {
           .
         </p>
 
-        <SubmitButton />
+        <PendingButton
+          pending={pending}
+          // Signup creates an account and sends a confirmation email. A second
+          // submission is not something to hand the user a button for.
+          mode="wait"
+          type="submit"
+          idleLabel="Join NurseDex"
+          workingLabel="Joining..."
+          slowLabel="Almost there..."
+          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
+        />
       </form>
     </div>
   );

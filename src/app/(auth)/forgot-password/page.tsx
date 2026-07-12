@@ -1,40 +1,31 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { forgotPassword } from "@/lib/auth/actions";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Sending...
-        </>
-      ) : (
-        "Send reset link"
-      )}
-    </Button>
-  );
-}
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const errorRef = useRef<HTMLDivElement>(null);
+
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setPending(true);
+    try {
+      await handleSubmit(formData);
+    } finally {
+      setPending(false);
+    }
+  }
 
   async function handleSubmit(formData: FormData) {
     setError(null);
@@ -55,16 +46,13 @@ export default function ForgotPasswordPage() {
         <h2 className="font-heading text-2xl">Reset your password</h2>
         <p className="text-muted-foreground mt-1 text-sm">
           Enter your email and we will send you a reset link.{" "}
-          <Link
-            href="/login"
-            className="text-teal-dark font-medium underline"
-          >
+          <Link href="/login" className="text-teal-dark font-medium underline">
             Back to sign in
           </Link>
         </p>
       </div>
 
-      <form action={handleSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4">
         {error && (
           <div
             ref={errorRef}
@@ -92,7 +80,16 @@ export default function ForgotPasswordPage() {
           />
         </div>
 
-        <SubmitButton />
+        <PendingButton
+          pending={pending}
+          // Sends an email, and Supabase rate-limits those, so a retry can both
+          // send a second one and get itself throttled. The user waits.
+          mode="wait"
+          type="submit"
+          idleLabel="Send reset link"
+          workingLabel="Sending..."
+          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
+        />
       </form>
     </div>
   );

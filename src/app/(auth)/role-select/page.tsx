@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { selectRole } from "@/lib/auth/actions";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Heart, Loader2, Stethoscope } from "lucide-react";
+import { Heart, Stethoscope } from "lucide-react";
 
 type Role = "nurse" | "family";
 
@@ -55,24 +55,22 @@ export default function RoleSelectPage() {
         />
       </div>
 
-      <Button
+      <PendingButton
+        pending={loading}
+        // Picking a role inserts a profile row guarded by a unique constraint, so
+        // a repeat is safe.
+        mode="retry"
         onClick={handleSubmit}
+        onRetry={handleSubmit}
+        disabled={!selected}
+        idleLabel="Continue"
+        workingLabel="Setting up..."
         className={`bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-all disabled:cursor-not-allowed ${
           selected && !loading
             ? "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-200"
             : ""
         }`}
-        disabled={!selected || loading}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Setting up...
-          </>
-        ) : (
-          "Continue"
-        )}
-      </Button>
+      />
     </div>
   );
 }

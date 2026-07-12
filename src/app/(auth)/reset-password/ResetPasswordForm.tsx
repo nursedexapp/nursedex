@@ -1,32 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import { resetPasswordRecovery } from "@/lib/auth/actions";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Updating...
-        </>
-      ) : (
-        "Update password"
-      )}
-    </Button>
-  );
-}
+import { Eye, EyeOff } from "lucide-react";
 
 export function ResetPasswordForm() {
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +39,19 @@ export function ResetPasswordForm() {
     return Object.keys(errors).length === 0;
   }
 
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setPending(true);
+    try {
+      await handleSubmit(formData);
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function handleSubmit(formData: FormData) {
     setError(null);
 
@@ -74,7 +66,7 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <form action={handleSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       {error && (
         <div
           ref={errorRef}
@@ -173,7 +165,15 @@ export function ResetPasswordForm() {
         )}
       </div>
 
-      <SubmitButton />
+      <PendingButton
+        pending={pending}
+        // Setting a password is safe to repeat, so a stall hands the button back.
+        mode="retry"
+        type="submit"
+        idleLabel="Update password"
+        workingLabel="Updating..."
+        className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
+      />
     </form>
   );
 }
