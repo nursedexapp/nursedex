@@ -118,6 +118,18 @@ describe("PendingButton phases", () => {
   });
 });
 
+describe("a caller's own disabled reason still wins", () => {
+  it("stays disabled when the caller says so, even once it has stalled", async () => {
+    // Role select disables Continue until a role is picked. A stall must not
+    // hand back a button that submits nothing.
+    setup({ disabled: true, pending: false });
+
+    await advance(STALL_MS);
+
+    expect(screen.getByRole("button")).toBeDisabled();
+  });
+});
+
 describe("retry restarts the clock", () => {
   it("puts the button back to working when the user tries again", async () => {
     // The red-team's finding. `pending` is still true (the first request is hung

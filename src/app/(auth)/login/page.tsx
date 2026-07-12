@@ -1,35 +1,15 @@
 "use client";
 
 import { Suspense, useRef, useState } from "react";
-import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn, resendConfirmation } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { GoogleSignInButton } from "@/components/ui/google-sign-in-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <Button
-      type="submit"
-      className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Signing in...
-        </>
-      ) : (
-        "Sign in"
-      )}
-    </Button>
-  );
-}
 
 export default function LoginPage() {
   return (
@@ -64,6 +44,19 @@ function LoginForm() {
   // email, etc.) doesn't wipe what the user just typed. Password is left
   // uncontrolled and resets on submit, which is the right security default.
   const [email, setEmail] = useState("");
+
+  const [pending, setPending] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    setPending(true);
+    try {
+      await handleSubmit(formData);
+    } finally {
+      setPending(false);
+    }
+  }
 
   async function handleSubmit(formData: FormData) {
     setError(null);
@@ -121,7 +114,7 @@ function LoginForm() {
         <div className="bg-sage/20 h-px flex-1" />
       </div>
 
-      <form action={handleSubmit} className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4">
         {error && (
           <div
             ref={errorRef}
@@ -210,7 +203,15 @@ function LoginForm() {
           </div>
         </div>
 
-        <SubmitButton />
+        <PendingButton
+          pending={pending}
+          // Signing in is safe to repeat.
+          mode="retry"
+          type="submit"
+          idleLabel="Sign in"
+          workingLabel="Signing in..."
+          className="bg-teal text-warm-white hover:bg-teal-dark disabled:bg-teal/50 h-11 w-full text-base font-semibold transition-colors disabled:cursor-not-allowed"
+        />
       </form>
     </div>
   );

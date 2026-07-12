@@ -14,8 +14,8 @@ export default async function ResetPasswordPage() {
         <div className="mb-8">
           <h2 className="font-heading text-2xl">Link invalid or expired</h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            This password reset link is invalid or has expired. Reset links
-            can only be opened once and are good for a short time.
+            This password reset link is invalid or has expired. Reset links can
+            only be opened once and are good for a short time.
           </p>
         </div>
         <Link

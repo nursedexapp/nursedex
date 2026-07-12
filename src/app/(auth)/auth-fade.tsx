@@ -25,9 +25,7 @@ export function AuthFade({ children }: { children: React.ReactNode }) {
   return (
     <div
       key={pathname}
-      style={
-        hasNavigated ? { animation: "fadeIn 0.3s ease-out" } : undefined
-      }
+      style={hasNavigated ? { animation: "fadeIn 0.3s ease-out" } : undefined}
     >
       {children}
     </div>

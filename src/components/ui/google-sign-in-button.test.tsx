@@ -102,6 +102,30 @@ describe("GoogleSignInButton", () => {
     expect(screen.getByRole("button")).toHaveTextContent("Connecting...");
   });
 
+  it("stalls on the app's shared deadline, not a private one of its own", async () => {
+    // #655. This button used to carry its own 15s stall constant while the rest
+    // of the app was heading for a different one, which is two stall systems and
+    // exactly the duplication #443 exists to remove. It now runs on
+    // PendingButton: same deadline, same retry affordance, one implementation.
+    vi.useFakeTimers();
+    h.signInWithGoogle.mockReturnValue(new Promise(() => {}));
+    render(<GoogleSignInButton />);
+
+    await clickButton();
+
+    // Just short of the shared deadline it is still working, not stalled.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STALL_MS - 1);
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveTextContent(/try again/i);
+  });
+
   it("clears a previous error when the user retries", async () => {
     h.signInWithGoogle.mockResolvedValue({ error: "Google is unavailable." });
     render(<GoogleSignInButton />);

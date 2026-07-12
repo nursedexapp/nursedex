@@ -118,6 +118,10 @@ interface PendingButtonProps {
   onClick?: () => void;
   /** Fired when the user retries a stalled action. `retry` mode only. */
   onRetry?: () => void;
+  /** Disabled for a reason of the caller's own, e.g. nothing selected yet. */
+  disabled?: boolean;
+  /** Shown in place of the spinner while idle, e.g. the Google mark. */
+  icon?: React.ReactNode;
   className?: string;
   type?: "button" | "submit";
   slowAfterMs?: number;
@@ -133,6 +137,8 @@ export function PendingButton({
   stalledMessage,
   onClick,
   onRetry,
+  disabled = false,
+  icon,
   className,
   type = "button",
   slowAfterMs,
@@ -199,11 +205,13 @@ export function PendingButton({
         // In `wait` mode the button stays disabled for as long as the action is
         // in flight, stalled or not. Re-enabling it would hand back a control
         // that fires the side effect a second time.
-        disabled={pending && !canRetry}
+        disabled={disabled || (pending && !canRetry)}
         className={className}
       >
-        {pending && !stalled && (
+        {pending && !stalled ? (
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        ) : (
+          icon
         )}
         {canRetry ? "Try again" : pending ? workingLabel : idleLabel}
       </Button>
