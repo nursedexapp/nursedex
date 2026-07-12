@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
+import { unwatchedSideEffects } from "../../../test/side-effect-imports";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -40,6 +41,22 @@ const h = vi.hoisted(() => {
     sendVerificationApprovedEmail: vi.fn(),
     sendVerificationRejectedEmail: vi.fn(),
     sendDisputeDecisionEmail: vi.fn(),
+    // The rest of what the guarded modules can actually reach (#645). These were
+    // not "missing" through carelessness: the list simply had no way to know it
+    // was incomplete, so an action could reach for any of them and nothing here
+    // would be looking. cancelActiveStripeSubscriptions is the one that matters
+    // most: removing an account cancels the user's billing.
+    cancelActiveStripeSubscriptions: vi.fn(),
+    sendProfileSetupEmail: vi.fn(),
+    sendCommentSubmittedEmail: vi.fn(),
+    sendCommentApprovedEmail: vi.fn(),
+    sendHireConfirmRequestEmail: vi.fn(),
+    sendHireConfirmedEmail: vi.fn(),
+    sendNewsletterConfirmEmail: vi.fn(),
+    sendNewsletterWelcomeEmail: vi.fn(),
+    sendNewsletterBatch: vi.fn(),
+    sendVerifyReviewEmail: vi.fn(),
+    sendNewReviewEmail: vi.fn(),
   };
   function builder() {
     const b: Record<string, unknown> = {};
@@ -107,6 +124,19 @@ vi.mock("@/lib/email/send", () => ({
   sendVerificationApprovedEmail: h.writes.sendVerificationApprovedEmail,
   sendVerificationRejectedEmail: h.writes.sendVerificationRejectedEmail,
   sendDisputeDecisionEmail: h.writes.sendDisputeDecisionEmail,
+  sendProfileSetupEmail: h.writes.sendProfileSetupEmail,
+  sendCommentSubmittedEmail: h.writes.sendCommentSubmittedEmail,
+  sendCommentApprovedEmail: h.writes.sendCommentApprovedEmail,
+  sendHireConfirmRequestEmail: h.writes.sendHireConfirmRequestEmail,
+  sendHireConfirmedEmail: h.writes.sendHireConfirmedEmail,
+  sendNewsletterConfirmEmail: h.writes.sendNewsletterConfirmEmail,
+  sendNewsletterWelcomeEmail: h.writes.sendNewsletterWelcomeEmail,
+  sendNewsletterBatch: h.writes.sendNewsletterBatch,
+  sendVerifyReviewEmail: h.writes.sendVerifyReviewEmail,
+  sendNewReviewEmail: h.writes.sendNewReviewEmail,
+}));
+vi.mock("@/lib/stripe/cancel-subscriptions", () => ({
+  cancelActiveStripeSubscriptions: h.writes.cancelActiveStripeSubscriptions,
 }));
 
 function setCaller(role: string | null) {
@@ -120,7 +150,10 @@ function setCaller(role: string | null) {
 // is asserted on automatically instead of waiting to be added here too.
 function expectNoSideEffects() {
   for (const [name, spy] of Object.entries(h.writes)) {
-    expect(spy, `${name} ran for an unauthorized caller`).not.toHaveBeenCalled();
+    expect(
+      spy,
+      `${name} ran for an unauthorized caller`,
+    ).not.toHaveBeenCalled();
   }
 }
 
@@ -666,5 +699,28 @@ describe("every guarded module is registered", () => {
 
     const unwatched = guarded.filter((f) => !registered.has(f));
     expect(unwatched).toEqual([]);
+  });
+});
+
+// #645. expectNoSideEffects walks the `writes` object, which LOOKS exhaustive and
+// is a hand-maintained list. A guarded action that reaches for something not on
+// it is simply unwatched: a rejected caller could trigger it and this suite would
+// stay green, because nothing is looking. cancelActiveStripeSubscriptions was
+// exactly that, in an action that removes an account.
+//
+// So the list stops being hand-maintained. This reads what the guarded modules
+// actually import, and which modules belong here is read from the mutation gate's
+// own routing rather than decided twice.
+describe("every side effect a guarded module can cause is watched", () => {
+  it("has a spy for each one, so expectNoSideEffects really is exhaustive", () => {
+    const gaps = unwatchedSideEffects(
+      "src/lib/admin/authz-boundary.test.ts",
+      Object.keys(h.writes),
+    );
+
+    expect(
+      gaps,
+      "These modules can cause a side effect this suite is not spying on. Add a spy to `writes` and mock the module, or a rejected caller could trigger it and nothing here would notice.",
+    ).toEqual([]);
   });
 });

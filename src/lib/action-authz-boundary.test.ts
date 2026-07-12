@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { unwatchedSideEffects } from "../../test/side-effect-imports";
 
 // Issue #681. The admin server actions have had a boundary suite since #493, and
 // the mutation gate (#642) proves those guards can fail. The MEMBER-facing server
@@ -41,6 +42,9 @@ const h = vi.hoisted(() => {
     upsert: vi.fn(),
     rpc: vi.fn(),
     sendNewReviewEmail: vi.fn(),
+    // Spied under the name the action IMPORTS, so the completeness check below
+    // can see it. Reaching for Stripe at all means the caller got past the guard.
+    getStripe: vi.fn(),
     stripeCheckoutCreate: vi.fn(),
     stripePortalCreate: vi.fn(),
   };
@@ -160,10 +164,13 @@ vi.mock("@/lib/email/send", () => ({
   sendNewReviewEmail: h.writes.sendNewReviewEmail,
 }));
 vi.mock("@/lib/stripe/server", () => ({
-  getStripe: () => ({
-    checkout: { sessions: { create: h.writes.stripeCheckoutCreate } },
-    billingPortal: { sessions: { create: h.writes.stripePortalCreate } },
-  }),
+  getStripe: (...a: unknown[]) => {
+    h.writes.getStripe(...a);
+    return {
+      checkout: { sessions: { create: h.writes.stripeCheckoutCreate } },
+      billingPortal: { sessions: { create: h.writes.stripePortalCreate } },
+    };
+  },
 }));
 // A refused caller never reaches these, and leaving them real would drag a
 // Turnstile call and a subscription lookup into a test about authentication.
@@ -465,5 +472,31 @@ describe("a signed-in NURSE is refused every family-only action", () => {
 
     expect(result).toEqual({ error: "Wrong role" });
     expectNoSideEffects();
+  });
+});
+
+// #645. expectNoSideEffects walks the `writes` object, which LOOKS exhaustive and
+// is a hand-maintained list. An action that reaches for something not on it (a
+// Stripe cancellation, an email helper added last week) is simply unwatched: a
+// refused caller could trigger it and this suite would stay green, because
+// nothing is looking.
+//
+// So the list stops being hand-maintained. This reads what the member-facing
+// actions actually import and fails if any of it is unspied. Add an email to an
+// action and forget to watch it here, and this is what tells you.
+describe("every side effect a member action can cause is watched", () => {
+  it("has a spy for each one, so expectNoSideEffects really is exhaustive", () => {
+    // Which modules this suite owns comes from the mutation gate's own routing,
+    // so the suite required to catch a missing guard is the same suite required
+    // to watch what that module can do.
+    const gaps = unwatchedSideEffects(
+      "src/lib/action-authz-boundary.test.ts",
+      Object.keys(h.writes),
+    );
+
+    expect(
+      gaps,
+      "These modules can cause a side effect this suite is not spying on. Add a spy to `writes` and mock the module, or a refused caller could trigger it and nothing here would notice.",
+    ).toEqual([]);
   });
 });
