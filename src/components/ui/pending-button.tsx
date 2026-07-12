@@ -93,6 +93,19 @@ export function usePendingPhase({
   return { phase, restart };
 }
 
+// WHY THIS TAKES `pending` RATHER THAN READING useFormStatus ITSELF
+//
+// It cannot read it. useFormStatus reports pending only while the component is
+// rendering inside the form's transition, and ANY local state update in that
+// component knocks it out: a bare component with the hook goes pending on submit,
+// but add one useState plus an effect keyed on pending and the hook reports idle
+// again, mid-flight. Verified directly (#655). Since this component's whole job
+// is to hold phase state, it can never be the one calling the hook.
+//
+// So callers own the pending signal (useTransition, or a local flag). The auth
+// screens already pass a client function to `action`, so they never worked
+// without JavaScript anyway, and converting them to an explicit handler costs
+// nothing.
 interface PendingButtonProps {
   pending: boolean;
   mode: StallMode;

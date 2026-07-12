@@ -8,7 +8,8 @@ import {
   screen,
   fireEvent,
 } from "@testing-library/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { PendingButton, SLOW_MS, STALL_MS } from "./pending-button";
 
 // #654 (phase 0 of #443). Every async button in the app hand-rolls its pending
@@ -172,6 +173,51 @@ describe("wait mode never hands back a button that could fire twice", () => {
     });
 
     expect(onRetry).not.toHaveBeenCalled();
+  });
+});
+
+describe("why this cannot read useFormStatus itself", () => {
+  // Phase 1 of #443 planned to keep the auth screens on <form action> and have
+  // the button read the form's pending state. It cannot, and this test is the
+  // proof, kept so we find out if React ever changes it.
+  //
+  // A bare component calling useFormStatus DOES go pending on submit (the
+  // red-team claim that form actions do not work under happy-dom is false). But
+  // add a single useState plus an effect keyed on pending, which is exactly what
+  // holding a phase requires, and the hook reports idle again while the action is
+  // still in flight. The state update re-renders the component outside the form's
+  // transition and the pending signal is lost.
+  //
+  // Consequence beyond this component: the signup page's SubmitButton has this
+  // exact shape today.
+  it("loses the pending signal as soon as the component holds any state", async () => {
+    function Stateful() {
+      const { pending } = useFormStatus();
+      const [phase, setPhase] = useState("idle");
+      useEffect(() => {
+        setPhase(pending ? "working" : "idle");
+      }, [pending]);
+      return (
+        <button type="submit">
+          {pending ? "pending" : "idle"}:{phase}
+        </button>
+      );
+    }
+
+    const action = () => new Promise<void>(() => {});
+    render(
+      <form action={action}>
+        <Stateful />
+      </form>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // The action IS in flight, and the button still says idle. That is the trap.
+    expect(screen.getByRole("button")).toHaveTextContent("idle:idle");
   });
 });
 
