@@ -13,7 +13,11 @@ export function OrganizationJsonLd() {
     name: "NurseDex",
     url: "https://nursedex.com",
     logo: "https://nursedex.com/icon-512.png",
-    sameAs: [SOCIAL_LINKS.facebook, SOCIAL_LINKS.instagram, SOCIAL_LINKS.linkedin],
+    sameAs: [
+      SOCIAL_LINKS.facebook,
+      SOCIAL_LINKS.instagram,
+      SOCIAL_LINKS.linkedin,
+    ],
   };
 
   return (

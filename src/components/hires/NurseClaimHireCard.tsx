@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { claimHireByEmail } from "@/lib/hires/actions";
+import { PendingButton } from "@/components/ui/pending-button";
 
 interface NurseClaimHireCardProps {
   slug: string;
@@ -38,6 +39,8 @@ export function NurseClaimHireCard({ slug }: NurseClaimHireCardProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     setError(null);
     setShowShareLink(false);
     startTransition(async () => {
@@ -102,9 +105,18 @@ export function NurseClaimHireCard({ slug }: NurseClaimHireCardProps) {
               required
               disabled={pending}
             />
-            <Button type="submit" size="sm" disabled={pending || !email}>
-              {pending ? "Sending..." : "Submit"}
-            </Button>
+            {/* wait, not retry (#443 phase 5): a second fire emails the
+                family a second confirmation request. */}
+            <PendingButton
+              pending={pending}
+              mode="wait"
+              type="submit"
+              idleLabel="Submit"
+              workingLabel="Sending..."
+              slowLabel="Still sending..."
+              stalledMessage="This is still sending. Refresh to check whether the family was emailed before trying again."
+              disabled={!email}
+            />
           </div>
           {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
         </form>

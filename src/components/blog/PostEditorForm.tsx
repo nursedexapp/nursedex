@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import NextImage from "next/image";
 import { toast } from "sonner";
@@ -21,6 +21,8 @@ import type {
   BlogTag,
   TiptapDoc,
 } from "@/types/database";
+import { PendingButton } from "@/components/ui/pending-button";
+import { useInFlight } from "@/components/ui/use-in-flight";
 
 interface PostEditorFormProps {
   post: BlogPost | null;
@@ -46,7 +48,16 @@ export function PostEditorForm({
   postTags,
 }: PostEditorFormProps) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  // Keyed: three buttons drove one flag, so pressing "Save draft" also greyed
+  // "Publish now" into looking like the thing that was running.
+  //
+  // wait, not retry (#443 phase 5). Retry would be the nicer answer here (these
+  // actions are safe to repeat), but a retry does NOT cancel the first request: it
+  // leaves a hung one in flight that can still land and contradict the retry, the
+  // hole PhotoUpload had to close with a newest-attempt guard (#667). Graduating
+  // these to retry means carrying that guard, which is tracked in #669.
+  const { inFlight, busy, run } = useInFlight<BlogIntent>();
+  const pending = busy;
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [coverUploading, setCoverUploading] = useState(false);
 
@@ -196,13 +207,14 @@ export function PostEditorForm({
   ]);
 
   function submit(intent: BlogIntent) {
+    if (busy) return;
     setErrors({});
     const publishAtIso =
       intent === "schedule" && publishAtLocal
         ? new Date(publishAtLocal).toISOString()
         : undefined;
 
-    startTransition(async () => {
+    run(intent, async () => {
       const res = await savePost({
         id,
         intent,
@@ -559,18 +571,26 @@ export function PostEditorForm({
       )}
 
       <div className="border-border flex flex-wrap items-center gap-3 border-t pt-6">
-        <Button onClick={() => submit("publish")} disabled={pending}>
-          {pending && <Loader2 className="size-4 animate-spin" />}
-          Publish now
-        </Button>
+        <PendingButton
+          pending={inFlight === "publish"}
+          mode="wait"
+          idleLabel="Publish now"
+          workingLabel="Publishing..."
+          slowLabel="Still publishing..."
+          disabled={busy}
+          onClick={() => submit("publish")}
+        />
         {showSchedule ? (
-          <Button
+          <PendingButton
+            pending={inFlight === "schedule"}
+            mode="wait"
             variant="secondary"
+            idleLabel="Schedule"
+            workingLabel="Scheduling..."
+            slowLabel="Still scheduling..."
+            disabled={busy}
             onClick={() => submit("schedule")}
-            disabled={pending}
-          >
-            Schedule
-          </Button>
+          />
         ) : (
           <Button
             variant="secondary"
@@ -581,13 +601,16 @@ export function PostEditorForm({
             Schedule for later
           </Button>
         )}
-        <Button
+        <PendingButton
+          pending={inFlight === "draft"}
+          mode="wait"
           variant="outline"
+          idleLabel="Save draft"
+          workingLabel="Saving..."
+          slowLabel="Still saving..."
+          disabled={busy}
           onClick={() => submit("draft")}
-          disabled={pending}
-        >
-          Save draft
-        </Button>
+        />
 
         {id && (
           <Button

@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { usePendingPhase } from "@/components/ui/pending-button";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -89,15 +92,7 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
             })}
           </nav>
           <div className="border-sage/20 border-t px-2 py-3">
-            <form action={signOut} onSubmit={resetPostHog}>
-              <button
-                type="submit"
-                className="text-muted-foreground hover:bg-sage/10 hover:text-foreground flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors"
-              >
-                <LogOut className="size-4" />
-                Sign out
-              </button>
-            </form>
+            <SignOutButton />
           </div>
         </div>
       </aside>
@@ -125,5 +120,52 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
         })}
       </nav>
     </>
+  );
+}
+
+/**
+ * Sign out had no pending state at all: a hung sign-out looked exactly like a
+ * button nobody had pressed (#443 phase 5).
+ *
+ * It keeps its nav-item styling rather than taking PendingButton's, so it
+ * borrows the shared clock. wait, not retry, for the same reason as the rest of
+ * this sweep: a retry does not cancel the first request (#669). The form action
+ * became an explicit handler because a component that holds phase state cannot
+ * read useFormStatus (see the note on PendingButton), and these screens are
+ * behind auth and JavaScript anyway.
+ */
+function SignOutButton() {
+  const [pending, setPending] = useState(false);
+  const { phase } = usePendingPhase({ pending });
+  const stalled = phase === "stalled";
+
+  async function handleSignOut() {
+    if (pending) return;
+    setPending(true);
+    resetPostHog();
+    await signOut();
+  }
+
+  return (
+    <div>
+      {stalled && (
+        <p role="alert" className="text-error mb-1 px-3 text-xs">
+          Still signing out. Refresh to check whether you were signed out.
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={handleSignOut}
+        disabled={pending}
+        className="text-muted-foreground hover:bg-sage/10 hover:text-foreground flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50"
+      >
+        {pending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <LogOut className="size-4" />
+        )}
+        {pending ? "Signing out..." : "Sign out"}
+      </button>
+    </div>
   );
 }

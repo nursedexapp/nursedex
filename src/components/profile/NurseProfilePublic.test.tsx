@@ -12,12 +12,16 @@ vi.mock("@/components/hires/HireButton", () => ({ HireButton: () => <div /> }));
 vi.mock("@/components/reviews/ReviewStateAction", () => ({
   ReviewStateAction: () => <div />,
 }));
-vi.mock("@/components/reviews/ReviewList", () => ({ ReviewList: () => <div /> }));
+vi.mock("@/components/reviews/ReviewList", () => ({
+  ReviewList: () => <div />,
+}));
 vi.mock("next/image", () => ({ default: () => null }));
 
 afterEach(cleanup);
 
-function makeNurse(overrides: Partial<PublicNurseProfile> = {}): PublicNurseProfile {
+function makeNurse(
+  overrides: Partial<PublicNurseProfile> = {},
+): PublicNurseProfile {
   return {
     user_id: "11111111-1111-4111-8111-111111111111",
     first_name: "Jane",

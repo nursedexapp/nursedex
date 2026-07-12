@@ -5,6 +5,7 @@ import tseslint from "typescript-eslint";
 import noDirectSecretComparison from "./eslint-rules/no-direct-secret-comparison.mjs";
 import requireVisibleNurseFilter from "./eslint-rules/require-visible-nurse-filter.mjs";
 import noMockedAuthGuard from "./eslint-rules/no-mocked-auth-guard.mjs";
+import requirePendingButton from "./eslint-rules/require-pending-button.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -24,6 +25,7 @@ export default [
           // be defined once; the rule itself is switched on for tests only,
           // below.
           "no-mocked-auth-guard": noMockedAuthGuard,
+          "require-pending-button": requirePendingButton,
         },
       },
     },
@@ -40,6 +42,14 @@ export default [
       // CI. The three reads that intentionally see non-public profiles carry
       // an eslint-disable with the reason at the query.
       "local/require-visible-nurse-filter": "error",
+      // An async button that hand-rolls its own loading flag makes a hung server
+      // action look exactly like a working one: the same spinner, forever, with
+      // nothing to click (#443). 27 buttons tracked pending with useTransition
+      // and 43 with a local flag before the sweep; forgetting the primitive on
+      // the next one now fails CI rather than shipping (#659). Controls that are
+      // not waiting on a server write (a navigation transition, a clipboard
+      // copy) carry an eslint-disable saying so.
+      "local/require-pending-button": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
@@ -60,6 +70,10 @@ export default [
       // eslint-disable naming the boundary test that covers the negative
       // direction, so the coupling is explicit rather than assumed (#634).
       "local/no-mocked-auth-guard": "error",
+      // A test may hand-roll a pending flag freely: its fake buttons exist to
+      // drive the primitive, not to ship. Enforcing it there would only make
+      // the rule's own harness illegal.
+      "local/require-pending-button": "off",
     },
   },
   {

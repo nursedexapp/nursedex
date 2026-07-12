@@ -418,9 +418,7 @@ function DebouncedFilterInput({
   renderHint?: (text: string) => React.ReactNode;
 } & Omit<React.ComponentProps<typeof Input>, "value" | "onChange">) {
   const [text, setText] = useState(value);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const commitPendingRef = useRef(false);
   const lastValueRef = useRef(value);
   const onCommitRef = useRef(onCommit);

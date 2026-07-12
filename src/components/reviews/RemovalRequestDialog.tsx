@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { REMOVAL_REASON_MAX } from "@/lib/schemas/review";
 import { requestReviewRemoval } from "@/lib/reviews/actions";
+import { PendingButton } from "@/components/ui/pending-button";
 
 interface RemovalRequestDialogProps {
   reviewId: string;
@@ -36,6 +37,8 @@ export function RemovalRequestDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     setError(null);
 
     startTransition(async () => {
@@ -111,9 +114,17 @@ export function RemovalRequestDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Sending..." : "Send request"}
-            </Button>
+            {/* wait, not retry (#443 phase 5): a second fire raises a second
+                request and notifies again. */}
+            <PendingButton
+              pending={pending}
+              mode="wait"
+              type="submit"
+              idleLabel="Send request"
+              workingLabel="Sending..."
+              slowLabel="Still sending..."
+              stalledMessage="This is still processing. Refresh to check whether your request went through before sending it again."
+            />
           </div>
         </form>
       </DialogContent>

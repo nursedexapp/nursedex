@@ -80,9 +80,7 @@ describe("EmbedNodeView", () => {
   it("flags an unsupported url", async () => {
     await mountEditor({
       type: "doc",
-      content: [
-        { type: "embed", attrs: { url: "https://example.com/clip" } },
-      ],
+      content: [{ type: "embed", attrs: { url: "https://example.com/clip" } }],
     });
     expect(await screen.findByText("Unsupported embed")).toBeInTheDocument();
   });
@@ -92,7 +90,9 @@ describe("EmbedNodeView", () => {
       type: "doc",
       content: [{ type: "embed", attrs: { url: YT_URL } }],
     });
-    fireEvent.click(await screen.findByRole("button", { name: "Remove embed" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove embed" }),
+    );
     await waitFor(() =>
       expect(
         editor.getJSON().content?.some((n) => n.type === "embed"),
@@ -207,13 +207,18 @@ describe("BlogImageNodeView", () => {
   });
 
   it("edits the alt text via the prompt when selected", async () => {
-    vi.stubGlobal("prompt", vi.fn(() => "Updated alt"));
+    vi.stubGlobal(
+      "prompt",
+      vi.fn(() => "Updated alt"),
+    );
     const editor = await mountEditor(IMG);
     act(() => {
       editor.commands.setNodeSelection(0);
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Edit alt text" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Edit alt text" }),
+    );
     await waitFor(() => {
       const image = editor.getJSON().content?.[0];
       expect(image?.attrs?.alt).toBe("Updated alt");
@@ -226,7 +231,9 @@ describe("BlogImageNodeView", () => {
       editor.commands.setNodeSelection(0);
     });
 
-    fireEvent.click(await screen.findByRole("button", { name: "Remove image" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Remove image" }),
+    );
     await waitFor(() =>
       expect(
         editor.getJSON().content?.some((n) => n.type === "image"),

@@ -1,3 +1,7 @@
+/* eslint-disable local/require-pending-button -- These are static design mocks of
+   the auth screens. Their `loading` flags are simulated, nothing here calls a
+   server action, and there is no hung request to show. The real login, signup and
+   reset screens they illustrate are on the primitive (#655). */
 "use client";
 
 import { useState } from "react";

@@ -62,7 +62,9 @@ export function FamilyAccessCard({
             Annual
             <span
               className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                isAnnual ? "bg-white/20 text-white" : "bg-teal/10 text-teal-dark"
+                isAnnual
+                  ? "bg-white/20 text-white"
+                  : "bg-teal/10 text-teal-dark"
               }`}
             >
               Save 67%

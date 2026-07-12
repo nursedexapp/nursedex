@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2 } from "lucide-react";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Input } from "@/components/ui/input";
 import { subscribeNewsletter } from "@/lib/newsletter/actions";
 
@@ -15,6 +15,8 @@ export function NewsletterCta({ source }: { source: string }) {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     setError(null);
     startTransition(async () => {
       const res = await subscribeNewsletter({ email, source, website });
@@ -48,7 +50,10 @@ export function NewsletterCta({ source }: { source: string }) {
           <p className="text-soft-black-light mt-1 text-sm">
             Occasional guides on home care and finding trusted nurses. No spam.
           </p>
-          <form onSubmit={onSubmit} className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <form
+            onSubmit={onSubmit}
+            className="mt-4 flex flex-col gap-2 sm:flex-row"
+          >
             <Input
               type="email"
               required
@@ -67,10 +72,17 @@ export function NewsletterCta({ source }: { source: string }) {
               onChange={(e) => setWebsite(e.target.value)}
               className="hidden"
             />
-            <Button type="submit" disabled={pending}>
-              {pending && <Loader2 className="size-4 animate-spin" />}
-              Subscribe
-            </Button>
+            {/* wait, not retry (#443 phase 5): subscribing sends a
+                confirmation email, so a second fire is a second email. */}
+            <PendingButton
+              pending={pending}
+              mode="wait"
+              type="submit"
+              idleLabel="Subscribe"
+              workingLabel="Subscribing..."
+              slowLabel="Still subscribing..."
+              stalledMessage="This is still processing. Refresh to check whether the confirmation email is on its way."
+            />
           </form>
           {error && <p className="text-error mt-2 text-sm">{error}</p>}
         </>

@@ -16,7 +16,9 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
   return (
     <Card className="border-sage/20">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">How your profile is shaping up</CardTitle>
+        <CardTitle className="text-base">
+          How your profile is shaping up
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-6">

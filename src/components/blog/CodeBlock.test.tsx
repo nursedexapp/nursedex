@@ -24,7 +24,7 @@ describe("CodeBlock", () => {
 
   it("escapes code text (no raw markup injection)", () => {
     const out = renderToStaticMarkup(
-      <CodeBlock code={'<script>alert(1)</script>'} language="html" />,
+      <CodeBlock code={"<script>alert(1)</script>"} language="html" />,
     );
     // The code is rendered as escaped text, never as a live <script> tag.
     expect(out).not.toContain("<script>");

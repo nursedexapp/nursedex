@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { usePendingPhase } from "@/components/ui/pending-button";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { BlogImage } from "@/components/blog/tiptap/BlogImage";
@@ -42,6 +43,14 @@ const EMPTY_DOC: TiptapDoc = {
 export function PostEditor({ value, onChange }: PostEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+
+  // The image button is a 32px toolbar icon and cannot carry PendingButton's
+  // stall panel, so it borrows the shared clock and speaks through the toolbar
+  // (#443 phase 5). wait, not retry: a hung upload can still land and insert its
+  // image on top of the retry's, the newest-attempt hole PhotoUpload had to close
+  // (#667). Graduating this needs that guard (#669).
+  const { phase: uploadPhase } = usePendingPhase({ pending: uploading });
+  const uploadStalled = uploadPhase === "stalled";
   // Inline toolbar input (replaces window.prompt) for inserting a link,
   // embed, or footnote. Null when closed.
   const [inline, setInline] = useState<{
@@ -311,6 +320,20 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
           className="hidden"
           onChange={onPickImage}
         />
+        {uploadPhase === "slow" && (
+          <span
+            role="status"
+            aria-live="polite"
+            className="text-soft-black-light text-xs"
+          >
+            Still uploading...
+          </span>
+        )}
+        {uploadStalled && (
+          <span role="alert" className="text-error text-xs">
+            That upload is still running. Refresh to check whether it landed.
+          </span>
+        )}
         {btn(inline?.kind === "embed", insertEmbed, "Embed a video", Video)}
         {btn(
           inline?.kind === "footnote",

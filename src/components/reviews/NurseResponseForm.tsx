@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -18,6 +18,8 @@ import {
   saveNurseResponse,
   deleteNurseResponse,
 } from "@/lib/reviews/nurse-actions";
+import { PendingButton } from "@/components/ui/pending-button";
+import { useInFlight } from "@/components/ui/use-in-flight";
 
 interface NurseResponseFormProps {
   reviewId: string;
@@ -31,16 +33,25 @@ export function NurseResponseForm({
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(existingResponse ?? "");
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // Keyed: a single flag would put "Saving..." on the Delete button too.
+  //
+  // wait, not retry (#443 phase 5). Retry would be the nicer answer here (these
+  // actions are safe to repeat), but a retry does NOT cancel the first request: it
+  // leaves a hung one in flight that can still land and contradict the retry, the
+  // hole PhotoUpload had to close with a newest-attempt guard (#667). Graduating
+  // these to retry means carrying that guard, which is tracked in #669.
+  const { inFlight, busy, run } = useInFlight<"save" | "delete">();
+  const pending = busy;
 
   const isEdit = Boolean(existingResponse);
   const triggerLabel = isEdit ? "Edit response" : "Respond";
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
     setError(null);
 
-    startTransition(async () => {
+    run("save", async () => {
       const result = await saveNurseResponse({
         review_id: reviewId,
         text,
@@ -59,7 +70,7 @@ export function NurseResponseForm({
   };
 
   const handleDelete = () => {
-    startTransition(async () => {
+    run("delete", async () => {
       const result = await deleteNurseResponse(reviewId);
       if (!result.success) {
         toast.error("Could not delete your response. Please try again.");
@@ -112,14 +123,16 @@ export function NurseResponseForm({
           <div className="flex items-center justify-between gap-2">
             <div>
               {isEdit && (
-                <Button
-                  type="button"
+                <PendingButton
+                  pending={inFlight === "delete"}
+                  mode="wait"
                   variant="ghost"
+                  idleLabel="Delete"
+                  workingLabel="Deleting..."
+                  slowLabel="Still deleting..."
+                  disabled={busy}
                   onClick={handleDelete}
-                  disabled={pending}
-                >
-                  Delete
-                </Button>
+                />
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -131,13 +144,15 @@ export function NurseResponseForm({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={pending}>
-                {pending
-                  ? "Saving..."
-                  : isEdit
-                    ? "Save changes"
-                    : "Post response"}
-              </Button>
+              <PendingButton
+                pending={inFlight === "save"}
+                mode="wait"
+                type="submit"
+                idleLabel={isEdit ? "Save changes" : "Post response"}
+                workingLabel="Saving..."
+                slowLabel="Still saving..."
+                disabled={busy}
+              />
             </div>
           </div>
         </form>

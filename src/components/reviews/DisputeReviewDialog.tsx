@@ -19,6 +19,7 @@ import {
   type DisputeReason,
 } from "@/lib/schemas/review";
 import { disputeReview } from "@/lib/reviews/nurse-actions";
+import { PendingButton } from "@/components/ui/pending-button";
 
 interface DisputeReviewDialogProps {
   reviewId: string;
@@ -33,6 +34,8 @@ export function DisputeReviewDialog({ reviewId }: DisputeReviewDialogProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     setErrors({});
 
     if (!reason) {
@@ -143,9 +146,17 @@ export function DisputeReviewDialog({ reviewId }: DisputeReviewDialogProps) {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Submitting..." : "Submit dispute"}
-            </Button>
+            {/* wait, not retry (#443 phase 5): a second fire raises a second
+                dispute and notifies again. */}
+            <PendingButton
+              pending={pending}
+              mode="wait"
+              type="submit"
+              idleLabel="Submit dispute"
+              workingLabel="Submitting..."
+              slowLabel="Still submitting..."
+              stalledMessage="This is still processing. Refresh to check whether your dispute went through before submitting it again."
+            />
           </div>
         </form>
       </DialogContent>
