@@ -12,10 +12,21 @@ export type GuardedStatusUpdateResult =
   | { outcome: "already_resolved" }
   | { outcome: "error"; message: string };
 
+/**
+ * The state the row must still be in for this transition to be legal.
+ *
+ * An array means "any of these": approving a nurse's verification is legal from
+ * `pending` and also from `rejected` (an admin reversing a rejection), and a
+ * single expected status could not express that. A boolean guards a flag column
+ * such as `users.is_suspended`. Both exist because the admin actions could not
+ * otherwise adopt this helper and kept hand-rolling the race instead (#652).
+ */
+export type ExpectedStatus = string | boolean | readonly string[];
+
 export interface GuardedStatusUpdateArgs {
   table: string;
   id: string | number;
-  expectedStatus: string;
+  expectedStatus: ExpectedStatus;
   patch: Record<string, unknown>;
   idColumn?: string;
   statusColumn?: string;
@@ -46,12 +57,13 @@ export async function guardedStatusUpdate(
     statusColumn = "status",
   }: GuardedStatusUpdateArgs,
 ): Promise<GuardedStatusUpdateResult> {
-  const { data, error } = await client
-    .from(table)
-    .update(patch)
-    .eq(idColumn, id)
-    .eq(statusColumn, expectedStatus)
-    .select(idColumn);
+  const guarded = client.from(table).update(patch).eq(idColumn, id);
+
+  const { data, error } = await (
+    Array.isArray(expectedStatus)
+      ? guarded.in(statusColumn, expectedStatus as string[])
+      : guarded.eq(statusColumn, expectedStatus as string | boolean)
+  ).select(idColumn);
 
   // An error wins over any rows handed back, so a caller can never fire a
   // side effect on a write that did not land.

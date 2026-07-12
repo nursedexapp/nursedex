@@ -13,6 +13,7 @@ type Resolved = { data: unknown[] | null; error: { message: string } | null };
  */
 function clientFor(result: Resolved) {
   const eqCalls: unknown[][] = [];
+  const inCalls: unknown[][] = [];
   const updates: unknown[] = [];
   const tables: string[] = [];
 
@@ -28,12 +29,16 @@ function clientFor(result: Resolved) {
           eqCalls.push(args);
           return "chain";
         },
+        in: (...args: unknown[]) => {
+          inCalls.push(args);
+          return "chain";
+        },
         select: () => result,
       });
     },
   } as unknown as SupabaseClient;
 
-  return { client, eqCalls, updates, tables };
+  return { client, eqCalls, inCalls, updates, tables };
 }
 
 describe("guardedStatusUpdate", () => {
@@ -67,6 +72,69 @@ describe("guardedStatusUpdate", () => {
       ["id", 7],
       ["status", "triaged"],
     ]);
+  });
+
+  // #652. The admin actions could not adopt this helper as it stood, because
+  // their transitions are not single-status. Approving a verification is legal
+  // from `pending` OR from `rejected` (an admin reversing a rejection), and
+  // suspending a user guards on a boolean, not a status string. Rather than let
+  // each one hand-roll its own check-then-act again, which is exactly how the
+  // duplicate-email bug got there, the helper takes the shapes they need.
+  it("accepts a set of allowed statuses, filtering the UPDATE with IN", async () => {
+    const { client, eqCalls, inCalls } = clientFor({
+      data: [{ user_id: "u1" }],
+      error: null,
+    });
+
+    const res = await guardedStatusUpdate(client, {
+      table: "nurse_profiles",
+      id: "u1",
+      idColumn: "user_id",
+      statusColumn: "verification_status",
+      expectedStatus: ["pending", "rejected"],
+      patch: { verification_status: "verified" },
+    });
+
+    expect(res).toEqual({ outcome: "updated" });
+    expect(eqCalls).toEqual([["user_id", "u1"]]);
+    expect(inCalls).toEqual([["verification_status", ["pending", "rejected"]]]);
+  });
+
+  it("accepts a boolean guard, for a flag column like is_suspended", async () => {
+    const { client, eqCalls } = clientFor({
+      data: [{ id: "u1" }],
+      error: null,
+    });
+
+    const res = await guardedStatusUpdate(client, {
+      table: "users",
+      id: "u1",
+      statusColumn: "is_suspended",
+      expectedStatus: false,
+      patch: { is_suspended: true },
+    });
+
+    expect(res).toEqual({ outcome: "updated" });
+    expect(eqCalls).toEqual([
+      ["id", "u1"],
+      ["is_suspended", false],
+    ]);
+  });
+
+  it("reports already_resolved when a set-guarded update matches nothing", async () => {
+    // The concurrent loser. It must not go on to fire the side effect.
+    const { client } = clientFor({ data: [], error: null });
+
+    const res = await guardedStatusUpdate(client, {
+      table: "nurse_profiles",
+      id: "u1",
+      idColumn: "user_id",
+      statusColumn: "verification_status",
+      expectedStatus: ["pending", "rejected"],
+      patch: { verification_status: "verified" },
+    });
+
+    expect(res).toEqual({ outcome: "already_resolved" });
   });
 
   it("reports already_resolved when no row matched the expected status", async () => {

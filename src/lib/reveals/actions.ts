@@ -117,7 +117,17 @@ export async function revealNurse(
     family_user_id: user.id,
     nurse_user_id: nurseUserId,
   });
-  if (revealErr) return { success: false, error: "unknown" };
+
+  // 23505 is the UNIQUE (family_user_id, nurse_user_id) constraint, which means
+  // this family already has this nurse revealed: either the existing-reveal
+  // check above raced with a concurrent attempt, or the user retried one that
+  // was quietly still in flight. Either way the reveal EXISTS, which is exactly
+  // what the caller asked for. Reporting "unknown" here showed a generic error
+  // toast on a reveal that had worked, having just charged the family a second
+  // slot from a capped daily allowance for the privilege (#653).
+  if (revealErr && revealErr.code !== "23505") {
+    return { success: false, error: "unknown" };
+  }
 
   // Best-effort analytics increment.
   await supabase

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { requireAdmin } from "@/lib/auth/helpers";
+import { guardedStatusUpdate } from "@/lib/db/guarded-status-update";
 import { cancelActiveStripeSubscriptions } from "@/lib/stripe/cancel-subscriptions";
 import {
   sendAccountSuspendedEmail,
@@ -52,13 +53,21 @@ export async function suspendAccount(
   if (target.is_deleted) return { success: false, error: "wrong_state" };
   if (target.is_suspended) return { success: false, error: "wrong_state" };
 
-  const { error } = await supabase
-    .from("users")
-    .update({ is_suspended: true })
-    .eq("id", parsed.data.user_id);
-  if (error) {
-    console.error("[admin] suspend failed:", error.message);
+  // Guard on the flag itself, so a second suspend cannot land and cannot mail
+  // this person a second "your account has been suspended" (#652).
+  const guard = await guardedStatusUpdate(supabase, {
+    table: "users",
+    id: parsed.data.user_id,
+    statusColumn: "is_suspended",
+    expectedStatus: false,
+    patch: { is_suspended: true },
+  });
+  if (guard.outcome === "error") {
+    console.error("[admin] suspend failed:", guard.message);
     return { success: false, error: "unknown" };
+  }
+  if (guard.outcome === "already_resolved") {
+    return { success: false, error: "wrong_state" };
   }
 
   await supabase.from("admin_actions").insert({
@@ -105,13 +114,19 @@ export async function unsuspendAccount(
   if (!target) return { success: false, error: "not_found" };
   if (!target.is_suspended) return { success: false, error: "wrong_state" };
 
-  const { error } = await supabase
-    .from("users")
-    .update({ is_suspended: false })
-    .eq("id", parsed.data.user_id);
-  if (error) {
-    console.error("[admin] unsuspend failed:", error.message);
+  const guard = await guardedStatusUpdate(supabase, {
+    table: "users",
+    id: parsed.data.user_id,
+    statusColumn: "is_suspended",
+    expectedStatus: true,
+    patch: { is_suspended: false },
+  });
+  if (guard.outcome === "error") {
+    console.error("[admin] unsuspend failed:", guard.message);
     return { success: false, error: "unknown" };
+  }
+  if (guard.outcome === "already_resolved") {
+    return { success: false, error: "wrong_state" };
   }
 
   await supabase.from("admin_actions").insert({

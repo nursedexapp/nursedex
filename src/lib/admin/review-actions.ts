@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/helpers";
+import { guardedStatusUpdate } from "@/lib/db/guarded-status-update";
 import { sendDisputeDecisionEmail } from "@/lib/email/send";
 
 export type AdminReviewError =
@@ -45,13 +46,20 @@ export async function adminApproveReview(
     return { success: false, error: "wrong_state" };
   }
 
-  const { error } = await supabase
-    .from("reviews")
-    .update({ status: "approved" })
-    .eq("id", parsed.data.review_id);
-  if (error) {
-    console.error("[admin] approve review failed:", error.message);
+  // The pending check above is a stale read: two admins moderating the same
+  // review both pass it. The guard that decides the race is in the UPDATE (#652).
+  const guard = await guardedStatusUpdate(supabase, {
+    table: "reviews",
+    id: parsed.data.review_id,
+    expectedStatus: "pending",
+    patch: { status: "approved" },
+  });
+  if (guard.outcome === "error") {
+    console.error("[admin] approve review failed:", guard.message);
     return { success: false, error: "unknown" };
+  }
+  if (guard.outcome === "already_resolved") {
+    return { success: false, error: "wrong_state" };
   }
 
   await supabase.from("admin_actions").insert({
@@ -92,13 +100,18 @@ export async function adminRejectReview(
     return { success: false, error: "wrong_state" };
   }
 
-  const { error } = await supabase
-    .from("reviews")
-    .update({ status: "rejected" })
-    .eq("id", parsed.data.review_id);
-  if (error) {
-    console.error("[admin] reject review failed:", error.message);
+  const guard = await guardedStatusUpdate(supabase, {
+    table: "reviews",
+    id: parsed.data.review_id,
+    expectedStatus: "pending",
+    patch: { status: "rejected" },
+  });
+  if (guard.outcome === "error") {
+    console.error("[admin] reject review failed:", guard.message);
     return { success: false, error: "unknown" };
+  }
+  if (guard.outcome === "already_resolved") {
+    return { success: false, error: "wrong_state" };
   }
 
   await supabase.from("admin_actions").insert({

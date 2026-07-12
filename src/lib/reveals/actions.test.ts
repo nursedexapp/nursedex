@@ -162,7 +162,11 @@ beforeEach(() => {
   h.state.hasAccess = true;
   h.state.existingReveal = null;
   h.state.rateRow = { allowed: true, current_count: 0, needs_captcha: false };
-  h.state.consumeRow = { allowed: true, current_count: 1, needs_captcha: false };
+  h.state.consumeRow = {
+    allowed: true,
+    current_count: 1,
+    needs_captcha: false,
+  };
   h.state.consumeError = null;
   h.state.revealInsertError = null;
   h.state.contact = {
@@ -341,6 +345,23 @@ describe("revealNurse reveal insert failure", () => {
     // Fail-closed: the slot is consumed before the insert, so a failed
     // insert burns quota rather than reopening the cap-bypass race.
     expect(h.calls.consumeRpc).toHaveLength(1);
+  });
+
+  // #653. The existing-reveal check (which makes a re-reveal free) happens
+  // before the insert, so two reveals of the SAME nurse racing each other both
+  // pass it, both consume a slot, and then the loser's insert hits
+  // UNIQUE (family_user_id, nurse_user_id). Mapping that to "unknown" showed the
+  // family a generic error toast on a reveal that had, in fact, succeeded, and
+  // charged them a second slot from a capped daily allowance for the privilege.
+  //
+  // A duplicate key here means the reveal exists. That is the definition of the
+  // thing the caller asked for, so it is a success.
+  it("treats a duplicate reveal as the success it is, not an error", async () => {
+    h.state.revealInsertError = { code: "23505", message: "duplicate key" };
+
+    const res = await revealNurse(NURSE_ID);
+
+    expect(res).toEqual({ success: true, contact: h.state.contact });
   });
 });
 
