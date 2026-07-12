@@ -59,8 +59,8 @@ export function BlogPostList({
               )}
               <div className="text-soft-black-light flex flex-wrap items-center gap-2 text-sm">
                 <span>
-                  {formatDate(post.publish_at)} ·{" "}
-                  {post.reading_time_minutes} min read
+                  {formatDate(post.publish_at)} · {post.reading_time_minutes}{" "}
+                  min read
                 </span>
                 {post.pinned && (
                   <span className="bg-cream-light text-cream-dark rounded-full px-2 py-0.5 text-xs font-medium">

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2 } from "lucide-react";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Input } from "@/components/ui/input";
 import { unsubscribeByEmail } from "@/lib/newsletter/actions";
 
@@ -14,6 +14,7 @@ export function UnsubscribeForm() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (pending) return;
     setError(null);
     startTransition(async () => {
       const res = await unsubscribeByEmail({ email });
@@ -48,10 +49,16 @@ export function UnsubscribeForm() {
         required
       />
       {error && <p className="text-error text-sm">{error}</p>}
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending && <Loader2 className="size-4 animate-spin" />}
-        Unsubscribe
-      </Button>
+      <PendingButton
+        pending={pending}
+        mode="wait"
+        type="submit"
+        idleLabel="Unsubscribe"
+        workingLabel="Unsubscribing..."
+        slowLabel="Still unsubscribing..."
+        stalledMessage="This is still processing. Refresh to check whether you were unsubscribed."
+        className="w-full"
+      />
     </form>
   );
 }

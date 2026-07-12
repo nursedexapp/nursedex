@@ -210,6 +210,8 @@ export function PendingButton({
         // In `wait` mode the button stays disabled for as long as the action is
         // in flight, stalled or not. Re-enabling it would hand back a control
         // that fires the side effect a second time.
+        //
+        // eslint-disable-next-line local/require-pending-button -- this IS the primitive the rule points everyone at, and it cannot import itself.
         disabled={disabled || (pending && !canRetry)}
         className={className}
       >

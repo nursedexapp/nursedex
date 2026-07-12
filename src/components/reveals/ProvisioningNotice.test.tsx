@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, render, screen, fireEvent } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  fireEvent,
+} from "@testing-library/react";
 
 const h = vi.hoisted(() => ({ refresh: vi.fn() }));
 
@@ -35,7 +41,9 @@ afterEach(() => {
 describe("ProvisioningNotice", () => {
   it("shows a working state immediately", () => {
     render(<ProvisioningNotice />);
-    expect(screen.getByText(/Finishing your subscription/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Finishing your subscription/i),
+    ).toBeInTheDocument();
   });
 
   it("polls via router.refresh on an interval while still working", async () => {
@@ -46,7 +54,9 @@ describe("ProvisioningNotice", () => {
     });
 
     expect(h.refresh).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/Finishing your subscription/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Finishing your subscription/i),
+    ).toBeInTheDocument();
   });
 
   it("gives up and shows a stalled, actionable state after enough failed polls", async () => {
@@ -54,7 +64,9 @@ describe("ProvisioningNotice", () => {
 
     await advancePolls(6);
 
-    expect(screen.getByText(/taking longer than expected/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/taking longer than expected/i),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Refresh now/i }),
     ).toBeInTheDocument();
@@ -68,6 +80,8 @@ describe("ProvisioningNotice", () => {
     fireEvent.click(screen.getByRole("button", { name: /Refresh now/i }));
 
     expect(h.refresh).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/Finishing your subscription/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Finishing your subscription/i),
+    ).toBeInTheDocument();
   });
 });

@@ -198,7 +198,10 @@ export default {
         if (isFilteredInline(outermost)) return;
         if (isFilteredViaVariable(outermost, sourceCode)) return;
 
-        context.report({ node: outermost, messageId: "missingVisibleNurseFilter" });
+        context.report({
+          node: outermost,
+          messageId: "missingVisibleNurseFilter",
+        });
       },
     };
   },

@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -12,6 +11,7 @@ import {
   CONTACT_SUBJECT_MAX,
 } from "@/lib/schemas/contact";
 import { submitContact } from "@/lib/contact/actions";
+import { PendingButton } from "@/components/ui/pending-button";
 
 export function ContactForm() {
   const [name, setName] = useState("");
@@ -33,6 +33,8 @@ export function ContactForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     setErrors({});
 
     if (!token) {
@@ -190,12 +192,18 @@ export function ContactForm() {
         )}
       </div>
 
-      <Button
+      {/* wait, not retry (#443 phase 5): a second fire sends a second
+          message. */}
+      <PendingButton
+        pending={pending}
+        mode="wait"
         type="submit"
-        disabled={pending || !name || !email || !subject || !message}
-      >
-        {pending ? "Sending..." : "Send message"}
-      </Button>
+        idleLabel="Send message"
+        workingLabel="Sending..."
+        slowLabel="Still sending..."
+        stalledMessage="This is still sending. Refresh to check whether your message went through before sending it again."
+        disabled={!name || !email || !subject || !message}
+      />
     </form>
   );
 }

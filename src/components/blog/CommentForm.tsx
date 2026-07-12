@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { submitComment } from "@/lib/comments/actions";
+import { PendingButton } from "@/components/ui/pending-button";
 
 export function CommentForm({ postId }: { postId: string }) {
   const [pending, startTransition] = useTransition();
@@ -19,6 +19,8 @@ export function CommentForm({ postId }: { postId: string }) {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     setErrors({});
     startTransition(async () => {
       const res = await submitComment({
@@ -86,7 +88,9 @@ export function CommentForm({ postId }: { postId: string }) {
           required
           className="mt-1"
         />
-        {errors.body && <p className="text-error mt-1 text-xs">{errors.body}</p>}
+        {errors.body && (
+          <p className="text-error mt-1 text-xs">{errors.body}</p>
+        )}
       </div>
       <input
         type="text"
@@ -97,10 +101,17 @@ export function CommentForm({ postId }: { postId: string }) {
         onChange={(e) => setWebsite(e.target.value)}
         className="hidden"
       />
-      <Button type="submit" disabled={pending}>
-        {pending && <Loader2 className="size-4 animate-spin" />}
-        Post comment
-      </Button>
+      {/* wait, not retry (#443 phase 5): a second fire posts a second
+          comment. */}
+      <PendingButton
+        pending={pending}
+        mode="wait"
+        type="submit"
+        idleLabel="Post comment"
+        workingLabel="Posting..."
+        slowLabel="Still posting..."
+        stalledMessage="This is still processing. Refresh to check whether your comment went through before posting it again."
+      />
       <p className="text-soft-black-light text-xs">
         Comments are reviewed before they appear.
       </p>

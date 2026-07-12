@@ -195,7 +195,9 @@ export function NurseProfilePublic({
           {nurse.care_philosophy && (
             <Card className="border-sage/20">
               <CardContent className="pt-4">
-                <h2 className="mb-2 text-base font-semibold">Care Philosophy</h2>
+                <h2 className="mb-2 text-base font-semibold">
+                  Care Philosophy
+                </h2>
                 <p className="text-muted-foreground text-base leading-relaxed whitespace-pre-line italic">
                   &ldquo;{nurse.care_philosophy}&rdquo;
                 </p>
