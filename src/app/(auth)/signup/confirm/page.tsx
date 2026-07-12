@@ -4,8 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { resendConfirmation } from "@/lib/auth/actions";
-import { Button } from "@/components/ui/button";
-import { Loader2, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
+import { PendingButton } from "@/components/ui/pending-button";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -97,24 +97,24 @@ function ConfirmContent() {
         Don&apos;t see it? Check your spam or junk folder.
       </p>
       <div className="mt-6 flex flex-col items-center gap-2">
-        <Button
-          type="button"
+        {/* wait, not retry (#443): a second fire sends the nurse a second
+            confirmation email. Phase 1 converted the auth screens but missed
+            this one; the lint rule from #659 is what found it. */}
+        <PendingButton
+          pending={resendLoading}
+          mode="wait"
           variant="outline"
-          size="sm"
+          idleLabel={
+            resendCooldown > 0
+              ? `Resend available in ${resendCooldown}s`
+              : "Resend confirmation email"
+          }
+          workingLabel="Sending..."
+          slowLabel="Still sending..."
+          stalledMessage="This is still sending. Check your inbox before asking for another one."
+          disabled={resendCooldown > 0}
           onClick={handleResend}
-          disabled={resendLoading || resendCooldown > 0}
-        >
-          {resendLoading ? (
-            <>
-              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-              Sending...
-            </>
-          ) : resendCooldown > 0 ? (
-            `Resend available in ${resendCooldown}s`
-          ) : (
-            "Resend confirmation email"
-          )}
-        </Button>
+        />
         {resendMessage && (
           <p className="text-muted-foreground text-xs">{resendMessage}</p>
         )}

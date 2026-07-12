@@ -1,13 +1,12 @@
-import { LogOut } from "lucide-react";
 import { requireAuth } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
-import { resetPassword, signOut } from "@/lib/auth/actions";
+import { resetPassword } from "@/lib/auth/actions";
 import { updateFamilyContact } from "@/lib/family/actions";
 import { getActiveSubscription } from "@/lib/subscriptions/queries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { SettingsForm } from "./SettingsForm";
 import { ManageSubscriptionCard } from "@/components/dashboard/ManageSubscriptionCard";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 
 async function updateMarketing(optOut: boolean) {
   "use server";
@@ -106,16 +105,7 @@ export default async function SettingsPage() {
             <CardTitle className="text-base">Account</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={signOut}>
-              <Button
-                type="submit"
-                variant="outline"
-                className="w-full sm:w-auto"
-              >
-                <LogOut className="mr-1.5 size-4" aria-hidden="true" />
-                Sign out
-              </Button>
-            </form>
+            <SignOutButton variant="button" />
           </CardContent>
         </Card>
       </div>
