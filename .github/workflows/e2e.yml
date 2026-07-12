@@ -34,7 +34,7 @@ jobs:
       # auto-exposing public tables, which broke every query with "permission
       # denied" until those grants landed. See issue #354.)
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: latest
           # Resolving "latest" hits the GitHub API; without a token it uses the
