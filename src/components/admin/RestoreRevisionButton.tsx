@@ -2,9 +2,9 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { History, Loader2 } from "lucide-react";
+import { History } from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { restoreRevision } from "@/lib/blog/actions";
 
 export function RestoreRevisionButton({
@@ -18,6 +18,7 @@ export function RestoreRevisionButton({
   const [pending, startTransition] = useTransition();
 
   function onRestore() {
+    if (pending) return;
     if (
       !window.confirm(
         "Restore this version? The current content is saved to history first.",
@@ -37,14 +38,19 @@ export function RestoreRevisionButton({
     });
   }
 
+  // wait, not retry (#443 phase 4). Restoring writes the current content to
+  // history and replaces it, so a second fire adds another history entry.
   return (
-    <Button variant="outline" size="sm" onClick={onRestore} disabled={pending}>
-      {pending ? (
-        <Loader2 className="size-4 animate-spin" />
-      ) : (
-        <History className="size-4" />
-      )}
-      Restore
-    </Button>
+    <PendingButton
+      pending={pending}
+      mode="wait"
+      variant="outline"
+      idleLabel="Restore"
+      workingLabel="Restoring..."
+      slowLabel="Still restoring..."
+      stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the version was restored."
+      icon={<History className="size-4" />}
+      onClick={onRestore}
+    />
   );
 }

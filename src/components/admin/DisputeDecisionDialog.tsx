@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,9 @@ export function DisputeDecisionDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form. Resolving a
+    // dispute emails BOTH parties, so a second submit is two more real emails.
+    if (pending) return;
     startTransition(async () => {
       const result = await adminResolveDispute({
         review_id: reviewId,
@@ -89,7 +93,7 @@ export function DisputeDecisionDialog({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-end justify-end gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -98,17 +102,17 @@ export function DisputeDecisionDialog({
             >
               Cancel
             </Button>
-            <Button
+            {/* wait, not retry (#443 phase 4): both parties get an email. */}
+            <PendingButton
+              pending={pending}
+              mode="wait"
               type="submit"
               variant={decision === "remove" ? "destructive" : "default"}
-              disabled={pending}
-            >
-              {pending
-                ? "Saving..."
-                : decision === "keep"
-                  ? "Keep review"
-                  : "Remove review"}
-            </Button>
+              idleLabel={decision === "keep" ? "Keep review" : "Remove review"}
+              workingLabel="Saving..."
+              slowLabel="Still saving..."
+              stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the decision went through."
+            />
           </div>
         </form>
       </DialogContent>

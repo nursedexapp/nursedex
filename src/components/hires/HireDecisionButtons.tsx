@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { CircleCheck } from "lucide-react";
 import { PendingButton } from "@/components/ui/pending-button";
+import { useInFlight } from "@/components/ui/use-in-flight";
 import { confirmHireFromToken, rejectHireFromToken } from "@/lib/hires/actions";
 
 interface HireDecisionButtonsProps {
@@ -18,33 +19,27 @@ const STALLED =
   "This is still processing. Please do not close this page. Refresh to check whether your answer went through.";
 
 export function HireDecisionButtons({ token }: HireDecisionButtonsProps) {
-  const [, startTransition] = useTransition();
   const [decided, setDecided] = useState<null | Decision>(null);
-  // WHICH decision is in flight, not merely that one is. Both buttons share a
-  // transition, so a single flag would put "Recording..." on the button the
-  // family did not press. It also has to kill the OTHER button: answering "No"
-  // while "Yes" is still in flight sends two conflicting decisions on one token.
-  const [inFlight, setInFlight] = useState<null | Decision>(null);
+  // WHICH decision is in flight, not merely that one is: a single flag would put
+  // "Recording..." on the button the family did not press. Same need turned up on
+  // three admin surfaces, so it is a shared hook now (#658).
+  const { inFlight, busy, run } = useInFlight<Decision>();
 
   const decide = (
     fn: typeof confirmHireFromToken | typeof rejectHireFromToken,
     label: string,
     outcome: Decision,
-  ) => {
-    setInFlight(outcome);
-    startTransition(async () => {
+  ) =>
+    run(outcome, async () => {
       const result = await fn({ token });
       if (!result.success) {
         toast.error(`Could not ${label.toLowerCase()}. Please try again.`);
-        setInFlight(null);
         return;
       }
       // Show the result in place. Don't refresh: confirming/rejecting clears
       // the single-use token, so a re-query would 404 as "Link not valid".
-      setInFlight(null);
       setDecided(outcome);
     });
-  };
 
   if (decided) {
     return (
@@ -58,8 +53,6 @@ export function HireDecisionButtons({ token }: HireDecisionButtonsProps) {
       </div>
     );
   }
-
-  const busy = inFlight !== null;
 
   return (
     <div className="flex items-end gap-2">

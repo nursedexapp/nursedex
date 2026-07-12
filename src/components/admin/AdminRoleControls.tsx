@@ -2,10 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { promoteToAdmin, demoteAdmin } from "@/lib/admin/role-actions";
+
+// wait, not retry (#443 phase 4). Granting and revoking admin access is the
+// highest-privilege write in the app. See VerificationRowActions for why the
+// #652 guard does not yet make these safe to retry (#669).
+const STALLED =
+  "This is still processing. Please do not close this page. Refresh to check whether it went through.";
 
 export function PromoteForm() {
   const [email, setEmail] = useState("");
@@ -14,6 +20,8 @@ export function PromoteForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     startTransition(async () => {
       const result = await promoteToAdmin({ email, role });
       if (!result.success) {
@@ -65,9 +73,16 @@ export function PromoteForm() {
           <option value="super_admin">super_admin</option>
         </select>
       </div>
-      <Button type="submit" disabled={pending || !email}>
-        {pending ? "Granting..." : "Grant role"}
-      </Button>
+      <PendingButton
+        pending={pending}
+        mode="wait"
+        type="submit"
+        idleLabel="Grant role"
+        workingLabel="Granting..."
+        slowLabel="Still granting..."
+        stalledMessage={STALLED}
+        disabled={!email}
+      />
     </form>
   );
 }
@@ -86,6 +101,7 @@ export function DemoteButton({ userId, email, isSelf }: DemoteButtonProps) {
   }
 
   const handleDemote = () => {
+    if (pending) return;
     if (
       !confirm(
         `Demote ${email}? They lose access to /admin and become a family role user.`,
@@ -104,13 +120,15 @@ export function DemoteButton({ userId, email, isSelf }: DemoteButtonProps) {
   };
 
   return (
-    <Button
-      size="sm"
+    <PendingButton
+      pending={pending}
+      mode="wait"
       variant="outline"
+      idleLabel="Demote"
+      workingLabel="Demoting..."
+      slowLabel="Still demoting..."
+      stalledMessage={STALLED}
       onClick={handleDemote}
-      disabled={pending}
-    >
-      Demote
-    </Button>
+    />
   );
 }
