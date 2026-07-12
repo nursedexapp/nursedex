@@ -130,15 +130,25 @@ export function collectGuardSites(file: string, source: string): GuardSite[] {
   const isRoute = /^src\/app\/api\/.+\/route\.ts$/.test(
     file.split(sep).join("/"),
   );
+  // A server action is a publicly callable endpoint, not an internal helper, and
+  // the "use server" directive is what makes it one. Read it from the source
+  // rather than the path: a file is an endpoint because of the directive, and a
+  // path convention is only a guess at it.
+  const isServerAction = /^\s*["']use server["']/m.test(source);
 
   for (const guard of Object.keys(GUARDS)) {
-    // getCurrentUser refuses nobody. In an API route it IS the authentication
-    // check, because the route returns a 401 when it comes back null. In a page
-    // or layout it is a read used to personalize what renders: the dashboard
-    // layout uses it to pick a sidebar and tolerates a null user, and the pages
-    // themselves are guarded by require* instead. Mutating it there reports a
-    // survivor for a line that was never protecting anything.
-    if (guard === "getCurrentUser" && !isRoute) continue;
+    // getCurrentUser refuses nobody IN A PAGE. There it is a read used to
+    // personalize what renders: the dashboard layout uses it to pick a sidebar
+    // and happily tolerates a null user, and the pages themselves are guarded by
+    // require* instead. Mutating it there reports a survivor for a line that was
+    // never protecting anything.
+    //
+    // In an API route and in a SERVER ACTION it is the authentication itself: the
+    // route returns a 401 and the action returns not_authenticated when it comes
+    // back null. Skipping it in server actions (#681) meant nothing ever proved
+    // those guards could fail, across five action files, on endpoints anyone can
+    // POST to. The old skip applied a page's reasoning to an endpoint.
+    if (guard === "getCurrentUser" && !isRoute && !isServerAction) continue;
 
     const re = new RegExp(`\\b${guard}\\s*\\(`, "g");
     let m: RegExpExecArray | null;
@@ -208,8 +218,18 @@ export function mutate(source: string, site: GuardSite): string {
   return source.slice(0, site.index) + replacement + source.slice(end);
 }
 
-/** The suite that is supposed to catch a guard in this file going missing. */
-export function suiteFor(file: string): string | null {
+/**
+ * The suite that is supposed to catch a guard going missing.
+ *
+ * Keyed on the GUARD as well as the file, because one action file can hold both
+ * kinds. reviews/actions.ts authenticates a family with getCurrentUser and also
+ * calls requireRole elsewhere; blog/actions.ts is all requireAdmin. Routing by
+ * file alone sent a whole file to one suite, and when #681 added the
+ * getCurrentUser sites it dragged 21 require* guards away from the admin suite
+ * that had been proving them for months. The guard is what decides who is
+ * responsible.
+ */
+export function suiteFor(file: string, guard?: string): string | null {
   const f = file.split(sep).join("/");
 
   if (f === "src/lib/email/route-handler.ts") {
@@ -222,6 +242,14 @@ export function suiteFor(file: string): string | null {
     return "src/app/page-authz-boundary.test.tsx";
   }
   if (/^src\/lib\/.+[a-z-]*actions\.ts$/.test(f)) {
+    // A member-facing action authenticates with getCurrentUser and refuses by
+    // returning an error. Nothing proved those guards could fail until #681,
+    // when all ten survived the first time the gate was pointed at them.
+    if (guard === "getCurrentUser") {
+      return "src/lib/action-authz-boundary.test.ts";
+    }
+    // Everything else in an action file is a require* guard, and the admin
+    // boundary suite has run the real ones against a mocked session since #493.
     return "src/lib/admin/authz-boundary.test.ts";
   }
   return null;
@@ -246,7 +274,7 @@ export function affectedSites(
   const set = new Set(changed.map((f) => f.split(sep).join("/")));
   if (set.has("scripts/guard-mutation.ts")) return sites;
   return sites.filter(
-    (s) => set.has(s.file) || set.has(suiteFor(s.file) ?? "\0"),
+    (s) => set.has(s.file) || set.has(suiteFor(s.file, s.guard) ?? "\0"),
   );
 }
 
@@ -433,7 +461,7 @@ async function main() {
   for (const file of guardedFiles()) {
     const src = readFileSync(join(REPO_ROOT, file), "utf8");
     for (const site of collectGuardSites(file, src)) {
-      if (suiteFor(file)) sites.push(site);
+      if (suiteFor(file, site.guard)) sites.push(site);
       else unmapped.push(site);
     }
   }
@@ -477,7 +505,7 @@ async function main() {
 
   console.log(`Guard call sites to mutate: ${sites.length}`);
 
-  const suites = [...new Set(sites.map((s) => suiteFor(s.file)!))];
+  const suites = [...new Set(sites.map((s) => suiteFor(s.file, s.guard)!))];
   console.log(`Checking ${suites.length} suites are green first...`);
   await assertBaselineGreen(suites, runVitest);
 
@@ -485,7 +513,7 @@ async function main() {
   let done = 0;
 
   for (const site of sites) {
-    const suite = suiteFor(site.file)!;
+    const suite = suiteFor(site.file, site.guard)!;
     const full = join(REPO_ROOT, site.file);
     const source = readFileSync(full, "utf8");
 
