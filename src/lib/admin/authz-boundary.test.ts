@@ -134,17 +134,38 @@ beforeEach(() => {
 // Real v4 UUIDs: z.string().uuid() in Zod 4 rejects placeholder shapes.
 const UUID = "11111111-1111-4111-8111-111111111111";
 
+/**
+ * Assert a call was refused by a redirect to EXACTLY `lands`.
+ *
+ * Not toThrow(): toThrow(string) matches a SUBSTRING, so
+ * `toThrow("NEXT_REDIRECT:/")` is satisfied by a redirect to /dashboard or
+ * /login. That is not hypothetical. It made two page guards untestable in the
+ * page suite, and here softDeleteAccount redirects to "/" on its own after
+ * deleting the account, so with its guard removed a loose match would still see
+ * a redirect and call the test passed. Equality is what tells a refusal apart
+ * from the action's own routine redirect.
+ */
+async function expectRefusedTo(call: Promise<unknown>, lands: string) {
+  let thrown: unknown;
+  try {
+    await call;
+  } catch (err) {
+    thrown = err;
+  }
+  expect((thrown as Error | undefined)?.message).toBe(`NEXT_REDIRECT:${lands}`);
+}
+
 describe("requireAdmin rejects non-admins and admits admins", () => {
   it.each(["family", "nurse"])("redirects a %s caller", async (role) => {
     setCaller(role);
     const { requireAdmin } = await import("@/lib/auth/helpers");
-    await expect(requireAdmin()).rejects.toThrow("NEXT_REDIRECT:/");
+    await expectRefusedTo(requireAdmin(), "/");
   });
 
   it("redirects a signed-out caller to /login", async () => {
     setCaller(null);
     const { requireAdmin } = await import("@/lib/auth/helpers");
-    await expect(requireAdmin()).rejects.toThrow("NEXT_REDIRECT:/login");
+    await expectRefusedTo(requireAdmin(), "/login");
   });
 
   it.each(["admin", "super_admin"])("admits a %s caller", async (role) => {
@@ -159,7 +180,7 @@ describe("requireSuperAdmin rejects plain admins", () => {
   it("redirects an admin to /admin", async () => {
     setCaller("admin");
     const { requireSuperAdmin } = await import("@/lib/auth/helpers");
-    await expect(requireSuperAdmin()).rejects.toThrow("NEXT_REDIRECT:/admin");
+    await expectRefusedTo(requireSuperAdmin(), "/admin");
   });
 
   it("admits a super_admin", async () => {
@@ -233,6 +254,12 @@ const CASES: ReadonlyArray<{
   /** The caller who must be refused. null = signed out entirely. */
   caller: string | null;
   args: unknown[];
+  /**
+   * Where the guard sends a refused caller. Defaults to "/", which is where
+   * requireAdmin and requireRole send the wrong role. Only the super-admin
+   * actions ("/admin") and the one requireAuth action ("/login") differ.
+   */
+  lands?: string;
 }> = [
   {
     module: "./account-actions",
@@ -294,12 +321,14 @@ const CASES: ReadonlyArray<{
     module: "./role-actions",
     action: "promoteToAdmin",
     caller: "admin",
+    lands: "/admin",
     args: [{ email: "victim@example.com", role: "admin" }],
   },
   {
     module: "./role-actions",
     action: "demoteAdmin",
     caller: "admin",
+    lands: "/admin",
     args: [{ user_id: UUID }],
   },
 
@@ -483,6 +512,7 @@ const CASES: ReadonlyArray<{
     module: "@/lib/profile/actions",
     action: "softDeleteAccount",
     caller: null,
+    lands: "/login",
     args: [],
   },
 
@@ -552,14 +582,14 @@ const CASES: ReadonlyArray<{
 describe("admin actions reject an unauthorized caller with no side effect", () => {
   it.each(CASES)(
     "$action refuses a $caller caller and writes nothing",
-    async ({ module, action, caller, args }) => {
+    async ({ module, action, caller, args, lands }) => {
       setCaller(caller);
       const mod = (await MODULES[module]()) as unknown as Record<
         string,
         (...a: unknown[]) => Promise<unknown>
       >;
 
-      await expect(mod[action](...args)).rejects.toThrow(/NEXT_REDIRECT/);
+      await expectRefusedTo(mod[action](...args), lands ?? "/");
 
       expectNoSideEffects();
     },
