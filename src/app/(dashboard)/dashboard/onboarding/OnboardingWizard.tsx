@@ -167,6 +167,11 @@ export function OnboardingWizard({
 
   // ── Generic step submit handler ───────────────────────────
 
+  // Who owns the message on this surface (#656). The toast owns "the save came
+  // back and it failed". The stall alert on the Continue button owns "the save
+  // never came back at all". They cannot collide: the alert only exists while
+  // isSubmitting is true, and every toast below is raised after the action has
+  // returned, which clears isSubmitting in the same commit.
   const submitStep = async (
     step: number,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { ButtonVariantProps } from "@/components/ui/button-variants";
 
 // The one pending primitive (#654, phase 0 of #443).
 //
@@ -122,6 +123,8 @@ interface PendingButtonProps {
   disabled?: boolean;
   /** Shown in place of the spinner while idle, e.g. the Google mark. */
   icon?: React.ReactNode;
+  /** Passed through to Button, e.g. "destructive" on a delete. */
+  variant?: ButtonVariantProps["variant"];
   className?: string;
   type?: "button" | "submit";
   slowAfterMs?: number;
@@ -139,6 +142,7 @@ export function PendingButton({
   onRetry,
   disabled = false,
   icon,
+  variant,
   className,
   type = "button",
   slowAfterMs,
@@ -201,6 +205,7 @@ export function PendingButton({
 
       <Button
         type={type}
+        variant={variant}
         onClick={handleClick}
         // In `wait` mode the button stays disabled for as long as the action is
         // in flight, stalled or not. Re-enabling it would hand back a control

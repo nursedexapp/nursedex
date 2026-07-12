@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import posthog from "posthog-js";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { BasicsFields } from "@/components/profile-form/BasicsFields";
 import { CredentialsFields } from "@/components/profile-form/CredentialsFields";
 import { SkillsFields } from "@/components/profile-form/SkillsFields";
@@ -314,11 +314,23 @@ export function ProfileEditForm({
         </TabsContent>
       </Tabs>
 
-      {/* Save button */}
+      {/* Save button. Updating a profile is an upsert (#443 phase 2), so a
+          stalled save is safe to fire again.
+
+          Who owns the message: the toast owns "the save failed", this button's
+          stall alert owns "the save never answered". They cannot both be on
+          screen, because the alert only lives while isSubmitting is true and
+          every toast in handleSave is raised after the action has returned. */}
       <div className="border-sage/20 flex justify-end border-t pt-4">
-        <Button onClick={handleSave} disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : "Save changes"}
-        </Button>
+        <PendingButton
+          pending={isSubmitting}
+          mode="retry"
+          idleLabel="Save changes"
+          workingLabel="Saving..."
+          slowLabel="Still saving..."
+          onClick={handleSave}
+          onRetry={handleSave}
+        />
       </div>
     </div>
   );

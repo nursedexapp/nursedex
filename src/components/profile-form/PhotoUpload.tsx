@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { PHOTO_UPLOAD, TIER_LIMITS } from "@/lib/constants";
@@ -11,15 +11,36 @@ import {
   deletePhoto,
 } from "@/lib/profile/actions";
 import { PhotoCropModal } from "./PhotoCropModal";
+import { Button } from "@/components/ui/button";
+import { usePendingPhase } from "@/components/ui/pending-button";
 import type { NurseTier } from "@/types/enums";
 import { cn } from "@/lib/utils";
-import { Upload, X, ImageIcon } from "lucide-react";
+import { Upload, X, ImageIcon, Loader2 } from "lucide-react";
 
 interface PhotoUploadProps {
   photos: string[];
   photoUrls: (string | null)[];
   tier: NurseTier;
   onChange: (photos: string[]) => void;
+}
+
+/**
+ * Lets only the newest attempt report its result (#656).
+ *
+ * A hung request cannot be aborted, so offering a retry leaves the first one
+ * still in flight. If that first one finally lands it must stay silent, or the
+ * retry's success is contradicted: a superseded upload would add the same photo
+ * a second time, and a superseded delete would toast "could not remove" for a
+ * photo the retry already removed.
+ */
+function useLatestAttempt() {
+  const latest = useRef(0);
+  const begin = useCallback(() => ++latest.current, []);
+  const isLatest = useCallback(
+    (attempt: number) => attempt === latest.current,
+    [],
+  );
+  return { begin, isLatest };
 }
 
 export function PhotoUpload({
@@ -36,12 +57,33 @@ export function PhotoUpload({
   // otherwise show the placeholder icon until the next full reload.
   const [sessionUrls, setSessionUrls] = useState<Record<string, string>>({});
   // The selected photo waiting to be cropped before upload.
-  const [cropState, setCropState] = useState<{ file: File; src: string } | null>(
-    null,
-  );
+  const [cropState, setCropState] = useState<{
+    file: File;
+    src: string;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const removeAlertRef = useRef<HTMLDivElement>(null);
   const maxPhotos = TIER_LIMITS[tier].maxPhotos;
   const canUpload = photos.length < maxPhotos;
+
+  const upload = useLatestAttempt();
+  const remove = useLatestAttempt();
+
+  // The remove control is a 14px X in the corner of a thumbnail, so it cannot
+  // carry PendingButton's chrome. It borrows the same clock instead and renders
+  // its own: a spinner on the X, then one retry alert above the grid (#443).
+  const { phase: removePhase, restart: restartRemove } = usePendingPhase({
+    pending: removingIndex !== null,
+  });
+  const removeStalled = removePhase === "stalled";
+
+  useEffect(() => {
+    // Focus the alert, the same as PendingButton does. A keyboard user lost
+    // focus to <body> when the X was disabled; without this the retry is
+    // announced to nobody.
+    if (removeStalled)
+      requestAnimationFrame(() => removeAlertRef.current?.focus());
+  }, [removeStalled]);
 
   // Validate the chosen file, then open the cropper. Upload happens on
   // crop confirm so nurses frame exactly what shows on the search card.
@@ -80,6 +122,7 @@ export function PhotoUpload({
     async (area: CropArea) => {
       if (!cropState) return;
       const { file, src } = cropState;
+      const attempt = upload.begin();
       setUploading(true);
 
       try {
@@ -88,7 +131,7 @@ export function PhotoUpload({
 
         const urlResult = await requestPhotoUploadUrl(file.name);
         if ("error" in urlResult) {
-          toast.error(urlResult.error);
+          if (upload.isLatest(attempt)) toast.error(urlResult.error);
           return;
         }
 
@@ -98,15 +141,21 @@ export function PhotoUpload({
           body: cropped,
         });
         if (!uploadResponse.ok) {
-          toast.error("Upload failed. Please try again.");
+          if (upload.isLatest(attempt))
+            toast.error("Upload failed. Please try again.");
           return;
         }
 
         const validation = await confirmPhotoUpload(urlResult.path);
         if (!validation.valid) {
-          toast.error(validation.error || "Invalid image file");
+          if (upload.isLatest(attempt))
+            toast.error(validation.error || "Invalid image file");
           return;
         }
+
+        // A retry superseded this attempt. Landing now would add the same photo
+        // to the form twice, one path per attempt.
+        if (!upload.isLatest(attempt)) return;
 
         if (validation.signedUrl) {
           setSessionUrls((prev) => ({
@@ -119,28 +168,42 @@ export function PhotoUpload({
         toast.success("Photo uploaded");
         setCropState(null);
       } catch {
-        toast.error("Something went wrong. Please try again.");
+        if (upload.isLatest(attempt))
+          toast.error("Something went wrong. Please try again.");
       } finally {
-        setUploading(false);
+        if (upload.isLatest(attempt)) setUploading(false);
       }
     },
-    [cropState, photos, onChange],
+    [cropState, photos, onChange, upload],
   );
 
-  const handleRemove = async (index: number) => {
-    const path = photos[index];
-    setRemovingIndex(index);
+  const handleRemove = useCallback(
+    async (index: number) => {
+      const path = photos[index];
+      const attempt = remove.begin();
+      setRemovingIndex(index);
 
-    try {
-      await deletePhoto(path);
-      onChange(photos.filter((_, i) => i !== index));
-      toast.success("Photo removed");
-    } catch {
-      toast.error("Could not remove photo. Please try again.");
-    } finally {
-      setRemovingIndex(null);
-    }
-  };
+      try {
+        await deletePhoto(path);
+        if (!remove.isLatest(attempt)) return;
+        onChange(photos.filter((_, i) => i !== index));
+        toast.success("Photo removed");
+      } catch {
+        // A superseded attempt stays silent: the retry has already reported.
+        if (remove.isLatest(attempt))
+          toast.error("Could not remove photo. Please try again.");
+      } finally {
+        if (remove.isLatest(attempt)) setRemovingIndex(null);
+      }
+    },
+    [photos, onChange, remove],
+  );
+
+  const handleRetryRemove = useCallback(() => {
+    if (removingIndex === null) return;
+    restartRemove();
+    void handleRemove(removingIndex);
+  }, [removingIndex, restartRemove, handleRemove]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -152,6 +215,38 @@ export function PhotoUpload({
 
   return (
     <div className="space-y-3">
+      {/* Removing a photo: still-alive, then failed. The toast still owns a
+          delete that comes back and fails; this owns one that never comes back
+          at all. */}
+      {removePhase === "slow" && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="text-muted-foreground text-sm"
+        >
+          Removing photo...
+        </div>
+      )}
+      {removeStalled && (
+        <div
+          ref={removeAlertRef}
+          tabIndex={-1}
+          role="alert"
+          className="bg-error/10 text-error flex flex-wrap items-center gap-2 rounded-lg px-4 py-3 text-sm outline-none"
+        >
+          <span>Removing that photo is taking longer than usual.</span>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            onClick={handleRetryRemove}
+            className="text-error h-auto px-0 underline"
+          >
+            Try again
+          </Button>
+        </div>
+      )}
+
       {/* Photo previews */}
       {photos.length > 0 && (
         <div className="flex flex-wrap gap-3">
@@ -178,10 +273,16 @@ export function PhotoUpload({
                 <button
                   type="button"
                   onClick={() => handleRemove(i)}
+                  // Stays disabled once stalled too: the retry lives in the
+                  // alert above, so there is only ever one control to press.
                   disabled={removingIndex === i}
-                  className="absolute top-1 right-1 rounded-full bg-black/60 p-0.5 text-white transition-colors hover:bg-black/80"
+                  className="absolute top-1 right-1 rounded-full bg-black/60 p-0.5 text-white transition-colors hover:bg-black/80 disabled:opacity-70"
                 >
-                  <X className="size-3.5" />
+                  {removingIndex === i ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <X className="size-3.5" />
+                  )}
                   <span className="sr-only">Remove photo</span>
                 </button>
               </div>

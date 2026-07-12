@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import type { CropArea } from "@/lib/profile/crop";
 
 interface PhotoCropModalProps {
@@ -77,17 +78,29 @@ export function PhotoCropModal({
           />
         </div>
 
-        <div className="mt-4 flex justify-end gap-2">
+        {/* This is PhotoUpload's upload button: PhotoUpload owns the request and
+            passes its progress down as `busy`. A stalled upload is safe to fire
+            again (each attempt asks for a fresh signed URL and writes a fresh
+            object), so it retries rather than waits (#443 phase 2).
+
+            Who owns the message: PhotoUpload's toast owns "the upload failed",
+            this button's stall alert owns "the upload never answered". `busy`
+            goes false the moment there is a real answer, so only one shows. */}
+        <div className="mt-4 flex items-end justify-end gap-2">
           <Button variant="outline" onClick={onCancel} disabled={busy}>
             Cancel
           </Button>
-          <Button
+          <PendingButton
+            pending={!!busy}
+            mode="retry"
+            idleLabel="Use photo"
+            workingLabel="Uploading..."
+            slowLabel="Still uploading..."
             onClick={() => area && onConfirm(area)}
-            disabled={!area || busy}
+            onRetry={() => area && onConfirm(area)}
+            disabled={!area}
             className="bg-teal hover:bg-teal-dark text-white"
-          >
-            {busy ? "Uploading..." : "Use photo"}
-          </Button>
+          />
         </div>
       </DialogContent>
     </Dialog>

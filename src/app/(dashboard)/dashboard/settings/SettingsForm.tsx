@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,7 +60,6 @@ export function SettingsForm({
   const [contactErrors, setContactErrors] = useState<
     Record<string, string | undefined>
   >({});
-  const [savingContact, setSavingContact] = useState(false);
   const [contactSaved, setContactSaved] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -86,28 +85,57 @@ export function SettingsForm({
   const handleDeleteAccount = async () => {
     if (deleteConfirm !== "DELETE") return;
     setDeleting(true);
+    // No catch. softDeleteAccount redirects on success (so we never come back
+    // here), and a genuine failure throws, which Sentry sees. Swallowing it into
+    // a "done" state would be the worse bug. If it hangs, the button is in wait
+    // mode and tells the user to refresh and check, which is the honest answer:
+    // this one cancels Stripe subscriptions on the way out (#413), so we must
+    // never hand back a control that could fire it twice.
     await softDeleteAccount();
-    // softDeleteAccount redirects, so we won't reach here
   };
 
-  const handleSaveContact = async (formData: FormData) => {
-    if (!onSaveContact) return;
-    setSavingContact(true);
-    setContactErrors({});
-    formData.set("communication_preference", commPref ?? "");
-    const result = await onSaveContact(formData);
-    if (result.error) {
-      toast.error(result.error);
-    } else if (result.fieldErrors) {
-      setContactErrors(result.fieldErrors);
-    } else if (result.success) {
-      toast.success("Contact preferences updated");
-      setContactSaved(true);
-      if (savedTimer.current) clearTimeout(savedTimer.current);
-      savedTimer.current = setTimeout(() => setContactSaved(false), 2500);
-    }
-    setSavingContact(false);
-  };
+  // Pending comes from useActionState, not a local flag. A flag set inside a
+  // <form action> is set inside React's transition, where it is deferred and can
+  // fail to commit while the action is in flight (#444, and the note on
+  // PendingButton). isPending is the signal that is actually reliable here.
+  //
+  // Who owns the message on this surface (#656): the toast owns "the save came
+  // back and failed", the button's stall alert owns "the save never came back".
+  // The alert only exists while pending is true, and every toast below is raised
+  // after the action returns, which clears pending in the same commit.
+  const [, saveContactAction, savingContact] = useActionState(
+    async (_prev: null, formData: FormData) => {
+      if (!onSaveContact) return null;
+      setContactErrors({});
+      formData.set("communication_preference", commPref ?? "");
+      const result = await onSaveContact(formData);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.fieldErrors) {
+        setContactErrors(result.fieldErrors);
+      } else if (result.success) {
+        toast.success("Contact preferences updated");
+        setContactSaved(true);
+        if (savedTimer.current) clearTimeout(savedTimer.current);
+        savedTimer.current = setTimeout(() => setContactSaved(false), 2500);
+      }
+      return null;
+    },
+    null,
+  );
+
+  const [, changePasswordAction, changingPassword] = useActionState(
+    async (_prev: null, formData: FormData) => {
+      const result = await onChangePassword(formData);
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.success) {
+        toast.success(result.success);
+      }
+      return null;
+    },
+    null,
+  );
 
   return (
     <div className="space-y-6">
@@ -119,7 +147,7 @@ export function SettingsForm({
           </CardHeader>
           <CardContent>
             <form
-              action={handleSaveContact}
+              action={saveContactAction}
               onChange={() => contactSaved && setContactSaved(false)}
               className="space-y-5"
             >
@@ -204,26 +232,26 @@ export function SettingsForm({
                 )}
               </div>
 
-              <Button
+              {/* Saving contact preferences is an upsert, so a stalled save is
+                  safe to fire again: retry mode (#443 phase 2). The retry is the
+                  form's own submit. */}
+              <PendingButton
+                pending={savingContact}
+                mode="retry"
                 type="submit"
                 variant="outline"
-                disabled={savingContact}
+                idleLabel={contactSaved ? "Saved" : "Save changes"}
+                workingLabel="Saving..."
+                slowLabel="Still saving..."
+                icon={
+                  contactSaved ? (
+                    <Check className="size-4" aria-hidden="true" />
+                  ) : undefined
+                }
                 className={cn(
-                  contactSaved &&
-                    "border-teal text-teal hover:text-teal disabled:opacity-100",
+                  contactSaved && "border-teal text-teal hover:text-teal",
                 )}
-              >
-                {savingContact ? (
-                  "Saving..."
-                ) : contactSaved ? (
-                  <>
-                    <Check className="mr-1.5 size-4" aria-hidden="true" />
-                    Saved
-                  </>
-                ) : (
-                  "Save changes"
-                )}
-              </Button>
+              />
             </form>
           </CardContent>
         </Card>
@@ -259,17 +287,7 @@ export function SettingsForm({
           <CardTitle className="text-base">Change Password</CardTitle>
         </CardHeader>
         <CardContent>
-          <form
-            action={async (formData) => {
-              const result = await onChangePassword(formData);
-              if (result.error) {
-                toast.error(result.error);
-              } else if (result.success) {
-                toast.success(result.success);
-              }
-            }}
-            className="space-y-4"
-          >
+          <form action={changePasswordAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">New password</Label>
               <Input
@@ -292,9 +310,18 @@ export function SettingsForm({
                 className="max-w-sm"
               />
             </div>
-            <Button type="submit" variant="outline">
-              Update password
-            </Button>
+            {/* This one had no pending state at all: the click looked dead until
+                the toast landed. Changing a password is idempotent, so a stalled
+                one retries. */}
+            <PendingButton
+              pending={changingPassword}
+              mode="retry"
+              type="submit"
+              variant="outline"
+              idleLabel="Update password"
+              workingLabel="Updating..."
+              slowLabel="Still updating..."
+            />
           </form>
         </CardContent>
       </Card>
@@ -328,17 +355,25 @@ export function SettingsForm({
                 onChange={(e) => setDeleteConfirm(e.target.value)}
                 placeholder="Type DELETE to confirm"
               />
-              <div className="flex justify-end gap-2">
+              <div className="flex items-end justify-end gap-2">
                 <DialogClose className="hover:bg-muted inline-flex h-8 items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors">
                   Cancel
                 </DialogClose>
-                <Button
+                {/* wait, not retry. This cancels the user's Stripe subscriptions
+                    before it deletes, so a second fire is a second side effect,
+                    not a harmless repeat. On a stall the button stays dead and
+                    the user is told how to check. */}
+                <PendingButton
+                  pending={deleting}
+                  mode="wait"
                   variant="destructive"
+                  idleLabel="Delete account"
+                  workingLabel="Deleting..."
+                  slowLabel="Still deleting..."
+                  stalledMessage="This is still processing. Please do not close this page. Refresh to check whether your account was deleted."
                   onClick={handleDeleteAccount}
-                  disabled={deleteConfirm !== "DELETE" || deleting}
-                >
-                  {deleting ? "Deleting..." : "Delete account"}
-                </Button>
+                  disabled={deleteConfirm !== "DELETE"}
+                />
               </div>
             </DialogContent>
           </Dialog>
