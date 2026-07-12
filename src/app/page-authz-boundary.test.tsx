@@ -211,10 +211,21 @@ describe("a guarded page turns away the wrong caller", () => {
       default: (props: unknown) => Promise<unknown>;
     };
 
-    // The exact destination, not merely "a redirect happened": see the note on
-    // PAGES. A page that redirects for its own reasons would otherwise stand in
-    // for the guard and hide its deletion.
-    await expect(mod.default(PROPS)).rejects.toThrow(`NEXT_REDIRECT:${lands}`);
+    let thrown: unknown;
+    try {
+      await mod.default(PROPS);
+    } catch (err) {
+      thrown = err;
+    }
+
+    // Compared for EQUALITY, not with toThrow(). toThrow(string) matches a
+    // substring, so `toThrow("NEXT_REDIRECT:/")` is satisfied by a redirect to
+    // /dashboard or /dashboard/onboarding: with the guard deleted, edit and
+    // preview still "passed" on the strength of their own unrelated redirects.
+    // Every guard whose refusal lands on "/" was effectively unasserted.
+    expect((thrown as Error | undefined)?.message).toBe(
+      `NEXT_REDIRECT:${lands}`,
+    );
   });
 });
 
