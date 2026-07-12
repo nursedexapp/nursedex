@@ -19,6 +19,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # The guard mutation step diffs this branch against its base to work
+          # out which guards it has to re-prove, which needs real history.
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -40,3 +44,23 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      # #642. `npm test` proves every guarded surface HAS a test. It cannot prove
+      # the test would FAIL if the guard were deleted, and every gap closed in
+      # #617, #629, #618, #633 and #634 was a passing test that could not fail.
+      # This deletes each guard for real and requires the suite to notice.
+      #
+      # It lives in this job, rather than a workflow of its own, because this is
+      # the check main's ruleset actually requires: a separate workflow would run
+      # on a pull request and still let it merge red.
+      #
+      # On a pull request it re-proves only the guards that branch could have
+      # broken (a changed guard, or a changed boundary suite), so a branch that
+      # touches neither pays nothing. On merge to main it sweeps all of them.
+      - name: Prove guard tests can fail (pull request)
+        if: github.event_name == 'pull_request'
+        run: npx tsx scripts/guard-mutation.ts --since=origin/${{ github.base_ref }}
+
+      - name: Prove guard tests can fail (full sweep)
+        if: github.event_name == 'push'
+        run: npx tsx scripts/guard-mutation.ts
