@@ -129,7 +129,7 @@ export interface GuardSite {
  * same false positive #644 describes in the route coverage check, where a
  * commented-out guard still reads as protection.
  */
-function maskNonCode(src: string): string {
+export function maskNonCode(src: string): string {
   const out = src.split("");
   let i = 0;
   const n = src.length;

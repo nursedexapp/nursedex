@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { maskNonCode } from "../../../scripts/guard-mutation";
 
 // The completeness guard for API routes.
 //
@@ -62,6 +63,33 @@ interface Route {
   hasTest: boolean;
 }
 
+/**
+ * The guards a route actually CALLS (#644).
+ *
+ * This used to be `src.includes(guard)`: a plain substring search over the whole
+ * file, comments included. A route whose guard had been commented OUT, or which
+ * merely named one in a comment, still counted as fully guarded and was never
+ * required to carry a test. A false positive here is the worst kind, because
+ * this check is what decides a route needs a test at all: it removes the surface
+ * from scrutiny entirely rather than merely mis-scoring it.
+ *
+ * So it matches a CALL, in code, using the same comment stripping the mutation
+ * gate uses to find its own call sites. "Guarded" now means "calls a guard", not
+ * "mentions one", which is what the page equivalent has always required.
+ *
+ * An `import { requireAdmin } from ...` line names the guard without calling it,
+ * and is not matched: there is no `(` after the name.
+ */
+export function guardsIn(source: string): string[] {
+  const code = maskNonCode(source);
+  return GUARDS.filter((g) => new RegExp(`\\b${g}\\s*\\(`).test(code));
+}
+
+/** Does the route really hand off to the shared email handler, or just say so? */
+function usesEmailHandler(source: string): boolean {
+  return /\bhandleEmailRoute\s*\(/.test(maskNonCode(source));
+}
+
 function collectRoutes(dir = API_ROOT, out: Route[] = []): Route[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
@@ -71,8 +99,8 @@ function collectRoutes(dir = API_ROOT, out: Route[] = []): Route[] {
       const src = readFileSync(full, "utf8");
       out.push({
         id: relative(API_ROOT, full).replace(/\\/g, "/"),
-        usesSharedEmailHandler: src.includes("handleEmailRoute"),
-        guards: GUARDS.filter((g) => src.includes(g)),
+        usesSharedEmailHandler: usesEmailHandler(src),
+        guards: guardsIn(src),
         hasTest: readdirSync(dir).includes("route.test.ts"),
       });
     }
@@ -117,5 +145,54 @@ describe("every API route is accounted for", () => {
     });
 
     expect(stale).toEqual([]);
+  });
+});
+
+// #644. "Guarded" has to mean "calls a guard", not "mentions one". A false
+// positive here does not merely mis-score a route: it removes the route from
+// scrutiny, because this check is what decides the route needs a test at all.
+describe("a route counts as guarded only when it CALLS a guard", () => {
+  it("does not count a guard named in a comment", () => {
+    expect(
+      guardsIn(`// requireAdmin is not needed here, this route is public.
+export async function GET() {
+  return Response.json({ ok: true });
+}
+`),
+    ).toEqual([]);
+  });
+
+  it("does not count a guard that has been commented OUT", () => {
+    // The shape that made this worth fixing: the guard is gone, the route is
+    // wide open, and the old substring search still called it fully guarded and
+    // never asked it for a test.
+    expect(
+      guardsIn(`export async function POST() {
+  // const admin = await requireAdmin();
+  return Response.json({ ok: true });
+}
+`),
+    ).toEqual([]);
+  });
+
+  it("does not count a guard that is only imported", () => {
+    expect(
+      guardsIn(`import { requireAdmin } from "@/lib/auth/helpers";
+export async function GET() {
+  return Response.json({ ok: true });
+}
+`),
+    ).toEqual([]);
+  });
+
+  it("counts a guard that is really called", () => {
+    expect(
+      guardsIn(`import { requireAdmin } from "@/lib/auth/helpers";
+export async function POST() {
+  const admin = await requireAdmin();
+  return Response.json({ id: admin.id });
+}
+`),
+    ).toEqual(["requireAdmin"]);
   });
 });
