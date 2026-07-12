@@ -360,12 +360,22 @@ export function affectedSites(
   );
 }
 
+/** One test in the suite, and HOW it failed if it did. */
+export interface TestOutcome {
+  name: string;
+  failed: boolean;
+  /** It failed on an assertion, rather than crashing before reaching one. */
+  byAssertion: boolean;
+}
+
 export interface RunResult {
   exitCode: number;
   numTotalTests: number;
   numFailedTests: number;
   /** Why each failing test failed, from vitest's json report. */
   failureMessages?: string[];
+  /** Per test, so a hollow one cannot hide behind a working sibling (#648). */
+  tests?: TestOutcome[];
 }
 
 export type Verdict = "killed" | "weak" | "survived" | "error";
@@ -389,6 +399,33 @@ export type Verdict = "killed" | "weak" | "survived" | "error";
  *    as guarding the route. That is the exact false green this job exists to
  *    catch, so it gets its own verdict rather than being waved through.
  */
+/**
+ * Failing tests that never reached an assertion, when a sibling did (#648).
+ *
+ * The gate credits a kill to the whole FILE. So with the guard gone,
+ * /api/slack/track's POST test can fail on its 401 assertion while the GET test
+ * fails on a TypeError, because the fake request it is handed carries no
+ * nextUrl. The mutant is scored KILLED on the strength of POST, and the GET test
+ * is quietly certified as guarding the route while proving nothing: it is red
+ * for a reason that is not its assertion, so it would be red with its assertion
+ * DELETED, and it could be hollowed out to `expect(res).toBeDefined()` and
+ * nobody would notice.
+ *
+ * That is the same sampling mistake the boundary suites kept making, one level
+ * up: judging a group and assuming every member of it.
+ *
+ * A run where EVERY failure is a crash is not listed here. That is the existing
+ * `weak` verdict, and reporting one mutant twice under two names is noise.
+ */
+export function hollowRiskTests(r: RunResult): string[] {
+  const tests = r.tests ?? [];
+  const failed = tests.filter((t) => t.failed);
+  if (failed.length === 0) return [];
+  // Only interesting when a sibling DID assert: that is the hiding place.
+  if (!failed.some((t) => t.byAssertion)) return [];
+  return failed.filter((t) => !t.byAssertion).map((t) => t.name);
+}
+
 export function classifyRun(r: RunResult): Verdict {
   if (r.numTotalTests === 0) return "error";
   if (r.exitCode === 0) return "survived";
@@ -471,16 +508,32 @@ function runVitest(suite: string): Promise<RunResult> {
       let numTotalTests = 0;
       let numFailedTests = 0;
       let failureMessages: string[] = [];
+      let tests: TestOutcome[] = [];
       try {
         const json = JSON.parse(readFileSync(outFile, "utf8"));
         numTotalTests = json.numTotalTests ?? 0;
         numFailedTests = json.numFailedTests ?? 0;
-        failureMessages = (json.testResults ?? []).flatMap(
-          (file: { assertionResults?: { failureMessages?: string[] }[] }) =>
-            (file.assertionResults ?? []).flatMap(
-              (a) => a.failureMessages ?? [],
-            ),
+        type Assertion = {
+          fullName?: string;
+          title?: string;
+          status?: string;
+          failureMessages?: string[];
+        };
+        const assertions: Assertion[] = (json.testResults ?? []).flatMap(
+          (file: { assertionResults?: Assertion[] }) =>
+            file.assertionResults ?? [],
         );
+        failureMessages = assertions.flatMap((a) => a.failureMessages ?? []);
+        // Per test, not per file: which test failed, and whether its own
+        // assertion is what failed (#648).
+        tests = assertions.map((a) => {
+          const messages = a.failureMessages ?? [];
+          return {
+            name: a.fullName ?? a.title ?? "(unnamed)",
+            failed: a.status === "failed",
+            byAssertion: messages.some((m) => /AssertionError/i.test(m)),
+          };
+        });
       } catch {
         // No parseable report means vitest could not even collect the suite.
         // Left at zero, which classifyRun reads as an error, never as a kill.
@@ -491,6 +544,7 @@ function runVitest(suite: string): Promise<RunResult> {
         numTotalTests,
         numFailedTests,
         failureMessages,
+        tests,
       });
     });
   });
@@ -528,6 +582,8 @@ interface Finding {
   site: GuardSite;
   suite: string;
   verdict: Verdict;
+  /** Tests that went red on a crash while a sibling asserted (#648). */
+  hollow: string[];
 }
 
 async function main() {
@@ -603,7 +659,7 @@ async function main() {
       runVitest(suite),
     );
     const verdict = classifyRun(result);
-    findings.push({ site, suite, verdict });
+    findings.push({ site, suite, verdict, hollow: hollowRiskTests(result) });
 
     done++;
     const mark = {
@@ -617,6 +673,19 @@ async function main() {
     );
   }
 
+  // A test that only went red by crashing, next to a sibling that asserted. The
+  // mutant is scored killed on the sibling's strength and the crashing one is
+  // certified while proving nothing (#648). Dedupe: the same test can crash
+  // under several mutants of the same guard.
+  const hollowByTest = new Map<string, Set<string>>();
+  for (const f of findings) {
+    for (const name of f.hollow) {
+      const suites = hollowByTest.get(name) ?? new Set<string>();
+      suites.add(f.suite);
+      hollowByTest.set(name, suites);
+    }
+  }
+
   const survived = findings.filter((f) => f.verdict === "survived");
   const errored = findings.filter((f) => f.verdict === "error");
   const weak = findings.filter((f) => f.verdict === "weak");
@@ -628,6 +697,23 @@ async function main() {
     `Mutated ${sites.length} guard call sites. Killed ${killed.length}, weak ${weak.length}, survived ${survived.length}, inconclusive ${errored.length}.`,
     "",
   ];
+
+  if (hollowByTest.size > 0) {
+    lines.push(
+      "### Red on a crash, next to a sibling that asserted",
+      "",
+      "The mutant was killed, but only by another test in the same file. These",
+      "tests went red because the guardless code CRASHED, not because their own",
+      "assertion caught it, so they would go red with their assertion deleted and",
+      "they are proving nothing. Give each one a request it can actually run, so",
+      "its own assertion is what fails.",
+      "",
+    );
+    for (const [name, suites] of hollowByTest) {
+      lines.push(`- \`${[...suites].join(", ")}\` :: ${name}`);
+    }
+    lines.push("");
+  }
 
   if (survived.length > 0) {
     lines.push(
@@ -690,6 +776,10 @@ async function main() {
   if (
     survived.length > 0 ||
     weak.length > 0 ||
+    // A test that only goes red by crashing is proving nothing, and it is
+    // certified anyway because a sibling in the same file asserted. Reporting it
+    // and passing would leave it there, so it fails the gate like the rest (#648).
+    hollowByTest.size > 0 ||
     errored.length > 0 ||
     unmapped.length > 0
   ) {
