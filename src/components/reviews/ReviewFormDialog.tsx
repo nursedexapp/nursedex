@@ -10,6 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,6 +63,10 @@ export function ReviewFormDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form. Any other route to
+    // a submit event would otherwise write a second review while the first is
+    // still in flight, so the handler refuses too.
+    if (pending) return;
     setErrors({});
 
     if (rating < 1) {
@@ -204,7 +209,7 @@ export function ReviewFormDialog({
             </label>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-2">
+          <div className="flex items-end justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="ghost"
@@ -213,13 +218,17 @@ export function ReviewFormDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={pending}>
-              {pending
-                ? "Saving..."
-                : isEdit
-                  ? "Save changes"
-                  : "Submit review"}
-            </Button>
+            {/* wait, not retry (#443 phase 3). A second fire writes a second
+                review, so there is nothing safe to hand back on a stall. */}
+            <PendingButton
+              pending={pending}
+              mode="wait"
+              type="submit"
+              idleLabel={isEdit ? "Save changes" : "Submit review"}
+              workingLabel="Sending..."
+              slowLabel="Still sending..."
+              stalledMessage="This is still sending. Please do not close this page. Refresh to check whether your review went through."
+            />
           </div>
         </form>
       </DialogContent>

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Briefcase, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Dialog,
@@ -88,7 +89,7 @@ export function HireButton({
           families can see they&apos;ve been hired before. If you haven&apos;t
           already, consider leaving a review at the same time.
         </DialogDescription>
-        <div className="mt-4 flex items-center justify-end gap-2">
+        <div className="mt-4 flex items-end justify-end gap-2">
           <Button
             type="button"
             variant="ghost"
@@ -97,9 +98,19 @@ export function HireButton({
           >
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={pending}>
-            {pending ? "Saving..." : `Yes, I hired ${nurseFirstName}`}
-          </Button>
+          {/* wait, not retry (#443 phase 3). A second fire writes a second hire
+              row and sends a second pair of emails, which is #651. There is
+              nothing safe to hand back, so the button stays dead and the message
+              tells them how to check. */}
+          <PendingButton
+            pending={pending}
+            mode="wait"
+            idleLabel={`Yes, I hired ${nurseFirstName}`}
+            workingLabel="Recording..."
+            slowLabel="Still recording..."
+            stalledMessage="This is still recording. Please do not close this page. Refresh to check whether the hire was recorded."
+            onClick={handleConfirm}
+          />
         </div>
       </DialogContent>
     </Dialog>

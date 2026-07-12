@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Lock } from "lucide-react";
+import { PendingButton } from "@/components/ui/pending-button";
 import {
   Dialog,
   DialogTrigger,
@@ -22,6 +22,11 @@ import {
   redirectToCheckout,
 } from "@/lib/subscriptions/actions";
 import { PRICING, GRACE_PERIODS } from "@/lib/constants";
+
+// Creating a checkout session never charges anyone, so a refresh is a safe way
+// out of a stall and the message says so.
+const CHECKOUT_STALLED =
+  "This is still opening Stripe. You have not been charged. Refresh the page to try again.";
 
 interface RevealCTAProps {
   nurseUserId: string;
@@ -98,19 +103,20 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
   if (mode === "subscribed") {
     return (
       <>
-        <Button onClick={() => fireReveal()} disabled={isPending}>
-          {isPending ? (
-            <>
-              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-              Revealing...
-            </>
-          ) : (
-            <>
-              <Lock className="mr-1.5 size-3.5" aria-hidden="true" />
-              Reveal contact info
-            </>
-          )}
-        </Button>
+        {/* wait, not retry (#443 phase 3). A concurrent reveal burns one of the
+            family's capped daily slots and can error on a reveal that actually
+            worked (#653), so a stall must not hand back a button that spends a
+            second one. Once #653 is fixed this can graduate to retry. */}
+        <PendingButton
+          pending={isPending}
+          mode="wait"
+          idleLabel="Reveal contact info"
+          workingLabel="Revealing..."
+          slowLabel="Still revealing..."
+          stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the contact info unlocked."
+          icon={<Lock className="size-3.5" aria-hidden="true" />}
+          onClick={() => fireReveal()}
+        />
         <Dialog open={captchaOpen} onOpenChange={setCaptchaOpen}>
           <DialogContent>
             <DialogTitle className="font-heading text-lg font-semibold">
@@ -144,6 +150,17 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
 
   const handleSubscribe = async (interval: "month" | "year") => {
     setSubscribing(interval);
+    const result = await createFamilyAccessCheckout({ returnTo, interval });
+    if (result.error) {
+      toast.error(result.error);
+      setSubscribing(null);
+      return;
+    }
+
+    // Counted once a session actually exists, not on click. The same defect
+    // #657 names in CheckoutButton: firing on click counted a subscription start
+    // for a checkout that never reached Stripe, and counted another on the next
+    // attempt.
     if (posthog.__loaded) {
       posthog.capture(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
         plan: "family_access",
@@ -151,12 +168,7 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
         source: "reveal_paywall",
       });
     }
-    const result = await createFamilyAccessCheckout({ returnTo, interval });
-    if (result.error) {
-      toast.error(result.error);
-      setSubscribing(null);
-      return;
-    }
+
     await redirectToCheckout(result);
   };
 
@@ -190,32 +202,33 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
             for {GRACE_PERIODS.CANCELLED_ACCESS_DAYS} days
           </li>
         </ul>
-        <Button
+        {/* Both are `wait` mode (#443 phase 3): a checkout session cannot be
+            aborted, so a stall never hands back a button that opens a second one.
+            Each knows which interval is in flight, so the button the family did
+            not press keeps its own label and simply goes dead. */}
+        <PendingButton
+          pending={subscribing === "year"}
+          mode="wait"
+          idleLabel={`Get your first year for $${PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR}`}
+          workingLabel="Redirecting to checkout..."
+          slowLabel="Still opening Stripe..."
+          stalledMessage={CHECKOUT_STALLED}
+          disabled={subscribing !== null}
           onClick={() => handleSubscribe("year")}
-          disabled={subscribing !== null}
           className="w-full"
-        >
-          {subscribing === "year" ? (
-            <>
-              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-              Redirecting to checkout...
-            </>
-          ) : (
-            `Get your first year for $${PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR}`
-          )}
-        </Button>
-        <button
-          type="button"
-          onClick={() => handleSubscribe("month")}
+        />
+        <PendingButton
+          pending={subscribing === "month"}
+          mode="wait"
+          variant="link"
+          idleLabel={`Or subscribe monthly for $${PRICING.FAMILY_ACCESS_MONTHLY}/month`}
+          workingLabel="Redirecting to checkout..."
+          slowLabel="Still opening Stripe..."
+          stalledMessage={CHECKOUT_STALLED}
           disabled={subscribing !== null}
-          className="text-teal-dark hover:text-teal w-full text-center text-sm font-medium underline underline-offset-2 disabled:opacity-50"
-        >
-          {subscribing === "month" ? (
-            "Redirecting to checkout..."
-          ) : (
-            <>Or subscribe monthly for ${PRICING.FAMILY_ACCESS_MONTHLY}/month</>
-          )}
-        </button>
+          onClick={() => handleSubscribe("month")}
+          className="text-teal-dark hover:text-teal w-full text-center text-sm font-medium underline underline-offset-2"
+        />
         <p className="text-soft-black-light text-center text-xs">
           You&apos;ll be redirected to Stripe to enter payment details securely.
           No charges until you confirm.

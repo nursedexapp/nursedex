@@ -2,12 +2,14 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
 } from "@testing-library/react";
+import { STALL_MS } from "@/components/ui/pending-button";
 
 vi.mock("@/lib/subscriptions/actions", () => ({
   getCustomerPortalUrl: vi.fn(),
@@ -45,7 +47,11 @@ describe("ManageSubscriptionCard", () => {
 
   it("softens the copy to an end date when cancellation is scheduled", () => {
     render(
-      <ManageSubscriptionCard {...base} planLabel="Featured" cancelAtPeriodEnd />,
+      <ManageSubscriptionCard
+        {...base}
+        planLabel="Featured"
+        cancelAtPeriodEnd
+      />,
     );
     expect(
       screen.getByText(/Featured cancellation scheduled\. Access ends on/),
@@ -95,5 +101,68 @@ describe("ManageSubscriptionCard", () => {
     expect(redirectToCheckout).toHaveBeenCalledWith({
       url: "https://portal.example",
     });
+  });
+});
+
+// Phase 3 of #443. Opening a billing portal session is `wait` mode: it cannot be
+// aborted once in flight, so a stall never hands the button back.
+describe("a billing portal that never opens", () => {
+  // Fake timers are scoped to this block. The tests above drive real promises
+  // through waitFor and would hang under them.
+  const hung: Array<(value: unknown) => void> = [];
+
+  function hang<T>(): Promise<T> {
+    return new Promise<T>((resolve) => {
+      hung.push(resolve as (value: unknown) => void);
+    });
+  }
+
+  beforeEach(() => vi.useFakeTimers());
+
+  afterEach(async () => {
+    // Release the hung action before the next test: React entangles concurrent
+    // async actions, so one left in flight stops the next one from settling.
+    await act(async () => {
+      hung.splice(0).forEach((resolve) => resolve({ error: "cleanup" }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    vi.useRealTimers();
+  });
+
+  async function clickManage() {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /manage|update/i }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  it("shows it is opening and blocks a second click", async () => {
+    vi.mocked(getCustomerPortalUrl).mockReturnValue(hang());
+    render(<ManageSubscriptionCard {...base} />);
+
+    await clickManage();
+
+    expect(screen.getByRole("button")).toBeDisabled();
+    expect(getCustomerPortalUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays disabled on a stall and never offers a retry", async () => {
+    vi.mocked(getCustomerPortalUrl).mockReturnValue(hang());
+    render(<ManageSubscriptionCard {...base} />);
+
+    await clickManage();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STALL_MS);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
+    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(getCustomerPortalUrl).toHaveBeenCalledTimes(1);
   });
 });

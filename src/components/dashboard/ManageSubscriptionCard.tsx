@@ -1,15 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Sparkles, Loader2, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
-import {
-  getCustomerPortalUrl,
-  redirectToCheckout,
-} from "@/lib/subscriptions/actions";
+import { PendingButton } from "@/components/ui/pending-button";
+import { Sparkles, AlertTriangle } from "lucide-react";
+import { useBillingPortal, BILLING_PORTAL_STALLED } from "./use-billing-portal";
 
 interface ManageSubscriptionCardProps {
   // Human-readable plan name, e.g. "Family Access" or "Featured".
@@ -39,18 +34,7 @@ export function ManageSubscriptionCard({
   featured = false,
   title,
 }: ManageSubscriptionCardProps) {
-  const [loading, setLoading] = useState(false);
-
-  const handleManage = async () => {
-    setLoading(true);
-    const result = await getCustomerPortalUrl(returnTo);
-    if (result.error) {
-      toast.error(result.error);
-      setLoading(false);
-      return;
-    }
-    await redirectToCheckout(result);
-  };
+  const { pending, open } = useBillingPortal(returnTo);
 
   const renewsLabel = new Date(renewsOn).toLocaleDateString("en-US", {
     month: "short",
@@ -94,23 +78,19 @@ export function ManageSubscriptionCard({
 
         <p className="text-soft-black-light text-sm">{statusCopy}</p>
 
-        <Button
-          onClick={handleManage}
-          disabled={loading}
-          variant="outline"
-          className="mt-4 w-full sm:w-auto"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-              Opening billing portal...
-            </>
-          ) : isPastDue ? (
-            "Update payment"
-          ) : (
-            "Manage subscription"
-          )}
-        </Button>
+        <div className="mt-4">
+          <PendingButton
+            pending={pending}
+            mode="wait"
+            variant="outline"
+            idleLabel={isPastDue ? "Update payment" : "Manage subscription"}
+            workingLabel="Opening billing portal..."
+            slowLabel="Still opening Stripe..."
+            stalledMessage={BILLING_PORTAL_STALLED}
+            onClick={open}
+            className="w-full sm:w-auto"
+          />
+        </div>
       </CardContent>
     </Card>
   );
