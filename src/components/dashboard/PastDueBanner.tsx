@@ -1,31 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import {
-  getCustomerPortalUrl,
-  redirectToCheckout,
-} from "@/lib/subscriptions/actions";
+import { AlertTriangle } from "lucide-react";
+import { PendingButton } from "@/components/ui/pending-button";
+import { useBillingPortal, BILLING_PORTAL_STALLED } from "./use-billing-portal";
 
 interface PastDueBannerProps {
-  // Which plan is past_due. Affects copy.
   planType: "nurse_featured" | "family_access";
 }
 
 export function PastDueBanner({ planType }: PastDueBannerProps) {
-  const [loading, setLoading] = useState(false);
-
-  const handleUpdate = async () => {
-    setLoading(true);
-    const result = await getCustomerPortalUrl();
-    if (result.error) {
-      toast.error(result.error);
-      setLoading(false);
-      return;
-    }
-    await redirectToCheckout(result);
-  };
+  const { pending, open } = useBillingPortal();
 
   const message =
     planType === "family_access"
@@ -40,21 +24,16 @@ export function PastDueBanner({ planType }: PastDueBannerProps) {
           aria-hidden="true"
         />
         <p className="text-warning flex-1 text-sm">{message}</p>
-        <button
-          type="button"
-          onClick={handleUpdate}
-          disabled={loading}
-          className="border-warning/40 text-warning hover:bg-warning/20 inline-flex h-8 cursor-pointer items-center justify-center rounded-md border bg-white px-3 text-xs font-medium disabled:cursor-wait"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="mr-1 size-3 animate-spin" />
-              Opening...
-            </>
-          ) : (
-            "Update payment"
-          )}
-        </button>
+        <PendingButton
+          pending={pending}
+          mode="wait"
+          idleLabel="Update payment"
+          workingLabel="Opening..."
+          slowLabel="Still opening Stripe..."
+          stalledMessage={BILLING_PORTAL_STALLED}
+          onClick={open}
+          className="border-warning/40 text-warning hover:bg-warning/20 h-8 border bg-white px-3 text-xs font-medium"
+        />
       </div>
     </div>
   );

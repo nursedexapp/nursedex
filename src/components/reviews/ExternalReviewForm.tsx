@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -34,6 +34,10 @@ export function ExternalReviewForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form. Any other route to
+    // a submit event would otherwise write a second review while the first is
+    // still in flight, so the handler refuses too.
+    if (pending) return;
     setErrors({});
 
     if (rating < 1) {
@@ -184,9 +188,19 @@ export function ExternalReviewForm({
         </label>
       )}
 
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Sending..." : "Submit review"}
-      </Button>
+      {/* wait, not retry (#443 phase 3). A second fire writes a second review
+          and sends a second confirmation email, so a stall never hands the
+          button back. */}
+      <PendingButton
+        pending={pending}
+        mode="wait"
+        type="submit"
+        idleLabel="Submit review"
+        workingLabel="Sending..."
+        slowLabel="Still sending..."
+        stalledMessage="This is still sending. Please do not close this page. Refresh to check whether your review went through."
+        className="w-full"
+      />
     </form>
   );
 }
