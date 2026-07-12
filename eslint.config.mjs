@@ -6,6 +6,7 @@ import noDirectSecretComparison from "./eslint-rules/no-direct-secret-comparison
 import requireVisibleNurseFilter from "./eslint-rules/require-visible-nurse-filter.mjs";
 import noMockedAuthGuard from "./eslint-rules/no-mocked-auth-guard.mjs";
 import requirePendingButton from "./eslint-rules/require-pending-button.mjs";
+import noHandRolledPageGuard from "./eslint-rules/no-hand-rolled-page-guard.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -26,6 +27,7 @@ export default [
           // below.
           "no-mocked-auth-guard": noMockedAuthGuard,
           "require-pending-button": requirePendingButton,
+          "no-hand-rolled-page-guard": noHandRolledPageGuard,
         },
       },
     },
@@ -74,6 +76,20 @@ export default [
       // drive the primitive, not to ship. Enforcing it there would only make
       // the rule's own harness illegal.
       "local/require-pending-button": "off",
+    },
+  },
+  {
+    // Only a page or a layout can be the thing a visitor lands on, so only they
+    // can hand-roll the guard that decides whether they may.
+    files: ["src/app/**/page.tsx", "src/app/**/layout.tsx"],
+    rules: {
+      // A page that reads getCurrentUser() and refuses the caller by hand is
+      // guarded in practice but invisible to BOTH checks that prove our pages
+      // are guarded: the completeness check only recognises the require*
+      // helpers, and the mutation gate skips getCurrentUser outside API routes.
+      // It would look protected and be watched by nothing. Nothing does this
+      // today, and this rule is what keeps it that way (#649).
+      "local/no-hand-rolled-page-guard": "error",
     },
   },
   {
