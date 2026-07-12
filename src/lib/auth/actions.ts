@@ -181,7 +181,7 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
   redirect("/dashboard");
 }
 
-export async function signInWithGoogle(): Promise<void> {
+export async function signInWithGoogle(): Promise<AuthResult | void> {
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -195,13 +195,19 @@ export async function signInWithGoogle(): Promise<void> {
     },
   });
 
-  if (error) {
-    return;
+  // Returning void on failure was the whole bug (#444): the caller could not
+  // tell a sign-in that failed from one that was still working, so the button
+  // sat on "Connecting..." forever. Both failure shapes have to come back as an
+  // error, including the quiet one where Supabase reports no error but hands
+  // back no URL to send the user to.
+  if (error || !data.url) {
+    console.error("Google sign-in could not start", error);
+    return {
+      error: "We could not reach Google. Please try again or use your email.",
+    };
   }
 
-  if (data.url) {
-    redirect(data.url);
-  }
+  redirect(data.url);
 }
 
 export async function forgotPassword(formData: FormData): Promise<AuthResult> {
