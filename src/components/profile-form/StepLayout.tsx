@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { cn } from "@/lib/utils";
 
 const STEP_LABELS = [
@@ -60,10 +61,7 @@ export function StepLayout({
               const isComplete = stepNum < step;
 
               return (
-                <div
-                  key={label}
-                  className="flex flex-col items-center gap-1.5"
-                >
+                <div key={label} className="flex flex-col items-center gap-1.5">
                   <div
                     className={cn(
                       "flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors",
@@ -123,8 +121,10 @@ export function StepLayout({
       {/* Step content */}
       <div className="space-y-6">{children}</div>
 
-      {/* Navigation */}
-      <div className="mt-8 flex items-center justify-between">
+      {/* Navigation. items-end, not items-center: a stalled save stacks its
+          message above the Continue button, and Back has to stay level with the
+          button rather than float up beside the message. */}
+      <div className="mt-8 flex items-end justify-between gap-4">
         {onBack ? (
           <Button
             type="button"
@@ -137,13 +137,18 @@ export function StepLayout({
         ) : (
           <div />
         )}
-        <Button
-          type="button"
+        {/* A step save is an upsert (#443 phase 2), so a stalled one is safe to
+            fire again. Retrying re-runs the same step submit. */}
+        <PendingButton
+          pending={isSubmitting}
+          mode="retry"
+          idleLabel={nextLabel}
+          workingLabel="Saving..."
+          slowLabel="Still saving..."
           onClick={onNext}
-          disabled={nextDisabled || isSubmitting}
-        >
-          {isSubmitting ? "Saving..." : nextLabel}
-        </Button>
+          onRetry={onNext}
+          disabled={nextDisabled}
+        />
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
@@ -162,17 +162,26 @@ export function FamilyOnboardingForm({
         )}
       </div>
 
+      {/* Who owns the message (#656): formError owns "the save came back and it
+          failed", the button's stall alert owns "the save never came back". The
+          alert only exists while isPending is true, and formError only lands
+          when the action returns, which clears isPending in the same commit, so
+          a family is never told two things about one save. */}
       {state?.formError && (
         <p className="text-destructive text-sm">{state.formError}</p>
       )}
 
-      <Button
+      {/* Onboarding is an upsert (#443 phase 2): safe to fire again. The retry
+          is the form's own submit, so no onRetry is needed. */}
+      <PendingButton
+        pending={isPending}
+        mode="retry"
         type="submit"
-        disabled={isPending}
+        idleLabel="Continue"
+        workingLabel="Saving..."
+        slowLabel="Still saving..."
         className="bg-teal text-warm-white hover:bg-teal-dark h-11 w-full text-base font-semibold"
-      >
-        {isPending ? "Saving..." : "Continue"}
-      </Button>
+      />
     </form>
   );
 }
