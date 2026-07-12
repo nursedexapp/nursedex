@@ -56,6 +56,50 @@ const GUARDS: Record<string, Admits> = {
 };
 
 /**
+ * The name given to a hand-written role refusal, which is a guard without being
+ * a call to anything (#683).
+ *
+ * getCurrentUser answers WHO is calling. The next line answers WHETHER they may,
+ * and in a member-facing action nobody wrote a helper for it:
+ *
+ *   if (user.role !== "family") return { success: false, error: "wrong_role" };
+ *
+ * The collector only knew how to find calls, so this was invisible: deleting it
+ * from revealNurse would let a NURSE reveal another nurse's contact details, and
+ * the sweep would still report a clean board.
+ */
+export const ROLE_CHECK = "role-check";
+
+/**
+ * A role refusal: a NEGATIVE comparison against a role, which is what turns a
+ * caller away. `role === "family"` is deliberately not matched: it picks a
+ * branch rather than refusing anyone, which is what the dashboard layout does to
+ * choose a sidebar.
+ */
+// The comparison is matched against the MASKED source, where a string's contents
+// are blanked to spaces and only its quotes survive, so the role name itself
+// cannot be part of the pattern.
+const ROLE_REFUSAL = /\b([\w$]+)(?:\?\.|\.)role\s*!==\s*["'][^"'\n]*["']/g;
+
+/**
+ * Identifiers bound to the CALLER, i.e. to getCurrentUser() or a require* guard.
+ *
+ * A role comparison only guards the boundary when it is about the caller.
+ * `target.role !== "admin"` in demoteAdmin asks whether the person being demoted
+ * is an admin, and claimHireByEmail asks whether the email it looked up belongs
+ * to a family. Both are state checks on a row, neither refuses the caller, and
+ * mutating them would report a survivor for a line that never guarded anything.
+ */
+function callerNames(masked: string): Set<string> {
+  const names = new Set<string>();
+  const re =
+    /\b(?:const|let|var)\s+([\w$]+)\s*=\s*await\s+(?:getCurrentUser|require[A-Za-z]+)\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(masked)) !== null) names.add(m[1]);
+  return names;
+}
+
+/**
  * Files this job does not mutate, and why. Anything skipped here is a guard
  * whose test is NOT proven able to fail, so each entry has to earn its place.
  */
@@ -172,6 +216,23 @@ export function collectGuardSites(file: string, source: string): GuardSite[] {
     }
   }
 
+  // Hand-written role refusals. Only in an endpoint: a page or layout compares a
+  // role to choose what to render, and refusing there is done with requireRole.
+  if (isServerAction || isRoute) {
+    const callers = callerNames(masked);
+    ROLE_REFUSAL.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = ROLE_REFUSAL.exec(masked)) !== null) {
+      if (!callers.has(m[1])) continue;
+      sites.push({
+        file,
+        index: m.index,
+        guard: ROLE_CHECK,
+        line: source.slice(0, m.index).split("\n").length,
+      });
+    }
+  }
+
   return sites.sort((a, b) => a.index - b.index);
 }
 
@@ -194,6 +255,23 @@ function admittedUser(role: string): string {
 
 /** Rewrite one guard call into its "caller admitted" outcome. */
 export function mutate(source: string, site: GuardSite): string {
+  // A role refusal is neutralized to `false`, so the refusal never fires and
+  // every role is admitted. Only the ROLE comparison is replaced: a leading
+  // `!user ||` survives untouched, or the mutant would delete the authentication
+  // too and the suite could go red for a reason that is not the role.
+  if (site.guard === ROLE_CHECK) {
+    ROLE_REFUSAL.lastIndex = site.index;
+    const m = ROLE_REFUSAL.exec(source);
+    if (!m || m.index !== site.index) {
+      throw new Error(`Role check at ${site.file}:${site.line} moved`);
+    }
+    return (
+      source.slice(0, site.index) +
+      "false" +
+      source.slice(site.index + m[0].length)
+    );
+  }
+
   const admits = GUARDS[site.guard];
   const open = source.indexOf("(", site.index);
   const end = endOfCall(source, open);
@@ -242,10 +320,14 @@ export function suiteFor(file: string, guard?: string): string | null {
     return "src/app/page-authz-boundary.test.tsx";
   }
   if (/^src\/lib\/.+[a-z-]*actions\.ts$/.test(f)) {
-    // A member-facing action authenticates with getCurrentUser and refuses by
-    // returning an error. Nothing proved those guards could fail until #681,
-    // when all ten survived the first time the gate was pointed at them.
-    if (guard === "getCurrentUser") {
+    // A member-facing action authenticates with getCurrentUser and refuses a
+    // wrong role with a hand-written check. Nothing proved either could fail
+    // until #681 and #683. Admin actions keep their own boundary suite.
+    const isAdminAction = /^src\/lib\/admin\//.test(f);
+    if (
+      !isAdminAction &&
+      (guard === "getCurrentUser" || guard === ROLE_CHECK)
+    ) {
       return "src/lib/action-authz-boundary.test.ts";
     }
     // Everything else in an action file is a require* guard, and the admin
