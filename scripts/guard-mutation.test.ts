@@ -17,6 +17,7 @@ import {
   mutate,
   suiteFor,
   classifyRun,
+  hollowRiskTests,
   assertBaselineGreen,
   withMutation,
   affectedSites,
@@ -330,6 +331,62 @@ describe("affectedSites: what a pull request has to re-prove", () => {
 
   it("selects nothing for a change that touches no guard and no suite", () => {
     expect(affectedSites(sites, ["src/components/Button.tsx"])).toEqual([]);
+  });
+});
+
+describe("hollowRiskTests: a test that only goes red by crashing (#648)", () => {
+  // The gate credits a kill to the whole FILE, so a test that fails on a crash
+  // can sit next to one that fails on its assertion and never be noticed. The
+  // crashing one is red for a reason that is not its assertion, which means it
+  // would be red with its assertion DELETED. It proves nothing, and per-file
+  // scoring lets it hide behind its working sibling.
+  it("names a failing test that never reached an assertion", () => {
+    const risky = hollowRiskTests({
+      exitCode: 1,
+      numTotalTests: 2,
+      numFailedTests: 2,
+      tests: [
+        {
+          name: "POST refuses an unsigned caller",
+          failed: true,
+          byAssertion: true,
+        },
+        {
+          name: "GET refuses an unsigned caller",
+          failed: true,
+          byAssertion: false,
+        },
+      ],
+    });
+
+    expect(risky).toEqual(["GET refuses an unsigned caller"]);
+  });
+
+  it("names nothing when every failing test failed on its assertion", () => {
+    expect(
+      hollowRiskTests({
+        exitCode: 1,
+        numTotalTests: 2,
+        numFailedTests: 1,
+        tests: [
+          { name: "refuses a stranger", failed: true, byAssertion: true },
+          { name: "admits a member", failed: false, byAssertion: false },
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it("names nothing when the whole run is weak, which is reported already", () => {
+    // Every failure a crash is the existing `weak` verdict. Reporting the same
+    // mutant twice, under two names, is noise.
+    expect(
+      hollowRiskTests({
+        exitCode: 1,
+        numTotalTests: 1,
+        numFailedTests: 1,
+        tests: [{ name: "refuses", failed: true, byAssertion: false }],
+      }),
+    ).toEqual([]);
   });
 });
 
