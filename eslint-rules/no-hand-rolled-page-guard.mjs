@@ -29,6 +29,11 @@
  * refuses the caller: either the ABSENCE of the user (`!user`, `user === null`,
  * `!user?.id`) or a negative role comparison (`user.role !== "admin"`).
  *
+ * Every spelling of it, not just the `if`. The first version of this rule only
+ * understood an if-statement, so `user || redirect("/login")` walked straight
+ * past it. A guard does not need an `if` to be a guard, and a rule that only
+ * understands one spelling is a rule that only half works.
+ *
  * WHAT IT DELIBERATELY LEAVES ALONE
  *
  * Reading `getCurrentUser()` to RENDER is fine and common: a public page shows a
@@ -130,6 +135,16 @@ function refusesCaller(test, users) {
   }
 }
 
+/** A bare read of the user: `user`, `user.id`. Its falsiness is the guard. */
+function readsUser(node, users) {
+  if (!node) return false;
+  if (node.type === "Identifier") return users.has(node.name);
+  if (node.type === "MemberExpression" || node.type === "ChainExpression") {
+    return users.has(rootIdentifier(node));
+  }
+  return false;
+}
+
 export default {
   meta: {
     type: "problem",
@@ -168,6 +183,41 @@ export default {
         if (!refusesCaller(node.test, users)) return;
         if (!containsRefusal(node.consequent)) return;
         context.report({ node, messageId: "handRolled" });
+      },
+
+      // `user || redirect("/login")` and `!user && redirect("/login")`. No `if`
+      // in sight, and exactly as much of a guard.
+      LogicalExpression(node) {
+        if (users.size === 0) return;
+
+        const refuses =
+          node.operator === "&&"
+            ? // `!user && redirect(...)`
+              refusesCaller(node.left, users)
+            : // `user || redirect(...)`, `user ?? redirect(...)`: the guard is
+              // the falsiness of the left, so a bare read of the user is enough.
+              readsUser(node.left, users) || refusesCaller(node.left, users);
+
+        if (refuses && containsRefusal(node.right)) {
+          context.report({ node, messageId: "handRolled" });
+        }
+      },
+
+      // `!user ? redirect("/login") : null`
+      ConditionalExpression(node) {
+        if (users.size === 0) return;
+
+        if (
+          refusesCaller(node.test, users) &&
+          containsRefusal(node.consequent)
+        ) {
+          context.report({ node, messageId: "handRolled" });
+          return;
+        }
+        // `user ? <page> : redirect("/login")`
+        if (readsUser(node.test, users) && containsRefusal(node.alternate)) {
+          context.report({ node, messageId: "handRolled" });
+        }
       },
     };
   },

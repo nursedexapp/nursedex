@@ -108,6 +108,39 @@ describe("refusing a caller by hand in a page", () => {
     `);
   });
 
+  it("rejects the one-liner spellings that carry no if at all", () => {
+    // The shape that got past the first version of this rule. A guard does not
+    // need an `if` to be a guard, and a rule that only understands one spelling
+    // is a rule that only half works.
+    expectRejected(`
+      import { getCurrentUser } from "@/lib/auth/helpers";
+      export default async function Page() {
+        const user = await getCurrentUser();
+        user || redirect("/login");
+        return null;
+      }
+    `);
+    expectRejected(`
+      import { getCurrentUser } from "@/lib/auth/helpers";
+      export default async function Page() {
+        const user = await getCurrentUser();
+        !user && redirect("/login");
+        return null;
+      }
+    `);
+  });
+
+  it("rejects a refusal reached through a ternary", () => {
+    expectRejected(`
+      import { getCurrentUser } from "@/lib/auth/helpers";
+      export default async function Page() {
+        const user = await getCurrentUser();
+        !user ? redirect("/login") : null;
+        return null;
+      }
+    `);
+  });
+
   it("rejects it when the refusal is buried in an else or a block", () => {
     expectRejected(`
       import { getCurrentUser } from "@/lib/auth/helpers";
