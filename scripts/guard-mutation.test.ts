@@ -77,6 +77,28 @@ if (!user) return NextResponse.json({}, { status: 401 });
     expect(sites.map((s) => s.guard)).toEqual(["getCurrentUser"]);
   });
 
+  it("treats getCurrentUser as a guard inside a server action", () => {
+    // #681. The skip below was justified for pages, where getCurrentUser refuses
+    // nobody. But a server action is a publicly callable endpoint, and there it
+    // IS the authentication: null means the action returns not_authenticated and
+    // does nothing. Skipping it there meant nothing ever proved those guards
+    // could fail, across five action files.
+    const src = `"use server";
+const user = await getCurrentUser();
+if (!user) return { success: false, error: "not_authenticated" };
+`;
+    const sites = collectGuardSites("src/lib/nurses/saves-actions.ts", src);
+    expect(sites.map((s) => s.guard)).toEqual(["getCurrentUser"]);
+  });
+
+  it("still ignores getCurrentUser in a lib file that is not a server action", () => {
+    // A plain helper reading the current user is not an authorization decision.
+    const src = `const user = await getCurrentUser();
+export const isMember = Boolean(user);
+`;
+    expect(collectGuardSites("src/lib/nurses/queries.ts", src)).toEqual([]);
+  });
+
   it("ignores getCurrentUser in a page or layout, where it refuses nobody", () => {
     // The dashboard layout reads it to choose a sidebar and happily renders for
     // a signed-out visitor; the pages under it are guarded by require* instead.
@@ -172,6 +194,31 @@ describe("suiteFor: which suite is supposed to catch this guard", () => {
     ["src/lib/email/route-handler.ts", "src/lib/email/route-handler.test.ts"],
   ])("%s is covered by %s", (file, suite) => {
     expect(suiteFor(file)).toBe(suite);
+  });
+
+  it("sends a member action's getCurrentUser guard to the action boundary suite", () => {
+    // #681. Which suite is responsible depends on the GUARD, not only the file.
+    // blog/actions.ts guards with requireAdmin, which the admin boundary suite
+    // proves; reveals/actions.ts authenticates with getCurrentUser, which only
+    // the action boundary suite proves. Routing by file alone sent one of them
+    // to a suite that had never heard of it.
+    expect(suiteFor("src/lib/reveals/actions.ts", "getCurrentUser")).toBe(
+      "src/lib/action-authz-boundary.test.ts",
+    );
+    expect(suiteFor("src/lib/reviews/actions.ts", "getCurrentUser")).toBe(
+      "src/lib/action-authz-boundary.test.ts",
+    );
+  });
+
+  it("keeps a require* guard in the same file with the admin boundary suite", () => {
+    // reviews/actions.ts has both kinds. The require* ones were already proven
+    // by the admin suite and must stay there.
+    expect(suiteFor("src/lib/blog/actions.ts", "requireAdmin")).toBe(
+      "src/lib/admin/authz-boundary.test.ts",
+    );
+    expect(suiteFor("src/lib/hires/actions.ts", "requireRole")).toBe(
+      "src/lib/admin/authz-boundary.test.ts",
+    );
   });
 
   it("returns null for a file no suite claims, rather than guessing", () => {
