@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # The guard mutation step diffs this branch against its base to work
           # out which guards it has to re-prove, which needs real history.
