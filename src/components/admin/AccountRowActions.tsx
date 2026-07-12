@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,14 @@ import {
   unsuspendAccount,
   removeAccount,
 } from "@/lib/admin/account-actions";
+
+// wait, not retry (#443 phase 4). Suspending locks a real person out and emails
+// them; removing soft-deletes them, cancels their Stripe subscriptions and blocks
+// their email from signing up again. Nothing here is safe to fire twice. See
+// VerificationRowActions for why the #652 guard does not yet make these safe to
+// retry (#669).
+const STALLED =
+  "This is still processing. Please do not close this page. Refresh to check whether it went through.";
 
 interface AccountRowActionsProps {
   userId: string;
@@ -39,6 +48,7 @@ export function AccountRowActions({
   }
 
   const handleSuspend = () => {
+    if (pending) return;
     if (!confirm(`Suspend ${email}? They'll be locked out and emailed.`)) {
       return;
     }
@@ -57,6 +67,7 @@ export function AccountRowActions({
   };
 
   const handleUnsuspend = () => {
+    if (pending) return;
     startTransition(async () => {
       const result = await unsuspendAccount({ user_id: userId });
       if (!result.success) {
@@ -70,18 +81,26 @@ export function AccountRowActions({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {isSuspended ? (
-        <Button size="sm" onClick={handleUnsuspend} disabled={pending}>
-          Unsuspend
-        </Button>
+        <PendingButton
+          pending={pending}
+          mode="wait"
+          idleLabel="Unsuspend"
+          workingLabel="Unsuspending..."
+          slowLabel="Still unsuspending..."
+          stalledMessage={STALLED}
+          onClick={handleUnsuspend}
+        />
       ) : (
-        <Button
-          size="sm"
+        <PendingButton
+          pending={pending}
+          mode="wait"
           variant="outline"
+          idleLabel="Suspend"
+          workingLabel="Suspending..."
+          slowLabel="Still suspending..."
+          stalledMessage={STALLED}
           onClick={handleSuspend}
-          disabled={pending}
-        >
-          Suspend
-        </Button>
+        />
       )}
       <RemoveDialog userId={userId} email={email} />
     </div>
@@ -95,6 +114,8 @@ function RemoveDialog({ userId, email }: { userId: string; email: string }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     if (!reason.trim()) return;
 
     startTransition(async () => {
@@ -151,7 +172,7 @@ function RemoveDialog({ userId, email }: { userId: string; email: string }) {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-end justify-end gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -160,13 +181,17 @@ function RemoveDialog({ userId, email }: { userId: string; email: string }) {
             >
               Cancel
             </Button>
-            <Button
+            <PendingButton
+              pending={pending}
+              mode="wait"
               type="submit"
               variant="destructive"
-              disabled={pending || !reason.trim()}
-            >
-              {pending ? "Removing..." : "Remove account"}
-            </Button>
+              idleLabel="Remove account"
+              workingLabel="Removing..."
+              slowLabel="Still removing..."
+              stalledMessage={STALLED}
+              disabled={!reason.trim()}
+            />
           </div>
         </form>
       </DialogContent>

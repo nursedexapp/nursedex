@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PendingButton } from "@/components/ui/pending-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,18 @@ import {
   rejectVerification,
 } from "@/lib/admin/verification-actions";
 
+// wait, not retry (#443 phase 4). Approving or rejecting emails a real nurse, so
+// a second fire is a second email to a person.
+//
+// It stays wait even though #652 landed a database guard against the double
+// write. The guard makes a repeat apply come back as `wrong_state`, and these
+// components map any failure to "Could not approve. Please try again." So a retry
+// after a hung-but-successful approve would tell the admin it FAILED when it
+// worked. Graduating to retry needs that "already applied" case handled first
+// (#669).
+const STALLED =
+  "This is still processing. Please do not close this page. Refresh to check whether it went through.";
+
 interface VerificationRowActionsProps {
   userId: string;
   nurseFirstName: string;
@@ -36,6 +49,7 @@ export function VerificationRowActions({
   const [pending, startTransition] = useTransition();
 
   const handleApprove = () => {
+    if (pending) return;
     if (
       !confirm(
         `Approve ${nurseFirstName}? They'll get a verified badge and an approval email.`,
@@ -55,15 +69,16 @@ export function VerificationRowActions({
 
   return (
     <div className="flex items-center gap-2">
-      <Button
-        size="sm"
+      <PendingButton
+        pending={pending}
+        mode="wait"
+        idleLabel="Approve"
+        workingLabel="Approving..."
+        slowLabel="Still approving..."
+        stalledMessage={STALLED}
+        icon={<Check className="size-3.5" />}
         onClick={handleApprove}
-        disabled={pending}
-        className="gap-1"
-      >
-        <Check className="size-3.5" />
-        Approve
-      </Button>
+      />
       <RejectDialog userId={userId} nurseFirstName={nurseFirstName} />
     </div>
   );
@@ -84,6 +99,8 @@ function RejectDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (pending) return;
     setErrors({});
     if (!reason) {
       setErrors({ reason: "Pick a reason" });
@@ -177,7 +194,7 @@ function RejectDialog({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-end justify-end gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -186,9 +203,16 @@ function RejectDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" variant="destructive" disabled={pending}>
-              {pending ? "Sending..." : "Send rejection"}
-            </Button>
+            <PendingButton
+              pending={pending}
+              mode="wait"
+              type="submit"
+              variant="destructive"
+              idleLabel="Send rejection"
+              workingLabel="Sending..."
+              slowLabel="Still sending..."
+              stalledMessage={STALLED}
+            />
           </div>
         </form>
       </DialogContent>

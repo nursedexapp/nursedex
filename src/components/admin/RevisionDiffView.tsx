@@ -26,13 +26,7 @@ function DiffParts({ parts }: { parts: DiffPart[] }) {
   );
 }
 
-function Field({
-  label,
-  parts,
-}: {
-  label: string;
-  parts: DiffPart[];
-}) {
+function Field({ label, parts }: { label: string; parts: DiffPart[] }) {
   return (
     <div>
       <h2 className="text-soft-black-light mb-1 text-xs font-semibold tracking-wide uppercase">

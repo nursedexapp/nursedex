@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +24,8 @@ import {
   mergeTag,
   type TaxonomyResult,
 } from "@/lib/blog/taxonomy-actions";
+import { usePendingPhase } from "@/components/ui/pending-button";
+import { useInFlight } from "@/components/ui/use-in-flight";
 import type { CategoryWithCount, TagWithCount } from "@/lib/blog/queries";
 
 interface Item {
@@ -51,10 +53,24 @@ export function TaxonomyManager({
   tags: TagWithCount[];
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  // Keyed by row id. A single flag disabled EVERY row at once and spun EVERY
+  // row's menu, so an admin deleting one tag watched the whole page seize with
+  // no way to tell which row was actually working.
+  const { inFlight, busy, run } = useInFlight<string>();
+  const { phase } = usePendingPhase({ pending: busy });
+  const stalled = phase === "stalled";
+  const alertRef = useRef<HTMLDivElement>(null);
 
-  function act(fn: () => Promise<TaxonomyResult>, successMsg: string) {
-    startTransition(async () => {
+  useEffect(() => {
+    if (stalled) requestAnimationFrame(() => alertRef.current?.focus());
+  }, [stalled]);
+
+  function act(
+    id: string,
+    fn: () => Promise<TaxonomyResult>,
+    successMsg: string,
+  ) {
+    run(id, async () => {
       const res = await fn();
       if (!res.success) {
         toast.error(
@@ -96,10 +112,10 @@ export function TaxonomyManager({
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       aria-label={`${item.name} actions`}
-                      disabled={pending}
+                      disabled={busy}
                       className="hover:bg-muted text-soft-black-light inline-flex size-8 items-center justify-center rounded-md transition-colors disabled:opacity-50"
                     >
-                      {pending ? (
+                      {inFlight === item.id ? (
                         <Loader2 className="size-4 animate-spin" />
                       ) : (
                         <MoreHorizontal className="size-4" />
@@ -118,6 +134,7 @@ export function TaxonomyManager({
                             name.trim() !== item.name
                           ) {
                             act(
+                              item.id,
                               () => cfg.onRename(item.id, name),
                               `Renamed to ${name.trim()}.`,
                             );
@@ -144,6 +161,7 @@ export function TaxonomyManager({
                                       )
                                     ) {
                                       act(
+                                        item.id,
                                         () => cfg.onMerge(item.id, o.id),
                                         `Merged into ${o.name}.`,
                                       );
@@ -165,7 +183,11 @@ export function TaxonomyManager({
                               ? ` It is used by ${item.postCount} ${plural(item.postCount)}, which will be ${cfg.orphanVerb}.`
                               : "";
                           if (window.confirm(`Delete "${item.name}"?${note}`)) {
-                            act(() => cfg.onDelete(item.id), "Deleted.");
+                            act(
+                              item.id,
+                              () => cfg.onDelete(item.id),
+                              "Deleted.",
+                            );
                           }
                         }}
                       >
@@ -184,6 +206,20 @@ export function TaxonomyManager({
 
   return (
     <div className="space-y-10">
+      {/* wait, not retry (#443 phase 4). Deleting or merging rewrites every post
+          that used the term, so a stall never hands the menu back. Icons cannot
+          carry the stall panel, so one alert speaks for the list. */}
+      {stalled && (
+        <div
+          ref={alertRef}
+          tabIndex={-1}
+          role="alert"
+          className="bg-error/10 text-error rounded-lg px-4 py-3 text-sm outline-none"
+        >
+          This is still processing. Please do not close this page. Refresh to
+          check whether it went through.
+        </div>
+      )}
       {section({
         title: "Categories",
         label: "category",
