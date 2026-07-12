@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth/helpers";
+import { guardedStatusUpdate } from "@/lib/db/guarded-status-update";
 import {
   verifyApproveSchema,
   verifyRejectSchema,
@@ -56,22 +57,34 @@ export async function approveVerification(
   const row = profile as unknown as ProfileRow | null;
 
   if (!row || !row.users) return { success: false, error: "not_found" };
-  if (row.verification_status === "verified") {
-    return { success: false, error: "wrong_state" };
-  }
 
-  const { error: updateError } = await supabase
-    .from("nurse_profiles")
-    .update({
+  // The status guard lives in the UPDATE, not in a JavaScript check above it
+  // (#652). Reading the status and then updating by user_id alone let two admins
+  // clicking at once both pass the check and both write, and each then went on
+  // to mail this nurse that she had been approved. Approving is legal from
+  // pending and from rejected (an admin reversing a rejection), so both are
+  // named here; verified is what must not be re-applied.
+  const guard = await guardedStatusUpdate(supabase, {
+    table: "nurse_profiles",
+    id: input.user_id,
+    idColumn: "user_id",
+    statusColumn: "verification_status",
+    expectedStatus: ["pending", "rejected"],
+    patch: {
       verification_status: "verified",
       verification_rejected_reason: null,
       verified_at: new Date().toISOString(),
-    })
-    .eq("user_id", input.user_id);
+    },
+  });
 
-  if (updateError) {
-    console.error("[admin] approve failed:", updateError.message);
+  if (guard.outcome === "error") {
+    console.error("[admin] approve failed:", guard.message);
     return { success: false, error: "unknown" };
+  }
+  // Either she was already verified, or a concurrent admin just verified her.
+  // Both mean: do not send the email or write the audit row a second time.
+  if (guard.outcome === "already_resolved") {
+    return { success: false, error: "wrong_state" };
   }
 
   await supabase.from("admin_actions").insert({
@@ -133,17 +146,28 @@ export async function rejectVerification(
     ? `${input.reason}: ${input.details}`
     : input.reason;
 
-  const { error: updateError } = await supabase
-    .from("nurse_profiles")
-    .update({
+  // Same guard as approve (#652): a rejection mails the nurse, so a second one
+  // must not be able to land. Rejecting is legal from pending and from verified
+  // (an admin revoking a verification); rejecting an already-rejected nurse is
+  // the double-apply this refuses.
+  const guard = await guardedStatusUpdate(supabase, {
+    table: "nurse_profiles",
+    id: input.user_id,
+    idColumn: "user_id",
+    statusColumn: "verification_status",
+    expectedStatus: ["pending", "verified"],
+    patch: {
       verification_status: "rejected",
       verification_rejected_reason: reasonText,
-    })
-    .eq("user_id", input.user_id);
+    },
+  });
 
-  if (updateError) {
-    console.error("[admin] reject failed:", updateError.message);
+  if (guard.outcome === "error") {
+    console.error("[admin] reject failed:", guard.message);
     return { success: false, error: "unknown" };
+  }
+  if (guard.outcome === "already_resolved") {
+    return { success: false, error: "wrong_state" };
   }
 
   await supabase.from("admin_actions").insert({
