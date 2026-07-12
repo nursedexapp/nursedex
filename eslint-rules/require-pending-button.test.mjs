@@ -89,6 +89,77 @@ describe("a hand-rolled pending flag on a button", () => {
   });
 });
 
+describe("a button with no pending state at all", () => {
+  // The worse half of the bug, and the half the first version of this rule
+  // missed. Sign out shipped like this: a hung sign-out looked exactly like a
+  // button nobody had pressed, because there was no flag to notice and nothing
+  // on screen changed. A rule that only looks for a hand-rolled flag can never
+  // see it.
+  it("is rejected when its click handler is async and nothing tracks pending", () => {
+    expectRejected(
+      `
+      import { signOut } from "@/lib/auth/actions";
+      export function SignOut() {
+        return <Button onClick={async () => { await signOut(); }}>Sign out</Button>;
+      }
+      `,
+      /nothing on screen changes/,
+    );
+  });
+
+  it("is rejected when the handler is an async function declared above it", () => {
+    expectRejected(`
+      export function Save() {
+        async function handleSave() {
+          await savePost();
+        }
+        return <Button onClick={handleSave}>Save</Button>;
+      }
+    `);
+  });
+
+  it("is rejected when a form posts straight to a server action", () => {
+    // The exact shape sign out had.
+    expectRejected(`
+      import { signOut } from "@/lib/auth/actions";
+      export function SignOut() {
+        return (
+          <form action={signOut}>
+            <button type="submit">Sign out</button>
+          </form>
+        );
+      }
+    `);
+  });
+
+  it("accepts it once the component tracks pending", () => {
+    expectClean(`
+      import { PendingButton } from "@/components/ui/pending-button";
+      export function SignOut() {
+        const [pending, setPending] = useState(false);
+        return (
+          <PendingButton
+            pending={pending}
+            mode="wait"
+            idleLabel="Sign out"
+            workingLabel="Signing out..."
+            onClick={async () => { setPending(true); await signOut(); }}
+          />
+        );
+      }
+    `);
+  });
+
+  it("leaves a synchronous button alone", () => {
+    // Not every button talks to a server. A plain one has nothing to wait for.
+    expectClean(`
+      export function Toggle() {
+        return <Button onClick={() => setOpen(true)}>Open</Button>;
+      }
+    `);
+  });
+});
+
 describe("what the rule must not flag", () => {
   it("accepts a file that has adopted the primitive", () => {
     // The Cancel button beside a PendingButton is legitimately disabled by the

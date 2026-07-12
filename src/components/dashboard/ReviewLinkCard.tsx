@@ -1,3 +1,6 @@
+/* eslint-disable local/require-pending-button -- copying a link to the clipboard. It writes nothing to a
+   server, so there is no hung request to show and nothing to hand back: the
+   Check icon already says it worked and a toast says when it did not. */
 "use client";
 
 import { useState } from "react";
