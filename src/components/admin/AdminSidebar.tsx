@@ -12,12 +12,9 @@ import {
   BarChart3,
   KeyRound,
   FileText,
-  LogOut,
   Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { signOut } from "@/lib/auth/actions";
-import { resetPostHog } from "@/lib/posthog";
 import { NavPendingIcon } from "@/components/nav/NavPendingIcon";
 import {
   Sheet,
@@ -25,6 +22,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 
 interface NavItem {
   href: string;
@@ -121,21 +119,7 @@ export function AdminSidebar({ isSuperAdmin, counts }: AdminSidebarProps) {
     });
 
   const signOutButton = (onNavigate?: () => void) => (
-    <form
-      action={signOut}
-      onSubmit={() => {
-        resetPostHog();
-        onNavigate?.();
-      }}
-    >
-      <button
-        type="submit"
-        className="text-soft-black-light hover:text-foreground flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
-      >
-        <LogOut className="size-4" aria-hidden="true" />
-        Sign out
-      </button>
-    </form>
+    <SignOutButton onNavigate={onNavigate} />
   );
 
   return (

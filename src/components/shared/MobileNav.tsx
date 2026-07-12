@@ -2,15 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, LogOut } from "lucide-react";
+import { Menu } from "lucide-react";
 import {
   Sheet,
   SheetContent,
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { signOut } from "@/lib/auth/actions";
-import { resetPostHog } from "@/lib/posthog";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 
 interface MobileNavProps {
   isLoggedIn: boolean;
@@ -58,21 +57,10 @@ export function MobileNav({ isLoggedIn }: MobileNavProps) {
               >
                 Dashboard
               </Link>
-              <form
-                action={signOut}
-                onSubmit={() => {
-                  resetPostHog();
-                  setOpen(false);
-                }}
-              >
-                <button
-                  type="submit"
-                  className="font-body text-soft-black hover:bg-sage/10 mt-1 flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left text-sm transition-colors"
-                >
-                  <LogOut className="size-4" aria-hidden="true" />
-                  Sign out
-                </button>
-              </form>
+              <SignOutButton
+                className="mt-1"
+                onNavigate={() => setOpen(false)}
+              />
             </>
           ) : (
             <>
