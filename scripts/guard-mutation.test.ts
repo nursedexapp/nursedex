@@ -175,6 +175,60 @@ if (authError) return authError;
   });
 });
 
+describe("inline role checks are guards too (#683)", () => {
+  // getCurrentUser answers WHO is calling. The line after it answers WHETHER
+  // they may, and in a member-facing action that line is written by hand:
+  // `if (user.role !== "family") return { error: "wrong_role" }`. It is not a
+  // call to anything, so the guard collector could not see it, and nothing ever
+  // proved it could fail. Deleting it from revealNurse would let a NURSE reveal
+  // another nurse's contact details.
+  it("finds a hand-written role check in a server action", () => {
+    const src = `"use server";
+const user = await getCurrentUser();
+if (!user) return { success: false, error: "not_authenticated" };
+if (user.role !== "family") return { success: false, error: "wrong_role" };
+`;
+    const sites = collectGuardSites("src/lib/reveals/actions.ts", src);
+    expect(sites.map((s) => s.guard)).toEqual(["getCurrentUser", "role-check"]);
+  });
+
+  it("admits every role when the check is neutralized, and refuses nobody else", () => {
+    // Neutralizing must remove ONLY the role refusal. `!user ||` has to survive,
+    // or the mutant would also delete the authentication and a test could go red
+    // for the wrong reason.
+    const src = `"use server";
+const user = await getCurrentUser();
+if (!user || user.role !== "family") return false;
+`;
+    const site = collectGuardSites("src/lib/reveals/actions.ts", src).find(
+      (s) => s.guard === "role-check",
+    )!;
+    expect(mutate(src, site)).toContain("if (!user || false) return false;");
+  });
+
+  it("ignores a role comparison on a row that is not the caller", () => {
+    // The precision that decides whether this is a boundary check at all.
+    // `target.role !== "admin"` in demoteAdmin asks whether the person being
+    // demoted IS an admin, and claimHireByEmail asks whether the email it looked
+    // up belongs to a family. Neither refuses the CALLER, and mutating them
+    // reports a survivor for a line that never guarded the boundary.
+    const src = `"use server";
+const user = await getCurrentUser();
+if (target.role !== "admin") return { error: "wrong_state" };
+if (family.role !== "family") return { error: "email_not_found" };
+`;
+    const sites = collectGuardSites("src/lib/admin/role-actions.ts", src);
+    expect(sites.map((s) => s.guard)).toEqual(["getCurrentUser"]);
+  });
+
+  it("ignores a role comparison that is not a refusal", () => {
+    // `role === "family"` picks a branch; it turns nobody away. The dashboard
+    // layout does exactly this to choose a sidebar.
+    const src = `"use server";\nif (user.role === "family") showFamilyThing();\n`;
+    expect(collectGuardSites("src/lib/x/actions.ts", src)).toEqual([]);
+  });
+});
+
 describe("suiteFor: which suite is supposed to catch this guard", () => {
   it.each([
     [

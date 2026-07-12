@@ -211,6 +211,20 @@ async function expectRefusedTo(call: Promise<unknown>, lands: string) {
   expect((thrown as Error | undefined)?.message).toBe(`NEXT_REDIRECT:${lands}`);
 }
 
+/** Sign the caller in as `role`, or out when null. */
+function setCaller(role: string | null) {
+  h.state.user =
+    role === null
+      ? null
+      : {
+          id: "00000000-0000-4000-8000-000000000001",
+          email: "caller@example.com",
+          role,
+          is_suspended: false,
+          is_deleted: false,
+        };
+}
+
 /** No caller touched anything that writes, sends, or charges. */
 function expectNoSideEffects() {
   for (const [name, spy] of Object.entries(h.writes)) {
@@ -338,6 +352,118 @@ describe("a signed-out caller cannot act as a family", () => {
     const result = await updateFamilyContact(form);
 
     expect(result).toEqual({ error: "Not authenticated" });
+    expectNoSideEffects();
+  });
+});
+
+// The other half of the boundary, and the half that was still unproven after
+// #681 (#683).
+//
+// getCurrentUser answers WHO is calling. The line after it answers WHETHER they
+// may, and in these actions nobody wrote a helper for it: it is a hand-written
+// `if (user.role !== "family")`. Being a comparison rather than a call, the
+// mutation gate could not see it, and this suite only ever drove a signed-OUT
+// caller, so neither noticed it was there.
+//
+// Deleting it from revealNurse would let a NURSE reveal another nurse's contact
+// details, and the whole board would still report clean. These are what make it
+// fail.
+describe("a signed-in NURSE is refused every family-only action", () => {
+  beforeEach(() => setCaller("nurse"));
+
+  it("cannot reveal a nurse's contact details", async () => {
+    const { revealNurse } = await import("@/lib/reveals/actions");
+
+    const result = await revealNurse(NURSE_ID);
+
+    expect(result).toEqual({ success: false, error: "wrong_role" });
+    expectNoSideEffects();
+  });
+
+  it("is never told a nurse has been revealed", async () => {
+    // The mocked reveals table says YES on purpose. If it said no, this would
+    // return false with the guard and without it, and the guard would look
+    // protective while protecting nothing.
+    const { hasRevealedNurse } = await import("@/lib/reveals/actions");
+
+    expect(await hasRevealedNurse(NURSE_ID)).toBe(false);
+  });
+
+  it("cannot save a nurse", async () => {
+    const { toggleSavedNurse } = await import("@/lib/nurses/saves-actions");
+
+    const result = await toggleSavedNurse(NURSE_ID);
+
+    expect(result).toMatchObject({ success: false, error: "wrong_role" });
+    expectNoSideEffects();
+  });
+
+  it("cannot submit a review", async () => {
+    const { submitFamilyReview } = await import("@/lib/reviews/actions");
+
+    const result = await submitFamilyReview({
+      nurse_user_id: NURSE_ID,
+      rating: 5,
+      reviewer_name: "Dana",
+      text: "Wonderful with my father, always on time and kind.",
+      testimonial_opt_in: false,
+    });
+
+    expect(result).toEqual({ success: false, error: "wrong_role" });
+    expectNoSideEffects();
+  });
+
+  it("cannot edit a review", async () => {
+    const { updateFamilyReview } = await import("@/lib/reviews/actions");
+
+    const result = await updateFamilyReview(REVIEW_ID, {
+      nurse_user_id: NURSE_ID,
+      rating: 5,
+      reviewer_name: "Dana",
+      text: "Wonderful with my father, always on time and kind.",
+      testimonial_opt_in: false,
+    });
+
+    expect(result).toEqual({ success: false, error: "wrong_role" });
+    expectNoSideEffects();
+  });
+
+  it("cannot ask for a review's removal", async () => {
+    const { requestReviewRemoval } = await import("@/lib/reviews/actions");
+
+    const result = await requestReviewRemoval({
+      review_id: REVIEW_ID,
+      reason: "Not a real client",
+      text: "This family never hired me and I have never met them.",
+    });
+
+    expect(result).toEqual({ success: false, error: "wrong_role" });
+    expectNoSideEffects();
+  });
+
+  it("cannot complete family onboarding", async () => {
+    const { completeFamilyOnboarding } = await import("@/lib/family/actions");
+
+    const form = new FormData();
+    form.set("zip_code", "11779");
+    form.set("communication_preference", "email");
+    form.set("disclaimer_accepted", "on");
+
+    // A nurse who reaches this form is sent to her own dashboard, not signed out.
+    await expectRefusedTo(completeFamilyOnboarding({}, form), "/dashboard");
+    expectNoSideEffects();
+  });
+
+  it("cannot change a family's contact details", async () => {
+    const { updateFamilyContact } = await import("@/lib/family/actions");
+
+    const form = new FormData();
+    form.set("zip_code", "11779");
+    form.set("communication_preference", "email");
+
+    const result = await updateFamilyContact(form);
+
+    expect(result).toEqual({ error: "Wrong role" });
     expectNoSideEffects();
   });
 });
