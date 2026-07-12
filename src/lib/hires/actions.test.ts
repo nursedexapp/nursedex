@@ -23,6 +23,8 @@ const h = vi.hoisted(() => {
     recentEmailCount: 0,
     newHireId: "new-hire-1",
     hireInsertError: null as unknown,
+    /** Simulates losing a guarded UPDATE race: the WHERE matched no row. */
+    guardLoses: false,
   };
 
   const calls = {
@@ -81,8 +83,11 @@ const h = vi.hoisted(() => {
         const filters = updateFilters;
         pendingUpdate = null;
         calls.hireUpdate.push({ filters, payload });
-        const row = state.tokenHireRow;
+        // The token flows guard tokenHireRow; recordFamilyHire's revive of a
+        // rejected hire guards existingHire (#651).
+        const row = state.tokenHireRow ?? state.existingHire;
         const matches =
+          !state.guardLoses &&
           !!row &&
           Object.entries(filters).every(([col, val]) => row[col] === val);
         if (state.hireUpdateError) {
@@ -124,8 +129,15 @@ const h = vi.hoisted(() => {
     return createQueryBuilder({ maybeSingle: () => ({ data: state.reveal }) });
   }
 
+  // Two update shapes reach this table through the service-role client, and the
+  // builder has to tell them apart:
+  //   - the claim-token resend: `.update().eq()`, awaited directly
+  //   - the guarded revive of a rejected hire (#651): `.update().eq().eq().select()`,
+  //     which only matches (and only returns a row) when every filter, status
+  //     precondition included, still holds. That models Postgres deciding the race.
   function hiresServiceBuilder() {
     let pendingUpdate: Record<string, unknown> | null = null;
+    let updateFilters: Record<string, unknown> = {};
     return createQueryBuilder({
       maybeSingle: () => ({ data: state.existingHire }),
       insert: (payload) => {
@@ -138,13 +150,37 @@ const h = vi.hoisted(() => {
       }),
       update: (payload) => {
         pendingUpdate = payload as Record<string, unknown>;
+        updateFilters = {};
         return "chain";
       },
-      eq: () => {
+      eq: (...args) => {
+        const [col, val] = args as [string, unknown];
+        if (pendingUpdate) updateFilters[col] = val;
+        return "chain";
+      },
+      select: () => {
         if (!pendingUpdate) return "chain";
-        calls.claimTokenUpdate.push(pendingUpdate);
+        const payload = pendingUpdate;
+        const filters = updateFilters;
         pendingUpdate = null;
-        return { error: null };
+        calls.hireUpdate.push({ filters, payload });
+
+        const row = state.existingHire;
+        const matches =
+          !state.guardLoses &&
+          !!row &&
+          Object.entries(filters).every(([col, val]) => row[col] === val);
+        if (!matches) return { data: [], error: null };
+        Object.assign(row as Record<string, unknown>, payload);
+        return { data: [{ id: (row as { id: string }).id }], error: null };
+      },
+      // The resend path awaits `.update().eq()` with no terminal select.
+      then: () => {
+        if (pendingUpdate) {
+          calls.claimTokenUpdate.push(pendingUpdate);
+          pendingUpdate = null;
+        }
+        return { data: null, error: null };
       },
     });
   }
@@ -215,7 +251,10 @@ import {
   claimHireByEmail,
   recordFamilyHire,
 } from "./actions";
-import { sendHireConfirmedEmail } from "@/lib/email/send";
+import {
+  sendHireConfirmedEmail,
+  sendHireConfirmRequestEmail,
+} from "@/lib/email/send";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -229,6 +268,7 @@ beforeEach(() => {
   h.state.recentEmailCount = 0;
   h.state.newHireId = "new-hire-1";
   h.state.hireInsertError = null;
+  h.state.guardLoses = false;
   h.calls.hireUpdate = [];
   h.calls.hireInsert = [];
   h.calls.familyHireInsert = [];
@@ -431,6 +471,57 @@ describe("claimHireByEmail", () => {
     ]);
   });
 
+  // #651. Same story on the nurse's side: a re-claim after a rejection used to
+  // insert a SECOND row for the pair, which the new UNIQUE constraint forbids.
+  it("revives a rejected hire with a fresh token instead of inserting a second row", async () => {
+    h.state.existingHire = {
+      id: "hire-1",
+      status: "rejected",
+      family_user_id: FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
+
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+
+    expect(res).toEqual({ success: true, hireId: "hire-1" });
+    expect(h.calls.hireInsert).toHaveLength(0);
+    expect(h.calls.hireUpdate).toEqual([
+      {
+        filters: { id: "hire-1", status: "rejected" },
+        payload: expect.objectContaining({
+          status: "claimed",
+          claimed_by: "nurse",
+        }),
+      },
+    ]);
+  });
+
+  it("sends no second confirmation request when a concurrent claim revived it first", async () => {
+    h.state.existingHire = {
+      id: "hire-1",
+      status: "rejected",
+      family_user_id: FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
+    h.state.guardLoses = true;
+
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+
+    expect(res).toEqual({ success: false, error: "already_recorded" });
+    expect(h.calls.emailLogInsert).toHaveLength(0);
+    expect(sendHireConfirmRequestEmail).not.toHaveBeenCalled();
+  });
+
+  it("treats a duplicate-key claim insert as already recorded, not an error", async () => {
+    h.state.existingHire = null;
+    h.state.hireInsertError = { code: "23505", message: "duplicate key" };
+
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+
+    expect(res).toEqual({ success: false, error: "already_recorded" });
+    expect(sendHireConfirmRequestEmail).not.toHaveBeenCalled();
+  });
+
   it("inserts a new claim with a token and logs the send on the happy path", async () => {
     h.state.existingHire = null;
     const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
@@ -479,13 +570,69 @@ describe("recordFamilyHire", () => {
     expect(h.calls.familyHireInsert).toHaveLength(0);
   });
 
-  it("allows re-recording after a prior rejected hire", async () => {
+  // #651. Re-recording after a rejection used to INSERT a second row for the
+  // same family and nurse. Now that the pair is UNIQUE (migration 058) it revives
+  // the existing row instead, guarded on the rejected status so two callers
+  // cannot both revive it and both mail the nurse.
+  it("revives a prior rejected hire instead of inserting a second row", async () => {
     h.state.reveal = { id: "reveal-1" };
-    h.state.existingHire = { id: "hire-1", status: "rejected" };
+    h.state.existingHire = {
+      id: "hire-1",
+      status: "rejected",
+      family_user_id: FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
     h.state.nurseLookup = { email: "nurse@example.com", first_name: "Nia" };
+
     const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
-    expect(res).toEqual({ success: true, hireId: h.state.newHireId });
-    expect(h.calls.familyHireInsert).toHaveLength(1);
+
+    expect(res).toEqual({ success: true, hireId: "hire-1" });
+    expect(h.calls.familyHireInsert).toHaveLength(0);
+    // The status precondition is in the UPDATE, not in a JavaScript check.
+    expect(h.calls.hireUpdate).toEqual([
+      {
+        filters: { id: "hire-1", status: "rejected" },
+        payload: expect.objectContaining({
+          status: "confirmed",
+          claimed_by: "family",
+        }),
+      },
+    ]);
+    expect(sendHireConfirmedEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends no second email when a concurrent caller revived the same rejected hire", async () => {
+    // The loser of the revive race: the guarded UPDATE matched no row.
+    h.state.reveal = { id: "reveal-1" };
+    h.state.existingHire = {
+      id: "hire-1",
+      status: "rejected",
+      family_user_id: FAMILY_ID,
+      nurse_user_id: NURSE_ID,
+    };
+    h.state.nurseLookup = { email: "nurse@example.com", first_name: "Nia" };
+    h.state.guardLoses = true;
+
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+
+    expect(res).toEqual({ success: false, error: "already_recorded" });
+    expect(h.calls.familyHireInsert).toHaveLength(0);
+    expect(sendHireConfirmedEmail).not.toHaveBeenCalled();
+  });
+
+  it("treats a duplicate-key insert as an already recorded hire, not a second one", async () => {
+    // Two fresh calls racing: both see no existing hire, both insert, and the
+    // loser hits UNIQUE (family_user_id, nurse_user_id). Before the constraint
+    // existed this produced two hire rows and mailed the nurse twice (#651).
+    h.state.reveal = { id: "reveal-1" };
+    h.state.existingHire = null;
+    h.state.nurseLookup = { email: "nurse@example.com", first_name: "Nia" };
+    h.state.hireInsertError = { code: "23505", message: "duplicate key" };
+
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+
+    expect(res).toEqual({ success: false, error: "already_recorded" });
+    expect(sendHireConfirmedEmail).not.toHaveBeenCalled();
   });
 
   it("inserts a confirmed family-claimed hire and queues the nurse email on the happy path", async () => {

@@ -75,20 +75,57 @@ export async function recordFamilyHire(
     return { success: false, error: "already_recorded" };
   }
 
-  const { data: inserted, error } = await supabase
-    .from("hires")
-    .insert({
-      family_user_id: user.id,
-      nurse_user_id: parsed.data.nurse_user_id,
-      status: "confirmed",
-      claimed_by: "family",
-      confirmed_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
-  if (error || !inserted) {
-    console.error("[hires] family record failed:", error?.message);
-    return { success: false, error: "unknown" };
+  const confirmed = {
+    status: "confirmed",
+    claimed_by: "family",
+    confirmed_at: new Date().toISOString(),
+  };
+
+  let hireId: string;
+
+  if (existing) {
+    // A previously rejected hire. It used to be re-recorded by inserting a
+    // SECOND row for the same pair, which migration 058 now forbids, so revive
+    // the row instead. Guarded on the rejected status, because two callers both
+    // reading "rejected" and both writing is how the nurse got mailed twice.
+    const revived = await guardedStatusUpdate(supabase, {
+      table: "hires",
+      id: existing.id,
+      expectedStatus: "rejected",
+      patch: confirmed,
+    });
+    if (revived.outcome === "error") {
+      console.error("[hires] family re-record failed:", revived.message);
+      return { success: false, error: "unknown" };
+    }
+    // A concurrent caller revived it first. Their email is already on its way.
+    if (revived.outcome === "already_resolved") {
+      return { success: false, error: "already_recorded" };
+    }
+    hireId = existing.id;
+  } else {
+    const { data: inserted, error } = await supabase
+      .from("hires")
+      .insert({
+        family_user_id: user.id,
+        nurse_user_id: parsed.data.nurse_user_id,
+        ...confirmed,
+      })
+      .select("id")
+      .single();
+
+    // 23505 is the UNIQUE (family_user_id, nurse_user_id) constraint from
+    // migration 058: a concurrent caller inserted the same hire between our
+    // check above and this write. Exactly one of us won, and the winner is
+    // mailing the nurse. Silently ok, not an error to shout about.
+    if (error && (error as { code?: string }).code === "23505") {
+      return { success: false, error: "already_recorded" };
+    }
+    if (error || !inserted) {
+      console.error("[hires] family record failed:", error?.message);
+      return { success: false, error: "unknown" };
+    }
+    hireId = inserted.id;
   }
 
   // Notify the nurse using the service-role client to look up their
@@ -111,7 +148,7 @@ export async function recordFamilyHire(
 
   revalidatePath("/dashboard/revealed");
   revalidatePath("/dashboard");
-  return { success: true, hireId: inserted.id };
+  return { success: true, hireId };
 }
 
 /**
@@ -217,27 +254,62 @@ export async function claimHireByEmail(
   }
 
   const claimToken = crypto.randomUUID();
-  const { data: inserted, error } = await service
-    .from("hires")
-    .insert({
-      family_user_id: family.id,
-      nurse_user_id: nurse.id,
-      status: "claimed",
-      claimed_by: "nurse",
-      claim_token: claimToken,
-    })
-    .select("id")
-    .single();
-  if (error || !inserted) {
-    console.error("[hires] nurse claim failed:", error?.message);
-    return { success: false, error: "unknown" };
+  const claim = {
+    status: "claimed",
+    claimed_by: "nurse",
+    claim_token: claimToken,
+  };
+
+  let hireId: string;
+
+  if (existing) {
+    // Only a rejected hire reaches here (anything else returned above). It used
+    // to be re-claimed by inserting a second row for the same pair, which
+    // migration 058 forbids, so revive the existing one with a fresh token.
+    // Guarded on the rejected status so two claims cannot both revive it and
+    // both mail the family (#651).
+    const revived = await guardedStatusUpdate(service, {
+      table: "hires",
+      id: existing.id,
+      expectedStatus: "rejected",
+      patch: { ...claim, confirmed_at: null },
+    });
+    if (revived.outcome === "error") {
+      console.error("[hires] nurse re-claim failed:", revived.message);
+      return { success: false, error: "unknown" };
+    }
+    if (revived.outcome === "already_resolved") {
+      return { success: false, error: "already_recorded" };
+    }
+    hireId = existing.id;
+  } else {
+    const { data: inserted, error } = await service
+      .from("hires")
+      .insert({
+        family_user_id: family.id,
+        nurse_user_id: nurse.id,
+        ...claim,
+      })
+      .select("id")
+      .single();
+
+    // The UNIQUE (family_user_id, nurse_user_id) constraint: a concurrent caller
+    // got there between the check above and this write.
+    if (error && (error as { code?: string }).code === "23505") {
+      return { success: false, error: "already_recorded" };
+    }
+    if (error || !inserted) {
+      console.error("[hires] nurse claim failed:", error?.message);
+      return { success: false, error: "unknown" };
+    }
+    hireId = inserted.id;
   }
 
   // Log the send so a subsequent resend respects the cooldown window.
   await service.from("email_log").insert({
     recipient_user_id: family.id,
     email_type: "hire_confirm_request",
-    dedup_key: inserted.id,
+    dedup_key: hireId,
   });
   after(() =>
     sendHireConfirmRequestEmail({
@@ -251,7 +323,7 @@ export async function claimHireByEmail(
   );
 
   revalidatePath("/dashboard");
-  return { success: true, hireId: inserted.id };
+  return { success: true, hireId };
 }
 
 /**
