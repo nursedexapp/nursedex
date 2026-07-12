@@ -60,7 +60,9 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
   unstable_cache: (fn: unknown) => fn,
 }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => client() }));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => client(),
+}));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => client(),
 }));
@@ -242,11 +244,15 @@ describe("every guarded page is covered", () => {
         const full = join(dir, entry.name);
         if (entry.isDirectory()) {
           walk(full);
-        } else if (
-          entry.name === "page.tsx" ||
-          entry.name === "layout.tsx"
-        ) {
+        } else if (entry.name === "page.tsx" || entry.name === "layout.tsx") {
           const src = readFileSync(full, "utf8");
+          // Only the require* helpers count as a guard here, which used to be a
+          // blind spot: a page that read getCurrentUser() and refused the caller
+          // by hand would be guarded in practice and invisible to this scan, so
+          // no boundary test would ever be demanded of it (and the mutation gate,
+          // which skips getCurrentUser outside API routes, would never prove it
+          // could fail). Rather than teach both checks to recognise that shape,
+          // local/no-hand-rolled-page-guard makes it impossible (#649).
           if (
             /require(Auth|Role|Admin|SuperAdmin)\s*\(/.test(src) &&
             // The guards live in @/lib/auth/helpers; a page merely importing the
@@ -254,7 +260,9 @@ describe("every guarded page is covered", () => {
             /await require(Auth|Role|Admin|SuperAdmin)\s*\(/.test(src)
           ) {
             guarded.push(
-              relative(appRoot, full).replace(/\.tsx$/, "").replace(/\\/g, "/"),
+              relative(appRoot, full)
+                .replace(/\.tsx$/, "")
+                .replace(/\\/g, "/"),
             );
           }
         }
