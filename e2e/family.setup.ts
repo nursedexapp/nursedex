@@ -7,7 +7,7 @@ import {
   signInThroughUI,
 } from "./helpers/provision";
 
-// Provisions the world a reveal needs, and signs in as the family.
+// Provisions the world the family journeys need, and signs in as the family.
 //
 // A reveal is the money path: it spends one of the family's capped daily
 // reveals and hands over a nurse's real contact details. Migration 059 rewrote
@@ -16,8 +16,11 @@ import {
 // tests prove the function behaves, and the component tests prove the button
 // behaves, but nothing put the two together.
 //
-// So this builds a subscribed family and a visible verified nurse, and the spec
-// reveals one with a real browser.
+// So this builds a subscribed family and TWO visible verified nurses: one the
+// reveal spec reveals, and one the review spec reviews. They get a nurse each on
+// purpose. The specs share a family and both write reveals and reviews for their
+// nurse, and Playwright runs spec files in parallel: pointed at the same nurse,
+// one spec's reset would delete the row the other was standing on.
 //
 // Only runs when E2E_AUTH=1 (see playwright.config.ts). Never point it at a
 // production database: it creates users and spends reveals.
@@ -31,6 +34,10 @@ const PASSWORD = process.env.TEST_FAMILY_PASSWORD ?? "e2e-family-password-1234";
 const NURSE_EMAIL = "e2e-reveal-nurse@nursedex.test";
 const NURSE_SLUG = "e2e-reveal-nurse";
 const NURSE_PHONE = "555-0142";
+
+const REVIEW_NURSE_EMAIL = "e2e-review-nurse@nursedex.test";
+const REVIEW_NURSE_SLUG = "e2e-review-nurse";
+const REVIEW_NURSE_FIRST = "Reviewed";
 
 setup(
   "authenticate as a subscribed family, with a nurse to reveal",
@@ -68,6 +75,41 @@ setup(
       { onConflict: "user_id" },
     );
     if (profErr) throw new Error(`Could not create nurse: ${profErr.message}`);
+
+    // The nurse the review journey reviews. Her own, so the two specs never
+    // reach for the same rows.
+    const reviewNurseId = await ensureUser(
+      service,
+      REVIEW_NURSE_EMAIL,
+      PASSWORD,
+    );
+
+    await upsertUserRow(service, {
+      id: reviewNurseId,
+      email: REVIEW_NURSE_EMAIL,
+      role: "nurse",
+      first_name: REVIEW_NURSE_FIRST,
+      last_name: "Nurse",
+      phone: "555-0143",
+    });
+
+    const { error: reviewProfErr } = await service
+      .from("nurse_profiles")
+      .upsert(
+        {
+          user_id: reviewNurseId,
+          slug: REVIEW_NURSE_SLUG,
+          credential: "rn",
+          license_number: "E2E-REVIEW-001",
+          verification_status: "verified",
+        },
+        { onConflict: "user_id" },
+      );
+    if (reviewProfErr) {
+      throw new Error(
+        `Could not create review nurse: ${reviewProfErr.message}`,
+      );
+    }
 
     // An ACTIVE family_access subscription. Without it the CTA is a paywall and
     // revealNurse refuses with no_subscription.
@@ -108,7 +150,14 @@ setup(
     mkdirSync("e2e/.auth", { recursive: true });
     writeFileSync(
       FIXTURE,
-      JSON.stringify({ familyId, nurseId, nurseSlug: NURSE_SLUG }),
+      JSON.stringify({
+        familyId,
+        nurseId,
+        nurseSlug: NURSE_SLUG,
+        reviewNurseId,
+        reviewNurseSlug: REVIEW_NURSE_SLUG,
+        reviewNurseFirstName: REVIEW_NURSE_FIRST,
+      }),
     );
 
     expect(familyId).toBeTruthy();
