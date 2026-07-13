@@ -121,17 +121,12 @@ setup(
     if (subErr)
       throw new Error(`Could not subscribe family: ${subErr.message}`);
 
-    // Start from a clean slate: no reveal of this nurse, and no reveals spent
-    // today, so the spec can assert on exact counts.
-    await service
-      .from("reveals")
-      .delete()
-      .eq("family_user_id", familyId)
-      .eq("nurse_user_id", nurseId);
-    await service
-      .from("rate_limit_reveals")
-      .delete()
-      .eq("family_user_id", familyId);
+    // Reveal state (the reveals row, today's spent slots) is deliberately NOT
+    // reset here. This setup runs once per RUN, and the spec spends a reveal on
+    // every attempt, so a reset here leaves a retry starting from a slot that
+    // attempt 1 already spent. The spec resets it per attempt instead; this
+    // file's job is to provision the world, not to own the counters the spec
+    // asserts on.
 
     // Sign in through the UI so @supabase/ssr writes the auth cookies.
     await page.goto("/login");

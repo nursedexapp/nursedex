@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // The reveal, end to end, in a real browser (#691, #669).
 //
@@ -20,13 +21,35 @@ const fixture = () =>
     nurseSlug: string;
   };
 
-function service() {
+function service(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SECRET_KEY!;
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
+
+// Every attempt starts from an unspent slot, including a RETRY.
+//
+// This reset used to live in family.setup.ts, which runs once per run rather
+// than once per attempt. The test spends a reveal, so the moment it failed for
+// any reason, retries 1 and 2 opened with a slot already gone and died on
+// `expect(slotsSpent).toBe(0)` before reaching the assertion under test. The
+// retries reported the wreckage of attempt 1 instead of re-running it, and the
+// real failure only appeared in the first attempt's log.
+//
+// A test that spends something has to put it back itself.
+test.beforeEach(async () => {
+  const { familyId, nurseId } = fixture();
+  const db = service();
+
+  await db
+    .from("reveals")
+    .delete()
+    .eq("family_user_id", familyId)
+    .eq("nurse_user_id", nurseId);
+  await db.from("rate_limit_reveals").delete().eq("family_user_id", familyId);
+});
 
 /** How many of today's capped daily reveals this family has spent. */
 async function slotsSpent(familyId: string): Promise<number> {
