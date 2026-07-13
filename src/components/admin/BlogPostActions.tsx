@@ -20,6 +20,7 @@ import {
   type BlogActionResult,
 } from "@/lib/blog/actions";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { BlogPostStatus } from "@/types/enums";
 
 interface BlogPostActionsProps {
@@ -38,12 +39,15 @@ export function BlogPostActions({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // wait, not retry (#443 phase 4). Publishing puts a post live and deleting
   // takes it away. The control is an icon menu trigger, too small for the stall
   // panel, so it borrows the shared clock and renders its own alert.
   const { phase } = usePendingPhase({ pending });
-  const stalled = phase === "stalled";
+  // While the delete dialog is up, the PendingButton inside it owns the stall
+  // alert. Rendering this one too would put two on screen for one action.
+  const stalled = phase === "stalled" && !confirmingDelete;
   const alertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,10 +57,8 @@ export function BlogPostActions({
   function run(
     fn: (id: string) => Promise<BlogActionResult>,
     successMsg: string,
-    confirmMsg?: string,
   ) {
     if (pending) return;
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
     setOpen(false);
     startTransition(async () => {
       const res = await fn(id);
@@ -65,6 +67,7 @@ export function BlogPostActions({
         return;
       }
       toast.success(successMsg);
+      setConfirmingDelete(false);
       router.refresh();
     });
   }
@@ -141,18 +144,31 @@ export function BlogPostActions({
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
-            onClick={() =>
-              run(
-                deletePost,
-                "Post deleted.",
-                "Delete this post permanently? This cannot be undone.",
-              )
-            }
+            onClick={() => {
+              setOpen(false);
+              setConfirmingDelete(true);
+            }}
           >
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Sibling of the menu, never a child of it. A dialog rendered inside the
+          menu is unmounted the moment the menu closes, so the confirmation would
+          flash and vanish and Delete would look like it did nothing. */}
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title="Delete this post permanently?"
+        description="The post and its revision history are removed for good. Any link to it starts returning a 404. This cannot be undone."
+        confirmLabel="Delete post"
+        workingLabel="Deleting..."
+        slowLabel="Still deleting..."
+        stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the post was deleted."
+        pending={pending}
+        onConfirm={() => run(deletePost, "Post deleted.")}
+      />
     </div>
   );
 }

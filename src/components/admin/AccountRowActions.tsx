@@ -7,6 +7,7 @@ import { PendingButton } from "@/components/ui/pending-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -47,25 +48,6 @@ export function AccountRowActions({
     return <span className="text-muted-foreground text-xs">Removed</span>;
   }
 
-  const handleSuspend = () => {
-    if (pending) return;
-    if (!confirm(`Suspend ${email}? They'll be locked out and emailed.`)) {
-      return;
-    }
-    startTransition(async () => {
-      const result = await suspendAccount({ user_id: userId });
-      if (!result.success) {
-        toast.error(
-          result.error === "self_action"
-            ? "You can't suspend your own admin account."
-            : "Could not suspend. Please try again.",
-        );
-        return;
-      }
-      toast.success("Suspended");
-    });
-  };
-
   const handleUnsuspend = () => {
     if (pending) return;
     startTransition(async () => {
@@ -91,19 +73,48 @@ export function AccountRowActions({
           onClick={handleUnsuspend}
         />
       ) : (
-        <PendingButton
-          pending={pending}
-          mode="wait"
-          variant="outline"
-          idleLabel="Suspend"
-          workingLabel="Suspending..."
-          slowLabel="Still suspending..."
-          stalledMessage={STALLED}
-          onClick={handleSuspend}
-        />
+        <SuspendDialog userId={userId} email={email} />
       )}
       <RemoveDialog userId={userId} email={email} />
     </div>
+  );
+}
+
+function SuspendDialog({ userId, email }: { userId: string; email: string }) {
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  const handleConfirm = () => {
+    startTransition(async () => {
+      const result = await suspendAccount({ user_id: userId });
+      if (!result.success) {
+        toast.error(
+          result.error === "self_action"
+            ? "You can't suspend your own admin account."
+            : "Could not suspend. Please try again.",
+        );
+        return;
+      }
+      toast.success("Suspended");
+      setOpen(false);
+    });
+  };
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger="Suspend"
+      triggerVariant="outline"
+      title={`Suspend ${email}`}
+      description="They are locked out of their account immediately and emailed to say it was suspended. Their profile stops appearing in search. You can unsuspend them at any time."
+      confirmLabel="Suspend account"
+      workingLabel="Suspending..."
+      slowLabel="Still suspending..."
+      stalledMessage={STALLED}
+      pending={pending}
+      onConfirm={handleConfirm}
+    />
   );
 }
 

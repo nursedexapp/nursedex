@@ -44,8 +44,9 @@ function hang<T>(): Promise<T> {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
-  // The approve button is behind a native confirm().
-  vi.stubGlobal("confirm", () => true);
+  // #674: approve is behind a real dialog now, not a native confirm. The stub is
+  // here to catch the native one being called, not to wave it through.
+  vi.stubGlobal("confirm", vi.fn());
 });
 
 afterEach(async () => {
@@ -64,15 +65,40 @@ async function advance(ms: number) {
   });
 }
 
-async function clickApprove() {
-  render(<VerificationRowActions userId="u1" nurseFirstName="Sam" />);
+async function click(name: RegExp) {
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: /approve/i }));
+    fireEvent.click(screen.getByRole("button", { name }));
     await vi.advanceTimersByTimeAsync(0);
   });
 }
 
+/** Open the confirmation dialog and go through with it. */
+async function clickApprove() {
+  render(<VerificationRowActions userId="u1" nurseFirstName="Sam" />);
+  await click(/^approve$/i);
+  await click(/approve verification/i);
+}
+
 describe("approving a verification", () => {
+  it("asks in a real dialog, and approves nobody until the admin confirms", async () => {
+    render(<VerificationRowActions userId="u1" nurseFirstName="Sam" />);
+
+    await click(/^approve$/i);
+
+    expect(screen.getByRole("dialog")).toHaveTextContent(/email/i);
+    expect(approveVerification).not.toHaveBeenCalled();
+    expect(window.confirm).not.toHaveBeenCalled();
+  });
+
+  it("approves nobody when the admin cancels", async () => {
+    render(<VerificationRowActions userId="u1" nurseFirstName="Sam" />);
+
+    await click(/^approve$/i);
+    await click(/cancel/i);
+
+    expect(approveVerification).not.toHaveBeenCalled();
+  });
+
   it("blocks a second approve while the first is running", async () => {
     vi.mocked(approveVerification).mockReturnValue(hang());
     await clickApprove();
@@ -105,7 +131,11 @@ describe("approving a verification", () => {
       "Could not approve. Please try again.",
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /approve/i })).toBeEnabled();
+    // The dialog stays up on failure, so the admin can see it did not work and
+    // try again from where they are.
+    expect(
+      screen.getByRole("button", { name: /approve verification/i }),
+    ).toBeEnabled();
   });
 });
 

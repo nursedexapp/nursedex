@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { PendingButton } from "@/components/ui/pending-button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { promoteToAdmin, demoteAdmin } from "@/lib/admin/role-actions";
@@ -94,21 +95,14 @@ interface DemoteButtonProps {
 }
 
 export function DemoteButton({ userId, email, isSelf }: DemoteButtonProps) {
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   if (isSelf) {
     return <span className="text-muted-foreground text-xs">You</span>;
   }
 
-  const handleDemote = () => {
-    if (pending) return;
-    if (
-      !confirm(
-        `Demote ${email}? They lose access to /admin and become a family role user.`,
-      )
-    ) {
-      return;
-    }
+  const handleConfirm = () => {
     startTransition(async () => {
       const result = await demoteAdmin({ user_id: userId });
       if (!result.success) {
@@ -116,19 +110,24 @@ export function DemoteButton({ userId, email, isSelf }: DemoteButtonProps) {
         return;
       }
       toast.success("Demoted");
+      setOpen(false);
     });
   };
 
   return (
-    <PendingButton
-      pending={pending}
-      mode="wait"
-      variant="outline"
-      idleLabel="Demote"
+    <ConfirmDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger="Demote"
+      triggerVariant="outline"
+      title={`Remove admin access from ${email}`}
+      description="They lose access to the whole admin area immediately, including verifications, accounts and the blog, and become an ordinary family account. Any admin can grant the role back."
+      confirmLabel="Remove admin access"
       workingLabel="Demoting..."
       slowLabel="Still demoting..."
       stalledMessage={STALLED}
-      onClick={handleDemote}
+      pending={pending}
+      onConfirm={handleConfirm}
     />
   );
 }

@@ -33,7 +33,9 @@ function hang<T>(): Promise<T> {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
-  vi.stubGlobal("confirm", () => true);
+  // #674: demote is behind a real dialog now. The stub catches the native one
+  // being reached for, it does not wave it through.
+  vi.stubGlobal("confirm", vi.fn());
 });
 
 afterEach(async () => {
@@ -84,14 +86,38 @@ describe("granting a role", () => {
 });
 
 describe("revoking a role", () => {
+  async function click(name: RegExp) {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  it("asks in a real dialog, and demotes nobody until the admin confirms", async () => {
+    render(<DemoteButton userId="u1" email="a@b.c" isSelf={false} />);
+
+    await click(/^demote$/i);
+
+    expect(screen.getByRole("dialog")).toHaveTextContent(/admin/i);
+    expect(demoteAdmin).not.toHaveBeenCalled();
+    expect(window.confirm).not.toHaveBeenCalled();
+  });
+
+  it("demotes nobody when the admin cancels", async () => {
+    render(<DemoteButton userId="u1" email="a@b.c" isSelf={false} />);
+
+    await click(/^demote$/i);
+    await click(/cancel/i);
+
+    expect(demoteAdmin).not.toHaveBeenCalled();
+  });
+
   it("stays disabled on a stall and never demotes twice", async () => {
     vi.mocked(demoteAdmin).mockReturnValue(hang());
     render(<DemoteButton userId="u1" email="a@b.c" isSelf={false} />);
 
-    await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /^demote$/i }));
-      await vi.advanceTimersByTimeAsync(0);
-    });
+    await click(/^demote$/i);
+    await click(/remove admin access/i);
     await advance(STALL_MS);
 
     expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
