@@ -15,7 +15,11 @@ import {
 // though it always evaluates false for anon) or every policy that
 // references it starts throwing "permission denied for function" instead
 // of just evaluating to false.
-const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceKey: SERVICE_KEY } = getLiveSupabaseEnv();
+const {
+  url: SUPABASE_URL,
+  anonKey: ANON_KEY,
+  serviceKey: SERVICE_KEY,
+} = getLiveSupabaseEnv();
 
 assertLocalSupabaseUrl(SUPABASE_URL, "Routine EXECUTE grants tests");
 
@@ -60,7 +64,11 @@ function isPermissionDenied(error: { message: string } | null): boolean {
 
 describe("#517: is_admin() stays executable by anon inside OR'd RLS policies", () => {
   it("anon can still select approved reviews (reviews_select_approved OR reviews_select_admin)", async () => {
-    const { data, error } = await anon.from("reviews").select("id").eq("status", "approved").limit(1);
+    const { data, error } = await anon
+      .from("reviews")
+      .select("id")
+      .eq("status", "approved")
+      .limit(1);
 
     expect(isPermissionDenied(error)).toBe(false);
     expect(error).toBeNull();
@@ -77,7 +85,10 @@ describe("#517: is_admin() stays executable by anon inside OR'd RLS policies", (
   });
 
   it("a non-admin authenticated user is still denied admin_actions insert (false, not a permission error)", async () => {
-    const { id: familyId, client } = await createTestUser("family", "reviews-nonadmin");
+    const { id: familyId, client } = await createTestUser(
+      "family",
+      "reviews-nonadmin",
+    );
 
     const { error } = await client
       .from("admin_actions")
@@ -164,5 +175,99 @@ describe("#517: calculate_distance stays open to anon", () => {
     expect(isPermissionDenied(error)).toBe(false);
     expect(error).toBeNull();
     expect(data).toBeCloseTo(0, 1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// The other half of a grant: the callers that must still get in.
+//
+// Migration 052 revoked EXECUTE on every public function from PUBLIC, anon
+// AND authenticated, then re-granted three. It reasoned that functions
+// carrying an explicit grant from an earlier migration were "additive and
+// unaffected", and that is false: revoking from authenticated removes the
+// grant to authenticated no matter which migration wrote it. Six app-facing
+// RPCs lost the permission their callers depend on, and the suite above
+// never noticed, because it only asserted the grants 052 talks about.
+//
+// get_nurse_contact is the one that cost real money: a family clicking
+// "Reveal contact info" spent one of their capped daily reveals, and then
+// the page asked for the contact with their own session and got
+// "permission denied for function get_nurse_contact". Charged, and shown an
+// empty card (#700 caught this in a real browser).
+//
+// These assert the grant layer ONLY. Every call passes arguments that match
+// nothing, so the function is free to answer "no such review" / "invalid
+// token"; what must never come back is a permission error. Each name is a
+// function some server action calls with the USER's client, not the service
+// role, so authenticated (or anon, for the external-review pages a logged-out
+// reviewer uses) has to be able to execute it.
+const GHOST = "00000000-0000-4000-8000-000000000000";
+
+describe("every app-facing RPC is executable by the role that calls it", () => {
+  it("authenticated can execute get_nurse_contact (the reveal money path)", async () => {
+    const { client } = await createTestUser("family", "contact");
+
+    const { error } = await client.rpc("get_nurse_contact", {
+      p_nurse_user_id: GHOST,
+    });
+
+    expect(isPermissionDenied(error)).toBe(false);
+  });
+
+  it("authenticated can execute increment_save_count_for_upsell", async () => {
+    const { client } = await createTestUser("family", "save-upsell");
+
+    const { error } = await client.rpc("increment_save_count_for_upsell", {
+      p_nurse_user_id: GHOST,
+    });
+
+    expect(isPermissionDenied(error)).toBe(false);
+  });
+
+  it("authenticated can execute request_review_removal", async () => {
+    const { client } = await createTestUser("family", "removal");
+
+    const { error } = await client.rpc("request_review_removal", {
+      p_review_id: GHOST,
+      p_reason: "grant check, matches no review",
+    });
+
+    expect(isPermissionDenied(error)).toBe(false);
+  });
+
+  it("authenticated can execute dispute_review", async () => {
+    const { client } = await createTestUser("nurse", "dispute");
+
+    const { error } = await client.rpc("dispute_review", {
+      p_review_id: GHOST,
+      p_reason: "grant check, matches no review",
+      p_text: "grant check",
+    });
+
+    expect(isPermissionDenied(error)).toBe(false);
+  });
+
+  // The external reviewer follows an emailed link and is NOT logged in, so
+  // these two must stay reachable by anon as well as authenticated.
+  it("anon can execute verify_external_review", async () => {
+    const { error } = await anon.rpc("verify_external_review", {
+      p_token: GHOST,
+    });
+
+    expect(isPermissionDenied(error)).toBe(false);
+  });
+
+  it("anon can execute submit_external_review", async () => {
+    const { error } = await anon.rpc("submit_external_review", {
+      p_link_token: GHOST,
+      p_reviewer_name: "Grant Check",
+      p_reviewer_email: "grant-check@nursedex.test",
+      p_rating: 5,
+      p_text: "grant check, matches no link token",
+      p_testimonial_opt_in: false,
+      p_verification_expires_at: new Date().toISOString(),
+    });
+
+    expect(isPermissionDenied(error)).toBe(false);
   });
 });

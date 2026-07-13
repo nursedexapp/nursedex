@@ -6,6 +6,7 @@ import { defineConfig, devices } from "@playwright/test";
 // touches a production database. See e2e/README.md.
 const AUTH = process.env.E2E_AUTH === "1";
 const ADMIN_STATE = "e2e/.auth/admin.json";
+const FAMILY_STATE = "e2e/.auth/family.json";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -28,7 +29,12 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       // The auth setup and authenticated specs run only via the dedicated
       // projects below (when AUTH is enabled), never in the default run.
-      testIgnore: ["**/auth.setup.ts", "**/*.auth.spec.ts"],
+      testIgnore: [
+        "**/auth.setup.ts",
+        "**/*.auth.spec.ts",
+        "**/family.setup.ts",
+        "**/*.family.spec.ts",
+      ],
     },
     ...(AUTH
       ? [
@@ -41,6 +47,19 @@ export default defineConfig({
               storageState: ADMIN_STATE,
             },
             dependencies: ["setup"],
+          },
+          // The family specs need a DIFFERENT session (a subscribed family, not
+          // an admin), so they get their own setup and storageState rather than
+          // sharing the admin one.
+          { name: "family-setup", testMatch: /family\.setup\.ts/ },
+          {
+            name: "family",
+            testMatch: /.*\.family\.spec\.ts/,
+            use: {
+              ...devices["Desktop Chrome"],
+              storageState: FAMILY_STATE,
+            },
+            dependencies: ["family-setup"],
           },
         ]
       : []),
