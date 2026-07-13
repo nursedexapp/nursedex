@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
+import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock } from "lucide-react";
 import { PendingButton } from "@/components/ui/pending-button";
@@ -43,32 +42,16 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [captchaOpen, setCaptchaOpen] = useState(false);
-  // A local flag, not useTransition's isPending (#669). A retry does not cancel
-  // the request it supersedes, and useTransition stays pending until EVERY
-  // transition it started has settled, so the hung one would pin the button in
-  // "Revealing..." forever and the retry's success could never clear it.
-  const [isPending, setIsPending] = useState(false);
-  const { begin, isLatest } = useLatestAttempt();
+  const [isPending, startTransition] = useTransition();
 
   const fireReveal = (turnstileToken?: string) => {
-    const attempt = begin();
-    setIsPending(true);
-
-    void (async () => {
+    startTransition(async () => {
       if (posthog.__loaded) {
         posthog.capture(ANALYTICS_EVENTS.REVEAL_ATTEMPTED, {
           nurse_user_id: nurseUserId,
         });
       }
       const result = await revealNurse(nurseUserId, turnstileToken);
-
-      // Superseded by a retry. The reveal itself is safe (migration 059 spends
-      // nothing for a nurse the family already has), but this attempt no longer
-      // owns the button: reporting here would toast over the retry's result and
-      // hand back a control the retry is still using.
-      if (!isLatest(attempt)) return;
-      setIsPending(false);
-
       if (!result.success) {
         if (result.error === "needs_captcha") {
           setCaptchaOpen(true);
@@ -96,7 +79,7 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
         });
       }
       router.refresh();
-    })();
+    });
   };
 
   const handleCaptchaSolved = (token: string) => {
@@ -118,21 +101,27 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
   if (mode === "subscribed") {
     return (
       <>
-        {/* retry, not wait (#669). This used to stay dead on a stall, because a
-            second reveal could spend a second slot from the family's capped daily
-            allowance for one nurse (#653). Migration 059 closed that: the check,
-            the spend and the write are one transaction, so a repeat spends
-            nothing and hands back the contact the family already owns. A stalled
-            reveal can now simply be tried again. */}
+        {/* REVERTED to wait, deliberately (#669, #701).
+            #669 graduated this to retry, which meant driving `pending` from a
+            local flag instead of useTransition (a hung transition never settles,
+            so it would pin the button forever). An end-to-end test then caught
+            the reveal SPENDING a slot while the contact never appeared on the
+            page, which points at the repaint: router.refresh() ran outside the
+            transition it used to run inside.
+            That is not proven, but a family clicking Reveal, losing one of their
+            capped daily reveals and seeing nothing is far worse than not being
+            offered a retry, so this goes back to the code that was live and
+            working until the cause is actually established. The database half of
+            #691 (migration 059, a repeat spends nothing) is untouched. */}
         <PendingButton
           pending={isPending}
-          mode="retry"
+          mode="wait"
           idleLabel="Reveal contact info"
           workingLabel="Revealing..."
           slowLabel="Still revealing..."
+          outcome="the contact info unlocked"
           icon={<Lock className="size-3.5" aria-hidden="true" />}
           onClick={() => fireReveal()}
-          onRetry={() => fireReveal()}
         />
         <Dialog open={captchaOpen} onOpenChange={setCaptchaOpen}>
           <DialogContent>
