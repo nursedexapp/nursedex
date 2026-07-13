@@ -65,14 +65,12 @@ setup(
     const familyId = await ensureUser(EMAIL, PASSWORD);
     const nurseId = await ensureUser(NURSE_EMAIL, PASSWORD);
 
-    const { error: famErr } = await service
-      .from("users")
-      .upsert({
-        id: familyId,
-        email: EMAIL,
-        role: "family",
-        first_name: "Fam",
-      });
+    const { error: famErr } = await service.from("users").upsert({
+      id: familyId,
+      email: EMAIL,
+      role: "family",
+      first_name: "Fam",
+    });
     if (famErr) throw new Error(`Could not set family role: ${famErr.message}`);
 
     const { error: nurseErr } = await service.from("users").upsert({
@@ -100,12 +98,24 @@ setup(
 
     // An ACTIVE family_access subscription. Without it the CTA is a paywall and
     // revealNurse refuses with no_subscription.
+    //
+    // Every NOT NULL on the table is filled, including the Stripe ids: they are
+    // NOT NULL and stripe_subscription_id is UNIQUE, so this deletes the row
+    // first rather than upserting (there is no unique key on user+plan to
+    // conflict on, so an upsert would just stack another subscription on each
+    // run).
+    const now = new Date();
     const periodEnd = new Date();
     periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-    const { error: subErr } = await service.from("subscriptions").upsert({
+
+    await service.from("subscriptions").delete().eq("user_id", familyId);
+    const { error: subErr } = await service.from("subscriptions").insert({
       user_id: familyId,
       plan_type: "family_access",
       status: "active",
+      stripe_customer_id: "cus_e2e_family",
+      stripe_subscription_id: "sub_e2e_family",
+      current_period_start: now.toISOString(),
       current_period_end: periodEnd.toISOString(),
     });
     if (subErr)
