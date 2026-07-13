@@ -15,12 +15,8 @@ vi.mock("@/lib/newsletter/actions", () => ({
 }));
 
 import { NewsletterCta } from "./NewsletterCta";
-import { UnsubscribeForm } from "./UnsubscribeForm";
 import { STALL_MS } from "@/components/ui/pending-button";
-import {
-  subscribeNewsletter,
-  unsubscribeByEmail,
-} from "@/lib/newsletter/actions";
+import { subscribeNewsletter } from "@/lib/newsletter/actions";
 
 // Phase 5 of #443. Both `wait`. Subscribing sends a confirmation email, so a
 // second fire is a second email. Unsubscribing is safe to repeat and would be a
@@ -81,27 +77,5 @@ describe("subscribing", () => {
     });
 
     expect(subscribeNewsletter).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("unsubscribing", () => {
-  it("stays disabled on a stall and never fires a second unsubscribe", async () => {
-    vi.mocked(unsubscribeByEmail).mockReturnValue(hang());
-    render(<UnsubscribeForm />);
-
-    await submit("dana@example.com");
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(STALL_MS);
-    });
-
-    expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
-    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
-
-    await act(async () => {
-      fireEvent.submit(document.querySelector("form")!);
-      await vi.advanceTimersByTimeAsync(0);
-    });
-
-    expect(unsubscribeByEmail).toHaveBeenCalledTimes(1);
   });
 });

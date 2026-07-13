@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
 import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { toggleAvailability } from "@/lib/profile/actions";
 import { UserCheck, UserX, Loader2 } from "lucide-react";
@@ -29,18 +30,34 @@ export function QuickActions({
   // markup and borrows the shared clock rather than taking PendingButton's
   // layout (#443 phase 5).
   //
-  // wait, not retry. A retry does NOT cancel the first request: the hung one can
-  // still land and toast over the retry's result, the hole PhotoUpload had to
-  // close with a newest-attempt guard (#667). Graduating this needs that guard
-  // (#669).
-  const { phase } = usePendingPhase({ pending: toggling });
+  // retry, not wait (#669 phase 5). Two things make it safe.
+  //
+  // The action takes an ABSOLUTE value, not "flip it", and `isAvailable` only
+  // moves on success. So a retry after a hung attempt asks for the same target
+  // again rather than flipping availability back off, which is what a real toggle
+  // would have done.
+  //
+  // And the retry does not cancel the first request, which is still out there and
+  // can land afterwards. The newest-attempt guard (#690) is what stops it toasting
+  // over the retry's result.
+  const { phase, restart } = usePendingPhase({ pending: toggling });
   const stalled = phase === "stalled";
+  const { begin, isLatest } = useLatestAttempt();
 
   const handleToggleAvailability = async () => {
-    if (toggling) return;
+    // The handler is the gate. A STALLED action is the one case where firing
+    // again is exactly the point.
+    if (toggling && !stalled) return;
+    if (stalled) restart();
+
+    const attempt = begin();
     setToggling(true);
     const newValue = !isAvailable;
     const result = await toggleAvailability(newValue);
+
+    // Superseded by a retry: this attempt no longer owns the button.
+    if (!isLatest(attempt)) return;
+    setToggling(false);
 
     if (result.error) {
       toast.error(result.error);
@@ -48,7 +65,6 @@ export function QuickActions({
       setIsAvailable(newValue);
       toast.success(result.success);
     }
-    setToggling(false);
   };
 
   return (
@@ -71,16 +87,18 @@ export function QuickActions({
             role="alert"
             className="bg-error/10 text-error rounded-lg px-3 py-2 text-sm"
           >
-            {stalledMessageFor("wait", "your availability changed", "saving")}
+            {stalledMessageFor("retry", "your availability changed", "saving")}
           </div>
         )}
         <Button
           variant="outline"
           className="w-full justify-start gap-2"
           onClick={handleToggleAvailability}
-          disabled={toggling}
+          disabled={toggling && !stalled}
         >
-          {toggling ? (
+          {stalled ? (
+            <span>Try again</span>
+          ) : toggling ? (
             <>
               <Loader2 className="size-4 animate-spin" />
               <span>Saving...</span>

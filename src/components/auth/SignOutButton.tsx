@@ -39,23 +39,31 @@ export function SignOutButton({
   className?: string;
 }) {
   const [pending, setPending] = useState(false);
-  const { phase } = usePendingPhase({ pending });
+  const { phase, restart } = usePendingPhase({ pending });
   const stalled = phase === "stalled";
 
+  // retry, not wait (#669 phase 5). Signing out is idempotent: a second call ends
+  // the same session the first was ending, so there was never anything here to
+  // protect. Telling a stuck user to refresh, when we could just sign them out,
+  // was the whole cost of being cautious.
   async function handleSignOut() {
-    if (pending) return;
+    // The gate is the handler, not the disabled attribute. But a STALLED action
+    // is exactly the case where firing again is the point.
+    if (pending && !stalled) return;
+    if (stalled) restart();
     setPending(true);
     onNavigate?.();
     resetPostHog();
     await signOut();
   }
 
-  const label = pending ? "Signing out..." : "Sign out";
-  const icon = pending ? (
-    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-  ) : (
-    <LogOut className="size-4" aria-hidden="true" />
-  );
+  const label = stalled ? "Try again" : pending ? "Signing out..." : "Sign out";
+  const icon =
+    pending && !stalled ? (
+      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+    ) : (
+      <LogOut className="size-4" aria-hidden="true" />
+    );
 
   return (
     <div className={className}>
@@ -70,7 +78,7 @@ export function SignOutButton({
           type="button"
           variant="outline"
           onClick={handleSignOut}
-          disabled={pending}
+          disabled={pending && !stalled}
           className="w-full sm:w-auto"
         >
           <span className="mr-1.5">{icon}</span>
@@ -80,7 +88,7 @@ export function SignOutButton({
         <button
           type="button"
           onClick={handleSignOut}
-          disabled={pending}
+          disabled={pending && !stalled}
           className={cn(
             "text-muted-foreground hover:bg-sage/10 hover:text-foreground flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50",
           )}

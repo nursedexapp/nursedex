@@ -35,27 +35,31 @@ export function NurseResponseForm({
   const [error, setError] = useState<string | null>(null);
   // Keyed: a single flag would put "Saving..." on the Delete button too.
   //
-  // wait, not retry (#443 phase 5). Retry would be the nicer answer here (these
-  // actions are safe to repeat), but a retry does NOT cancel the first request: it
-  // leaves a hung one in flight that can still land and contradict the retry, the
-  // hole PhotoUpload had to close with a newest-attempt guard (#667). Graduating
-  // these to retry means carrying that guard, which is tracked in #669.
-  const { inFlight, busy, run } = useInFlight<"save" | "delete">();
+  // retry, not wait (#669 phase 5). Both actions are plain UPDATEs on the review
+  // row (write the response text, or clear it), so repeating one lands on exactly
+  // the same result. The only thing that stopped them offering a retry was that a
+  // retry does not cancel the first request, and the hung one could land
+  // afterwards and contradict it. `useInFlight` carries that guard now.
+  const { inFlight, busy, run, retry } = useInFlight<"save" | "delete">();
   const pending = busy;
 
   const isEdit = Boolean(existingResponse);
   const triggerLabel = isEdit ? "Edit response" : "Respond";
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (busy) return;
-    setError(null);
+  const save = (viaRetry = false) => {
+    // `run` refuses re-entry, which is what keeps Delete dead while a save is in
+    // flight. A retry needs the other door (#669).
+    const start = viaRetry ? retry : run;
 
-    run("save", async () => {
+    start("save", async (isLatest) => {
       const result = await saveNurseResponse({
         review_id: reviewId,
         text,
       });
+
+      // Superseded by a retry: this attempt no longer owns the dialog.
+      if (!isLatest()) return;
+
       if (!result.success) {
         if (result.fieldErrors?.text) {
           setError(result.fieldErrors.text);
@@ -69,9 +73,22 @@ export function NurseResponseForm({
     });
   };
 
-  const handleDelete = () => {
-    run("delete", async () => {
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    // A disabled submit button stops the button, not the form.
+    if (busy) return;
+    setError(null);
+    save();
+  };
+
+  const remove = (viaRetry = false) => {
+    const start = viaRetry ? retry : run;
+
+    start("delete", async (isLatest) => {
       const result = await deleteNurseResponse(reviewId);
+
+      if (!isLatest()) return;
+
       if (!result.success) {
         toast.error("Could not delete your response. Please try again.");
         return;
@@ -81,6 +98,8 @@ export function NurseResponseForm({
       setText("");
     });
   };
+
+  const handleDelete = () => remove();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -125,13 +144,14 @@ export function NurseResponseForm({
               {isEdit && (
                 <PendingButton
                   pending={inFlight === "delete"}
-                  mode="wait"
+                  mode="retry"
                   variant="ghost"
                   idleLabel="Delete"
                   workingLabel="Deleting..."
                   slowLabel="Still deleting..."
-                  disabled={busy}
+                  disabled={busy && inFlight !== "delete"}
                   onClick={handleDelete}
+                  onRetry={() => remove(true)}
                 />
               )}
             </div>
@@ -146,12 +166,13 @@ export function NurseResponseForm({
               </Button>
               <PendingButton
                 pending={inFlight === "save"}
-                mode="wait"
+                mode="retry"
                 type="submit"
                 idleLabel={isEdit ? "Save changes" : "Post response"}
                 workingLabel="Saving..."
                 slowLabel="Still saving..."
-                disabled={busy}
+                disabled={busy && inFlight !== "save"}
+                onRetry={() => save(true)}
               />
             </div>
           </div>
