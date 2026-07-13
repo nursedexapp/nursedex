@@ -62,7 +62,10 @@ describe("signing out", () => {
     expect(signOut).toHaveBeenCalledTimes(1);
   });
 
-  it("says so when the sign-out stalls, and never fires it twice", async () => {
+  it("offers a retry on a stall, because signing out twice is harmless", async () => {
+    // #669 phase 5. This was `wait`, so a stalled sign-out told the user to
+    // refresh. Signing out is idempotent: the second call ends the same session
+    // the first one was ending. There was never anything to protect here.
     vi.mocked(signOut).mockReturnValue(hang());
     render(<SignOutButton />);
 
@@ -71,12 +74,15 @@ describe("signing out", () => {
       await vi.advanceTimersByTimeAsync(STALL_MS);
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
-    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+    const again = screen.getByRole("button", { name: /try again/i });
+    expect(again).toBeEnabled();
 
-    await click(/signing out/i);
+    await act(async () => {
+      fireEvent.click(again);
+      await vi.advanceTimersByTimeAsync(0);
+    });
 
-    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(signOut).toHaveBeenCalledTimes(2);
   });
 
   it("closes the drawer it was opened from", async () => {

@@ -15,6 +15,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 import { QuickActions } from "./QuickActions";
 import { STALL_MS, SLOW_MS } from "@/components/ui/pending-button";
 import { toggleAvailability } from "@/lib/profile/actions";
+import { toast } from "sonner";
 
 // Phase 5 of #443. This button carries an icon and a right-aligned hint, so it
 // keeps its own markup and borrows the shared clock instead of taking
@@ -69,22 +70,59 @@ describe("toggling availability", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/still saving/i);
   });
 
-  it("stays disabled on a stall and never toggles twice", async () => {
+  it("offers a retry on a stall, and asks for the SAME value rather than flipping back", async () => {
+    // #669 phase 5. The thing that makes a retry safe here: the action takes an
+    // absolute value, not "flip it". The local state only moves on success, so a
+    // retry after a hung attempt asks for the same target again. A toggle that
+    // flipped on every press would have turned availability back off.
     vi.mocked(toggleAvailability).mockReturnValue(hang());
     await toggle();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(STALL_MS);
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
-    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+    const again = screen.getByRole("button", { name: /try again/i });
+    expect(again).toBeEnabled();
 
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /saving/i }));
+      fireEvent.click(again);
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    expect(toggleAvailability).toHaveBeenCalledTimes(1);
+    expect(toggleAvailability).toHaveBeenCalledTimes(2);
+    // Both calls asked for the same thing. This is the assertion that would
+    // catch a retry that flipped the value back.
+    const asked = vi.mocked(toggleAvailability).mock.calls.map((c) => c[0]);
+    expect(new Set(asked).size).toBe(1);
+  });
+
+  it("does not let the superseded toggle report over the retry", async () => {
+    let releaseFirst!: (v: unknown) => void;
+    vi.mocked(toggleAvailability)
+      .mockReturnValueOnce(
+        new Promise((r) => {
+          releaseFirst = r as (v: unknown) => void;
+        }),
+      )
+      .mockResolvedValueOnce({ success: "Availability updated" });
+
+    await toggle();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STALL_MS);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    vi.mocked(toast.error).mockClear();
+
+    await act(async () => {
+      releaseFirst({ error: "stale failure" });
+      await vi.advanceTimersByTimeAsync(20);
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("hands the button back when the toggle really fails", async () => {

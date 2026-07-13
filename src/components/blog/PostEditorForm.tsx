@@ -51,12 +51,7 @@ export function PostEditorForm({
   // Keyed: three buttons drove one flag, so pressing "Save draft" also greyed
   // "Publish now" into looking like the thing that was running.
   //
-  // wait, not retry (#443 phase 5). Retry would be the nicer answer here (these
-  // actions are safe to repeat), but a retry does NOT cancel the first request: it
-  // leaves a hung one in flight that can still land and contradict the retry, the
-  // hole PhotoUpload had to close with a newest-attempt guard (#667). Graduating
-  // these to retry means carrying that guard, which is tracked in #669.
-  const { inFlight, busy, run } = useInFlight<BlogIntent>();
+  const { inFlight, busy, run, retry } = useInFlight<BlogIntent>();
   const pending = busy;
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [coverUploading, setCoverUploading] = useState(false);
@@ -206,15 +201,32 @@ export function PostEditorForm({
     tags,
   ]);
 
-  function submit(intent: BlogIntent) {
-    if (busy) return;
+  // retry ONLY once the post exists (#669 phase 5).
+  //
+  // savePost decides create-vs-update from whether it was handed an id. With no
+  // id it INSERTS, and ensureUniqueSlug hands a second insert a DIFFERENT slug
+  // rather than colliding, so nothing in the database stops it: a retry on a hung
+  // save of a brand new post would quietly leave the author with TWO posts. Once
+  // the post exists it is a plain UPDATE by id, which is safe to repeat.
+  //
+  // Making creation retryable too means giving the client the id up front, which
+  // changes how savePost tells create from update and needs an author check so an
+  // id cannot be used to target someone else's post. Tracked separately.
+  const canRetry = Boolean(id);
+
+  function submit(intent: BlogIntent, viaRetry = false) {
+    if (busy && !viaRetry) return;
     setErrors({});
     const publishAtIso =
       intent === "schedule" && publishAtLocal
         ? new Date(publishAtLocal).toISOString()
         : undefined;
 
-    run(intent, async () => {
+    // `run` refuses re-entry, which is what stops Publish firing while a draft
+    // save is still out there. A retry needs the other door (#669).
+    const start = viaRetry ? retry : run;
+
+    start(intent, async (isLatest) => {
       const res = await savePost({
         id,
         intent,
@@ -230,6 +242,10 @@ export function PostEditorForm({
         tags,
         publish_at: publishAtIso,
       });
+
+      // Superseded by a retry: this attempt no longer owns the form, and its
+      // result would contradict the one the retry already reported.
+      if (!isLatest()) return;
 
       if (!res.success) {
         if (res.fieldErrors) setErrors(res.fieldErrors);
@@ -573,23 +589,25 @@ export function PostEditorForm({
       <div className="border-border flex flex-wrap items-center gap-3 border-t pt-6">
         <PendingButton
           pending={inFlight === "publish"}
-          mode="wait"
+          mode={canRetry ? "retry" : "wait"}
           idleLabel="Publish now"
           workingLabel="Publishing..."
           slowLabel="Still publishing..."
-          disabled={busy}
+          disabled={busy && inFlight !== "publish"}
           onClick={() => submit("publish")}
+          onRetry={() => submit("publish", true)}
         />
         {showSchedule ? (
           <PendingButton
             pending={inFlight === "schedule"}
-            mode="wait"
+            mode={canRetry ? "retry" : "wait"}
             variant="secondary"
             idleLabel="Schedule"
             workingLabel="Scheduling..."
             slowLabel="Still scheduling..."
-            disabled={busy}
+            disabled={busy && inFlight !== "schedule"}
             onClick={() => submit("schedule")}
+            onRetry={() => submit("schedule", true)}
           />
         ) : (
           <Button
@@ -603,13 +621,14 @@ export function PostEditorForm({
         )}
         <PendingButton
           pending={inFlight === "draft"}
-          mode="wait"
+          mode={canRetry ? "retry" : "wait"}
           variant="outline"
           idleLabel="Save draft"
           workingLabel="Saving..."
           slowLabel="Still saving..."
-          disabled={busy}
+          disabled={busy && inFlight !== "draft"}
           onClick={() => submit("draft")}
+          onRetry={() => submit("draft", true)}
         />
 
         {id && (
