@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock } from "lucide-react";
 import { PendingButton } from "@/components/ui/pending-button";
@@ -42,16 +43,32 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [captchaOpen, setCaptchaOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  // A local flag, not useTransition's isPending (#669). A retry does not cancel
+  // the request it supersedes, and useTransition stays pending until EVERY
+  // transition it started has settled, so the hung one would pin the button in
+  // "Revealing..." forever and the retry's success could never clear it.
+  const [isPending, setIsPending] = useState(false);
+  const { begin, isLatest } = useLatestAttempt();
 
   const fireReveal = (turnstileToken?: string) => {
-    startTransition(async () => {
+    const attempt = begin();
+    setIsPending(true);
+
+    void (async () => {
       if (posthog.__loaded) {
         posthog.capture(ANALYTICS_EVENTS.REVEAL_ATTEMPTED, {
           nurse_user_id: nurseUserId,
         });
       }
       const result = await revealNurse(nurseUserId, turnstileToken);
+
+      // Superseded by a retry. The reveal itself is safe (migration 059 spends
+      // nothing for a nurse the family already has), but this attempt no longer
+      // owns the button: reporting here would toast over the retry's result and
+      // hand back a control the retry is still using.
+      if (!isLatest(attempt)) return;
+      setIsPending(false);
+
       if (!result.success) {
         if (result.error === "needs_captcha") {
           setCaptchaOpen(true);
@@ -79,7 +96,7 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
         });
       }
       router.refresh();
-    });
+    })();
   };
 
   const handleCaptchaSolved = (token: string) => {
@@ -101,19 +118,21 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
   if (mode === "subscribed") {
     return (
       <>
-        {/* wait, not retry (#443 phase 3). A concurrent reveal burns one of the
-            family's capped daily slots and can error on a reveal that actually
-            worked (#653), so a stall must not hand back a button that spends a
-            second one. Once #653 is fixed this can graduate to retry. */}
+        {/* retry, not wait (#669). This used to stay dead on a stall, because a
+            second reveal could spend a second slot from the family's capped daily
+            allowance for one nurse (#653). Migration 059 closed that: the check,
+            the spend and the write are one transaction, so a repeat spends
+            nothing and hands back the contact the family already owns. A stalled
+            reveal can now simply be tried again. */}
         <PendingButton
           pending={isPending}
-          mode="wait"
+          mode="retry"
           idleLabel="Reveal contact info"
           workingLabel="Revealing..."
           slowLabel="Still revealing..."
-          outcome="the contact info unlocked"
           icon={<Lock className="size-3.5" aria-hidden="true" />}
           onClick={() => fireReveal()}
+          onRetry={() => fireReveal()}
         />
         <Dialog open={captchaOpen} onOpenChange={setCaptchaOpen}>
           <DialogContent>

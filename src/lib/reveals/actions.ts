@@ -103,31 +103,21 @@ export async function revealNurse(
     if (!ok) return { success: false, error: "captcha_failed" };
   }
 
-  // Atomically consume a slot. This, not the advisory check above, is the
-  // real cap gate: it increments and enforces the cap in one statement, so a
-  // burst of concurrent reveals can neither lose an increment nor slip past
-  // REVEALS_HARD_CAP between the check and the insert.
-  const consumed = await consumeRateLimit(user.id, rl.needs_captcha);
-  if (!consumed) return { success: false, error: "unknown" };
-  if (!consumed.allowed) return { success: false, error: "rate_limited" };
-
-  // Insert the reveal. Consuming first means a failed insert burns a slot
-  // rather than reopening the race; over-counting is the safe direction.
-  const { error: revealErr } = await supabase.from("reveals").insert({
-    family_user_id: user.id,
-    nurse_user_id: nurseUserId,
-  });
-
-  // 23505 is the UNIQUE (family_user_id, nurse_user_id) constraint, which means
-  // this family already has this nurse revealed: either the existing-reveal
-  // check above raced with a concurrent attempt, or the user retried one that
-  // was quietly still in flight. Either way the reveal EXISTS, which is exactly
-  // what the caller asked for. Reporting "unknown" here showed a generic error
-  // toast on a reveal that had worked, having just charged the family a second
-  // slot from a capped daily allowance for the privilege (#653).
-  if (revealErr && revealErr.code !== "23505") {
-    return { success: false, error: "unknown" };
-  }
+  // Spend the slot and write the reveal in ONE database call (migration 059,
+  // #691). They used to be two, and the gap between them was a real hole: two
+  // attempts overlapping in it both passed the existing-reveal check above and
+  // both paid, so the family lost two of their capped daily reveals and got one
+  // nurse. `reveal_nurse` does the check, the spend and the write as one
+  // transaction, and hands the slot back to whichever caller loses the race, so
+  // a repeat, including a retry of a request still quietly in flight, spends
+  // nothing.
+  const revealed = await revealAtomically(
+    user.id,
+    nurseUserId,
+    rl.needs_captcha,
+  );
+  if (!revealed) return { success: false, error: "unknown" };
+  if (!revealed.allowed) return { success: false, error: "rate_limited" };
 
   // Best-effort analytics increment.
   await supabase
@@ -161,37 +151,49 @@ async function fetchContactResult(nurseUserId: string): Promise<RevealResult> {
 }
 
 /**
- * Atomically claim one reveal against today's cap.
+ * Claim one reveal against today's cap AND write the reveal, as one transaction.
  *
- * Delegates the whole read-increment-guard sequence to the
- * consume_reveal_rate_limit RPC, which performs it as a single upsert. Doing
- * the increment in JavaScript was a lost-update race, and checking the cap
- * before the insert was a check-then-act race (issue #563).
+ * Spending the slot and writing the reveal used to be two round trips, and the
+ * gap between them was a hole: two attempts that overlapped in it both passed
+ * the existing-reveal check and both paid, so a family lost two of their capped
+ * daily reveals and got one nurse (#691). The whole sequence now happens inside
+ * `reveal_nurse` (migration 059), which spends nothing for a nurse the family
+ * already has and hands the slot back to whichever caller loses the race.
  *
  * Returns null when the RPC fails, so the caller can fail loud rather than
  * treating an unknown counter state as a granted reveal.
  */
-async function consumeRateLimit(
+async function revealAtomically(
   familyUserId: string,
+  nurseUserId: string,
   triggeredCaptcha: boolean,
-): Promise<{ allowed: boolean } | null> {
+): Promise<{ allowed: boolean; alreadyRevealed: boolean } | null> {
   // The daily counter is system-managed: rate_limit_reveals has no INSERT
   // RLS policy (families must not be able to write their own limit), and the
   // RPC only grants EXECUTE to service_role, so go through that client.
   const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
-    .rpc("consume_reveal_rate_limit", {
+    .rpc("reveal_nurse", {
       p_family_user_id: familyUserId,
+      p_nurse_user_id: nurseUserId,
       p_triggered_captcha: triggeredCaptcha,
     })
     .single();
 
   if (error || !data) return null;
 
+  const row = data as {
+    allowed: boolean | null;
+    already_revealed: boolean | null;
+  };
+
   // Fail closed: an unexpectedly NULL `allowed` denies the reveal rather
   // than granting it.
-  return { allowed: (data as { allowed: boolean | null }).allowed ?? false };
+  return {
+    allowed: row.allowed ?? false,
+    alreadyRevealed: row.already_revealed ?? false,
+  };
 }
 
 /**

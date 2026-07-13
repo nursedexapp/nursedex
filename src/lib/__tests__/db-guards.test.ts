@@ -25,7 +25,11 @@ import { RATE_LIMITS } from "@/lib/constants";
 // which is exactly how #563 shipped. Only firing real concurrent statements
 // at a real database can catch that.
 
-const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceKey: SERVICE_KEY } = getLiveSupabaseEnv();
+const {
+  url: SUPABASE_URL,
+  anonKey: ANON_KEY,
+  serviceKey: SERVICE_KEY,
+} = getLiveSupabaseEnv();
 
 // These tests force counters to their cap and replay payment events. They must
 // never point at production; .env.local holds production credentials.
@@ -345,7 +349,10 @@ describe("apply_subscription_event (migration 055, issue #528)", () => {
     subId = `sub_guard_${stamp}_${counter++}`;
   });
 
-  async function applyEvent(lastEventAt: string, status = "cancelled"): Promise<boolean> {
+  async function applyEvent(
+    lastEventAt: string,
+    status = "cancelled",
+  ): Promise<boolean> {
     const { data, error } = await service.rpc("apply_subscription_event", {
       p_user_id: family,
       p_stripe_customer_id: "cus_guard",
@@ -433,5 +440,144 @@ describe("apply_subscription_event (migration 055, issue #528)", () => {
     expect(results.some((r) => r)).toBe(true);
     const stored = await readLastEventAt();
     expect(new Date(stored!).getTime()).toBe(new Date(T3).getTime());
+  });
+});
+
+// reveal_nurse (migration 059, issue #691)
+//
+// The bug: revealNurse spent a slot from the family's capped daily allowance
+// BEFORE it wrote the reveal row. Spending first is deliberate, it is what stops
+// a burst slipping past the cap, but it means two attempts that overlap between
+// the spend and the write each pay, and the family ends up with ONE reveal and
+// TWO slots gone from a capped allowance. That is the exact harm #653 exists to
+// prevent, and it needs no retry button: two concurrent requests are enough.
+//
+// The fix folds the check, the spend and the write into one function, so a
+// repeat spends nothing. These cases are the reason it exists, so they run
+// against a real Postgres. The concurrency one is the whole point: the sequential
+// version of this bug is easy to miss and impossible to fix by reading.
+describe("reveal_nurse (migration 059, issue #691)", () => {
+  let family: string;
+  let nurse: string;
+  let otherNurse: string;
+
+  interface RevealRow {
+    allowed: boolean;
+    current_count: number;
+    needs_captcha: boolean;
+    already_revealed: boolean;
+  }
+
+  async function reveal(
+    familyId: string,
+    nurseId: string,
+    captcha = false,
+  ): Promise<RevealRow> {
+    const { data, error } = await service
+      .rpc("reveal_nurse", {
+        p_family_user_id: familyId,
+        p_nurse_user_id: nurseId,
+        p_triggered_captcha: captcha,
+      })
+      .single();
+    if (error) throw error;
+    return data as RevealRow;
+  }
+
+  async function createNurse(prefix: string): Promise<string> {
+    const { id } = await createLiveTestUser({
+      service,
+      url: SUPABASE_URL!,
+      anonKey: ANON_KEY!,
+      role: "nurse",
+      emailPrefix: `db-guards-${prefix}`,
+      stamp,
+    });
+    createdUserIds.push(id);
+    return id;
+  }
+
+  beforeAll(async () => {
+    family = await createFamily("reveal-atomic");
+    nurse = await createNurse("reveal-atomic-n1");
+    otherNurse = await createNurse("reveal-atomic-n2");
+  });
+
+  beforeEach(async () => {
+    await service
+      .from("rate_limit_reveals")
+      .delete()
+      .eq("family_user_id", family)
+      .eq("date", today());
+    await service.from("reveals").delete().eq("family_user_id", family);
+  });
+
+  it("spends one slot for a first reveal", async () => {
+    const res = await reveal(family, nurse);
+
+    expect(res.allowed).toBe(true);
+    expect(res.already_revealed).toBe(false);
+    expect(await readRevealCount(family)).toBe(1);
+  });
+
+  it("spends NOTHING when the same nurse is revealed again", async () => {
+    // This is the retry: the family already has this nurse. Charging them a
+    // second slot from a capped daily allowance for a reveal they already own is
+    // the bug.
+    await reveal(family, nurse);
+    const again = await reveal(family, nurse);
+
+    expect(again.allowed).toBe(true);
+    expect(again.already_revealed).toBe(true);
+    expect(await readRevealCount(family)).toBe(1);
+  });
+
+  it("spends exactly one slot when two reveals of the same nurse race", async () => {
+    // The case that cannot be caught sequentially. Both callers look, both see
+    // no reveal, and both go on to spend. Only the atomic version gives the
+    // loser's slot back.
+    const [a, b] = await Promise.all([
+      reveal(family, nurse),
+      reveal(family, nurse),
+    ]);
+
+    expect(a.allowed).toBe(true);
+    expect(b.allowed).toBe(true);
+    // One of them found the row already there and handed its slot back.
+    expect(
+      [a.already_revealed, b.already_revealed].filter(Boolean),
+    ).toHaveLength(1);
+    expect(await readRevealCount(family)).toBe(1);
+
+    const { count } = await service
+      .from("reveals")
+      .select("id", { count: "exact", head: true })
+      .eq("family_user_id", family)
+      .eq("nurse_user_id", nurse);
+    expect(count).toBe(1);
+  });
+
+  it("still refuses a NEW nurse once the family is at the cap", async () => {
+    // The cap is the reason the spend came first. Making the reveal idempotent
+    // must not reopen the hole it was protecting.
+    await setRevealCount(family, REVEALS_HARD_CAP);
+
+    const res = await reveal(family, otherNurse);
+
+    expect(res.allowed).toBe(false);
+    expect(await readRevealCount(family)).toBe(REVEALS_HARD_CAP);
+  });
+
+  it("still hands back a nurse the family already revealed, even at the cap", async () => {
+    // A family at their daily cap has not lost access to the contacts they
+    // already paid for. Refusing here would take away what they already own.
+    await reveal(family, nurse);
+    await setRevealCount(family, REVEALS_HARD_CAP);
+
+    const res = await reveal(family, nurse);
+
+    expect(res.allowed).toBe(true);
+    expect(res.already_revealed).toBe(true);
+    expect(await readRevealCount(family)).toBe(REVEALS_HARD_CAP);
   });
 });
