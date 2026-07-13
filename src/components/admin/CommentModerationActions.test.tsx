@@ -42,7 +42,9 @@ function hang<T>(): Promise<T> {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
-  vi.stubGlobal("confirm", () => true);
+  // #674: delete is behind a real dialog now. The stub is a trap for the native
+  // one, not a way to wave it through.
+  vi.stubGlobal("confirm", vi.fn());
 });
 
 afterEach(async () => {
@@ -93,7 +95,48 @@ describe("moderating a comment", () => {
     await click(/approve comment/i);
     await click(/delete comment/i);
 
+    // The delete button is dead while the row is busy, so it cannot even get as
+    // far as asking.
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(deleteComment).not.toHaveBeenCalled();
+  });
+
+  it("asks in a real dialog, and deletes nothing until the admin confirms", async () => {
+    setup();
+
+    await click(/delete comment/i);
+
+    expect(screen.getByRole("dialog")).toHaveTextContent(/for good/i);
+    expect(deleteComment).not.toHaveBeenCalled();
+    expect(window.confirm).not.toHaveBeenCalled();
+  });
+
+  it("deletes nothing when the admin cancels", async () => {
+    setup();
+
+    await click(/delete comment/i);
+    await click(/cancel/i);
+
+    expect(deleteComment).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("never deletes a comment twice when the delete stalls", async () => {
+    vi.mocked(deleteComment).mockReturnValue(hang());
+    setup();
+
+    await click(/delete comment/i);
+    await click(/delete permanently/i);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STALL_MS);
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
+    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+
+    await click(/deleting/i);
+
+    expect(deleteComment).toHaveBeenCalledTimes(1);
   });
 
   it("says what is stalled and never offers a retry", async () => {

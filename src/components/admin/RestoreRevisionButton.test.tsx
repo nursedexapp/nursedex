@@ -33,7 +33,8 @@ function hang<T>(): Promise<T> {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
-  vi.stubGlobal("confirm", () => true);
+  // #674: behind a real dialog now. The stub is a trap for the native one.
+  vi.stubGlobal("confirm", vi.fn());
 });
 
 afterEach(async () => {
@@ -46,14 +47,39 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-async function clickRestore(name: RegExp = /^restore$/i) {
+async function click(name: RegExp) {
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name }));
     await vi.advanceTimersByTimeAsync(0);
   });
 }
 
+/** Open the confirmation dialog and go through with it. */
+async function clickRestore() {
+  await click(/^restore$/i);
+  await click(/restore this version/i);
+}
+
 describe("restoring a revision", () => {
+  it("asks in a real dialog, and restores nothing until the admin confirms", async () => {
+    render(<RestoreRevisionButton revisionId="rev1" postId="p1" />);
+
+    await click(/^restore$/i);
+
+    expect(screen.getByRole("dialog")).toHaveTextContent(/saved to history/i);
+    expect(restoreRevision).not.toHaveBeenCalled();
+    expect(window.confirm).not.toHaveBeenCalled();
+  });
+
+  it("restores nothing when the admin cancels", async () => {
+    render(<RestoreRevisionButton revisionId="rev1" postId="p1" />);
+
+    await click(/^restore$/i);
+    await click(/cancel/i);
+
+    expect(restoreRevision).not.toHaveBeenCalled();
+  });
+
   it("blocks a second restore while the first is running", async () => {
     vi.mocked(restoreRevision).mockReturnValue(hang());
     render(<RestoreRevisionButton revisionId="rev1" postId="p1" />);
@@ -76,7 +102,7 @@ describe("restoring a revision", () => {
     expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
     expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
 
-    await clickRestore(/restoring/i);
+    await click(/restoring/i);
 
     expect(restoreRevision).toHaveBeenCalledTimes(1);
   });
@@ -88,6 +114,8 @@ describe("restoring a revision", () => {
     await clickRestore();
 
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^restore$/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /restore this version/i }),
+    ).toBeEnabled();
   });
 });

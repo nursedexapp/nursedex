@@ -8,6 +8,7 @@ import { PendingButton } from "@/components/ui/pending-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -46,17 +47,25 @@ export function VerificationRowActions({
   userId,
   nurseFirstName,
 }: VerificationRowActionsProps) {
+  return (
+    <div className="flex items-center gap-2">
+      <ApproveDialog userId={userId} nurseFirstName={nurseFirstName} />
+      <RejectDialog userId={userId} nurseFirstName={nurseFirstName} />
+    </div>
+  );
+}
+
+function ApproveDialog({
+  userId,
+  nurseFirstName,
+}: {
+  userId: string;
+  nurseFirstName: string;
+}) {
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const handleApprove = () => {
-    if (pending) return;
-    if (
-      !confirm(
-        `Approve ${nurseFirstName}? They'll get a verified badge and an approval email.`,
-      )
-    ) {
-      return;
-    }
+  const handleConfirm = () => {
     startTransition(async () => {
       const result = await approveVerification({ user_id: userId });
       if (!result.success) {
@@ -64,23 +73,31 @@ export function VerificationRowActions({
         return;
       }
       toast.success(`Approved ${nurseFirstName}`);
+      setOpen(false);
     });
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <PendingButton
-        pending={pending}
-        mode="wait"
-        idleLabel="Approve"
-        workingLabel="Approving..."
-        slowLabel="Still approving..."
-        stalledMessage={STALLED}
-        icon={<Check className="size-3.5" />}
-        onClick={handleApprove}
-      />
-      <RejectDialog userId={userId} nurseFirstName={nurseFirstName} />
-    </div>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <>
+          <Check className="mr-1 size-3.5" />
+          Approve
+        </>
+      }
+      triggerVariant="default"
+      title={`Approve ${nurseFirstName}'s verification`}
+      description={`${nurseFirstName} gets a verified badge on her profile, becomes visible in family search, and is emailed to say she was approved. The email goes out immediately and cannot be recalled.`}
+      confirmLabel="Approve verification"
+      workingLabel="Approving..."
+      slowLabel="Still approving..."
+      stalledMessage={STALLED}
+      confirmVariant="default"
+      pending={pending}
+      onConfirm={handleConfirm}
+    />
   );
 }
 

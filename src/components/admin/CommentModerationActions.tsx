@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useInFlight } from "@/components/ui/use-in-flight";
 import {
   approveComment,
@@ -33,8 +34,11 @@ const WORKING: Record<Action, string> = {
 export function CommentModerationActions({ id, status }: Props) {
   const router = useRouter();
   const { inFlight, busy, run } = useInFlight<Action>();
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const { phase } = usePendingPhase({ pending: busy });
-  const stalled = phase === "stalled";
+  // While the delete dialog is up, the PendingButton inside it owns the stall
+  // alert. Rendering the row's alert too would put two on screen for one action.
+  const stalled = phase === "stalled" && !confirmingDelete;
   const alertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,9 +51,7 @@ export function CommentModerationActions({ id, status }: Props) {
     key: Action,
     fn: (id: string) => Promise<CommentResult>,
     successMsg: string,
-    confirmMsg?: string,
   ) {
-    if (confirmMsg && !window.confirm(confirmMsg)) return;
     run(key, async () => {
       const res = await fn(id);
       if (!res.success) {
@@ -57,6 +59,7 @@ export function CommentModerationActions({ id, status }: Props) {
         return;
       }
       toast.success(successMsg);
+      setConfirmingDelete(false);
       router.refresh();
     });
   }
@@ -114,14 +117,7 @@ export function CommentModerationActions({ id, status }: Props) {
         )}
         <button
           type="button"
-          onClick={() =>
-            act(
-              "delete",
-              deleteComment,
-              "Comment deleted.",
-              "Delete this comment permanently?",
-            )
-          }
+          onClick={() => setConfirmingDelete(true)}
           disabled={busy}
           aria-label="Delete comment"
           className={`${iconBtn} text-error`}
@@ -129,6 +125,19 @@ export function CommentModerationActions({ id, status }: Props) {
           <Trash2 className="size-4" />
         </button>
       </div>
+
+      <ConfirmDialog
+        open={confirmingDelete}
+        onOpenChange={setConfirmingDelete}
+        title="Delete this comment permanently?"
+        description="The comment is removed from the post for good. Rejecting it instead hides it from readers but keeps it here, which is usually what you want."
+        confirmLabel="Delete permanently"
+        workingLabel="Deleting..."
+        slowLabel="Still deleting..."
+        stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the comment was deleted."
+        pending={busy}
+        onConfirm={() => act("delete", deleteComment, "Comment deleted.")}
+      />
     </div>
   );
 }
