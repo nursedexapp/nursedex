@@ -35,6 +35,7 @@ import { ReviewList } from "@/components/reviews/ReviewList";
 import { HireButton } from "@/components/hires/HireButton";
 import type { Review, Hire } from "@/types/database";
 import type { ApprovedReview } from "@/lib/reviews/queries";
+import { MASK_PII } from "@/components/ui/private";
 
 type ViewMode = "anon" | "free" | "subscribed";
 type RevealMode = "anon" | "no_sub" | "subscribed" | null;
@@ -334,7 +335,8 @@ export function NurseProfilePublic({
                   {canSeeIdentity && nurse.license_number ? (
                     <>
                       <p>
-                        <strong>License Number:</strong> {nurse.license_number}
+                        <strong>License Number:</strong>{" "}
+                        <span className={MASK_PII}>{nurse.license_number}</span>
                       </p>
                       {licenseVerifyUrl && (
                         <a

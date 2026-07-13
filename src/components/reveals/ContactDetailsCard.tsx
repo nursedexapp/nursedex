@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { BLOCK_PII } from "@/components/ui/private";
 import { Mail, Phone, MessageSquare } from "lucide-react";
 import { COMMUNICATION_PREFERENCE_LABELS } from "@/types/enums";
 import type { CommunicationPreference } from "@/types/enums";
@@ -30,7 +31,13 @@ export function ContactDetailsCard({ contact }: { contact: RevealedContact }) {
     <Card className="border-sage/20">
       <CardContent className="pt-4">
         <h2 className="mb-3 text-base font-semibold">Contact Information</h2>
-        <div className="space-y-3 text-base">
+        {/* BLOCK, not mask (#379). This is the nurse's real phone number and
+            email, the thing a family pays to unlock, and it does not only
+            appear as text: it is inside href="mailto:..." and href="tel:...".
+            Session replay records attributes too, so masking the text would
+            leave both sitting in plain sight in the link targets. Blocking
+            drops the element from the recording entirely. */}
+        <div className={`space-y-3 text-base ${BLOCK_PII}`}>
           {contact.email && (
             <a
               href={`mailto:${contact.email}?subject=NurseDex%20Inquiry`}

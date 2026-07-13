@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StarRatingInput } from "./StarRatingInput";
 import { REVIEW_TEXT_MAX, REVIEW_TEXT_MIN } from "@/lib/schemas/review";
 import { submitExternalReview } from "@/lib/reviews/external-actions";
+import { MASK_PII } from "@/components/ui/private";
 
 interface ExternalReviewFormProps {
   linkToken: string;
@@ -81,8 +82,9 @@ export function ExternalReviewForm({
         <h2 className="font-heading text-lg font-semibold">Check your inbox</h2>
         <p className="text-soft-black-light">
           We sent a confirmation email to{" "}
-          <span className="font-medium">{submittedEmail}</span>. Click the link
-          inside to confirm your review. The link expires in 7 days.
+          <span className={`font-medium ${MASK_PII}`}>{submittedEmail}</span>.
+          Click the link inside to confirm your review. The link expires in 7
+          days.
         </p>
         <p className="text-soft-black-light">
           After you confirm, a moderator will take a quick look before it shows

@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { promoteToAdmin, demoteAdmin } from "@/lib/admin/role-actions";
+import { MASK_PII } from "@/components/ui/private";
 
 // wait, not retry (#443 phase 4). Granting and revoking admin access is the
 // highest-privilege write in the app. See VerificationRowActions for why the
@@ -118,7 +119,11 @@ export function DemoteButton({ userId, email, isSelf }: DemoteButtonProps) {
       onOpenChange={setOpen}
       trigger="Demote"
       triggerVariant="outline"
-      title={`Remove admin access from ${email}`}
+      title={
+        <>
+          Remove admin access from <span className={MASK_PII}>{email}</span>
+        </>
+      }
       description="They lose access to the whole admin area immediately, including verifications, accounts and the blog, and become an ordinary family account. Any admin can grant the role back."
       confirmLabel="Remove admin access"
       workingLabel="Demoting..."

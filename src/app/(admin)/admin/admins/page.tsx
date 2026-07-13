@@ -1,3 +1,4 @@
+import { MASK_PII } from "@/components/ui/private";
 import type { Metadata } from "next";
 import { requireSuperAdmin } from "@/lib/auth/helpers";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,7 +53,9 @@ export default async function AdminsPage() {
                   <p className="font-medium">
                     {u.first_name || "(no name)"} {u.last_name ?? ""}
                   </p>
-                  <p className="text-muted-foreground text-xs">{u.email}</p>
+                  <p className={`text-muted-foreground text-xs ${MASK_PII}`}>
+                    {u.email}
+                  </p>
                   <Badge
                     variant="outline"
                     className={
