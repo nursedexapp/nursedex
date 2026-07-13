@@ -1,0 +1,68 @@
+name: Production Smoke
+
+# CI builds a database from scratch out of the migrations. Production is a
+# database those migrations were applied to, one at a time, over months. A
+# migration can be correct on the first and still break a real user on the
+# second, and it has: migration 052 revoked EXECUTE from authenticated on every
+# function and broke six user-facing RPCs in production for weeks, while every
+# test stayed green (#700). A family who clicked "Reveal contact info" was
+# charged one of their capped daily reveals and shown an empty card.
+#
+# This asks production itself what it currently allows, and fails when that is
+# not what the code needs. It is read-only: it SELECTs from the system catalog
+# and never touches application data, and it never applies a migration.
+
+on:
+  # Right after a merge, when a migration has most likely just been pushed.
+  push:
+    branches: [main]
+  # A daily backstop. A grant can also change without any push, for example when
+  # a migration is applied by hand or from the Supabase dashboard.
+  schedule:
+    - cron: "30 13 * * *"
+  # After a manual `supabase db push`, which is how migrations actually reach
+  # production (merging does not deploy them).
+  workflow_dispatch:
+
+concurrency:
+  group: prod-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Check production permission surface
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+          # Resolving "latest" hits the GitHub API; without a token it uses the
+          # unauthenticated 60/hr limit and intermittently fails.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Read-only. A missing secret makes the CLI fail, which fails the job,
+      # rather than quietly reporting a healthy production nobody looked at.
+      # SLACK_BOT_TOKEN is optional: without it the failing job is the signal,
+      # and the checker says so in the log rather than skipping in silence.
+      - name: Compare production's grants against what the app needs
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$PROJECT_REF"
+          supabase db query --linked --output-format json "$(cat scripts/prod-smoke.sql)" \
+            | npx tsx scripts/check-prod-smoke.ts
