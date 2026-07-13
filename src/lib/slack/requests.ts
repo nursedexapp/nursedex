@@ -54,6 +54,36 @@ export async function postReply(req: RequestRow, text: string): Promise<void> {
 export async function ensureIssue(req: RequestRow): Promise<void> {
   if (req.github_issue_url) return;
 
+  const supabase = createServiceRoleClient();
+
+  // Claim the right to create the issue BEFORE calling GitHub (#663). The check
+  // above is only a cheap early-out: on its own it was the whole guard, and the
+  // gap between it and the write below is a network round trip to GitHub, so a
+  // double-clicked Approve created two issues for one request. Whoever moves this
+  // column off NULL owns the creation; everyone else stops here.
+  const { data: claimed, error: claimError } = await supabase
+    .from("consulting_requests")
+    .update({ github_issue_claimed_at: new Date().toISOString() })
+    .eq("id", req.id)
+    .is("github_issue_claimed_at", null)
+    .select("id");
+  if (claimError) {
+    console.error(`Claiming issue creation for ${req.id} failed:`, claimError);
+    return;
+  }
+  if (!claimed || claimed.length === 0) {
+    // A concurrent caller is creating it, or already has.
+    return;
+  }
+
+  /** Hand the claim back so a later attempt can retry a creation that failed. */
+  const releaseClaim = async () => {
+    await supabase
+      .from("consulting_requests")
+      .update({ github_issue_claimed_at: null })
+      .eq("id", req.id);
+  };
+
   // Best-effort permalink so the issue points back at the Slack thread.
   let permalink = "";
   try {
@@ -97,6 +127,9 @@ export async function ensureIssue(req: RequestRow): Promise<void> {
     });
   } catch (err) {
     console.error(`createIssue for request ${req.id} failed:`, err);
+    // Nothing was created, so give the claim back rather than wedging the request
+    // in a state where no attempt can ever open its issue.
+    await releaseClaim();
     // Surface the failure in the thread so a missing issue is not silent.
     await postReply(
       req,
@@ -105,7 +138,6 @@ export async function ensureIssue(req: RequestRow): Promise<void> {
     return;
   }
 
-  const supabase = createServiceRoleClient();
   await supabase
     .from("consulting_requests")
     .update({

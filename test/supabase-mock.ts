@@ -11,6 +11,8 @@ type Handler = (...args: unknown[]) => Resolved | "chain";
 const METHODS = [
   "select",
   "eq",
+  "neq",
+  "not",
   "in",
   "is",
   "gte",

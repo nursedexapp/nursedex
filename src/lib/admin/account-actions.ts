@@ -176,18 +176,29 @@ export async function removeAccount(
   if (!target) return { success: false, error: "not_found" };
   if (target.is_deleted) return { success: false, error: "wrong_state" };
 
-  // Cancel any active Stripe subscriptions.
-  await cancelActiveStripeSubscriptions(service, parsed.data.user_id);
-
-  // Soft delete the user and block the email.
-  const { error: updateErr } = await service
-    .from("users")
-    .update({ is_deleted: true, is_suspended: false })
-    .eq("id", parsed.data.user_id);
-  if (updateErr) {
-    console.error("[admin] remove failed:", updateErr.message);
+  // Claim the row FIRST, before anything irreversible. Suspend and unsuspend
+  // were moved onto the guard in #652 and remove was left behind (#663): it read
+  // is_deleted, compared it here, then wrote by id alone, so two admins clicking
+  // at once both passed the check and both went on to cancel this person's Stripe
+  // subscriptions and mail them that their account was gone. The cancel used to
+  // run above this write, which meant even the LOSER reached Stripe.
+  const guard = await guardedStatusUpdate(service, {
+    table: "users",
+    id: parsed.data.user_id,
+    statusColumn: "is_deleted",
+    expectedStatus: false,
+    patch: { is_deleted: true, is_suspended: false },
+  });
+  if (guard.outcome === "error") {
+    console.error("[admin] remove failed:", guard.message);
     return { success: false, error: "unknown" };
   }
+  if (guard.outcome === "already_resolved") {
+    return { success: false, error: "wrong_state" };
+  }
+
+  // Only the winner gets here, so the cancellation runs exactly once.
+  await cancelActiveStripeSubscriptions(service, parsed.data.user_id);
 
   await service.from("blocked_emails").upsert(
     {

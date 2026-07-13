@@ -8,6 +8,7 @@ import noMockedAuthGuard from "./eslint-rules/no-mocked-auth-guard.mjs";
 import requirePendingButton from "./eslint-rules/require-pending-button.mjs";
 import noHandRolledPageGuard from "./eslint-rules/no-hand-rolled-page-guard.mjs";
 import noHandWrittenStallCopy from "./eslint-rules/no-hand-written-stall-copy.mjs";
+import requireStatusPrecondition from "./eslint-rules/require-status-precondition.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -30,6 +31,7 @@ export default [
           "require-pending-button": requirePendingButton,
           "no-hand-rolled-page-guard": noHandRolledPageGuard,
           "no-hand-written-stall-copy": noHandWrittenStallCopy,
+          "require-status-precondition": requireStatusPrecondition,
         },
       },
     },
@@ -59,6 +61,15 @@ export default [
       // (#673). Callers now pass an `outcome` and the button builds the sentence
       // from its own mode. Writing it by hand again fails CI.
       "local/no-hand-written-stall-copy": "error",
+      // Reading a row's status, comparing it in JavaScript, then updating by id
+      // alone is a check-then-act race: two callers both pass the check, both
+      // write, and both fire the side effect the transition guards (an email to a
+      // real person, a second billable time entry, a duplicate hire). It shipped
+      // four times (#419, #562, then #651/#652/#653 together) and each one was
+      // found by accident. #663 swept the codebase; writing the pattern again now
+      // fails CI. The expected status belongs in the UPDATE's own WHERE clause,
+      // via guardedStatusUpdate or an explicit .eq("status", ...).
+      "local/require-status-precondition": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
@@ -83,6 +94,16 @@ export default [
       // drive the primitive, not to ship. Enforcing it there would only make
       // the rule's own harness illegal.
       "local/require-pending-button": "off",
+    },
+  },
+  {
+    // The real-Postgres suite. Its whole job is to fire the write an attacker
+    // would fire and prove the database refuses it, so its unguarded status
+    // UPDATEs are the attack, not a transition the app performs. Guarding them
+    // would test a different query than the one we are worried about.
+    files: ["src/lib/__tests__/**/*.ts"],
+    rules: {
+      "local/require-status-precondition": "off",
     },
   },
   {

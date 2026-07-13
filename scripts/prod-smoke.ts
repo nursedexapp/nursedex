@@ -146,6 +146,11 @@ export const FUNCTION_GRANTS: Record<string, FunctionExpectation> = {
     authenticated: false,
     why: "applied from the Stripe webhook; service_role only",
   },
+  complete_consulting_request: {
+    anon: false,
+    authenticated: false,
+    why: "claims a consulting request and writes its billable time entry in one transaction (#663); service_role only, so nobody but the /done route can bill work",
+  },
 
   // ── Dead code: deliberately left with no grant ────────────────
   get_user_role: {

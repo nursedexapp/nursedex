@@ -96,16 +96,26 @@ async function setStatus(
 ): Promise<CommentResult> {
   await requireAdmin();
   const supabase = createServiceRoleClient();
+  // Only transition a comment that is not already in the target state (#663).
+  // Approving fires an email to the commenter, and the update carried no
+  // precondition at all, so a double-clicked Approve mailed them twice. Guarding
+  // on "not already this status" rather than on "pending" keeps a reject followed
+  // by an approve working, which is a real thing a moderator does.
   const { data, error } = await supabase
     .from("blog_comments")
     .update({ status })
     .eq("id", id)
+    .neq("status", status)
     .select("post_id, author_email")
-    .single();
-  if (error || !data) {
-    console.error("[comments] moderation failed:", error?.message);
+    .maybeSingle();
+  if (error) {
+    console.error("[comments] moderation failed:", error.message);
     return { success: false, error: "unknown" };
   }
+  // Zero rows: a concurrent moderator already applied this exact transition and
+  // has already sent whatever it sends.
+  if (!data) return { success: true };
+
   const post = await revalidatePostById(data.post_id as string);
 
   // Let the commenter know their comment is now live.

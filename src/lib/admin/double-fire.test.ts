@@ -27,6 +27,10 @@ const h = vi.hoisted(() => {
       id: "rev-1",
       status: "pending",
       nurse_user_id: "nurse-1",
+      rating: 2,
+      reviewer_name: "Pat",
+      reviewer_email: "pat@example.com",
+      users: { first_name: "Jane", email: "jane@example.com" },
     } as Record<string, unknown> | null,
     target: {
       id: "user-9",
@@ -44,7 +48,11 @@ const h = vi.hoisted(() => {
     adminActions: [] as unknown[],
     approvedEmail: [] as unknown[],
     suspendedEmail: [] as unknown[],
+    removedEmail: [] as unknown[],
+    disputeEmail: [] as unknown[],
     authBan: [] as unknown[],
+    stripeCancel: [] as unknown[],
+    blockedEmails: [] as unknown[],
   };
 
   return { state, calls };
@@ -71,8 +79,23 @@ vi.mock("@/lib/email/send", () => ({
     h.calls.suspendedEmail.push(a);
     return Promise.resolve();
   },
-  sendAccountRemovedEmail: () => Promise.resolve(),
-  sendDisputeDecisionEmail: () => Promise.resolve(),
+  sendAccountRemovedEmail: (...a: unknown[]) => {
+    h.calls.removedEmail.push(a);
+    return Promise.resolve();
+  },
+  sendDisputeDecisionEmail: (...a: unknown[]) => {
+    h.calls.disputeEmail.push(a);
+    return Promise.resolve();
+  },
+}));
+// Cancelling a subscription is money moving. removeAccount fired it BEFORE it
+// wrote anything, so the loser of a race cancelled Stripe subs on the way to
+// discovering the account was already gone (#663).
+vi.mock("@/lib/stripe/cancel-subscriptions", () => ({
+  cancelActiveStripeSubscriptions: (...a: unknown[]) => {
+    h.calls.stripeCancel.push(a);
+    return Promise.resolve();
+  },
 }));
 
 /**
@@ -112,6 +135,10 @@ function builder(table: string) {
     if (table === "admin_actions") h.calls.adminActions.push(payload);
     return { error: null };
   };
+  b.upsert = async (payload: unknown) => {
+    if (table === "blocked_emails") h.calls.blockedEmails.push(payload);
+    return { error: null };
+  };
   return b;
 }
 
@@ -137,10 +164,18 @@ const UUID = "11111111-1111-4111-8111-111111111111";
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.updateMatches = true;
+  // Tests below flip review.status to drive the dispute path, so reset it here
+  // or the next test inherits it.
+  if (h.state.review) h.state.review.status = "pending";
+  if (h.state.target) h.state.target.is_deleted = false;
   h.calls.adminActions.length = 0;
   h.calls.approvedEmail.length = 0;
   h.calls.suspendedEmail.length = 0;
+  h.calls.removedEmail.length = 0;
+  h.calls.disputeEmail.length = 0;
   h.calls.authBan.length = 0;
+  h.calls.stripeCancel.length = 0;
+  h.calls.blockedEmails.length = 0;
 });
 
 describe("approveVerification cannot be applied twice", () => {
@@ -190,6 +225,79 @@ describe("suspendAccount cannot be applied twice", () => {
     expect(res).toEqual({ success: false, error: "wrong_state" });
     expect(h.calls.suspendedEmail).toHaveLength(0);
     expect(h.calls.authBan).toHaveLength(0);
+    expect(h.calls.adminActions).toHaveLength(0);
+  });
+});
+
+// #663. suspend and unsuspend in this same file were fixed in #652 and remove was
+// left behind: it still read is_deleted, compared it in JavaScript, then updated
+// by id alone. It is the worst of the three to double-apply, because it cancels
+// Stripe subscriptions and mails the person that their account is gone.
+describe("removeAccount cannot be applied twice", () => {
+  it("removes, blocks the email and mails once when it wins the race", async () => {
+    const { removeAccount } = await import("./account-actions");
+
+    const res = await removeAccount({ user_id: UUID, reason: "spam" });
+
+    expect(res.success).toBe(true);
+    expect(h.calls.removedEmail).toHaveLength(1);
+    expect(h.calls.adminActions).toHaveLength(1);
+    expect(h.calls.blockedEmails).toHaveLength(1);
+  });
+
+  it("fires nothing when a concurrent admin already removed the account", async () => {
+    h.state.updateMatches = false;
+    const { removeAccount } = await import("./account-actions");
+
+    const res = await removeAccount({ user_id: UUID, reason: "spam" });
+
+    expect(res).toEqual({ success: false, error: "wrong_state" });
+    expect(h.calls.removedEmail).toHaveLength(0);
+    expect(h.calls.adminActions).toHaveLength(0);
+    expect(h.calls.authBan).toHaveLength(0);
+  });
+
+  it("does not cancel Stripe subscriptions when it loses the race", async () => {
+    // The cancel fired BEFORE the write, so the loser reached Stripe on its way
+    // to finding out it had already lost. Claiming the row has to come first.
+    h.state.updateMatches = false;
+    const { removeAccount } = await import("./account-actions");
+
+    await removeAccount({ user_id: UUID, reason: "spam" });
+
+    expect(h.calls.stripeCancel).toHaveLength(0);
+  });
+});
+
+// #663. Resolving a dispute mails BOTH the nurse and the reviewer. Under
+// check-then-act a concurrent resolve sent all four.
+describe("adminResolveDispute cannot be applied twice", () => {
+  it("mails the nurse and the reviewer once when it wins the race", async () => {
+    if (h.state.review) h.state.review.status = "disputed";
+    const { adminResolveDispute } = await import("./review-actions");
+
+    const res = await adminResolveDispute({
+      review_id: UUID,
+      decision: "keep",
+    });
+
+    expect(res.success).toBe(true);
+    expect(h.calls.disputeEmail).toHaveLength(2);
+    expect(h.calls.adminActions).toHaveLength(1);
+  });
+
+  it("sends NO email when a concurrent admin already resolved the dispute", async () => {
+    if (h.state.review) h.state.review.status = "disputed";
+    h.state.updateMatches = false;
+    const { adminResolveDispute } = await import("./review-actions");
+
+    const res = await adminResolveDispute({
+      review_id: UUID,
+      decision: "keep",
+    });
+
+    expect(res).toEqual({ success: false, error: "wrong_state" });
+    expect(h.calls.disputeEmail).toHaveLength(0);
     expect(h.calls.adminActions).toHaveLength(0);
   });
 });

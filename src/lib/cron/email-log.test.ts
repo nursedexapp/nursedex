@@ -4,13 +4,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createQueryBuilder } from "../../../test/supabase-mock";
 import { shouldSendOnce } from "./email-log";
 
-// shouldSendOnce takes the Supabase client as an argument, so the client is
-// the only thing to mock. It read-then-inserts against email_log with no
-// unique constraint, and deliberately fails closed (returns false) on an
-// insert error so a broken log never causes duplicate sends.
+/**
+ * shouldSendOnce takes the Supabase client as an argument, so the client is the
+ * only thing to mock.
+ *
+ * It used to SELECT email_log, decide in JavaScript, and insert only if it found
+ * nothing, which is the #663 check-then-write race: two callers both read no row,
+ * both insert, and the recipient gets the email twice. The INSERT is now the gate
+ * (uniq_email_log_dedup, migration 062), so these tests are written against error
+ * CODES coming back from the insert, not against a pre-read.
+ */
 const state = {
-  existing: null as { id: string } | null,
-  insertError: null as { message: string } | null,
+  insertError: null as { message: string; code?: string } | null,
 };
 const calls = { insert: [] as Record<string, unknown>[] };
 
@@ -18,7 +23,6 @@ function mockClient(): SupabaseClient {
   return {
     from: () =>
       createQueryBuilder({
-        maybeSingle: () => ({ data: state.existing }),
         insert: (payload) => {
           calls.insert.push(payload as Record<string, unknown>);
           return { error: state.insertError };
@@ -34,23 +38,15 @@ const ARGS = {
 };
 
 beforeEach(() => {
-  state.existing = null;
   state.insertError = null;
   calls.insert = [];
   vi.restoreAllMocks();
 });
 
 describe("shouldSendOnce", () => {
-  it("returns false and does not insert when a matching log row already exists", async () => {
-    state.existing = { id: "log-1" };
+  it("returns true and claims the dedup row on the first send", async () => {
     const result = await shouldSendOnce(mockClient(), ARGS);
-    expect(result).toBe(false);
-    expect(calls.insert).toHaveLength(0);
-  });
 
-  it("returns true and inserts the dedup row on the first send", async () => {
-    state.existing = null;
-    const result = await shouldSendOnce(mockClient(), ARGS);
     expect(result).toBe(true);
     expect(calls.insert).toEqual([
       {
@@ -61,12 +57,34 @@ describe("shouldSendOnce", () => {
     ]);
   });
 
-  it("fails closed (returns false) when the log insert errors", async () => {
-    state.existing = null;
-    state.insertError = { message: "log write failed" };
-    vi.spyOn(console, "error").mockImplementation(() => {});
+  it("returns false when a concurrent caller already claimed this email", async () => {
+    // The loser of the race. Postgres rejects the duplicate with 23505, which is
+    // the whole mechanism: it is not an error, it is the answer. Under the old
+    // read-then-insert both callers sent.
+    state.insertError = { message: "duplicate key value", code: "23505" };
+
     const result = await shouldSendOnce(mockClient(), ARGS);
+
     expect(result).toBe(false);
-    expect(calls.insert).toHaveLength(1);
+  });
+
+  it("does not log a duplicate as an error, because it is not one", async () => {
+    state.insertError = { message: "duplicate key value", code: "23505" };
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await shouldSendOnce(mockClient(), ARGS);
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("fails closed (returns false) and logs when the log write genuinely breaks", async () => {
+    // A real failure, not a duplicate: send nothing, but say so loudly.
+    state.insertError = { message: "connection reset", code: "08006" };
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await shouldSendOnce(mockClient(), ARGS);
+
+    expect(result).toBe(false);
+    expect(spy).toHaveBeenCalled();
   });
 });

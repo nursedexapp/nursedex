@@ -8,6 +8,10 @@ const h = vi.hoisted(() => {
     count: 0, // rate-limit count
     upsertError: null as unknown,
     updateError: null as unknown,
+    // Rows the guarded UPDATE matches (#663). One row = this caller won and may
+    // send its email; zero rows = a concurrent caller already did the transition
+    // and already sent it.
+    updateRows: [{ id: "s1" }] as unknown[],
   };
   const calls = { upsert: [] as unknown[], update: [] as unknown[] };
   return {
@@ -31,9 +35,14 @@ function builder() {
       h.calls.update.push(payload);
       return "chain";
     },
-    // Awaited directly by the count query and the confirm update; each
-    // destructures the field it needs.
-    then: () => ({ count: h.state.count, error: h.state.updateError }),
+    // Awaited directly by the count query and by the guarded updates; each
+    // destructures the field it needs. `data` is what the updates' terminal
+    // .select("id") hands back, which is how a caller learns it lost the race.
+    then: () => ({
+      count: h.state.count,
+      data: h.state.updateRows,
+      error: h.state.updateError,
+    }),
   });
 }
 
@@ -69,6 +78,7 @@ beforeEach(() => {
   h.state.count = 0;
   h.state.upsertError = null;
   h.state.updateError = null;
+  h.state.updateRows = [{ id: "s1" }];
   h.calls.upsert = [];
   h.calls.update = [];
   h.sendBatch.mockResolvedValue(true);
@@ -118,6 +128,23 @@ describe("subscribeNewsletter", () => {
     });
     // A fresh confirmation email is sent so re-activation needs a re-confirm.
     expect(h.sendConfirm).toHaveBeenCalledWith("a@b.com", expect.any(String));
+  });
+
+  it("sends no second token when a concurrent submit already re-subscribed them", async () => {
+    // #663. Both callers read unsubscribed_at as set, both wrote a DIFFERENT
+    // token, and both mailed one. The first token was dead on arrival, so the
+    // subscriber could click a confirm link that no longer worked.
+    h.state.row = {
+      id: "s1",
+      confirmed_at: null,
+      unsubscribed_at: "2026-02-01T00:00:00Z",
+    };
+    h.state.updateRows = [];
+
+    const res = await subscribeNewsletter({ email: "a@b.com" });
+
+    expect(res.success).toBe(true);
+    expect(h.sendConfirm).not.toHaveBeenCalled();
   });
 
   it("silently drops a filled honeypot", async () => {
@@ -171,6 +198,18 @@ describe("confirmNewsletter", () => {
     h.state.row = { id: "s1", email: "a@b.com", confirmed_at: "2026-01-01" };
     expect(await confirmNewsletter("tok")).toBe("already");
     expect(h.calls.update).toHaveLength(0);
+    expect(h.sendWelcome).not.toHaveBeenCalled();
+  });
+
+  it("sends no second welcome when a concurrent fetch of the link confirmed it first", async () => {
+    // #663, and the likeliest of the lot to fire in the wild: mail clients
+    // prefetch links, so the same confirmation URL is routinely fetched twice
+    // within milliseconds. Both callers read confirmed_at as null, both wrote,
+    // and the subscriber got two welcome emails.
+    h.state.row = { id: "s1", email: "a@b.com", confirmed_at: null };
+    h.state.updateRows = [];
+
+    expect(await confirmNewsletter("tok")).toBe("already");
     expect(h.sendWelcome).not.toHaveBeenCalled();
   });
 

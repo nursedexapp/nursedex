@@ -581,3 +581,159 @@ describe("reveal_nurse (migration 059, issue #691)", () => {
     expect(await readRevealCount(family)).toBe(REVEALS_HARD_CAP);
   });
 });
+
+// ── #663 ──────────────────────────────────────────────────────────────────────
+//
+// The same check-then-write race as #651/#652/#653, swept across the rest of the
+// app. Two of the fixes moved the decision into the database, so like the two
+// above they are only really tested by firing concurrent statements at a real
+// Postgres. A sequential test passes on the broken code.
+
+describe("uniq_email_log_dedup (migration 062, issue #663)", () => {
+  let recipient: string;
+
+  beforeAll(async () => {
+    recipient = await createFamily("emaillog");
+  });
+
+  const row = (dedupKey: string) => ({
+    recipient_user_id: recipient,
+    email_type: "renewal_reminder",
+    dedup_key: dedupKey,
+  });
+
+  it("refuses a second log row for the same recipient, type and dedup key", async () => {
+    const key = `sub-${stamp}-seq`;
+
+    const first = await service.from("email_log").insert(row(key));
+    const second = await service.from("email_log").insert(row(key));
+
+    expect(first.error).toBeNull();
+    // 23505 is not a failure, it is the mechanism: shouldSendOnce reads this
+    // code as "someone else already claimed this email" and sends nothing.
+    expect(second.error?.code).toBe("23505");
+  });
+
+  it("lets exactly one of two SIMULTANEOUS claims through", async () => {
+    // The case that matters. shouldSendOnce used to SELECT, find nothing, and
+    // insert, so two callers arriving together both sent. Without the unique
+    // index this assertion passes with BOTH inserts succeeding.
+    const key = `sub-${stamp}-concurrent`;
+
+    const results = await Promise.all([
+      service.from("email_log").insert(row(key)),
+      service.from("email_log").insert(row(key)),
+    ]);
+
+    const won = results.filter((r) => !r.error);
+    expect(won).toHaveLength(1);
+
+    const { data } = await service
+      .from("email_log")
+      .select("id")
+      .eq("recipient_user_id", recipient)
+      .eq("dedup_key", key);
+    expect(data).toHaveLength(1);
+  });
+
+  it("still allows a different dedup key for the same recipient and type", async () => {
+    // The index must not turn "send once per subscription period" into "send
+    // once, ever": a renewal reminder is legitimate again next period.
+    const a = await service.from("email_log").insert(row(`sub-${stamp}-a`));
+    const b = await service.from("email_log").insert(row(`sub-${stamp}-b`));
+
+    expect(a.error).toBeNull();
+    expect(b.error).toBeNull();
+  });
+});
+
+describe("complete_consulting_request (migration 062, issue #663)", () => {
+  async function newRequest(suffix: string): Promise<number> {
+    const { data, error } = await service
+      .from("consulting_requests")
+      .insert({
+        title: `db-guards ${suffix}`,
+        type: "ad_hoc",
+        rate: 75,
+        status: "approved",
+        slack_channel: "C-TEST",
+        slack_thread_ts: `${stamp}.${suffix}`,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return data.id as number;
+  }
+
+  async function billedEntries(requestId: number): Promise<number[]> {
+    const { data } = await service
+      .from("consulting_time_entries")
+      .select("billed_min")
+      .eq("request_id", requestId);
+    return (data ?? []).map((e) => e.billed_min as number);
+  }
+
+  const complete = (requestId: number) =>
+    service.rpc("complete_consulting_request", {
+      p_request_id: requestId,
+      p_billed_min: 90,
+      p_summary: "Shipped it",
+      p_pr_urls: ["https://github.com/x/y/pull/1"],
+    });
+
+  it("bills the work once and marks the request done", async () => {
+    const id = await newRequest("happy");
+
+    const { data, error } = await complete(id);
+
+    expect(error).toBeNull();
+    expect(data).toBe("completed");
+    expect(await billedEntries(id)).toEqual([90]);
+  });
+
+  it("refuses a second /done and does NOT bill again", async () => {
+    const id = await newRequest("twice");
+
+    await complete(id);
+    const { data } = await complete(id);
+
+    expect(data).toBe("already_completed");
+    expect(await billedEntries(id)).toEqual([90]);
+  });
+
+  it("bills once when two /done calls land SIMULTANEOUSLY", async () => {
+    // The money case, and the one the old JavaScript status check could not
+    // stop: both callers read a non-terminal status, both passed, and both
+    // inserted a billable time entry, so the same work was invoiced twice.
+    const id = await newRequest("race");
+
+    const results = await Promise.all([complete(id), complete(id)]);
+
+    const outcomes = results.map((r) => r.data).sort();
+    expect(outcomes).toEqual(["already_completed", "completed"]);
+    expect(await billedEntries(id)).toEqual([90]);
+  });
+
+  it("leaves the request unbilled and NOT done when the time entry is rejected", async () => {
+    // The claim and the billing share one transaction, so a rejected time entry
+    // has to roll the status back with it. Claiming in a separate round trip
+    // would leave a completed request with no billing on it.
+    const id = await newRequest("atomic");
+
+    const { error } = await service.rpc("complete_consulting_request", {
+      p_request_id: id,
+      p_billed_min: -1, // violates billed_min >= 0
+      p_summary: "Shipped it",
+    });
+
+    expect(error).not.toBeNull();
+    expect(await billedEntries(id)).toEqual([]);
+
+    const { data: req } = await service
+      .from("consulting_requests")
+      .select("status")
+      .eq("id", id)
+      .single();
+    expect(req?.status).toBe("approved");
+  });
+});

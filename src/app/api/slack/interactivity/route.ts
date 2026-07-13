@@ -283,6 +283,12 @@ async function handleTriage(
 
   try {
     const supabase = createServiceRoleClient();
+    // Re-triaging an open request is legitimate (an estimate gets revised), so
+    // this is not a one-way transition and must not be guarded as one. What it
+    // must never do is resurrect a request that has already been completed or
+    // invoiced, which an unguarded write by id alone would happily do: a stale
+    // Slack modal submitted late would drag a billed request back to triaged
+    // (#663). The terminal states are the precondition.
     const { error } = await supabase
       .from("consulting_requests")
       .update({
@@ -292,7 +298,8 @@ async function handleTriage(
         triaged_by: payload.user.id,
         status,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .not("status", "in", "(done,invoiced)");
     if (error) throw error;
 
     const req = await getRequest(id);

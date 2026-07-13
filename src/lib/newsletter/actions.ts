@@ -83,18 +83,28 @@ export async function subscribeNewsletter(
     // a fresh confirmation email so the address is only re-activated once
     // the owner confirms again.
     const token = crypto.randomUUID();
-    const { error } = await supabase
+    // Still-unsubscribed is the precondition, and it belongs in the WHERE clause
+    // (#663). Two rapid submits both read unsubscribed_at as set, both wrote a
+    // DIFFERENT confirmation token, and both mailed one: the first token was
+    // already dead by the time its email arrived.
+    const { data: claimed, error } = await supabase
       .from("newsletter_subscribers")
       .update({
         confirmation_token: token,
         confirmed_at: null,
         unsubscribed_at: null,
       })
-      .eq("id", ex.id);
+      .eq("id", ex.id)
+      .not("unsubscribed_at", "is", null)
+      .select("id");
     if (error) {
       console.error("[newsletter] resubscribe failed:", error.message);
       return { success: false, error: "unknown" };
     }
+    // A concurrent submit already re-opened the subscription and sent a live
+    // token. Sending a second one would invalidate theirs.
+    if (!claimed || claimed.length === 0) return { success: true };
+
     await sendNewsletterConfirmEmail(input.email, token);
     return { success: true };
   }
@@ -145,14 +155,24 @@ export async function confirmNewsletter(token: string): Promise<ConfirmResult> {
   if (!row) return "invalid";
   if (row.confirmed_at) return "already";
 
-  const { error } = await supabase
+  // Confirm only if still unconfirmed, in the UPDATE's own WHERE clause (#663).
+  // The read above cannot be the guard: mail clients prefetch links, so the same
+  // confirmation link is routinely fetched twice within milliseconds, and under
+  // check-then-write both callers saw confirmed_at as null and both sent the
+  // welcome email.
+  const { data: claimed, error } = await supabase
     .from("newsletter_subscribers")
     .update({ confirmed_at: new Date().toISOString() })
-    .eq("id", row.id);
+    .eq("id", row.id)
+    .is("confirmed_at", null)
+    .select("id");
   if (error) {
     console.error("[newsletter] confirm failed:", error.message);
     return "invalid";
   }
+  // Zero rows: a concurrent fetch of the same link confirmed it first and has
+  // already sent the welcome.
+  if (!claimed || claimed.length === 0) return "already";
 
   await sendNewsletterWelcomeEmail(row.email);
   return "confirmed";
