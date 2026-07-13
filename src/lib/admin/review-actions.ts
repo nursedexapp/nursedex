@@ -238,16 +238,24 @@ export async function adminResolveDispute(
       ? parsed.data.notes
       : null;
 
-  const { error } = await supabase
-    .from("reviews")
-    .update({
+  // Guard on `disputed` so a second resolve cannot land. This one mails BOTH the
+  // nurse and the reviewer, so an unguarded double-apply sent four emails about a
+  // decision that was made once (#663).
+  const guard = await guardedStatusUpdate(supabase, {
+    table: "reviews",
+    id: parsed.data.review_id,
+    expectedStatus: "disputed",
+    patch: {
       status: newStatus,
       admin_decision: notes ?? `Dispute ${parsed.data.decision}`,
-    })
-    .eq("id", parsed.data.review_id);
-  if (error) {
-    console.error("[admin] resolve dispute failed:", error.message);
+    },
+  });
+  if (guard.outcome === "error") {
+    console.error("[admin] resolve dispute failed:", guard.message);
     return { success: false, error: "unknown" };
+  }
+  if (guard.outcome === "already_resolved") {
+    return { success: false, error: "wrong_state" };
   }
 
   await supabase.from("admin_actions").insert({

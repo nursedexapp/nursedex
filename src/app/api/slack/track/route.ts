@@ -42,6 +42,39 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(data);
 }
 
+type ServiceClient = ReturnType<typeof createServiceRoleClient>;
+
+/**
+ * The answer for a /done that had nothing left to do: either it arrived after the
+ * request was already terminal, or it lost the race to a concurrent /done. Both
+ * report the totals that were actually recorded, so a retry still sees success
+ * rather than an error for work that did get billed.
+ */
+async function completedResponse(
+  supabase: ServiceClient,
+  id: number,
+  rate: number,
+  status: string,
+) {
+  const { data: entries } = await supabase
+    .from("consulting_time_entries")
+    .select("billed_min")
+    .eq("request_id", id);
+  const totalMin = (entries ?? []).reduce(
+    (sum: number, e: { billed_min: number | null }) => sum + (e.billed_min ?? 0),
+    0,
+  );
+  const hrs = totalMin / 60;
+  return NextResponse.json({
+    ok: true,
+    request_id: id,
+    already_completed: true,
+    status,
+    billed_hours: Number(hrs.toFixed(2)),
+    cost: Number((rate * hrs).toFixed(2)),
+  });
+}
+
 interface DonePayload {
   request_id: number;
   billed_min: number;
@@ -90,60 +123,46 @@ export async function POST(request: NextRequest) {
   const rate = req.rate ?? (req.type ? RATES[req.type as RequestType] : 0) ?? 0;
   const supabase = createServiceRoleClient();
 
-  // Idempotency guard: once a request is done or invoiced, /done is a no-op.
-  // Re-running must not log a second time entry (double counting the invoice),
-  // revert an invoiced request to done, re-post the completion report (thread
-  // clutter), or re-close the issue. Return the already-recorded totals so a
-  // retry still sees success.
+  // Fast path: a request that is already terminal is a no-op, and answering here
+  // saves a round trip. This is NOT the guard. It used to be, and that was the
+  // bug (#663): two /done calls could both read a non-terminal status here, both
+  // pass, and both bill. The real gate is inside complete_consulting_request,
+  // where the expected status lives in the UPDATE's own WHERE clause.
   if (req.status === "done" || req.status === "invoiced") {
-    const { data: entries } = await supabase
-      .from("consulting_time_entries")
-      .select("billed_min")
-      .eq("request_id", id);
-    const totalMin = (entries ?? []).reduce(
-      (sum, e) => sum + (e.billed_min ?? 0),
-      0,
-    );
-    const hrs = totalMin / 60;
-    return NextResponse.json({
-      ok: true,
-      request_id: id,
-      already_completed: true,
-      status: req.status,
-      billed_hours: Number(hrs.toFixed(2)),
-      cost: Number((rate * hrs).toFixed(2)),
-    });
+    return completedResponse(supabase, id, rate, req.status);
   }
 
-  const { error: entryError } = await supabase
-    .from("consulting_time_entries")
-    .insert({
-      request_id: id,
-      wall_clock_min: body.wall_clock_min ?? null,
-      active_min: body.active_min ?? null,
-      commit_span_min: body.commit_span_min ?? null,
-      billed_min: Math.round(billedMin),
-      note: body.note ?? null,
-    });
-  if (entryError) {
-    console.error("Time entry insert failed:", entryError);
-    return NextResponse.json({ error: "Failed to log time" }, { status: 500 });
-  }
-
-  const { error: updateError } = await supabase
-    .from("consulting_requests")
-    .update({
-      status: "done",
-      summary: body.summary.trim(),
-      pr_urls: prs.map((p) => p.url),
-    })
-    .eq("id", id);
-  if (updateError) {
-    console.error("Request update failed:", updateError);
+  // Claim the request and write its billable time entry in ONE transaction. The
+  // claim has to be the same statement that excludes the terminal states, and the
+  // billing has to ride with it: claiming first in a separate round trip would fix
+  // the double-bill but leave a request marked done with no time entry on it if
+  // the insert then failed. Either both land or neither does.
+  const { data: outcome, error: rpcError } = await supabase.rpc(
+    "complete_consulting_request",
+    {
+      p_request_id: id,
+      p_billed_min: Math.round(billedMin),
+      p_summary: body.summary.trim(),
+      p_pr_urls: prs.map((p) => p.url),
+      p_wall_clock_min: body.wall_clock_min ?? null,
+      p_active_min: body.active_min ?? null,
+      p_commit_span_min: body.commit_span_min ?? null,
+      p_note: body.note ?? null,
+    },
+  );
+  if (rpcError) {
+    console.error("Completing request failed:", rpcError);
     return NextResponse.json(
-      { error: "Failed to update request" },
+      { error: "Failed to complete request" },
       { status: 500 },
     );
+  }
+
+  // A concurrent /done got there first. It has already billed the work and posted
+  // the report, so this caller must do neither: no second time entry, no second
+  // completion post in the thread, no second issue close.
+  if (outcome === "already_completed") {
+    return completedResponse(supabase, id, rate, "done");
   }
 
   // Post the completion report and refresh the root to the done state.

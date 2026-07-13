@@ -12,14 +12,23 @@ const h = vi.hoisted(() => {
     } as Record<string, unknown> | null,
     updateError: null as { message: string } | null,
   };
-  function builder(table: string) {
+  // removeAccount now claims the row through guardedStatusUpdate (#663), whose
+  // chain is update().eq(id).eq(is_deleted, false).select(). So .eq() stays a
+  // link and the terminal .select() on an UPDATE hands back the rows Postgres
+  // would: one for the winner, zero for a caller who lost the race.
+  function builder(_table: string) {
     const b: Record<string, unknown> = {};
     let updating = false;
-    b.select = () => b;
-    b.eq = () =>
-      table === "users" && updating
-        ? Promise.resolve({ error: state.updateError })
+    b.select = () =>
+      updating
+        ? Promise.resolve(
+            state.updateError
+              ? { data: null, error: state.updateError }
+              : { data: [{ id: "target-1" }], error: null },
+          )
         : b;
+    b.eq = () => b;
+    b.in = () => b;
     b.maybeSingle = () => Promise.resolve({ data: state.target, error: null });
     b.update = () => {
       updating = true;
