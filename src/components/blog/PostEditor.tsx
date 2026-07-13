@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { useEditor, EditorContent, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { BlogImage } from "@/components/blog/tiptap/BlogImage";
@@ -331,7 +332,7 @@ export function PostEditor({ value, onChange }: PostEditorProps) {
         )}
         {uploadStalled && (
           <span role="alert" className="text-error text-xs">
-            That upload is still running. Refresh to check whether it landed.
+            {stalledMessageFor("wait", "the image landed", "uploading")}
           </span>
         )}
         {btn(inline?.kind === "embed", insertEmbed, "Embed a video", Video)}

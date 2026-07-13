@@ -20,6 +20,7 @@ import {
   type BlogActionResult,
 } from "@/lib/blog/actions";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { BlogPostStatus } from "@/types/enums";
 
@@ -81,7 +82,7 @@ export function BlogPostActions({
           role="alert"
           className="bg-error/10 text-error rounded-lg px-3 py-2 text-xs outline-none"
         >
-          Still processing. Refresh to check whether it went through.
+          {stalledMessageFor("wait")}
         </div>
       )}
       <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -165,7 +166,7 @@ export function BlogPostActions({
         confirmLabel="Delete post"
         workingLabel="Deleting..."
         slowLabel="Still deleting..."
-        stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the post was deleted."
+        outcome="the post was deleted"
         pending={pending}
         onConfirm={() => run(deletePost, "Post deleted.")}
       />

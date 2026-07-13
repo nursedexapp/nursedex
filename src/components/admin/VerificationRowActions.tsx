@@ -35,8 +35,6 @@ import {
 // after a hung-but-successful approve would tell the admin it FAILED when it
 // worked. Graduating to retry needs that "already applied" case handled first
 // (#669).
-const STALLED =
-  "This is still processing. Please do not close this page. Refresh to check whether it went through.";
 
 interface VerificationRowActionsProps {
   userId: string;
@@ -93,7 +91,7 @@ function ApproveDialog({
       confirmLabel="Approve verification"
       workingLabel="Approving..."
       slowLabel="Still approving..."
-      stalledMessage={STALLED}
+      outcome="the nurse was approved"
       confirmVariant="default"
       pending={pending}
       onConfirm={handleConfirm}
@@ -228,7 +226,8 @@ function RejectDialog({
               idleLabel="Send rejection"
               workingLabel="Sending..."
               slowLabel="Still sending..."
-              stalledMessage={STALLED}
+              outcome="the rejection was sent"
+              stalledVerb="sending"
             />
           </div>
         </form>

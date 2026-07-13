@@ -15,8 +15,7 @@ import {
  * Opening a portal never charges anyone, so a refresh is a safe way out and the
  * message says so rather than leaving them staring at a spinner.
  */
-export const BILLING_PORTAL_STALLED =
-  "This is still opening Stripe. Refresh the page to try again.";
+export { BILLING_PORTAL_STALLED } from "@/components/ui/stalled-copy";
 
 /**
  * Opens the Stripe billing portal. Shared by PastDueBanner and

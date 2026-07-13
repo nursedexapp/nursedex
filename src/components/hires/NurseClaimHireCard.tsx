@@ -114,7 +114,8 @@ export function NurseClaimHireCard({ slug }: NurseClaimHireCardProps) {
               idleLabel="Submit"
               workingLabel="Sending..."
               slowLabel="Still sending..."
-              stalledMessage="This is still sending. Refresh to check whether the family was emailed before trying again."
+              outcome="the family was emailed before trying again"
+              stalledVerb="sending"
               disabled={!email}
             />
           </div>

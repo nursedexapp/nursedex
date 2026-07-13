@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { toggleAvailability } from "@/lib/profile/actions";
 import { UserCheck, UserX, Loader2 } from "lucide-react";
 
@@ -70,8 +71,7 @@ export function QuickActions({
             role="alert"
             className="bg-error/10 text-error rounded-lg px-3 py-2 text-sm"
           >
-            This is still saving. Refresh to check whether your availability
-            changed.
+            {stalledMessageFor("wait", "your availability changed", "saving")}
           </div>
         )}
         <Button

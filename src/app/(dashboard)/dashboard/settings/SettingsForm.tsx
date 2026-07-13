@@ -370,7 +370,7 @@ export function SettingsForm({
                   idleLabel="Delete account"
                   workingLabel="Deleting..."
                   slowLabel="Still deleting..."
-                  stalledMessage="This is still processing. Please do not close this page. Refresh to check whether your account was deleted."
+                  outcome="your account was deleted"
                   onClick={handleDeleteAccount}
                   disabled={deleteConfirm !== "DELETE"}
                 />

@@ -26,8 +26,6 @@ import {
 // their email from signing up again. Nothing here is safe to fire twice. See
 // VerificationRowActions for why the #652 guard does not yet make these safe to
 // retry (#669).
-const STALLED =
-  "This is still processing. Please do not close this page. Refresh to check whether it went through.";
 
 interface AccountRowActionsProps {
   userId: string;
@@ -69,7 +67,7 @@ export function AccountRowActions({
           idleLabel="Unsuspend"
           workingLabel="Unsuspending..."
           slowLabel="Still unsuspending..."
-          stalledMessage={STALLED}
+          outcome="the account was unsuspended"
           onClick={handleUnsuspend}
         />
       ) : (
@@ -111,7 +109,7 @@ function SuspendDialog({ userId, email }: { userId: string; email: string }) {
       confirmLabel="Suspend account"
       workingLabel="Suspending..."
       slowLabel="Still suspending..."
-      stalledMessage={STALLED}
+      outcome="the account was suspended"
       pending={pending}
       onConfirm={handleConfirm}
     />
@@ -200,7 +198,7 @@ function RemoveDialog({ userId, email }: { userId: string; email: string }) {
               idleLabel="Remove account"
               workingLabel="Removing..."
               slowLabel="Still removing..."
-              stalledMessage={STALLED}
+              outcome="the account was removed"
               disabled={!reason.trim()}
             />
           </div>

@@ -13,8 +13,6 @@ import {
 // public profile and rejecting takes it down, so a second fire re-runs a real
 // moderation decision. See VerificationRowActions for why the #652 guard does
 // not yet make these safe to retry (#669).
-const STALLED =
-  "This is still processing. Please do not close this page. Refresh to check whether it went through.";
 
 interface PendingActionsProps {
   reviewId: string;
@@ -48,7 +46,7 @@ export function PendingReviewActions({ reviewId }: PendingActionsProps) {
         idleLabel="Approve"
         workingLabel="Approving..."
         slowLabel="Still approving..."
-        stalledMessage={STALLED}
+        outcome="the review was approved"
         disabled={busy}
         onClick={() =>
           decide("approve", adminApproveReview, "approve", "Approved")
@@ -61,7 +59,7 @@ export function PendingReviewActions({ reviewId }: PendingActionsProps) {
         idleLabel="Reject"
         workingLabel="Rejecting..."
         slowLabel="Still rejecting..."
-        stalledMessage={STALLED}
+        outcome="the review was rejected"
         disabled={busy}
         onClick={() =>
           decide("reject", adminRejectReview, "reject", "Rejected")
@@ -102,7 +100,7 @@ export function RemovalRequestActions({ reviewId }: RemovalActionsProps) {
         idleLabel="Honor (remove)"
         workingLabel="Removing..."
         slowLabel="Still removing..."
-        stalledMessage={STALLED}
+        outcome="the review was removed"
         disabled={busy}
         onClick={() => handle("honor")}
       />
@@ -113,7 +111,7 @@ export function RemovalRequestActions({ reviewId }: RemovalActionsProps) {
         idleLabel="Deny (keep)"
         workingLabel="Saving..."
         slowLabel="Still saving..."
-        stalledMessage={STALLED}
+        outcome="the decision was saved"
         disabled={busy}
         onClick={() => handle("deny")}
       />

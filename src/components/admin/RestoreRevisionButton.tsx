@@ -50,7 +50,7 @@ export function RestoreRevisionButton({
       confirmLabel="Restore this version"
       workingLabel="Restoring..."
       slowLabel="Still restoring..."
-      stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the version was restored."
+      outcome="the version was restored"
       confirmVariant="default"
       pending={pending}
       onConfirm={onRestore}

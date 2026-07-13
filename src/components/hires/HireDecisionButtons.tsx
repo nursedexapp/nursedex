@@ -15,8 +15,6 @@ type Decision = "confirmed" | "rejected";
 
 // wait, not retry (#443 phase 3). Confirming writes a hire row and sends email
 // (#651), so a second fire is a second hire, not a harmless repeat.
-const STALLED =
-  "This is still processing. Please do not close this page. Refresh to check whether your answer went through.";
 
 export function HireDecisionButtons({ token }: HireDecisionButtonsProps) {
   const [decided, setDecided] = useState<null | Decision>(null);
@@ -62,7 +60,7 @@ export function HireDecisionButtons({ token }: HireDecisionButtonsProps) {
         idleLabel="Yes, I hired them"
         workingLabel="Recording..."
         slowLabel="Still recording..."
-        stalledMessage={STALLED}
+        outcome="your answer went through"
         disabled={busy}
         onClick={() => decide(confirmHireFromToken, "Confirm", "confirmed")}
       />
@@ -73,7 +71,7 @@ export function HireDecisionButtons({ token }: HireDecisionButtonsProps) {
         idleLabel="No, I didn't"
         workingLabel="Recording..."
         slowLabel="Still recording..."
-        stalledMessage={STALLED}
+        outcome="your answer went through"
         disabled={busy}
         onClick={() => decide(rejectHireFromToken, "Reject", "rejected")}
       />

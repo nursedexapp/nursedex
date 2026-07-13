@@ -155,7 +155,7 @@ export function DisputeReviewDialog({ reviewId }: DisputeReviewDialogProps) {
               idleLabel="Submit dispute"
               workingLabel="Submitting..."
               slowLabel="Still submitting..."
-              stalledMessage="This is still processing. Refresh to check whether your dispute went through before submitting it again."
+              outcome="your dispute went through before submitting it again"
             />
           </div>
         </form>

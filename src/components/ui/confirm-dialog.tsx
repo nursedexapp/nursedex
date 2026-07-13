@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { PendingButton } from "@/components/ui/pending-button";
+import type { StalledVerb } from "@/components/ui/stalled-copy";
 import { buttonVariants } from "@/components/ui/button-variants";
 import type { ButtonVariantProps } from "@/components/ui/button-variants";
 import {
@@ -46,6 +47,10 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   workingLabel: string;
   slowLabel?: string;
+  /** What to look for after a stall, as a clause: "the post was deleted" (#673). */
+  outcome?: string;
+  stalledVerb?: StalledVerb;
+  /** Escape hatch for copy that does not fit the shape. Prefer `outcome`. */
   stalledMessage?: string;
   /** `destructive` on a delete, the default elsewhere. */
   confirmVariant?: ButtonVariantProps["variant"];
@@ -68,6 +73,8 @@ export function ConfirmDialog({
   confirmLabel,
   workingLabel,
   slowLabel,
+  outcome,
+  stalledVerb,
   stalledMessage,
   confirmVariant = "destructive",
   confirmDisabled = false,
@@ -125,6 +132,8 @@ export function ConfirmDialog({
               idleLabel={confirmLabel}
               workingLabel={workingLabel}
               slowLabel={slowLabel}
+              outcome={outcome}
+              stalledVerb={stalledVerb}
               stalledMessage={stalledMessage}
               disabled={confirmDisabled}
             />
