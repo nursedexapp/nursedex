@@ -18,6 +18,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 import { HireDecisionButtons } from "./HireDecisionButtons";
 import { STALL_MS } from "@/components/ui/pending-button";
 import { confirmHireFromToken, rejectHireFromToken } from "@/lib/hires/actions";
+import { toast } from "sonner";
 
 // Phase 3 of #443. Confirming a hire writes a hire row and sends email (#651), so
 // it is `wait` mode. Two buttons sharing one decision: whichever is in flight
@@ -83,17 +84,43 @@ describe("confirming a hire", () => {
     expect(confirmHireFromToken).toHaveBeenCalledTimes(1);
   });
 
-  it("stays disabled on a stall and never offers a retry", async () => {
+  it("offers a retry on a stall, and keeps the OTHER answer dead", async () => {
+    // #669. The retry is safe: the guarded status update only applies to a row
+    // still `claimed`, so a repeat cannot double-answer. But the family must
+    // still not be able to answer BOTH ways at once, so the opposite button stays
+    // disabled while one answer is in flight.
     vi.mocked(confirmHireFromToken).mockReturnValue(hang());
     render(<HireDecisionButtons token="t1" />);
 
     await click(/yes, i hired them/i);
     await advance(STALL_MS);
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
-    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /recording/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeEnabled();
     expect(screen.getByRole("button", { name: /no, i didn/i })).toBeDisabled();
+
+    await click(/try again/i);
+
+    expect(confirmHireFromToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("tells the family an already-answered hire went through, without claiming which way", async () => {
+    // The reason this could not graduate before: a retry over a hung-but-
+    // successful confirm comes back `wrong_state`, and any failure was rendered
+    // as "Could not confirm. Please try again." That is a lie: the answer landed.
+    //
+    // It deliberately does not assert WHICH answer was recorded. wrong_state
+    // cannot tell "already confirmed" from "already rejected", so claiming the
+    // button they pressed could announce the opposite of the truth.
+    vi.mocked(confirmHireFromToken).mockResolvedValue({
+      success: false,
+      error: "wrong_state",
+    });
+    render(<HireDecisionButtons token="t1" />);
+
+    await click(/yes, i hired them/i);
+
+    expect(screen.getByText(/already been answered/i)).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("lets the toast own a failure and hands both buttons back", async () => {

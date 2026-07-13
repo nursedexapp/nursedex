@@ -41,6 +41,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 import { RevealCTA } from "./RevealCTA";
 import { STALL_MS } from "@/components/ui/pending-button";
 import { revealNurse } from "@/lib/reveals/actions";
+import { toast } from "sonner";
 import { createFamilyAccessCheckout } from "@/lib/subscriptions/actions";
 
 beforeEach(() => {
@@ -138,9 +139,12 @@ describe("a reveal that never comes back", () => {
     expect(revealNurse).toHaveBeenCalledTimes(1);
   });
 
-  it("stays disabled on a stall and never spends a second reveal", async () => {
-    // #653: a concurrent reveal burns a capped daily slot and can error on a
-    // reveal that actually worked. A retry button here would be that bug.
+  it("offers a retry on a stall, because a repeat now spends nothing", async () => {
+    // #653 was the reason this stayed dead: a concurrent reveal could burn a
+    // second slot from the family's capped daily allowance for one nurse.
+    // Migration 059 made the check, the spend and the write one transaction, so
+    // a repeat spends nothing and hands back the contact they already own. The
+    // retry is safe, and a family whose reveal hangs no longer has to refresh.
     vi.mocked(revealNurse).mockReturnValue(hang());
     renderSubscribed();
 
@@ -149,12 +153,54 @@ describe("a reveal that never comes back", () => {
       await vi.advanceTimersByTimeAsync(STALL_MS);
     });
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
-    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
+    const again = screen.getByRole("button", { name: /try again/i });
+    expect(again).toBeEnabled();
 
+    await act(async () => {
+      fireEvent.click(again);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(revealNurse).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not let the superseded reveal report over the retry", async () => {
+    // The hung first request is still in flight. If it lands after the retry it
+    // must stay quiet, or it toasts an error over a reveal that worked.
+    let releaseFirst!: (v: unknown) => void;
+    vi.mocked(revealNurse)
+      .mockReturnValueOnce(
+        new Promise((r) => {
+          releaseFirst = r as (v: unknown) => void;
+        }),
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        contact: {
+          email: "a@b.c",
+          phone: null,
+          communication_preference: null,
+        },
+      });
+
+    renderSubscribed();
     await clickReveal();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STALL_MS);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+      await vi.advanceTimersByTimeAsync(0);
+    });
 
-    expect(revealNurse).toHaveBeenCalledTimes(1);
+    vi.mocked(toast.error).mockClear();
+
+    await act(async () => {
+      releaseFirst({ success: false, error: "unknown" });
+      await vi.advanceTimersByTimeAsync(20);
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("hands the button back when the reveal really fails", async () => {

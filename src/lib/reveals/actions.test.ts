@@ -18,20 +18,21 @@ const h = vi.hoisted(() => {
       current_count: number | null;
       needs_captcha: boolean | null;
     } | null,
-    // Result of the atomic consume RPC. `allowed: false` means the row was
-    // already at the hard cap, so the upsert's WHERE guard skipped the
-    // increment.
-    consumeRow: {
+    // Result of the atomic reveal RPC (migration 059). `allowed: false` means
+    // the family was already at the hard cap. `already_revealed: true` means the
+    // reveal was already there, so the function spent nothing.
+    revealRow: {
       allowed: true,
       current_count: 1,
       needs_captcha: false,
+      already_revealed: false,
     } as {
       allowed: boolean | null;
       current_count: number | null;
       needs_captcha: boolean | null;
+      already_revealed: boolean | null;
     } | null,
-    consumeError: null as unknown,
-    revealInsertError: null as unknown,
+    revealError: null as unknown,
     contact: {
       email: "nurse@example.com",
       phone: "555-0100",
@@ -45,9 +46,12 @@ const h = vi.hoisted(() => {
   };
 
   const calls = {
+    // The app must never write the reveal row itself any more: spending the slot
+    // and writing the reveal are one transaction inside reveal_nurse (#691), and
+    // an insert out here would be back outside it.
     revealInsert: [] as unknown[],
     rateLimitRpc: [] as unknown[],
-    consumeRpc: [] as unknown[],
+    revealRpc: [] as unknown[],
     analyticsRpc: [] as unknown[],
     // Any direct table access from the service-role client. The atomic fix
     // means the counter is only ever touched through the RPC, so this must
@@ -71,7 +75,7 @@ const h = vi.hoisted(() => {
     b.maybeSingle = async () => ({ data: state.existingReveal });
     b.insert = async (payload: unknown) => {
       calls.revealInsert.push(payload);
-      return { error: state.revealInsertError };
+      return { error: null };
     };
     return b;
   }
@@ -100,12 +104,12 @@ const h = vi.hoisted(() => {
       return chainStub();
     },
     rpc: (fn: string, params: unknown) => {
-      if (fn === "consume_reveal_rate_limit") {
-        calls.consumeRpc.push(params);
+      if (fn === "reveal_nurse") {
+        calls.revealRpc.push(params);
         return {
           single: async () => ({
-            data: state.consumeRow,
-            error: state.consumeError,
+            data: state.revealRow,
+            error: state.revealError,
           }),
         };
       }
@@ -162,13 +166,13 @@ beforeEach(() => {
   h.state.hasAccess = true;
   h.state.existingReveal = null;
   h.state.rateRow = { allowed: true, current_count: 0, needs_captcha: false };
-  h.state.consumeRow = {
+  h.state.revealRow = {
     allowed: true,
     current_count: 1,
     needs_captcha: false,
+    already_revealed: false,
   };
-  h.state.consumeError = null;
-  h.state.revealInsertError = null;
+  h.state.revealError = null;
   h.state.contact = {
     email: "nurse@example.com",
     phone: "555-0100",
@@ -177,7 +181,7 @@ beforeEach(() => {
   h.state.captchaOk = true;
   h.calls.revealInsert = [];
   h.calls.rateLimitRpc = [];
-  h.calls.consumeRpc = [];
+  h.calls.revealRpc = [];
   h.calls.analyticsRpc = [];
   h.calls.serviceRoleTables = [];
   h.calls.verifyTurnstile = [];
@@ -213,7 +217,7 @@ describe("revealNurse idempotent re-reveal", () => {
     expect(res).toEqual({ success: true, contact: h.state.contact });
     expect(h.calls.revealInsert).toHaveLength(0);
     expect(h.calls.rateLimitRpc).toHaveLength(0);
-    expect(h.calls.consumeRpc).toHaveLength(0);
+    expect(h.calls.revealRpc).toHaveLength(0);
     expect(h.revalidatePath).not.toHaveBeenCalled();
   });
 });
@@ -223,9 +227,12 @@ describe("revealNurse advisory rate-limit check", () => {
     h.state.rateRow = null;
     const res = await revealNurse(NURSE_ID);
     expect(res.success).toBe(true);
-    expect(h.calls.revealInsert).toHaveLength(1);
-    expect(h.calls.consumeRpc).toEqual([
-      { p_family_user_id: "fam-1", p_triggered_captcha: false },
+    expect(h.calls.revealRpc).toEqual([
+      {
+        p_family_user_id: "fam-1",
+        p_nurse_user_id: NURSE_ID,
+        p_triggered_captcha: false,
+      },
     ]);
   });
 
@@ -238,7 +245,7 @@ describe("revealNurse advisory rate-limit check", () => {
     const res = await revealNurse(NURSE_ID);
     expect(res).toEqual({ success: false, error: "rate_limited" });
     expect(h.calls.revealInsert).toHaveLength(0);
-    expect(h.calls.consumeRpc).toHaveLength(0);
+    expect(h.calls.revealRpc).toHaveLength(0);
   });
 });
 
@@ -263,115 +270,120 @@ describe("revealNurse captcha gate", () => {
     const res = await revealNurse(NURSE_ID, "bad-token");
     expect(res).toEqual({ success: false, error: "captcha_failed" });
     expect(h.calls.revealInsert).toHaveLength(0);
-    // A failed captcha must not burn quota: consume runs only after verify.
-    expect(h.calls.consumeRpc).toHaveLength(0);
+    // A failed captcha must not burn quota: the reveal runs only after verify.
+    expect(h.calls.revealRpc).toHaveLength(0);
   });
 
-  it("passes the captcha trigger through to the consume RPC", async () => {
+  it("passes the captcha trigger through to the reveal RPC", async () => {
     const res = await revealNurse(NURSE_ID, "good-token");
     expect(res.success).toBe(true);
     expect(h.verifyTurnstileToken).toHaveBeenCalledWith(
       "good-token",
       "1.2.3.4",
     );
-    expect(h.calls.consumeRpc).toEqual([
-      { p_family_user_id: "fam-1", p_triggered_captcha: true },
+    expect(h.calls.revealRpc).toEqual([
+      {
+        p_family_user_id: "fam-1",
+        p_nurse_user_id: NURSE_ID,
+        p_triggered_captcha: true,
+      },
     ]);
   });
 });
 
-describe("revealNurse atomic rate-limit consume (issue #563)", () => {
-  it("consumes the slot through the RPC and never touches rate_limit_reveals directly", async () => {
+describe("revealNurse atomic reveal (issues #563, #691)", () => {
+  it("spends the slot and writes the reveal in ONE call, never inserting the row itself", async () => {
     const res = await revealNurse(NURSE_ID);
+
     expect(res.success).toBe(true);
-    expect(h.calls.consumeRpc).toEqual([
-      { p_family_user_id: "fam-1", p_triggered_captcha: false },
+    expect(h.calls.revealRpc).toEqual([
+      {
+        p_family_user_id: "fam-1",
+        p_nurse_user_id: NURSE_ID,
+        p_triggered_captcha: false,
+      },
     ]);
-    // Read-modify-write is the bug. No direct table access at all.
+    // The bug was that spending the slot and writing the reveal were two round
+    // trips: two attempts overlapping in the gap both paid, and the family lost
+    // two of a capped daily allowance for one nurse (#691). An insert out here
+    // would put the write back outside the transaction that protects it.
+    expect(h.calls.revealInsert).toHaveLength(0);
+    // Read-modify-write is the other bug. No direct table access at all.
     expect(h.calls.serviceRoleTables).toEqual([]);
   });
 
-  it("denies the reveal when the atomic consume reports the cap is reached", async () => {
-    // The advisory check passed (a concurrent request had not yet landed),
-    // but the atomic upsert's WHERE guard refused to increment past the cap.
-    h.state.consumeRow = {
+  it("denies the reveal when the atomic call reports the cap is reached", async () => {
+    // The advisory check passed (a concurrent request had not yet landed), but
+    // the atomic upsert's WHERE guard refused to increment past the cap.
+    h.state.revealRow = {
       allowed: false,
       current_count: 25,
       needs_captcha: true,
+      already_revealed: false,
     };
+
     const res = await revealNurse(NURSE_ID);
+
     expect(res).toEqual({ success: false, error: "rate_limited" });
-    expect(h.calls.consumeRpc).toHaveLength(1);
-    // Critical: the reveal must not be inserted once the cap is hit.
-    expect(h.calls.revealInsert).toHaveLength(0);
     expect(h.revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("consumes the slot before inserting the reveal", async () => {
-    h.state.consumeRow = {
-      allowed: false,
-      current_count: 25,
+  it("treats a reveal that was already there as the success it is", async () => {
+    // #653/#691. Two reveals of the SAME nurse racing each other both pass the
+    // existing-reveal check above. The database now hands the loser's slot back
+    // and reports already_revealed, and the family gets the contact they asked
+    // for rather than a generic error toast over a reveal that worked.
+    h.state.revealRow = {
+      allowed: true,
+      current_count: 1,
       needs_captcha: false,
+      already_revealed: true,
     };
-    await revealNurse(NURSE_ID);
-    // A denied consume proves ordering: had the insert run first, it would
-    // have been recorded before the deny short-circuited.
-    expect(h.calls.revealInsert).toHaveLength(0);
-  });
-
-  it("fails loud and inserts nothing when the consume RPC errors", async () => {
-    h.state.consumeRow = null;
-    h.state.consumeError = { message: "db unavailable" };
-    const res = await revealNurse(NURSE_ID);
-    expect(res).toEqual({ success: false, error: "unknown" });
-    expect(h.calls.revealInsert).toHaveLength(0);
-    expect(h.revalidatePath).not.toHaveBeenCalled();
-  });
-
-  it("fails loud when the consume RPC returns no row", async () => {
-    h.state.consumeRow = null;
-    h.state.consumeError = null;
-    const res = await revealNurse(NURSE_ID);
-    expect(res).toEqual({ success: false, error: "unknown" });
-    expect(h.calls.revealInsert).toHaveLength(0);
-  });
-});
-
-describe("revealNurse reveal insert failure", () => {
-  it("returns unknown when the reveal insert errors", async () => {
-    h.state.revealInsertError = { message: "db error" };
-    const res = await revealNurse(NURSE_ID);
-    expect(res).toEqual({ success: false, error: "unknown" });
-    // Fail-closed: the slot is consumed before the insert, so a failed
-    // insert burns quota rather than reopening the cap-bypass race.
-    expect(h.calls.consumeRpc).toHaveLength(1);
-  });
-
-  // #653. The existing-reveal check (which makes a re-reveal free) happens
-  // before the insert, so two reveals of the SAME nurse racing each other both
-  // pass it, both consume a slot, and then the loser's insert hits
-  // UNIQUE (family_user_id, nurse_user_id). Mapping that to "unknown" showed the
-  // family a generic error toast on a reveal that had, in fact, succeeded, and
-  // charged them a second slot from a capped daily allowance for the privilege.
-  //
-  // A duplicate key here means the reveal exists. That is the definition of the
-  // thing the caller asked for, so it is a success.
-  it("treats a duplicate reveal as the success it is, not an error", async () => {
-    h.state.revealInsertError = { code: "23505", message: "duplicate key" };
 
     const res = await revealNurse(NURSE_ID);
 
     expect(res).toEqual({ success: true, contact: h.state.contact });
+  });
+
+  it("fails loud and reveals nothing when the RPC errors", async () => {
+    h.state.revealRow = null;
+    h.state.revealError = { message: "db unavailable" };
+
+    const res = await revealNurse(NURSE_ID);
+
+    expect(res).toEqual({ success: false, error: "unknown" });
+    expect(h.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("fails loud when the RPC returns no row", async () => {
+    h.state.revealRow = null;
+    h.state.revealError = null;
+
+    const res = await revealNurse(NURSE_ID);
+
+    expect(res).toEqual({ success: false, error: "unknown" });
+  });
+
+  it("fails closed when the RPC returns a NULL allowed", async () => {
+    // An unknown counter state must deny the reveal, not grant it.
+    h.state.revealRow = {
+      allowed: null,
+      current_count: null,
+      needs_captcha: null,
+      already_revealed: null,
+    };
+
+    const res = await revealNurse(NURSE_ID);
+
+    expect(res).toEqual({ success: false, error: "rate_limited" });
   });
 });
 
 describe("revealNurse happy path", () => {
-  it("inserts the reveal, consumes the limit, revalidates, and returns contact", async () => {
+  it("reveals atomically, revalidates, and returns contact", async () => {
     const res = await revealNurse(NURSE_ID);
     expect(res).toEqual({ success: true, contact: h.state.contact });
-    expect(h.calls.revealInsert).toEqual([
-      { family_user_id: "fam-1", nurse_user_id: NURSE_ID },
-    ]);
+    expect(h.calls.revealRpc).toHaveLength(1);
     expect(h.calls.analyticsRpc).toEqual([
       { p_nurse_user_id: NURSE_ID, p_field: "reveals" },
     ]);
