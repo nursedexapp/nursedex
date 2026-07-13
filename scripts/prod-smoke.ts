@@ -319,31 +319,54 @@ export interface SmokeResult {
 /**
  * Pull the rows out of the CLI's JSON payload.
  *
- * Throws rather than returning [] on anything unexpected. An empty or
- * unparseable result means the query never ran, and reporting "no findings" for
- * a production we never looked at is the precise failure this check exists to
- * prevent.
+ * Two shapes, because the workflow installs the CLI at "latest" and the payload
+ * is therefore not ours to pin:
+ *
+ *   2.109.1   { "boundary": "...", "rows": [ ... ], "warning": "..." }
+ *   newer     [ ... ]
+ *
+ * Both are preceded by progress lines on stdout, and those lines contain
+ * brackets of their own ("WARN: config section [inbucket] is deprecated"), so
+ * the payload cannot be found by looking for the first `[`. It starts at the
+ * first LINE that opens with `[` or `{` and parses.
+ *
+ * Throws rather than returning [] on anything else. An empty or unparseable
+ * result means the query never really ran, and reporting "no findings" for a
+ * production nobody looked at is the precise failure this check exists to
+ * prevent. (It threw on the first live run, for exactly this reason: the CLI in
+ * CI returned the bare array, and it refused to guess.)
  */
 export function parseGrantRows(raw: string): GrantRow[] {
-  const start = raw.indexOf("{");
-  if (start === -1) {
+  const lines = raw.split("\n");
+
+  let parsed: unknown;
+  for (let i = 0; i < lines.length; i++) {
+    const opener = lines[i].trimStart()[0];
+    if (opener !== "[" && opener !== "{") continue;
+
+    try {
+      parsed = JSON.parse(lines.slice(i).join("\n"));
+      break;
+    } catch {
+      // Not the payload (a log line that merely opens with a bracket). Keep
+      // looking rather than declaring the output unreadable.
+    }
+  }
+
+  if (parsed === undefined) {
     throw new Error(
       `No JSON payload in the query output. Got: ${raw.slice(0, 200)}`,
     );
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw.slice(start));
-  } catch {
-    throw new Error(
-      `Could not parse the query output as JSON: ${raw.slice(start, start + 200)}`,
-    );
-  }
+  const rows = Array.isArray(parsed)
+    ? parsed
+    : (parsed as { rows?: unknown }).rows;
 
-  const rows = (parsed as { rows?: unknown }).rows;
   if (!Array.isArray(rows)) {
-    throw new Error("Query output has no `rows` array; the query did not run.");
+    throw new Error(
+      "Query output is neither an array of rows nor an object with a `rows` array; the query did not run.",
+    );
   }
   if (rows.length === 0) {
     throw new Error(
