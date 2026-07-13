@@ -94,3 +94,62 @@ describe("sending a contact message", () => {
     expect(submitContact).toHaveBeenCalledTimes(1);
   });
 });
+
+// #708. The form mints the message's id, so a repeat of the SAME message can be
+// recognised and thrown away by the database. Two rules, and both are load
+// bearing: a retry must reuse the id, and a success must roll it over.
+describe("the message's submission id", () => {
+  it("sends an id with the message", async () => {
+    vi.mocked(submitContact).mockResolvedValue({ success: true });
+    await fillAndSend();
+
+    expect(submitContact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        submission_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      }),
+    );
+  });
+
+  it("reuses the SAME id when a failed send is retried", async () => {
+    // If a retry minted a fresh id it would look like a brand new message to the
+    // database, which is exactly the duplicate we are trying to prevent.
+    vi.mocked(submitContact).mockResolvedValue({
+      success: false,
+      error: "unknown",
+    });
+    await fillAndSend();
+
+    await act(async () => {
+      fireEvent.submit(document.querySelector("form")!);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const calls = vi.mocked(submitContact).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[1][0]).toMatchObject({
+      submission_id: (calls[0][0] as { submission_id: string }).submission_id,
+    });
+  });
+
+  it("mints a FRESH id once a message has landed", async () => {
+    // The failure this prevents is worse than the one it fixes, because it is
+    // silent: reusing the id would make the sender's next genuine message look
+    // like a duplicate, and the form would cheerfully say it sent.
+    vi.mocked(submitContact).mockResolvedValue({ success: true });
+    await fillAndSend();
+    const first = vi.mocked(submitContact).mock.calls[0][0] as {
+      submission_id: string;
+    };
+
+    cleanup();
+    vi.mocked(submitContact).mockClear();
+
+    // A second message from the same visitor, on a freshly mounted form.
+    await fillAndSend();
+    const second = vi.mocked(submitContact).mock.calls[0][0] as {
+      submission_id: string;
+    };
+
+    expect(second.submission_id).not.toBe(first.submission_id);
+  });
+});

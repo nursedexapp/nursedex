@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { requireAdmin } from "@/lib/auth/helpers";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { blogCommentSchema } from "@/lib/schemas/comment";
+import { isUniqueViolation } from "@/lib/db/postgres-errors";
 import {
   sendCommentSubmittedEmail,
   sendCommentApprovedEmail,
@@ -66,7 +67,11 @@ export async function submitComment(raw: unknown): Promise<CommentResult> {
     return { success: false, error: "invalid" };
   }
 
+  // The id comes from the form, not the database (#708). This used to let
+  // Postgres invent it, so a double-click posted the same comment twice and
+  // mailed the admins twice about it.
   const { error } = await supabase.from("blog_comments").insert({
+    id: input.submission_id,
     post_id: input.post_id,
     author_name: input.author_name,
     author_email: input.author_email,
@@ -74,6 +79,11 @@ export async function submitComment(raw: unknown): Promise<CommentResult> {
     status: "pending",
   });
   if (error) {
+    // Not a failure: this exact comment is already queued for moderation, and
+    // the admins have already been told about it. The commenter's view of the
+    // world ("it went through") is correct, so say so.
+    if (isUniqueViolation(error)) return { success: true };
+
     console.error("[comments] submit failed:", error.message);
     return { success: false, error: "unknown" };
   }

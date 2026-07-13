@@ -22,6 +22,7 @@ import type {
   TiptapDoc,
 } from "@/types/database";
 import { PendingButton } from "@/components/ui/pending-button";
+import { useSubmissionId } from "@/components/ui/use-submission-id";
 import { useInFlight } from "@/components/ui/use-in-flight";
 
 interface PostEditorFormProps {
@@ -98,6 +99,12 @@ export function PostEditorForm({
   const [addingCategory, setAddingCategory] = useState(false);
 
   const [id, setId] = useState(post?.id);
+  // The id a brand-new post will be created under (#696). Minted here, handed to
+  // BOTH autosavePost and savePost, and stable across retries, so whichever of
+  // them creates the post first wins and every later attempt collides on it
+  // instead of writing a second post. Never renewed: within one editor session
+  // there is only ever one post being created.
+  const { currentSubmissionId: newPostId } = useSubmissionId();
   const [autosaveState, setAutosaveState] = useState<
     "idle" | "saving" | "saved" | "error"
   >("idle");
@@ -158,6 +165,7 @@ export function PostEditorForm({
       setAutosaveState("saving");
       autosavePost({
         id,
+        new_id: id ? undefined : newPostId(),
         title,
         slug: slug || undefined,
         excerpt: excerpt || undefined,
@@ -201,18 +209,22 @@ export function PostEditorForm({
     tags,
   ]);
 
-  // retry ONLY once the post exists (#669 phase 5).
+  // Every save is retryable now, creation included (#696).
   //
-  // savePost decides create-vs-update from whether it was handed an id. With no
-  // id it INSERTS, and ensureUniqueSlug hands a second insert a DIFFERENT slug
-  // rather than colliding, so nothing in the database stops it: a retry on a hung
-  // save of a brand new post would quietly leave the author with TWO posts. Once
-  // the post exists it is a plain UPDATE by id, which is safe to repeat.
+  // It used to be `Boolean(id)`: a retry was offered only once the post existed,
+  // because creating one was not safe to repeat. savePost told create from update
+  // by whether it was handed an id, and with no id it INSERTed while
+  // ensureUniqueSlug handed the second insert a DIFFERENT slug rather than
+  // letting it collide, so a retry on a hung save of a brand-new post quietly
+  // left the author with TWO posts. Refusing to retry was a workaround for that,
+  // not a fix, and it left the author of a NEW post stuck staring at a hung save
+  // with nothing to press.
   //
-  // Making creation retryable too means giving the client the id up front, which
-  // changes how savePost tells create from update and needs an author check so an
-  // id cannot be used to target someone else's post. Tracked separately.
-  const canRetry = Boolean(id);
+  // The editor now mints the new post's id up front (newPostId above) and both
+  // save paths create under it, so a repeat collides on the primary key instead
+  // of writing a second post. There is nothing left for the workaround to protect
+  // against.
+  const canRetry = true;
 
   function submit(intent: BlogIntent, viaRetry = false) {
     if (busy && !viaRetry) return;
@@ -229,6 +241,7 @@ export function PostEditorForm({
     start(intent, async (isLatest) => {
       const res = await savePost({
         id,
+        new_id: id ? undefined : newPostId(),
         intent,
         title,
         slug: slug || undefined,

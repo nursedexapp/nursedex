@@ -32,6 +32,10 @@ export const contactSchema = z.object({
       `Keep your message under ${CONTACT_MESSAGE_MAX} characters`,
     ),
   turnstile_token: z.string().min(1, "Please complete the CAPTCHA"),
+  // The row's id, minted by the form rather than the database (#708). A retry
+  // carries the same one, so the insert collides with the row it already wrote
+  // instead of sending a second message to support.
+  submission_id: z.string().uuid(),
 });
 
 export type ContactInput = z.infer<typeof contactSchema>;

@@ -82,6 +82,11 @@ import {
 const PUB = (p: string) =>
   `https://x.supabase.co/storage/v1/object/public/blog-images/${p}`;
 
+// The id the editor mints for a brand-new post (#696). savePost and autosavePost
+// refuse to create without one, rather than falling back to a database-generated
+// id and quietly restoring the duplicate-post bug.
+const NEW_ID = "00000000-0000-4000-8000-00000000000a";
+
 const validContent = {
   type: "doc" as const,
   content: [{ type: "paragraph", content: [{ type: "text", text: "hello" }] }],
@@ -102,6 +107,7 @@ beforeEach(() => {
 describe("savePost", () => {
   it("creates a draft and revalidates the blog surfaces", async () => {
     const res = await savePost({
+      new_id: NEW_ID,
       intent: "draft",
       title: "My Post",
       content: validContent,
@@ -116,6 +122,7 @@ describe("savePost", () => {
 
   it("rejects invalid input with field errors and does not revalidate", async () => {
     const res = await savePost({
+      new_id: NEW_ID,
       intent: "draft",
       title: "",
       content: validContent,
@@ -127,6 +134,7 @@ describe("savePost", () => {
 
   it("rejects scheduling in the past", async () => {
     const res = await savePost({
+      new_id: NEW_ID,
       intent: "schedule",
       title: "My Post",
       content: validContent,
@@ -139,9 +147,12 @@ describe("savePost", () => {
 
 describe("autosavePost", () => {
   it("creates a draft for a new post and returns its id", async () => {
-    const res = await autosavePost({ title: "My Post", content: validContent });
+    const res = await autosavePost({
+      new_id: NEW_ID, title: "My Post", content: validContent });
     expect(res.success).toBe(true);
-    expect(res.id).toBe("p1");
+    // The post is created under the id the EDITOR minted, not one the database
+    // invented, which is what makes a repeat collide instead of duplicating (#696).
+    expect(res.id).toBe(NEW_ID);
     expect(h.calls.insert).toHaveLength(1);
     expect(h.calls.insert[0]).toMatchObject({
       status: "draft",
@@ -167,7 +178,8 @@ describe("autosavePost", () => {
   });
 
   it("rejects input without a title", async () => {
-    const res = await autosavePost({ title: "", content: validContent });
+    const res = await autosavePost({
+      new_id: NEW_ID, title: "", content: validContent });
     expect(res.success).toBe(false);
     expect(h.calls.insert).toHaveLength(0);
   });
@@ -204,6 +216,7 @@ describe("post taxonomy", () => {
   it("savePost persists category_id and syncs resolved tags", async () => {
     tax.findOrCreateTags.mockResolvedValue(["t1", "t2"]);
     const res = await savePost({
+      new_id: NEW_ID,
       intent: "draft",
       title: "My Post",
       content: validContent,
@@ -216,7 +229,8 @@ describe("post taxonomy", () => {
       "Home Care",
       "Licensing",
     ]);
-    expect(tax.syncPostTags).toHaveBeenCalledWith("p1", ["t1", "t2"]);
+        // Tags hang off the minted id now, since that is the post's real id (#696).
+    expect(tax.syncPostTags).toHaveBeenCalledWith(NEW_ID, ["t1", "t2"]);
   });
 
   it("autosavePost syncs tags without touching status", async () => {
@@ -272,6 +286,7 @@ describe("slug redirects on save", () => {
       error: null,
     };
     const res = await savePost({
+      new_id: NEW_ID,
       id,
       intent: "publish",
       title: "My Post",
@@ -292,6 +307,7 @@ describe("slug redirects on save", () => {
       error: null,
     };
     await savePost({
+      new_id: NEW_ID,
       id,
       intent: "draft",
       title: "My Post",
@@ -306,6 +322,7 @@ describe("slug redirects on save", () => {
       error: null,
     };
     await savePost({
+      new_id: NEW_ID,
       id,
       intent: "publish",
       title: "My Post",
@@ -353,6 +370,7 @@ describe("post content round-trip (regression: node attrs lost across the action
 
   it("savePost stores attrs from a stringified body (as the editor sends it)", async () => {
     const res = await savePost({
+      new_id: NEW_ID,
       intent: "publish",
       title: "Rich Post",
       content: JSON.stringify(richContent),
@@ -364,6 +382,7 @@ describe("post content round-trip (regression: node attrs lost across the action
 
   it("savePost still preserves attrs from a plain object (back-compat)", async () => {
     await savePost({
+      new_id: NEW_ID,
       intent: "publish",
       title: "Rich Post",
       content: richContent,
@@ -374,6 +393,7 @@ describe("post content round-trip (regression: node attrs lost across the action
 
   it("autosavePost stores attrs from a stringified body", async () => {
     await autosavePost({
+      new_id: NEW_ID,
       title: "Rich Post",
       content: JSON.stringify(richContent),
     });
@@ -383,6 +403,7 @@ describe("post content round-trip (regression: node attrs lost across the action
 
   it("snapshots the saved revision with attrs intact", async () => {
     await savePost({
+      new_id: NEW_ID,
       intent: "publish",
       title: "Rich Post",
       content: JSON.stringify(richContent),

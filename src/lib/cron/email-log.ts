@@ -1,8 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-/** Postgres unique_violation: someone else logged this exact email first. */
-const UNIQUE_VIOLATION = "23505";
+import { isUniqueViolation } from "@/lib/db/postgres-errors";
 
 /**
  * Send-once: returns true the first time we want to send a specific email_type
@@ -41,7 +39,7 @@ export async function shouldSendOnce(
 
   // Not a failure: a concurrent caller (or an earlier run) already claimed this
   // email and is sending it. Staying quiet is the whole point.
-  if (error.code === UNIQUE_VIOLATION) return false;
+  if (isUniqueViolation(error)) return false;
 
   console.error("[cron] email_log insert failed:", error.message);
   // Fail closed on a genuinely broken log: sending twice is worse than skipping

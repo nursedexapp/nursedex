@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { verifyTurnstileToken } from "@/lib/turnstile/verify";
 import { contactSchema, type ContactInput } from "@/lib/schemas/contact";
 import { sendContactReceivedEmail } from "@/lib/email/send";
+import { isUniqueViolation } from "@/lib/db/postgres-errors";
 
 export type ContactActionError = "invalid" | "captcha_failed" | "unknown";
 
@@ -43,13 +44,24 @@ export async function submitContact(
   if (!ok) return { success: false, error: "captcha_failed" };
 
   const supabase = await createClient();
+  // The id comes from the form, not the database (#708). This insert used to let
+  // Postgres invent the id, so a double-click wrote two rows and mailed support
+  // twice, and nothing could tell the second write from a genuine second message.
+  // Carrying the form's id makes the insert itself the gate.
   const { error } = await supabase.from("contact_submissions").insert({
+    id: input.submission_id,
     name: input.name,
     email: input.email,
     subject: input.subject,
     message: input.message,
   });
   if (error) {
+    // Not a failure: this exact submission is already in the inbox, so the
+    // support team has it and has already been emailed about it. Report success,
+    // because from the sender's side the message did go through, and an error
+    // here would only invite a third attempt.
+    if (isUniqueViolation(error)) return { success: true };
+
     console.error("[contact] insert failed:", error.message);
     return { success: false, error: "unknown" };
   }

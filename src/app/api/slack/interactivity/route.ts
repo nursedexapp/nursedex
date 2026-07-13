@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { guardedStatusUpdate } from "@/lib/db/guarded-status-update";
+import { isUniqueViolation } from "@/lib/db/postgres-errors";
 import { estimateRequest } from "@/lib/ai/estimate";
 import { OPS_CHANNEL_ID, slackPost, verifySlackRequest } from "@/lib/slack/client";
 import { OPS_NOTIFY_USER_ID } from "@/lib/slack/constants";
@@ -31,6 +32,7 @@ interface InteractionPayload {
   user: { id: string };
   actions?: { action_id: string; value?: string }[];
   view?: {
+    id: string;
     callback_id: string;
     private_metadata?: string;
     state: {
@@ -198,9 +200,29 @@ async function handleNewRequest(
         slack_channel: OPS_CHANNEL_ID,
         slack_thread_ts: ts,
         requested_by: fields.requested_by,
+        // Stable across Slack's own re-delivery of this submission, which is the
+        // duplicate that actually happens here (#708).
+        slack_view_id: payload.view!.id,
       })
       .select("id")
       .single();
+
+    // Slack re-delivered a submission it had already accepted. The request
+    // exists, its thread exists, Dan has been pinged, and the estimate has been
+    // computed. Everything below would do all of that a second time.
+    if (error && isUniqueViolation(error)) {
+      // The root posted above belongs to nothing, so take it back down rather
+      // than leaving an orphaned thread next to the real one.
+      if (ts) {
+        await slackPost("chat.delete", {
+          channel: OPS_CHANNEL_ID,
+          ts,
+        }).catch((delErr) =>
+          console.error("Failed to delete duplicate request message:", delErr),
+        );
+      }
+      return ACK;
+    }
     if (error) throw error;
     rowCreated = true;
 

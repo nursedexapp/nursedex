@@ -17,6 +17,7 @@ import {
   findOrCreateCategory,
 } from "./taxonomy";
 import { saveBlogSlugRedirect } from "./redirects";
+import { createPostWithMintedId } from "./create-post";
 import { snapshotRevision, getRevision } from "./revisions";
 import { toDraft, toPublished, toArchived, toScheduled } from "./transitions";
 import type { StatusPatch } from "./transitions";
@@ -77,7 +78,15 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
     patch = toDraft();
   }
 
-  const slug = await ensureUniqueSlug(input.slug || input.title, input.id);
+  // Exclude the post's own id when checking the slug for collisions, INCLUDING a
+  // brand-new post's minted id (#696). Without new_id here, a retried creation
+  // would find the post its own first attempt already wrote, decide the slug was
+  // taken, and mint "my-post-2". A different slug is precisely what let the
+  // duplicate post exist instead of colliding.
+  const slug = await ensureUniqueSlug(
+    input.slug || input.title,
+    input.id ?? input.new_id,
+  );
 
   const supabase = await createClient();
   const contentText = extractPlainText(input.content as unknown as TiptapDoc);
@@ -124,16 +133,28 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
       revalidatePath(`/blog/${prevSlug}`);
     }
   } else {
-    const { data, error } = await supabase
-      .from("blog_posts")
-      .insert({ ...fields, author_id: user.id })
-      .select("id")
-      .single();
-    if (error || !data) {
-      console.error("[blog] insert failed:", error?.message);
+    const newId = input.new_id;
+    if (!newId) {
+      // Falling back to a database-generated id would quietly restore the bug.
+      console.error("[blog] refusing to create a post with no minted id");
       return { success: false, error: "unknown" };
     }
-    postId = data.id as string;
+
+    const created = await createPostWithMintedId(supabase, {
+      newId,
+      authorId: user.id,
+      fields,
+    });
+    if (created.outcome === "error") {
+      console.error("[blog] insert failed:", created.message);
+      return { success: false, error: "unknown" };
+    }
+    if (created.outcome === "not_owner") {
+      console.error("[blog] create collided with a post this user does not own");
+      return { success: false, error: "unknown" };
+    }
+
+    postId = newId;
   }
 
   const tagIds = await findOrCreateTags(input.tags ?? []);
@@ -230,7 +251,13 @@ export async function autosavePost(raw: unknown): Promise<AutosaveResult> {
   if (!parsed.success) return { success: false, error: "invalid" };
   const input = parsed.data;
 
-  const slug = await ensureUniqueSlug(input.slug || input.title, input.id);
+  // Exclude the post's own id, including a brand-new post's minted id, so a
+  // repeated autosave does not treat the row it just wrote as a slug collision
+  // and mint "my-post-2" (#696).
+  const slug = await ensureUniqueSlug(
+    input.slug || input.title,
+    input.id ?? input.new_id,
+  );
   const supabase = await createClient();
 
   const contentText = extractPlainText(input.content as unknown as TiptapDoc);
@@ -259,21 +286,32 @@ export async function autosavePost(raw: unknown): Promise<AutosaveResult> {
     }
     postId = input.id;
   } else {
-    const { data, error } = await supabase
-      .from("blog_posts")
-      .insert({
-        ...fields,
-        status: "draft",
-        publish_at: null,
-        author_id: user.id,
-      })
-      .select("id")
-      .single();
-    if (error || !data) {
-      console.error("[blog] autosave insert failed:", error?.message);
+    const newId = input.new_id;
+    if (!newId) {
+      console.error("[blog] refusing to autosave a new post with no minted id");
       return { success: false, error: "unknown" };
     }
-    postId = data.id as string;
+
+    // Autosave is the likelier of the two to duplicate a post: it is debounced
+    // and fires repeatedly, so two autosaves racing before the editor learned the
+    // new id used to create two posts (#696). It shares the editor's minted id
+    // with savePost, so whichever lands first creates the post and the other
+    // collides on it.
+    const created = await createPostWithMintedId(supabase, {
+      newId,
+      authorId: user.id,
+      fields: { ...fields, status: "draft", publish_at: null },
+    });
+    if (created.outcome === "error") {
+      console.error("[blog] autosave insert failed:", created.message);
+      return { success: false, error: "unknown" };
+    }
+    if (created.outcome === "not_owner") {
+      console.error("[blog] autosave collided with another author's post");
+      return { success: false, error: "unknown" };
+    }
+
+    postId = newId;
   }
 
   const tagIds = await findOrCreateTags(input.tags ?? []);
