@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
         await handleSubscriptionDeleted(event.data.object, event.created);
         break;
       case "invoice.paid":
-        await handleInvoicePaid(event.data.object);
+        await handleInvoicePaid(event.data.object, event.created);
         break;
       case "invoice.payment_failed":
-        await handlePaymentFailed(event.data.object);
+        await handlePaymentFailed(event.data.object, event.created);
         break;
       default:
         // Unhandled events: ignore but ack so Stripe doesn't retry.
@@ -252,6 +252,7 @@ async function handleSubscriptionDeleted(
   // the cascading cleanup below must not run off a write that lost.
   if (row) {
     const incoming = new Date(eventCreated * 1000).toISOString();
+    // eslint-disable-next-line local/require-status-precondition -- the precondition IS in the WHERE clause, keyed on last_event_at rather than status: a stale event must lose whatever status the row currently holds.
     const result = await supabase
       .from("subscriptions")
       .update({
@@ -303,7 +304,7 @@ async function handleSubscriptionDeleted(
   });
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
+async function handleInvoicePaid(invoice: Stripe.Invoice, eventCreated: number) {
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
   const supabase = createServiceRoleClient();
@@ -315,19 +316,31 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const sub = await stripe.subscriptions.retrieve(subId);
   const item = sub.items.data[0];
 
-  assertNoWriteError(
-    await supabase
-      .from("subscriptions")
-      .update({
-        status: "active",
-        current_period_start: new Date(
-          item.current_period_start * 1000,
-        ).toISOString(),
-        current_period_end: new Date(item.current_period_end * 1000).toISOString(),
-      })
-      .eq("stripe_subscription_id", subId),
-    "subscriptions status update (invoice paid)",
-  );
+  // Ordering guard, same as subscription.deleted above (#528). Stripe retries a
+  // webhook for up to three days and does not promise delivery order, so this
+  // event can arrive AFTER a newer one. Writing by subscription id alone let a
+  // stale event overwrite fresher state; the sweep in #663 caught that this
+  // handler and payment_failed below were the two that never adopted the guard.
+  const incoming = new Date(eventCreated * 1000).toISOString();
+  // eslint-disable-next-line local/require-status-precondition -- the precondition IS in the WHERE clause, keyed on last_event_at rather than status: a stale event must lose whatever status the row currently holds.
+  const paidResult = await supabase
+    .from("subscriptions")
+    .update({
+      status: "active",
+      current_period_start: new Date(
+        item.current_period_start * 1000,
+      ).toISOString(),
+      current_period_end: new Date(item.current_period_end * 1000).toISOString(),
+      last_event_at: incoming,
+    })
+    .eq("stripe_subscription_id", subId)
+    .or(`last_event_at.is.null,last_event_at.lte.${incoming}`)
+    .select("id");
+  assertNoWriteError(paidResult, "subscriptions status update (invoice paid)");
+
+  // Zero rows: a newer event already superseded this one. Its renewal email (if
+  // any) belongs to that newer state, so this one must not send.
+  if (!paidResult.data || paidResult.data.length === 0) return;
 
   // Renewal email: fire only on recurring renewals, not the initial
   // subscription_create invoice (the welcome email handles that).
@@ -348,15 +361,28 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   });
 }
 
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
+async function handlePaymentFailed(
+  invoice: Stripe.Invoice,
+  eventCreated: number,
+) {
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
   const supabase = createServiceRoleClient();
+
+  // The worst one to get wrong (#663). This wrote past_due by subscription id
+  // with no ordering guard at all, so a payment_failed that Stripe retried hours
+  // later could land AFTER the customer's successful renewal and flip a paying
+  // subscriber back to past_due. The payment-failure cron reads that status and
+  // goes on to downgrade their tier and mail them about a failed payment that
+  // actually succeeded.
+  const incoming = new Date(eventCreated * 1000).toISOString();
   assertNoWriteError(
+    // eslint-disable-next-line local/require-status-precondition -- the precondition IS in the WHERE clause, keyed on last_event_at rather than status: a stale event must lose whatever status the row currently holds.
     await supabase
       .from("subscriptions")
-      .update({ status: "past_due" })
-      .eq("stripe_subscription_id", subId),
+      .update({ status: "past_due", last_event_at: incoming })
+      .eq("stripe_subscription_id", subId)
+      .or(`last_event_at.is.null,last_event_at.lte.${incoming}`),
     "subscriptions status update (payment failed)",
   );
 }

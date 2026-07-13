@@ -6,19 +6,41 @@ const h = vi.hoisted(() => {
     maybeSingle: { data: null as unknown, error: null as unknown },
     single: { data: { post_id: "post-1" } as unknown, error: null as unknown },
     insertError: null as unknown,
+    // What the guarded moderation UPDATE matches (#663). A row = this caller
+    // applied the transition; null = a concurrent moderator already did, and
+    // already sent whatever it sends.
+    moderationRow: { post_id: "post-1", author_email: "c@example.com" } as
+      | Record<string, unknown>
+      | null,
+    moderationError: null as unknown,
   };
   const calls = { insert: [] as unknown[] };
-  function builder() {
+  // setStatus's chain is update().eq(id).neq(status).select().maybeSingle(), and
+  // the post lookup it then does is a READ that also ends in maybeSingle. Same
+  // builder, different tables, so the terminal has to know which chain it is on.
+  function builder(table?: string) {
     const b: Record<string, unknown> = {};
+    let updating = false;
     b.select = () => b;
     b.eq = () => b;
-    b.update = () => b;
+    b.neq = () => b;
+    b.not = () => b;
+    b.is = () => b;
+    b.update = () => {
+      updating = true;
+      return b;
+    };
     b.delete = () => b;
     b.insert = (payload: unknown) => {
       calls.insert.push(payload);
       return Promise.resolve({ error: state.insertError });
     };
-    b.maybeSingle = () => Promise.resolve(state.maybeSingle);
+    b.maybeSingle = () =>
+      Promise.resolve(
+        table === "blog_comments" && updating
+          ? { data: state.moderationRow, error: state.moderationError }
+          : state.maybeSingle,
+      );
     b.single = () => Promise.resolve(state.single);
     return b;
   }
@@ -47,7 +69,9 @@ vi.mock("@/lib/auth/helpers", () => ({
   requireAdmin: async () => ({ id: "admin-1" }),
 }));
 vi.mock("@/lib/supabase/service-role", () => ({
-  createServiceRoleClient: () => ({ from: () => h.builder() }),
+  createServiceRoleClient: () => ({
+    from: (table: string) => h.builder(table),
+  }),
 }));
 
 import {
@@ -73,6 +97,11 @@ beforeEach(() => {
   };
   h.state.single = { data: { post_id: "post-1" }, error: null };
   h.state.insertError = null;
+  h.state.moderationRow = {
+    post_id: "post-1",
+    author_email: "c@example.com",
+  };
+  h.state.moderationError = null;
   h.calls.insert = [];
 });
 
@@ -112,9 +141,9 @@ describe("submitComment", () => {
 
 describe("moderation", () => {
   it("approveComment revalidates the post page and emails the commenter", async () => {
-    h.state.single = {
-      data: { post_id: "post-9", author_email: "reader@x.com" },
-      error: null,
+    h.state.moderationRow = {
+      post_id: "post-9",
+      author_email: "reader@x.com",
     };
     h.state.maybeSingle = {
       data: { slug: "my-post", title: "My Post" },
@@ -131,15 +160,31 @@ describe("moderation", () => {
   });
 
   it("rejectComment does not email the commenter", async () => {
-    h.state.single = {
-      data: { post_id: "post-9", author_email: "reader@x.com" },
-      error: null,
+    h.state.moderationRow = {
+      post_id: "post-9",
+      author_email: "reader@x.com",
     };
     h.state.maybeSingle = {
       data: { slug: "my-post", title: "My Post" },
       error: null,
     };
     const res = await rejectComment("c1");
+    expect(res.success).toBe(true);
+    expect(h.sendApproved).not.toHaveBeenCalled();
+  });
+
+  it("sends no second email when a concurrent moderator already approved it", async () => {
+    // #663. The moderation UPDATE carried no precondition at all, so a
+    // double-clicked Approve wrote twice and mailed the commenter twice. The
+    // .neq("status", status) guard means the second one matches no row.
+    h.state.moderationRow = null;
+    h.state.maybeSingle = {
+      data: { slug: "my-post", title: "My Post" },
+      error: null,
+    };
+
+    const res = await approveComment("c1");
+
     expect(res.success).toBe(true);
     expect(h.sendApproved).not.toHaveBeenCalled();
   });
