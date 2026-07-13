@@ -119,9 +119,10 @@ export default function PrivacyPolicyPage() {
             <p className="mt-3">
               Our analytics and session recording are provided by PostHog. You
               can opt out of both by enabling &quot;Do Not Track&quot; in your
-              browser: we check for it, and when it is on we do not load
-              analytics at all. Not every browser still offers the setting, so
-              if you would rather opt out and cannot, email{" "}
+              browser: we check for it, and when it is on we do not capture
+              events about you and we do not record your session. Not every
+              browser still offers the setting, so if you would rather opt out
+              and cannot, email{" "}
               <a
                 href="mailto:support@nursedex.com"
                 className="text-teal hover:underline"
