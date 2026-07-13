@@ -6,6 +6,7 @@ import { MoreHorizontal, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -211,8 +212,7 @@ export function TaxonomyManager({
           role="alert"
           className="bg-error/10 text-error rounded-lg px-4 py-3 text-sm outline-none"
         >
-          This is still processing. Please do not close this page. Refresh to
-          check whether it went through.
+          {stalledMessageFor("wait")}
         </div>
       )}
       {section({
@@ -306,8 +306,12 @@ function TaxonomyDialogContent({
     },
     pending: busy,
     onConfirm,
-    stalledMessage:
-      "This is still processing. Please do not close this page. Refresh to check whether it went through.",
+    outcome:
+      dialog.kind === "rename"
+        ? "the new name was saved"
+        : dialog.kind === "merge"
+          ? "the merge went through"
+          : "it was deleted",
   };
 
   if (dialog.kind === "rename") {

@@ -123,7 +123,7 @@ export function RemovalRequestDialog({
               idleLabel="Send request"
               workingLabel="Sending..."
               slowLabel="Still sending..."
-              stalledMessage="This is still processing. Refresh to check whether your request went through before sending it again."
+              outcome="your request went through before sending it again"
             />
           </div>
         </form>

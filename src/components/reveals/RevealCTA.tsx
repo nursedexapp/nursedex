@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock } from "lucide-react";
 import { PendingButton } from "@/components/ui/pending-button";
+import { PAYMENT_STALLED } from "@/components/ui/stalled-copy";
 import {
   Dialog,
   DialogTrigger,
@@ -25,9 +26,6 @@ import { PRICING, GRACE_PERIODS } from "@/lib/constants";
 
 // Creating a checkout session never charges anyone, so a refresh is a safe way
 // out of a stall and the message says so.
-const CHECKOUT_STALLED =
-  "This is still opening Stripe. You have not been charged. Refresh the page to try again.";
-
 interface RevealCTAProps {
   nurseUserId: string;
   nurseFirstName: string;
@@ -113,7 +111,7 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
           idleLabel="Reveal contact info"
           workingLabel="Revealing..."
           slowLabel="Still revealing..."
-          stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the contact info unlocked."
+          outcome="the contact info unlocked"
           icon={<Lock className="size-3.5" aria-hidden="true" />}
           onClick={() => fireReveal()}
         />
@@ -212,7 +210,7 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
           idleLabel={`Get your first year for $${PRICING.FAMILY_ACCESS_ANNUAL_FIRST_YEAR}`}
           workingLabel="Redirecting to checkout..."
           slowLabel="Still opening Stripe..."
-          stalledMessage={CHECKOUT_STALLED}
+          stalledMessage={PAYMENT_STALLED}
           disabled={subscribing !== null}
           onClick={() => handleSubscribe("year")}
           className="w-full"
@@ -224,7 +222,7 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
           idleLabel={`Or subscribe monthly for $${PRICING.FAMILY_ACCESS_MONTHLY}/month`}
           workingLabel="Redirecting to checkout..."
           slowLabel="Still opening Stripe..."
-          stalledMessage={CHECKOUT_STALLED}
+          stalledMessage={PAYMENT_STALLED}
           disabled={subscribing !== null}
           onClick={() => handleSubscribe("month")}
           className="text-teal-dark hover:text-teal w-full text-center text-sm font-medium underline underline-offset-2"

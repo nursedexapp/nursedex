@@ -56,7 +56,7 @@ export function UnsubscribeForm() {
         idleLabel="Unsubscribe"
         workingLabel="Unsubscribing..."
         slowLabel="Still unsubscribing..."
-        stalledMessage="This is still processing. Refresh to check whether you were unsubscribed."
+        outcome="you were unsubscribed"
         className="w-full"
       />
     </form>

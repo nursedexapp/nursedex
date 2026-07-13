@@ -11,8 +11,6 @@ import { promoteToAdmin, demoteAdmin } from "@/lib/admin/role-actions";
 // wait, not retry (#443 phase 4). Granting and revoking admin access is the
 // highest-privilege write in the app. See VerificationRowActions for why the
 // #652 guard does not yet make these safe to retry (#669).
-const STALLED =
-  "This is still processing. Please do not close this page. Refresh to check whether it went through.";
 
 export function PromoteForm() {
   const [email, setEmail] = useState("");
@@ -81,7 +79,7 @@ export function PromoteForm() {
         idleLabel="Grant role"
         workingLabel="Granting..."
         slowLabel="Still granting..."
-        stalledMessage={STALLED}
+        outcome="the role was granted"
         disabled={!email}
       />
     </form>
@@ -125,7 +123,7 @@ export function DemoteButton({ userId, email, isSelf }: DemoteButtonProps) {
       confirmLabel="Remove admin access"
       workingLabel="Demoting..."
       slowLabel="Still demoting..."
-      stalledMessage={STALLED}
+      outcome="admin access was removed"
       pending={pending}
       onConfirm={handleConfirm}
     />

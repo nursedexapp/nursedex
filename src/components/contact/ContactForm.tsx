@@ -201,7 +201,8 @@ export function ContactForm() {
         idleLabel="Send message"
         workingLabel="Sending..."
         slowLabel="Still sending..."
-        stalledMessage="This is still sending. Refresh to check whether your message went through before sending it again."
+        outcome="your message went through before sending it again"
+        stalledVerb="sending"
         disabled={!name || !email || !subject || !message}
       />
     </form>

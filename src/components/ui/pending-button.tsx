@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ButtonVariantProps } from "@/components/ui/button-variants";
+import {
+  stalledMessageFor,
+  type StalledVerb,
+} from "@/components/ui/stalled-copy";
 
 // The one pending primitive (#654, phase 0 of #443).
 //
@@ -114,7 +118,17 @@ interface PendingButtonProps {
   workingLabel: string;
   /** Shown once the action is slow. Defaults to the working label. */
   slowLabel?: string;
-  /** What a stalled action tells the user. Sensible default per mode. */
+  /**
+   * What to look for after a stall, as a clause: "the post was deleted".
+   *
+   * The button already knows its `mode`, so it can write the whole sentence
+   * (#673). Prefer this over `stalledMessage`: 21 hand-written copies of that
+   * sentence had already drifted apart.
+   */
+  outcome?: string;
+  /** Completes "This is still ___." Defaults to "processing". */
+  stalledVerb?: StalledVerb;
+  /** Escape hatch for copy that does not fit the shape, e.g. a payment. */
   stalledMessage?: string;
   onClick?: () => void;
   /** Fired when the user retries a stalled action. `retry` mode only. */
@@ -137,6 +151,8 @@ export function PendingButton({
   idleLabel,
   workingLabel,
   slowLabel,
+  outcome,
+  stalledVerb,
   stalledMessage,
   onClick,
   onRetry,
@@ -165,11 +181,10 @@ export function PendingButton({
     if (stalled) requestAnimationFrame(() => alertRef.current?.focus());
   }, [stalled]);
 
+  // The copy itself lives in one module (#673), so tone, a support link, or a
+  // future localisation changes in one place rather than 21.
   const message =
-    stalledMessage ??
-    (mode === "retry"
-      ? "This is taking longer than usual. You can try again."
-      : "This is still processing. Please do not close this page. Refresh to check whether it went through.");
+    stalledMessage ?? stalledMessageFor(mode, outcome, stalledVerb);
 
   function handleClick() {
     if (canRetry) {

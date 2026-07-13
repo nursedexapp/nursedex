@@ -4,6 +4,7 @@ import { useState } from "react";
 import { LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { signOut } from "@/lib/auth/actions";
 import { resetPostHog } from "@/lib/posthog";
 import { cn } from "@/lib/utils";
@@ -60,7 +61,7 @@ export function SignOutButton({
     <div className={className}>
       {stalled && (
         <p role="alert" className="text-error mb-1 px-3 text-xs">
-          Still signing out. Refresh to check whether you were signed out.
+          {stalledMessageFor("retry", "you were signed out", "signing out")}
         </p>
       )}
 

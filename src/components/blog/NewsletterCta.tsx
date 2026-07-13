@@ -81,7 +81,7 @@ export function NewsletterCta({ source }: { source: string }) {
               idleLabel="Subscribe"
               workingLabel="Subscribing..."
               slowLabel="Still subscribing..."
-              stalledMessage="This is still processing. Refresh to check whether the confirmation email is on its way."
+              outcome="the confirmation email is on its way"
             />
           </form>
           {error && <p className="text-error mt-2 text-sm">{error}</p>}

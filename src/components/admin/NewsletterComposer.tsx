@@ -102,7 +102,8 @@ export function NewsletterComposer({
         confirmLabel="Send now"
         workingLabel="Sending..."
         slowLabel="Still sending..."
-        stalledMessage="This is still sending. Please do not close this page. Refresh to check whether the issue went out before sending it again."
+        outcome="the issue went out before sending it again"
+        stalledVerb="sending"
         pending={pending}
         onConfirm={onSend}
       />

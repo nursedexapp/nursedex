@@ -108,7 +108,8 @@ export function HireButton({
             idleLabel={`Yes, I hired ${nurseFirstName}`}
             workingLabel="Recording..."
             slowLabel="Still recording..."
-            stalledMessage="This is still recording. Please do not close this page. Refresh to check whether the hire was recorded."
+            outcome="the hire was recorded"
+            stalledVerb="recording"
             onClick={handleConfirm}
           />
         </div>

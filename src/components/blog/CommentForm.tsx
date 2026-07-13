@@ -110,7 +110,7 @@ export function CommentForm({ postId }: { postId: string }) {
         idleLabel="Post comment"
         workingLabel="Posting..."
         slowLabel="Still posting..."
-        stalledMessage="This is still processing. Refresh to check whether your comment went through before posting it again."
+        outcome="your comment went through before posting it again"
       />
       <p className="text-soft-black-light text-xs">
         Comments are reviewed before they appear.

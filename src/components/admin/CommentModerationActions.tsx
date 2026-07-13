@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, X, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useInFlight } from "@/components/ui/use-in-flight";
 import {
@@ -76,7 +77,7 @@ export function CommentModerationActions({ id, status }: Props) {
           role="alert"
           className="bg-error/10 text-error rounded-lg px-3 py-2 text-xs outline-none"
         >
-          Still processing. Refresh to check whether it went through.
+          {stalledMessageFor("wait")}
         </div>
       )}
 
@@ -134,7 +135,7 @@ export function CommentModerationActions({ id, status }: Props) {
         confirmLabel="Delete permanently"
         workingLabel="Deleting..."
         slowLabel="Still deleting..."
-        stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the comment was deleted."
+        outcome="the comment was deleted"
         pending={busy}
         onConfirm={() => act("delete", deleteComment, "Comment deleted.")}
       />

@@ -227,7 +227,8 @@ export function ReviewFormDialog({
               idleLabel={isEdit ? "Save changes" : "Submit review"}
               workingLabel="Sending..."
               slowLabel="Still sending..."
-              stalledMessage="This is still sending. Please do not close this page. Refresh to check whether your review went through."
+              outcome="your review went through"
+              stalledVerb="sending"
             />
           </div>
         </form>

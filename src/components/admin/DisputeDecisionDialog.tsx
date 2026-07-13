@@ -111,7 +111,7 @@ export function DisputeDecisionDialog({
               idleLabel={decision === "keep" ? "Keep review" : "Remove review"}
               workingLabel="Saving..."
               slowLabel="Still saving..."
-              stalledMessage="This is still processing. Please do not close this page. Refresh to check whether the decision went through."
+              outcome="the decision went through"
             />
           </div>
         </form>

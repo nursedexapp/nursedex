@@ -9,6 +9,7 @@ import {
   redirectToCheckout,
 } from "@/lib/subscriptions/actions";
 import { PendingButton } from "@/components/ui/pending-button";
+import { PAYMENT_STALLED } from "@/components/ui/stalled-copy";
 import { posthog } from "@/lib/posthog";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
@@ -77,7 +78,7 @@ export function CheckoutButton({
       idleLabel={label}
       workingLabel="Loading..."
       slowLabel="Still opening Stripe..."
-      stalledMessage="This is still opening Stripe. You have not been charged. Refresh the page to try again."
+      stalledMessage={PAYMENT_STALLED}
       onClick={onClick}
       className={className}
     />

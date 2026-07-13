@@ -7,6 +7,7 @@ import requireVisibleNurseFilter from "./eslint-rules/require-visible-nurse-filt
 import noMockedAuthGuard from "./eslint-rules/no-mocked-auth-guard.mjs";
 import requirePendingButton from "./eslint-rules/require-pending-button.mjs";
 import noHandRolledPageGuard from "./eslint-rules/no-hand-rolled-page-guard.mjs";
+import noHandWrittenStallCopy from "./eslint-rules/no-hand-written-stall-copy.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -28,6 +29,7 @@ export default [
           "no-mocked-auth-guard": noMockedAuthGuard,
           "require-pending-button": requirePendingButton,
           "no-hand-rolled-page-guard": noHandRolledPageGuard,
+          "no-hand-written-stall-copy": noHandWrittenStallCopy,
         },
       },
     },
@@ -52,6 +54,11 @@ export default [
       // not waiting on a server write (a navigation transition, a clipboard
       // copy) carry an eslint-disable saying so.
       "local/require-pending-button": "error",
+      // The stalled sentence had 21 hand-written copies and they drifted: all 21
+      // buttons were wait mode, but only 14 told the user to stay on the page
+      // (#673). Callers now pass an `outcome` and the button builds the sentence
+      // from its own mode. Writing it by hand again fails CI.
+      "local/no-hand-written-stall-copy": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
