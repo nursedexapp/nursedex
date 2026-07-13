@@ -19,7 +19,8 @@
     "test:health": "vitest run --config vitest.health.config.ts",
     "test:rls": "vitest run --config vitest.health.config.ts src/lib/__tests__/rls-policies.test.ts src/lib/__tests__/rls-hardening.test.ts src/lib/__tests__/data-api-grants.test.ts src/lib/__tests__/routine-execute-grants.test.ts src/lib/__tests__/db-guards.test.ts src/lib/__tests__/rls-insert-shape.test.ts src/lib/__tests__/rls-with-check.test.ts src/lib/__tests__/nurse-identity-gating.test.ts",
     "test:rls:local": "./scripts/test-rls-local.sh",
-    "test:guard-mutation": "tsx scripts/guard-mutation.ts"
+    "test:guard-mutation": "tsx scripts/guard-mutation.ts",
+    "smoke:prod": "npx supabase db query --linked --output-format json \"$(cat scripts/prod-smoke.sql)\" | tsx scripts/check-prod-smoke.ts"
   },
   "keywords": [],
   "author": "",
