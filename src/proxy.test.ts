@@ -8,6 +8,8 @@ import { NextRequest, NextResponse } from "next/server";
 // still runs too late; only vi.hoisted() is guaranteed to run first.
 const h = vi.hoisted(() => {
   process.env.SITE_PASSWORD = "secret";
+  // The CSP's Supabase origin is derived from this, also at import time.
+  process.env.NEXT_PUBLIC_SUPABASE_URL = "https://abc123.supabase.co";
   return {
     updateSession: vi.fn(async (_req: NextRequest) => NextResponse.next()),
   };
@@ -82,10 +84,65 @@ describe("proxy security headers (#393)", () => {
     expect(res.headers.get("X-Frame-Options")).toBe("DENY");
   });
 
-  it("CSP allows Supabase, Sentry, Turnstile, and blog embed origins", async () => {
+  // The CSP names THIS project, not "any Supabase project on the internet".
+  // The wildcard it replaced was simultaneously too loose (every other tenant's
+  // project was a permitted destination for the browser) and too tight (a local
+  // or CI stack is not on *.supabase.co at all, so the browser's upload of a
+  // nurse photo straight to storage was blocked, and the onboarding journey
+  // could not be tested outside production).
+  it("CSP allows the configured Supabase origin, and not the whole of supabase.co", async () => {
     const res = await proxy(fakeRequest("/nurses"));
     const csp = res.headers.get("Content-Security-Policy") ?? "";
-    expect(csp).toMatch(/connect-src[^;]*https:\/\/\*\.supabase\.co/);
+
+    expect(csp).toMatch(/connect-src[^;]*https:\/\/abc123\.supabase\.co/);
+    expect(csp).toMatch(/connect-src[^;]*wss:\/\/abc123\.supabase\.co/);
+    expect(csp).toMatch(/img-src[^;]*https:\/\/abc123\.supabase\.co/);
+    expect(csp).not.toContain("*.supabase.co");
+  });
+
+  // A local stack is http://127.0.0.1:54321. If the CSP cannot say so, the
+  // browser cannot reach it, and no photo upload can ever be exercised in CI.
+  it("CSP allows a local Supabase when that is what the app is pointed at", async () => {
+    vi.resetModules();
+    const previous = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
+
+    try {
+      const { proxy: freshProxy } = await import("./proxy");
+      const res = await freshProxy(fakeRequest("/nurses"));
+      const csp = res.headers.get("Content-Security-Policy") ?? "";
+
+      expect(csp).toMatch(/connect-src[^;]*http:\/\/127\.0\.0\.1:54321/);
+      expect(csp).toMatch(/connect-src[^;]*ws:\/\/127\.0\.0\.1:54321/);
+    } finally {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = previous;
+      vi.resetModules();
+    }
+  });
+
+  // Fail open to the old wildcard, never to a CSP that blocks Supabase outright.
+  // A missing env var must not take the whole app down.
+  it("CSP falls back to the wildcard when no Supabase URL is configured", async () => {
+    vi.resetModules();
+    const previous = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    try {
+      const { proxy: freshProxy } = await import("./proxy");
+      const res = await freshProxy(fakeRequest("/nurses"));
+      const csp = res.headers.get("Content-Security-Policy") ?? "";
+
+      expect(csp).toMatch(/connect-src[^;]*https:\/\/\*\.supabase\.co/);
+      expect(csp).toMatch(/connect-src[^;]*wss:\/\/\*\.supabase\.co/);
+    } finally {
+      process.env.NEXT_PUBLIC_SUPABASE_URL = previous;
+      vi.resetModules();
+    }
+  });
+
+  it("CSP allows Sentry, Turnstile, and blog embed origins", async () => {
+    const res = await proxy(fakeRequest("/nurses"));
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
     expect(csp).toMatch(
       /connect-src[^;]*https:\/\/o4511116810584064\.ingest\.us\.sentry\.io/,
     );
