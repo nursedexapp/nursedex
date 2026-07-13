@@ -13,6 +13,7 @@ import {
 import { PhotoCropModal } from "./PhotoCropModal";
 import { Button } from "@/components/ui/button";
 import { usePendingPhase } from "@/components/ui/pending-button";
+import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
 import type { NurseTier } from "@/types/enums";
 import { cn } from "@/lib/utils";
 import { Upload, X, ImageIcon, Loader2 } from "lucide-react";
@@ -22,25 +23,6 @@ interface PhotoUploadProps {
   photoUrls: (string | null)[];
   tier: NurseTier;
   onChange: (photos: string[]) => void;
-}
-
-/**
- * Lets only the newest attempt report its result (#656).
- *
- * A hung request cannot be aborted, so offering a retry leaves the first one
- * still in flight. If that first one finally lands it must stay silent, or the
- * retry's success is contradicted: a superseded upload would add the same photo
- * a second time, and a superseded delete would toast "could not remove" for a
- * photo the retry already removed.
- */
-function useLatestAttempt() {
-  const latest = useRef(0);
-  const begin = useCallback(() => ++latest.current, []);
-  const isLatest = useCallback(
-    (attempt: number) => attempt === latest.current,
-    [],
-  );
-  return { begin, isLatest };
 }
 
 export function PhotoUpload({
