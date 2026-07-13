@@ -42,7 +42,7 @@
     "@tiptap/react": "^3.26.0",
     "@tiptap/starter-kit": "^3.26.0",
     "@types/canvas-confetti": "^1.9.0",
-    "@types/diff": "^7.0.2",
+    "@types/diff": "^8.0.0",
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "canvas-confetti": "^1.9.4",
