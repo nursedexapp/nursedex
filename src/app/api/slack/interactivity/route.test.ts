@@ -19,6 +19,9 @@ const h = vi.hoisted(() => {
     tables: [] as string[],
     updates: [] as unknown[],
     eqs: [] as unknown[][],
+    // Filters expressed as .not(...), which is how triage refuses to resurrect a
+    // request that has already been completed or invoiced (#663).
+    nots: [] as unknown[][],
     afterTasks: [] as Promise<unknown>[],
   };
 
@@ -34,8 +37,15 @@ const h = vi.hoisted(() => {
           calls.eqs.push(args);
           return "chain";
         },
+        not: (...args: unknown[]) => {
+          calls.nots.push(args);
+          return "chain";
+        },
         select: () =>
           state.updateResults.shift() ?? { data: [], error: null },
+        // The triage UPDATE has no terminal .select(): it is awaited straight off
+        // its last filter, so the builder has to be thenable for it.
+        then: () => ({ data: null, error: null }),
       });
     },
   };
@@ -83,7 +93,11 @@ vi.mock("@/lib/slack/requests", () => ({
 vi.mock("@/lib/ai/estimate", () => ({ estimateRequest: vi.fn() }));
 
 import { POST } from "./route";
-import { APPROVE_ACTION, REJECT_ACTION } from "@/lib/slack/views";
+import {
+  APPROVE_ACTION,
+  REJECT_ACTION,
+  TRIAGE_CALLBACK,
+} from "@/lib/slack/views";
 import type { NextRequest } from "next/server";
 
 function decisionRequest(
@@ -107,6 +121,31 @@ function decisionRequest(
   }) as unknown as NextRequest;
 }
 
+/** A submitted triage modal: billing type plus an hours estimate. */
+function triageRequest(id = 7, type: "ad_hoc" | "maintenance" = "ad_hoc") {
+  const payload = {
+    type: "view_submission",
+    user: { id: "U123" },
+    view: {
+      callback_id: TRIAGE_CALLBACK,
+      private_metadata: String(id),
+      state: {
+        values: {
+          type: { value: { selected_option: { value: type } } },
+          estimate: { value: { value: "2" } },
+        },
+      },
+    },
+  };
+  const body = new URLSearchParams({
+    payload: JSON.stringify(payload),
+  }).toString();
+  return new Request("https://nursedex.com/api/slack/interactivity", {
+    method: "POST",
+    body,
+  }) as unknown as NextRequest;
+}
+
 async function settleAfter() {
   await Promise.all(h.calls.afterTasks);
 }
@@ -123,6 +162,7 @@ beforeEach(() => {
   h.calls.tables = [];
   h.calls.updates = [];
   h.calls.eqs = [];
+  h.calls.nots = [];
   h.calls.afterTasks = [];
   h.verifySlackRequest.mockReturnValue(true);
 });
@@ -243,5 +283,35 @@ describe("consulting request decision guard (issue #562)", () => {
 
     expect(h.calls.updates).toHaveLength(0);
     expect(h.ensureIssue).not.toHaveBeenCalled();
+  });
+});
+
+// #663. Triage wrote type, rate, estimate and status by id alone. Re-triaging an
+// OPEN request is legitimate (an estimate gets revised), so this is not a one-way
+// transition and must not be guarded as one. What it must never do is resurrect a
+// request that has already been completed or invoiced: a stale modal, submitted
+// late, would drag a request that was already billed back to triaged.
+describe("triage cannot resurrect a completed request (issue #663)", () => {
+  it("refuses the write on a request that is already done or invoiced", async () => {
+    const res = await POST(triageRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls.updates).toHaveLength(1);
+    // The precondition rides in the query, not in a prior read.
+    expect(h.calls.nots).toContainEqual([
+      "status",
+      "in",
+      "(done,invoiced)",
+    ]);
+  });
+
+  it("still writes the revised estimate, so re-triaging an open request works", async () => {
+    await POST(triageRequest(7, "ad_hoc"));
+
+    expect(h.calls.updates[0]).toMatchObject({
+      type: "ad_hoc",
+      estimate_hours: 2,
+      status: "triaged",
+    });
   });
 });

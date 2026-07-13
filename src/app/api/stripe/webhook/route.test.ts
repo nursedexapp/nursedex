@@ -444,6 +444,98 @@ describe("stripe webhook: event ordering (#414, #528)", () => {
       last_event_at: new Date(1700001000 * 1000).toISOString(),
     });
   });
+
+  // #663. subscription.deleted got the ordering guard in #528 and these two never
+  // did: they wrote the subscription's status by id alone. Stripe retries a
+  // webhook for up to three days and does not promise delivery order, so a
+  // payment_failed that Stripe retried could land AFTER the customer's successful
+  // renewal and flip a paying subscriber back to past_due. The payment-failure
+  // cron reads that status and downgrades their tier off it.
+  it("puts the ordering guard in the invoice.paid UPDATE's own filter", async () => {
+    h.subscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [{ current_period_start: 1700000000, current_period_end: 1702592000 }],
+      },
+    });
+    h.state.event = {
+      type: "invoice.paid",
+      created: 1700001000,
+      data: {
+        object: {
+          id: "in_1",
+          billing_reason: "subscription_create",
+          parent: { subscription_details: { subscription: "sub_1" } },
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    const incoming = new Date(1700001000 * 1000).toISOString();
+    expect(h.state.writes["subscriptions.or"]).toBe(
+      `last_event_at.is.null,last_event_at.lte.${incoming}`,
+    );
+    expect(h.state.writes["subscriptions.update"]).toMatchObject({
+      status: "active",
+      last_event_at: incoming,
+    });
+  });
+
+  it("puts the ordering guard in the invoice.payment_failed UPDATE's own filter", async () => {
+    h.state.event = {
+      type: "invoice.payment_failed",
+      created: 1700001000,
+      data: {
+        object: {
+          id: "in_1",
+          parent: { subscription_details: { subscription: "sub_1" } },
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    const incoming = new Date(1700001000 * 1000).toISOString();
+    // Without this, a retried payment_failed overwrites a newer 'active'.
+    expect(h.state.writes["subscriptions.or"]).toBe(
+      `last_event_at.is.null,last_event_at.lte.${incoming}`,
+    );
+    expect(h.state.writes["subscriptions.update"]).toMatchObject({
+      status: "past_due",
+      last_event_at: incoming,
+    });
+  });
+
+  it("sends no renewal email when a newer event supersedes the invoice.paid write", async () => {
+    // The guarded UPDATE matched zero rows, so this event lost. Its renewal email
+    // describes a state that is no longer true and must not go out.
+    h.subscriptionsRetrieve.mockResolvedValue({
+      items: {
+        data: [{ current_period_start: 1700000000, current_period_end: 1702592000 }],
+      },
+    });
+    h.state.rows["subscriptions.update"] = [];
+    h.state.event = {
+      type: "invoice.paid",
+      created: 1700001000,
+      data: {
+        object: {
+          id: "in_1",
+          billing_reason: "subscription_cycle",
+          parent: { subscription_details: { subscription: "sub_1" } },
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    expect(res.status).toBe(200);
+    expect(h.calls).toContain("subscriptions.update");
+    // The renewal path re-reads the row to find the recipient. It must not run.
+    expect(h.calls).not.toContain("subscriptions.select");
+  });
 });
 
 describe("stripe webhook: subscription.deleted metadata fallback (#428)", () => {

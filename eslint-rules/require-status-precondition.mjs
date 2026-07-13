@@ -58,7 +58,7 @@ function propertyName(node) {
   return node.property?.type === "Identifier" ? node.property.name : null;
 }
 
-/** `.update({ status: "approved", ... })` — an object literal that sets status. */
+/** `.update({ status: "approved", ... })`: an object literal that sets status. */
 function updatesStatus(node) {
   const [patch] = node.arguments;
   if (patch?.type !== "ObjectExpression") return false;
