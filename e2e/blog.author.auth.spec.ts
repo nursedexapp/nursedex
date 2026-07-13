@@ -59,7 +59,8 @@ test("the delete confirmation survives the menu that opened it", async ({
   await page.getByRole("button", { name: "Save draft" }).click();
   await page.waitForURL(/\/admin\/blog$/);
 
-  const row = page.getByRole("row").filter({ hasText: title });
+  // The admin blog list is a list of cards, not a table.
+  const row = page.locator('[data-slot="card"]').filter({ hasText: title });
   await row.getByRole("button", { name: "Post actions" }).click();
   await page.getByRole("menuitem", { name: "Delete" }).click();
 
