@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { PendingButton } from "@/components/ui/pending-button";
 import type { StalledVerb } from "@/components/ui/stalled-copy";
@@ -41,7 +42,14 @@ interface ConfirmDialogProps {
   trigger?: React.ReactNode;
   triggerVariant?: ButtonVariantProps["variant"];
   triggerClassName?: string;
-  title: string;
+  /**
+   * The heading. A ReactNode, not just a string, so a caller can mask personal
+   * data inside it: several admin dialogs put a user's email in the title
+   * ("Suspend jane@example.com"), and PostHog session replay records rendered
+   * text, so that email was going into the recording (#379). Wrap it in a
+   * MASK_PII span, see src/components/ui/private.tsx.
+   */
+  title: ReactNode;
   /** The full consequence, in plain words. This is the whole point. */
   description: React.ReactNode;
   confirmLabel: string;

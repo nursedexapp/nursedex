@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { resendConfirmation } from "@/lib/auth/actions";
 import { Mail } from "lucide-react";
 import { PendingButton } from "@/components/ui/pending-button";
+import { MASK_PII } from "@/components/ui/private";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -90,8 +91,8 @@ function ConfirmContent() {
       <h2 className="font-heading mb-2 text-2xl">Check your email</h2>
       <p className="text-muted-foreground mx-auto max-w-xs text-sm leading-relaxed">
         We sent a confirmation link to{" "}
-        <strong className="text-soft-black">{email}</strong>. Click the link to
-        activate your account.
+        <strong className={`text-soft-black ${MASK_PII}`}>{email}</strong>.
+        Click the link to activate your account.
       </p>
       <p className="text-muted-foreground/80 mx-auto mt-2 max-w-xs text-xs leading-relaxed">
         Don&apos;t see it? Check your spam or junk folder.

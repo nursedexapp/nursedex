@@ -7,6 +7,7 @@ import { VerificationRowActions } from "@/components/admin/VerificationRowAction
 import { SLA_HOURS, getSlaState, type SlaState } from "@/lib/admin/sla";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 import type { Credential } from "@/types/enums";
+import { MASK_PII } from "@/components/ui/private";
 
 export const metadata: Metadata = {
   title: "Verifications | NurseDex Admin",
@@ -67,9 +68,17 @@ export default async function VerificationsPage() {
                       </div>
                       <p className="text-muted-foreground text-sm">
                         {credLabel}
-                        {row.license_number ? ` · ${row.license_number}` : ""}
+                        {row.license_number ? (
+                          <span className={MASK_PII}>
+                            {` · ${row.license_number}`}
+                          </span>
+                        ) : (
+                          ""
+                        )}
                       </p>
-                      <p className="text-muted-foreground text-xs">
+                      <p
+                        className={`text-muted-foreground text-xs ${MASK_PII}`}
+                      >
                         {row.email}
                       </p>
                     </div>

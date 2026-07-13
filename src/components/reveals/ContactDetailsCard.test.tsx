@@ -9,6 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 // were one copy of the markup inside the profile until the second caller
 // needed it, and two copies would have drifted the moment either changed.
 import { ContactDetailsCard } from "./ContactDetailsCard";
+import { BLOCK_PII } from "@/components/ui/private";
 
 afterEach(cleanup);
 
@@ -82,5 +83,50 @@ describe("ContactDetailsCard", () => {
 
     expect(screen.queryByRole("link", { name: /call|text/i })).toBeNull();
     expect(screen.queryByText(/prefers contact by/i)).toBeNull();
+  });
+  // BLOCK, not mask (#379). This card is the one thing a family pays to
+  // unlock, and the phone number and email are not only text: they sit inside
+  // href="tel:...", href="sms:..." and href="mailto:...". Session replay
+  // records attributes too, so masking the visible text would leave both in
+  // plain sight in the link targets. Blocking drops the element entirely.
+  //
+  // The assertion is on the card BOTH callers render (#831), because the
+  // profile page and the just-revealed client card are the same markup. A
+  // guard on only one of them would pass while the other leaked.
+  it("keeps the revealed contact out of session replay", () => {
+    render(
+      <ContactDetailsCard
+        contact={{
+          email: "nurse@example.com",
+          phone: "555-0100",
+          communication_preference: "text",
+        }}
+      />,
+    );
+
+    for (const name of [/nurse@example.com/, /call 555-0100/i, /text 555-0100/i]) {
+      const link = screen.getByRole("link", { name });
+      expect(
+        link.closest(`.${BLOCK_PII}`),
+        `${link.getAttribute("href")} is recorded into session replay`,
+      ).not.toBeNull();
+    }
+  });
+
+  // Masking is the weaker tool and it is not enough here: it leaves the value
+  // in the href. If someone downgrades the block to a mask, this fails.
+  it("blocks rather than masks, because the values are in attributes", () => {
+    render(
+      <ContactDetailsCard
+        contact={{
+          email: "nurse@example.com",
+          phone: null,
+          communication_preference: null,
+        }}
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: /nurse@example.com/ });
+    expect(link.closest(`.${BLOCK_PII}`)).not.toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import { getCommentsForAdmin } from "@/lib/comments/queries";
 import { CommentModerationActions } from "@/components/admin/CommentModerationActions";
 import { BlogCommentStatus } from "@/types/enums";
 import { cn } from "@/lib/utils";
+import { MASK_PII } from "@/components/ui/private";
 
 export const metadata: Metadata = {
   title: "Comments | NurseDex Admin",
@@ -129,7 +130,9 @@ export default async function AdminBlogCommentsPage({
                     <span className="text-soft-black font-medium">
                       {c.author_name}
                     </span>
-                    <span className="truncate">{c.author_email}</span>
+                    <span className={`truncate ${MASK_PII}`}>
+                      {c.author_email}
+                    </span>
                     <span>{formatDate(c.created_at)}</span>
                   </div>
                   <p className="text-soft-black mt-1 text-sm whitespace-pre-wrap">
