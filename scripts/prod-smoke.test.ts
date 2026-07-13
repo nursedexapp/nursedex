@@ -50,6 +50,7 @@ function healthyRows(): GrantRow[] {
   return rows;
 }
 
+/** The envelope shape, as the CLI emitted it at 2.109.1. */
 function payload(rows: GrantRow[]): string {
   return `${LOG_PREAMBLE}\n${JSON.stringify({
     boundary: "abc123",
@@ -58,12 +59,32 @@ function payload(rows: GrantRow[]): string {
   })}`;
 }
 
+/** The bare-array shape, as newer CLI versions emit it. */
+function arrayPayload(rows: GrantRow[]): string {
+  return `${LOG_PREAMBLE}\n${JSON.stringify(rows)}`;
+}
+
 describe("parseGrantRows", () => {
   it("reads the rows out of the CLI payload, ignoring the log preamble", () => {
     const rows = parseGrantRows(payload(healthyRows()));
 
     expect(rows.length).toBe(healthyRows().length);
     expect(rows[0]).toHaveProperty("granted");
+  });
+
+  // The workflow installs the CLI at "latest", so the payload shape is not ours
+  // to pin. 2.109.1 wraps the rows in {boundary, rows, warning}; newer versions
+  // return the array on its own. The first live run of this check died on
+  // exactly that difference, having only ever been fed the envelope locally.
+  it("reads a bare array of rows, which is what newer CLI versions emit", () => {
+    const rows = parseGrantRows(arrayPayload(healthyRows()));
+
+    expect(rows.length).toBe(healthyRows().length);
+    expect(rows[0]).toHaveProperty("granted");
+  });
+
+  it("throws on a bare empty array, rather than calling it an all-clear", () => {
+    expect(() => parseGrantRows("[]")).toThrow();
   });
 
   // Fail loud, not silent. A checker that reads garbage as "no problems found"
