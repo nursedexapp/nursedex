@@ -1,6 +1,11 @@
 import { test as setup, expect } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
 import { writeFileSync, mkdirSync } from "node:fs";
+import {
+  serviceClient,
+  ensureUser,
+  upsertUserRow,
+  signInThroughUI,
+} from "./helpers/provision";
 
 // Provisions the world a reveal needs, and signs in as the family.
 //
@@ -30,50 +35,19 @@ const NURSE_PHONE = "555-0142";
 setup(
   "authenticate as a subscribed family, with a nurse to reveal",
   async ({ page }) => {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SECRET_KEY;
-    if (!url || !serviceKey) {
-      throw new Error(
-        "Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SECRET_KEY for e2e family setup.",
-      );
-    }
+    const service = serviceClient();
 
-    const service = createClient(url, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    const familyId = await ensureUser(service, EMAIL, PASSWORD);
+    const nurseId = await ensureUser(service, NURSE_EMAIL, PASSWORD);
 
-    /** Create a confirmed user, or find the one a previous run left behind. */
-    async function ensureUser(
-      email: string,
-      password: string,
-    ): Promise<string> {
-      const { data: created } = await service.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-      });
-      if (created?.user?.id) return created.user.id;
-
-      const { data: list } = await service.auth.admin.listUsers();
-      const found = list?.users.find((u) => u.email === email)?.id;
-      if (!found) throw new Error(`Could not create or find ${email}`);
-      // A previous run may have left a different password on it.
-      await service.auth.admin.updateUserById(found, { password });
-      return found;
-    }
-
-    const familyId = await ensureUser(EMAIL, PASSWORD);
-    const nurseId = await ensureUser(NURSE_EMAIL, PASSWORD);
-
-    const { error: famErr } = await service.from("users").upsert({
+    await upsertUserRow(service, {
       id: familyId,
       email: EMAIL,
       role: "family",
       first_name: "Fam",
     });
-    if (famErr) throw new Error(`Could not set family role: ${famErr.message}`);
 
-    const { error: nurseErr } = await service.from("users").upsert({
+    await upsertUserRow(service, {
       id: nurseId,
       email: NURSE_EMAIL,
       role: "nurse",
@@ -81,7 +55,6 @@ setup(
       last_name: "Nurse",
       phone: NURSE_PHONE,
     });
-    if (nurseErr) throw new Error(`Could not set nurse: ${nurseErr.message}`);
 
     // Verified, so the visible-nurse filter lets a family see and reveal her.
     const { error: profErr } = await service.from("nurse_profiles").upsert(
@@ -128,14 +101,7 @@ setup(
     // file's job is to provision the world, not to own the counters the spec
     // asserts on.
 
-    // Sign in through the UI so @supabase/ssr writes the auth cookies.
-    await page.goto("/login");
-    await page.locator("#email").fill(EMAIL);
-    await page.locator("#password").fill(PASSWORD);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await page.waitForURL((u) => !u.pathname.startsWith("/login"), {
-      timeout: 15_000,
-    });
+    await signInThroughUI(page, EMAIL, PASSWORD);
 
     await page.context().storageState({ path: FAMILY_STATE });
 

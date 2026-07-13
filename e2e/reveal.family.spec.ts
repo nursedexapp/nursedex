@@ -1,7 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { serviceClient } from "./helpers/provision";
 
 // The reveal, end to end, in a real browser (#691, #669).
 //
@@ -21,13 +20,7 @@ const fixture = () =>
     nurseSlug: string;
   };
 
-function service(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SECRET_KEY!;
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
+const service = serviceClient;
 
 // Every attempt starts from an unspent slot, including a RETRY.
 //

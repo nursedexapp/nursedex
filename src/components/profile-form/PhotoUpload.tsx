@@ -149,7 +149,11 @@ export function PhotoUpload({
         onChange([...photos, urlResult.path]);
         toast.success("Photo uploaded");
         setCropState(null);
-      } catch {
+      } catch (err) {
+        // The nurse gets a plain message; the cause still has to go somewhere.
+        // Swallowing it whole left "Something went wrong" as the only evidence
+        // that a photo upload had failed, which is no evidence at all.
+        console.error("[photo] upload failed", err);
         if (upload.isLatest(attempt))
           toast.error("Something went wrong. Please try again.");
       } finally {

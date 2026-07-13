@@ -7,6 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
 const AUTH = process.env.E2E_AUTH === "1";
 const ADMIN_STATE = "e2e/.auth/admin.json";
 const FAMILY_STATE = "e2e/.auth/family.json";
+const NURSE_STATE = "e2e/.auth/nurse.json";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -34,6 +35,8 @@ export default defineConfig({
         "**/*.auth.spec.ts",
         "**/family.setup.ts",
         "**/*.family.spec.ts",
+        "**/nurse.setup.ts",
+        "**/*.nurse.spec.ts",
       ],
     },
     ...(AUTH
@@ -60,6 +63,21 @@ export default defineConfig({
               storageState: FAMILY_STATE,
             },
             dependencies: ["family-setup"],
+          },
+          // The nurse specs need a third session: a nurse who has just signed
+          // up, with no role and no profile, so the onboarding journey builds
+          // the profile by filling the form rather than finding one waiting.
+          // It depends on "setup" too, because the journey ends with an ADMIN
+          // approving the nurse, which needs the admin storageState.
+          { name: "nurse-setup", testMatch: /nurse\.setup\.ts/ },
+          {
+            name: "nurse",
+            testMatch: /.*\.nurse\.spec\.ts/,
+            use: {
+              ...devices["Desktop Chrome"],
+              storageState: NURSE_STATE,
+            },
+            dependencies: ["setup", "nurse-setup"],
           },
         ]
       : []),
