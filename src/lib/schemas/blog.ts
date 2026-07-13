@@ -42,7 +42,17 @@ export type BlogIntent = z.infer<typeof blogIntentSchema>;
 
 export const blogPostSchema = z
   .object({
+    /** An EXISTING post being edited. Absent means this save creates one. */
     id: z.string().uuid().optional(),
+    /**
+     * The id a brand-new post will be created under, minted by the editor (#696).
+     *
+     * Kept separate from `id` on purpose. savePost decides create-versus-update
+     * by whether it was handed an `id`, and an UPDATE against a row that does not
+     * exist yet succeeds while saving nothing, so reusing `id` for this would turn
+     * every creation into a silent no-op.
+     */
+    new_id: z.string().uuid().optional(),
     intent: blogIntentSchema,
     title: z
       .string()
@@ -108,6 +118,15 @@ export type BlogPostInput = z.infer<typeof blogPostSchema>;
  */
 export const blogAutosaveSchema = z.object({
   id: z.string().uuid().optional(),
+  /**
+   * The id a brand-new post will be created under, minted by the editor (#696).
+   * The editor hands the SAME one to autosavePost and savePost, so whichever
+   * creates the post first wins and the other collides on it rather than writing
+   * a second post. Autosave is the likelier offender of the two: it is debounced
+   * and fires repeatedly, so two autosaves racing before the editor learns the
+   * new id used to leave the author with two posts.
+   */
+  new_id: z.string().uuid().optional(),
   title: z
     .string()
     .trim()

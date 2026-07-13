@@ -82,11 +82,14 @@ import {
 } from "./actions";
 
 const POST_ID = "00000000-0000-4000-8000-000000000001";
+const SUBMISSION_ID = "00000000-0000-4000-8000-0000000000aa";
 const valid = {
   post_id: POST_ID,
   author_name: "Reader",
   author_email: "reader@example.com",
   body: "Great post, thanks!",
+  // The comment's id, minted by the form (#708).
+  submission_id: SUBMISSION_ID,
 };
 
 beforeEach(() => {
@@ -134,6 +137,44 @@ describe("submitComment", () => {
   it("refuses to store a comment on a non-published post", async () => {
     h.state.maybeSingle = { data: { status: "draft" }, error: null };
     const res = await submitComment(valid);
+    expect(res.success).toBe(false);
+    expect(h.calls.insert).toHaveLength(0);
+  });
+
+  // #708. The insert is now the gate: the same comment submitted twice collides
+  // on its id instead of posting twice and mailing the admins twice.
+  it("writes the comment under the id the form minted", async () => {
+    await submitComment(valid);
+
+    expect(h.calls.insert[0]).toMatchObject({ id: SUBMISSION_ID });
+  });
+
+  it("mails the admins only once when the same comment arrives twice", async () => {
+    h.state.insertError = { message: "duplicate key value", code: "23505" };
+
+    const res = await submitComment(valid);
+
+    // Success on purpose: the comment IS queued for moderation, so telling the
+    // commenter it failed would only invite a third attempt.
+    expect(res.success).toBe(true);
+    expect(h.sendComment).not.toHaveBeenCalled();
+  });
+
+  it("still reports a genuine database failure rather than a fake success", async () => {
+    h.state.insertError = { message: "connection reset", code: "08006" };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await submitComment(valid);
+
+    expect(res.success).toBe(false);
+    expect(h.sendComment).not.toHaveBeenCalled();
+  });
+
+  it("refuses a comment with no id rather than inventing one", async () => {
+    const { submission_id: _omitted, ...withoutId } = valid;
+
+    const res = await submitComment(withoutId);
+
     expect(res.success).toBe(false);
     expect(h.calls.insert).toHaveLength(0);
   });

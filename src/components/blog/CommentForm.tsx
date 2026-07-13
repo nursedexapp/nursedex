@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { submitComment } from "@/lib/comments/actions";
 import { PendingButton } from "@/components/ui/pending-button";
+import { useSubmissionId } from "@/components/ui/use-submission-id";
 
 export function CommentForm({ postId }: { postId: string }) {
   const [pending, startTransition] = useTransition();
@@ -16,6 +17,9 @@ export function CommentForm({ postId }: { postId: string }) {
   const [website, setWebsite] = useState(""); // honeypot
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [done, setDone] = useState(false);
+  // This comment's identity, minted here rather than by the database (#708). It
+  // survives a failed attempt on purpose: a retry has to carry the SAME id.
+  const { currentSubmissionId, renewSubmissionId } = useSubmissionId();
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -29,11 +33,15 @@ export function CommentForm({ postId }: { postId: string }) {
         author_email: email,
         body,
         website,
+        submission_id: currentSubmissionId(),
       });
       if (!res.success) {
         if (res.fieldErrors) setErrors(res.fieldErrors);
         return;
       }
+      // Landed. Roll the id over so a genuine second comment on the same post is
+      // not mistaken for a duplicate of this one and silently dropped.
+      renewSubmissionId();
       setDone(true);
     });
   }

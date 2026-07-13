@@ -7,6 +7,8 @@ const h = vi.hoisted(() => {
     // What the guarded UPDATE's .select() resolves to, consumed in order so a
     // test can model "first click wins, second click matches no row".
     updateResults: [] as { data: unknown[] | null; error: unknown }[],
+    /** Set to make the consulting_requests insert collide (#708). */
+    insertError: null as { message: string; code?: string } | null,
     request: {
       id: 7,
       status: "triaged",
@@ -17,6 +19,7 @@ const h = vi.hoisted(() => {
 
   const calls = {
     tables: [] as string[],
+    inserts: [] as unknown[],
     updates: [] as unknown[],
     eqs: [] as unknown[][],
     // Filters expressed as .not(...), which is how triage refuses to resurrect a
@@ -41,6 +44,14 @@ const h = vi.hoisted(() => {
           calls.nots.push(args);
           return "chain";
         },
+        insert: (payload: unknown) => {
+          calls.inserts.push(payload);
+          return "chain";
+        },
+        single: () =>
+          state.insertError
+            ? { data: null, error: state.insertError }
+            : { data: { id: 7 }, error: null },
         select: () =>
           state.updateResults.shift() ?? { data: [], error: null },
         // The triage UPDATE has no terminal .select(): it is awaited straight off
@@ -55,7 +66,13 @@ const h = vi.hoisted(() => {
     calls,
     serviceRoleClient,
     verifySlackRequest: vi.fn(() => true),
-    slackPost: vi.fn(async () => ({})),
+    // Slack answers chat.postMessage with the new message's timestamp, and the
+    // handler needs it: the thread root has to exist before the row is inserted
+    // (slack_thread_ts is NOT NULL), and on a duplicate it is the handle used to
+    // take that root back down.
+    slackPost: vi.fn(async (_method: string, _args?: unknown) => ({
+      ts: "1700000000.0001",
+    })),
     getRequest: vi.fn(async () => state.request),
     ensureIssue: vi.fn(async () => undefined),
     postReply: vi.fn(async () => undefined),
@@ -97,6 +114,7 @@ import {
   APPROVE_ACTION,
   REJECT_ACTION,
   TRIAGE_CALLBACK,
+  NEW_REQUEST_CALLBACK,
 } from "@/lib/slack/views";
 import type { NextRequest } from "next/server";
 
@@ -163,6 +181,8 @@ beforeEach(() => {
   h.calls.updates = [];
   h.calls.eqs = [];
   h.calls.nots = [];
+  h.calls.inserts = [];
+  h.state.insertError = null;
   h.calls.afterTasks = [];
   h.verifySlackRequest.mockReturnValue(true);
 });
@@ -313,5 +333,73 @@ describe("triage cannot resurrect a completed request (issue #663)", () => {
       estimate_hours: 2,
       status: "triaged",
     });
+  });
+});
+
+/** A submitted "new request" modal. `viewId` is what Slack keeps stable on a retry. */
+function newRequestSubmission(viewId = "V-100") {
+  const payload = {
+    type: "view_submission",
+    user: { id: "U123" },
+    view: {
+      id: viewId,
+      callback_id: NEW_REQUEST_CALLBACK,
+      state: {
+        values: {
+          title: { value: { value: "Fix the thing" } },
+          description: { value: { value: "It is broken" } },
+        },
+      },
+    },
+  };
+  const body = new URLSearchParams({
+    payload: JSON.stringify(payload),
+  }).toString();
+  return new Request("https://nursedex.com/api/slack/interactivity", {
+    method: "POST",
+    body,
+  }) as unknown as NextRequest;
+}
+
+// #708. A new request was a bare insert with nothing to stop a repeat: the only
+// unique index is on the thread, and a repeat creates a fresh thread, so it wrote
+// a second request, pinged ops again and paid for a second AI estimate. Slack
+// re-delivers a webhook whose first delivery timed out, replaying the identical
+// payload, so this is a retry problem rather than a double-click problem.
+describe("a re-delivered request modal creates only one request (issue #708)", () => {
+  it("stores the modal's view id, which is what Slack keeps stable on a retry", async () => {
+    await POST(newRequestSubmission("V-abc"));
+    await settleAfter();
+
+    expect(h.calls.inserts[0]).toMatchObject({ slack_view_id: "V-abc" });
+  });
+
+  it("creates no second request when Slack re-delivers the same submission", async () => {
+    // The re-delivery. Postgres rejects the repeated view id, and everything
+    // downstream (the ops ping, the AI estimate) must not run a second time.
+    h.state.insertError = { message: "duplicate key value", code: "23505" };
+
+    const res = await POST(newRequestSubmission("V-abc"));
+    await settleAfter();
+
+    expect(res.status).toBe(200);
+    // The estimate is the expensive one: a second call is a second AI bill for a
+    // request that already has its estimate.
+    expect(h.calls.afterTasks).toHaveLength(0);
+  });
+
+  it("takes down the orphaned thread root it posted before discovering the duplicate", async () => {
+    // The root has to be posted before the insert (slack_thread_ts is NOT NULL),
+    // so a duplicate always posts one. Leaving it would strand an empty thread
+    // next to the real request.
+    h.state.insertError = { message: "duplicate key value", code: "23505" };
+
+    await POST(newRequestSubmission("V-abc"));
+    await settleAfter();
+
+    const deleted = h.slackPost.mock.calls.filter(
+      (c) => c[0] === "chat.delete",
+    );
+    expect(deleted).toHaveLength(1);
   });
 });

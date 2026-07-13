@@ -737,3 +737,104 @@ describe("complete_consulting_request (migration 062, issue #663)", () => {
     expect(req?.status).toBe("approved");
   });
 });
+
+// ── #708 / #696 ───────────────────────────────────────────────────────────────
+//
+// The client mints the row's id, so a repeat of the same submission carries the
+// same id and the database throws it away. That only holds if the database really
+// does reject the duplicate under SIMULTANEOUS writes, which is the one thing a
+// sequential test cannot show.
+
+describe("client-minted ids make a repeat collide (issue #708)", () => {
+  const id = (suffix: string) =>
+    `00000000-0000-4000-8000-${stamp.toString().slice(-8)}${suffix}`;
+
+  it("lets exactly one of two SIMULTANEOUS contact submissions through", async () => {
+    const submissionId = id("0001");
+    const row = {
+      id: submissionId,
+      name: "Reader",
+      email: "reader@example.com",
+      subject: "Hello",
+      message: "A question about the platform.",
+    };
+
+    const results = await Promise.all([
+      service.from("contact_submissions").insert(row),
+      service.from("contact_submissions").insert(row),
+    ]);
+
+    expect(results.filter((r) => !r.error)).toHaveLength(1);
+
+    const { data } = await service
+      .from("contact_submissions")
+      .select("id")
+      .eq("id", submissionId);
+    expect(data).toHaveLength(1);
+  });
+
+  it("rejects a repeated contact submission with 23505, which the action reads as 'already received'", async () => {
+    const row = {
+      id: id("0002"),
+      name: "Reader",
+      email: "reader@example.com",
+      subject: "Hello",
+      message: "A question about the platform.",
+    };
+
+    const first = await service.from("contact_submissions").insert(row);
+    const second = await service.from("contact_submissions").insert(row);
+
+    expect(first.error).toBeNull();
+    expect(second.error?.code).toBe("23505");
+  });
+});
+
+describe("uniq_consulting_requests_slack_view (migration 063, issue #708)", () => {
+  const base = {
+    title: "db-guards view id",
+    slack_channel: "C-TEST",
+  };
+
+  it("refuses a second request for the same Slack modal", async () => {
+    // Slack re-delivers a submission whose first delivery timed out, replaying
+    // the identical payload. view.id is what stays stable across that retry.
+    const viewId = `V-${stamp}-dup`;
+
+    const first = await service.from("consulting_requests").insert({
+      ...base,
+      slack_thread_ts: `${stamp}.100`,
+      slack_view_id: viewId,
+    });
+    const second = await service.from("consulting_requests").insert({
+      ...base,
+      // A re-delivery posts a NEW thread root, so the thread is different. Only
+      // the view id ties the two together, which is the whole reason it exists:
+      // the pre-existing unique index on the thread could never have caught this.
+      slack_thread_ts: `${stamp}.200`,
+      slack_view_id: viewId,
+    });
+
+    expect(first.error).toBeNull();
+    expect(second.error?.code).toBe("23505");
+  });
+
+  it("still allows many requests that came from no modal at all", async () => {
+    // The index is partial. Every row predating migration 063 has NULL here, and
+    // a unique index that treated those as equal would make the migration
+    // unappliable and block every non-modal insert.
+    const a = await service.from("consulting_requests").insert({
+      ...base,
+      slack_thread_ts: `${stamp}.300`,
+      slack_view_id: null,
+    });
+    const b = await service.from("consulting_requests").insert({
+      ...base,
+      slack_thread_ts: `${stamp}.400`,
+      slack_view_id: null,
+    });
+
+    expect(a.error).toBeNull();
+    expect(b.error).toBeNull();
+  });
+});

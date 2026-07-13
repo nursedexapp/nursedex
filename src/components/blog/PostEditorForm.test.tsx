@@ -151,21 +151,56 @@ describe("saving a post that already exists", () => {
 });
 
 describe("saving a post that does not exist yet", () => {
-  it("REFUSES a retry, because a second insert would be a second post", async () => {
-    // The whole point. savePost with no id inserts, and the second insert would
-    // be given its own slug rather than colliding, so nothing downstream stops
-    // it. Handing this button back on a stall would quietly duplicate the post.
+  // This used to REFUSE a retry. savePost with no id inserted, and the second
+  // insert was handed its own slug rather than colliding, so a retry on a hung
+  // save quietly left the author with two posts. Refusing the retry was the
+  // workaround, and it stranded the author of a new post in front of a hung save
+  // with nothing to press.
+  //
+  // The editor now mints the post's id up front and both save paths create under
+  // it (#696), so a repeat collides on the primary key. The retry is safe, and
+  // the tests below are the ones that say so.
+  it("offers a retry on a stall, now that a second save cannot duplicate the post", async () => {
     vi.mocked(savePost).mockReturnValue(hang());
     renderForm(undefined);
 
     await click(/save draft/i);
     await stall();
 
-    expect(screen.queryByRole("button", { name: /try again/i })).toBeNull();
-    expect(screen.getByRole("alert")).toHaveTextContent(/refresh/i);
+    expect(
+      screen.getByRole("button", { name: /try again/i }),
+    ).toBeInTheDocument();
+  });
 
-    await click(/saving/i);
+  it("sends a minted id with a brand-new post, rather than letting the server invent one", async () => {
+    vi.mocked(savePost).mockResolvedValue({ success: true });
+    renderForm(undefined);
 
-    expect(savePost).toHaveBeenCalledTimes(1);
+    await click(/save draft/i);
+
+    expect(savePost).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: undefined,
+        new_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      }),
+    );
+  });
+
+  it("retries under the SAME minted id, so the retry cannot become a second post", async () => {
+    // The load-bearing assertion for #696. A retry that minted a fresh id would
+    // look like a brand-new post to the database, which is the duplicate we set
+    // out to prevent.
+    vi.mocked(savePost).mockReturnValue(hang());
+    renderForm(undefined);
+
+    await click(/save draft/i);
+    await stall();
+    await click(/try again/i);
+
+    const calls = vi.mocked(savePost).mock.calls;
+    expect(calls).toHaveLength(2);
+    const first = calls[0][0] as { new_id: string };
+    const second = calls[1][0] as { new_id: string };
+    expect(second.new_id).toBe(first.new_id);
   });
 });

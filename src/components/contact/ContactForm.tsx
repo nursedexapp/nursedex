@@ -12,6 +12,7 @@ import {
 } from "@/lib/schemas/contact";
 import { submitContact } from "@/lib/contact/actions";
 import { PendingButton } from "@/components/ui/pending-button";
+import { useSubmissionId } from "@/components/ui/use-submission-id";
 
 export function ContactForm() {
   const [name, setName] = useState("");
@@ -22,6 +23,10 @@ export function ContactForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitted, setSubmitted] = useState(false);
   const [pending, startTransition] = useTransition();
+  // This message's identity, minted here rather than by the database (#708). It
+  // survives a failed attempt on purpose: a retry has to carry the SAME id, or it
+  // is just a second message wearing a hat.
+  const { currentSubmissionId, renewSubmissionId } = useSubmissionId();
 
   const clearError = (field: string) =>
     setErrors((prev) => {
@@ -49,6 +54,7 @@ export function ContactForm() {
         subject,
         message,
         turnstile_token: token,
+        submission_id: currentSubmissionId(),
       });
       if (!result.success) {
         if (result.fieldErrors) {
@@ -62,6 +68,9 @@ export function ContactForm() {
         );
         return;
       }
+      // Landed. Roll the id over so a genuine second message is not mistaken for
+      // a duplicate of this one and silently dropped.
+      renewSubmissionId();
       setSubmitted(true);
     });
   };
@@ -192,8 +201,11 @@ export function ContactForm() {
         )}
       </div>
 
-      {/* wait, not retry (#443 phase 5): a second fire sends a second
-          message. */}
+      {/* Still wait, not retry, but no longer because a second fire would send a
+          second message: the submission id makes that impossible now (#708).
+          Graduating this button to retry is tracked with the rest of them in
+          #669, which needs the newest-attempt guard, not just an idempotent
+          write. */}
       <PendingButton
         pending={pending}
         mode="wait"
