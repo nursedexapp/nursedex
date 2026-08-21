@@ -75,4 +75,51 @@ describe("signInWithGoogle", () => {
 
     expect(result?.error).not.toContain("client_secret");
   });
+
+  // #742. Two parameters were being sent that nothing in this codebase acts on.
+  // access_type: "offline" asks Google for a refresh token, and prompt:
+  // "consent" forces the consent screen every single time so that the refresh
+  // token is reissued. Nothing ever reads provider_token or
+  // provider_refresh_token, so the refresh token was requested, stored by
+  // Supabase, and never used, while the price was paid by every returning user:
+  // a full "You're signing back in to..." interstitial on each sign-in.
+
+  async function optionsPassedToGoogle() {
+    h.signInWithOAuth.mockResolvedValue({
+      data: { url: "https://accounts.google.com/o/oauth2/v2/auth?x=1" },
+      error: null,
+    });
+    const { signInWithGoogle } = await import("./actions");
+    await signInWithGoogle().catch(() => {}); // the redirect throw is expected
+    return h.signInWithOAuth.mock.calls[0]?.[0]?.options ?? {};
+  }
+
+  it("does not force the consent screen on people who have signed in before", async () => {
+    const options = await optionsPassedToGoogle();
+
+    // Asserting the RULE, not one spelling of it: any prompt value that forces
+    // an interstitial is wrong here, not merely the literal "consent".
+    const prompt = options.queryParams?.prompt;
+    expect(prompt).not.toBe("consent");
+    expect(prompt).not.toBe("login");
+    expect(prompt).not.toBe("select_account consent");
+  });
+
+  it("does not ask Google for a refresh token it never reads", async () => {
+    const options = await optionsPassedToGoogle();
+
+    expect(options.queryParams?.access_type).not.toBe("offline");
+  });
+
+  it("still sends the user somewhere Google can authenticate them", async () => {
+    // A positive control. Both assertions above are satisfied by passing no
+    // options at all, or by breaking the call outright, so prove the sign-in
+    // still actually happens in the same fixture.
+    const options = await optionsPassedToGoogle();
+
+    expect(h.signInWithOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "google" }),
+    );
+    expect(options.redirectTo).toContain("/auth/callback");
+  });
 });

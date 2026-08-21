@@ -188,10 +188,13 @@ export async function signInWithGoogle(): Promise<AuthResult | void> {
     provider: "google",
     options: {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || "https://nursedex.com"}/auth/callback`,
-      queryParams: {
-        access_type: "offline",
-        prompt: "consent",
-      },
+      // Deliberately no queryParams. This used to send access_type: "offline"
+      // and prompt: "consent" (#742). Together those ask Google for a refresh
+      // token and force the consent screen on every sign-in so the token keeps
+      // being reissued. Nothing here has ever read provider_token or
+      // provider_refresh_token, so the token was requested and never used,
+      // while every returning user paid for it with a full "You're signing back
+      // in to..." interstitial. Do not add them back without a reader.
     },
   });
 
