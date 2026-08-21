@@ -40,13 +40,25 @@ function parseRows(raw: string): { cover_image_url?: string | null }[] {
   return parsed as { cover_image_url?: string | null }[];
 }
 
-async function probe(url: string): Promise<HostCheck> {
+async function probe(
+  url: string,
+  kind: HostCheck["kind"],
+): Promise<HostCheck> {
   try {
     const res = await fetch(url, { redirect: "follow" });
-    return { url, status: res.status };
+    return {
+      kind,
+      url,
+      status: res.status,
+      // Present on every Supabase response including a 401, and absent entirely
+      // when something else is answering on the name. Read it always; only the
+      // identity probe is judged on it.
+      projectRef: res.headers.get("sb-project-ref"),
+    };
   } catch (err: unknown) {
     // A request that never completed is a failure, never an absent result.
     return {
+      kind,
       url,
       status: null,
       error: err instanceof Error ? err.message : String(err),
@@ -59,9 +71,14 @@ async function main(): Promise<void> {
 
   // Throws when there is nothing on the legacy host to look at, which must fail
   // the job rather than read as an all clear.
-  const urls = [...collectLegacyImageUrls(rows), legacyHealthUrl()];
+  const objects = collectLegacyImageUrls(rows);
 
-  const result = evaluateLegacyHost(await Promise.all(urls.map(probe)));
+  const result = evaluateLegacyHost(
+    await Promise.all([
+      ...objects.map((u) => probe(u, "object")),
+      probe(legacyHealthUrl(), "identity"),
+    ]),
+  );
   const report = formatLegacyHostReport(result);
   console.log(report);
 

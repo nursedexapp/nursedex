@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   LEGACY_SUPABASE_HOST,
+  LEGACY_PROJECT_REF,
   collectLegacyImageUrls,
   evaluateLegacyHost,
   formatLegacyHostReport,
@@ -46,21 +47,54 @@ describe("collectLegacyImageUrls", () => {
   });
 });
 
+const objectOk = { kind: "object" as const, url: cover(LEGACY), status: 200 };
+const identityOk = {
+  kind: "identity" as const,
+  url: `${LEGACY}/auth/v1/health`,
+  status: 401,
+  projectRef: LEGACY_PROJECT_REF,
+};
+
 describe("evaluateLegacyHost", () => {
-  it("is ok when every checked URL served", () => {
-    const result = evaluateLegacyHost([
-      { url: cover(LEGACY), status: 200 },
-      { url: `${LEGACY}/auth/v1/health`, status: 200 },
-    ]);
+  it("is ok when the images serve and the host identifies as our project", () => {
+    const result = evaluateLegacyHost([objectOk, identityOk]);
 
     expect(result.ok).toBe(true);
     expect(result.failures).toEqual([]);
   });
 
+  // Measured 2026-08-21: /auth/v1/health with no apikey returns 401 and still
+  // carries sb-project-ref. That header is stronger evidence than a 200 status,
+  // because it proves WHICH project answered, and it needs no credential. Judging
+  // this probe by status would fail forever on a perfectly healthy host.
+  it("accepts a 401 on the identity probe, because the fingerprint is the point", () => {
+    expect(evaluateLegacyHost([objectOk, identityOk]).ok).toBe(true);
+  });
+
+  it("is NOT ok when something else answers on our host's name", () => {
+    // The negative control, measured: a non-Supabase host returns 404 and no
+    // sb-project-ref at all. A 200 from the wrong thing must not pass.
+    const result = evaluateLegacyHost([
+      objectOk,
+      { ...identityOk, status: 200, projectRef: null },
+    ]);
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("is NOT ok when a DIFFERENT Supabase project answers", () => {
+    const result = evaluateLegacyHost([
+      objectOk,
+      { ...identityOk, projectRef: "someoneelsesproject" },
+    ]);
+
+    expect(result.ok).toBe(false);
+  });
+
   it("is NOT ok when the legacy host stops serving an image", () => {
     const result = evaluateLegacyHost([
-      { url: cover(LEGACY), status: 404 },
-      { url: `${LEGACY}/auth/v1/health`, status: 200 },
+      { ...objectOk, status: 404 },
+      identityOk,
     ]);
 
     expect(result.ok).toBe(false);
@@ -70,13 +104,13 @@ describe("evaluateLegacyHost", () => {
 
   it("is NOT ok when nothing was checked", () => {
     // An empty result set is the shape a broken caller produces, and it would
-    // otherwise satisfy "every checked URL served" vacuously.
+    // otherwise satisfy "every check passed" vacuously.
     expect(evaluateLegacyHost([]).ok).toBe(false);
   });
 
   it("treats a network failure as a failure, not as a pass", () => {
     const result = evaluateLegacyHost([
-      { url: cover(LEGACY), status: null, error: "getaddrinfo ENOTFOUND" },
+      { ...objectOk, status: null, error: "getaddrinfo ENOTFOUND" },
     ]);
 
     expect(result.ok).toBe(false);
@@ -87,7 +121,9 @@ describe("evaluateLegacyHost", () => {
 describe("formatLegacyHostReport", () => {
   it("names what broke and why it matters, not just that something failed", () => {
     const report = formatLegacyHostReport(
-      evaluateLegacyHost([{ url: cover(LEGACY), status: 404 }]),
+      evaluateLegacyHost([
+        { kind: "object" as const, url: cover(LEGACY), status: 404 },
+      ]),
     );
 
     expect(report).toContain(cover(LEGACY));

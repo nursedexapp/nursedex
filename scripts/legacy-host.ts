@@ -21,13 +21,36 @@
  */
 export const LEGACY_SUPABASE_HOST = "fisuhtkzhyttdmqoivlp.supabase.co";
 
+/** The project this host must identify itself as. Derived, so the two cannot drift. */
+export const LEGACY_PROJECT_REF = LEGACY_SUPABASE_HOST.split(".")[0];
+
 const LEGACY_ORIGIN = `https://${LEGACY_SUPABASE_HOST}`;
 
-/** A URL the check attempted, and what came back. */
+/**
+ * A URL the check attempted, and what came back.
+ *
+ * The two kinds are judged by different rules on purpose.
+ *
+ * An "object" probe fetches a real published blog image and wants HTTP 200,
+ * because that is literally what a reader's browser does.
+ *
+ * An "identity" probe asks whether OUR Supabase project is still answering on
+ * this hostname, and is judged by the `sb-project-ref` response header rather
+ * than the status. Measured 2026-08-21: /auth/v1/health with no apikey returns
+ * 401 and still carries that header, while a non Supabase host on the same name
+ * returns 404 with no header at all. So the fingerprint is both stronger than a
+ * status check (it proves WHICH project answered, not merely that something
+ * did) and cheaper (it needs no credential in CI). Judging it by status would
+ * fail forever against a perfectly healthy host, which is exactly what the first
+ * version of this check did.
+ */
 export interface HostCheck {
+  kind: "object" | "identity";
   url: string;
   /** null when the request never completed at all. */
   status: number | null;
+  /** identity probes only: the project the host reported, if any. */
+  projectRef?: string | null;
   error?: string;
 }
 
@@ -87,7 +110,13 @@ export function evaluateLegacyHost(checks: HostCheck[]): LegacyHostResult {
     return { ok: false, checked: 0, failures: [] };
   }
 
-  const failures = checks.filter((c) => c.error !== undefined || c.status !== 200);
+  const failures = checks.filter((c) => {
+    // A request that never completed is a failure whatever kind it was.
+    if (c.error !== undefined) return true;
+    return c.kind === "identity"
+      ? c.projectRef !== LEGACY_PROJECT_REF
+      : c.status !== 200;
+  });
   return { ok: failures.length === 0, checked: checks.length, failures };
 }
 
@@ -108,9 +137,16 @@ export function formatLegacyHostReport(result: LegacyHostResult): string {
     );
   }
 
-  const lines = result.failures.map(
-    (f) => `  ${f.url}\n    ${f.error ?? `HTTP ${f.status}`}`,
-  );
+  const lines = result.failures.map((f) => {
+    if (f.error !== undefined) return `  ${f.url}\n    ${f.error}`;
+    if (f.kind === "identity") {
+      return (
+        `  ${f.url}\n    identified as ${f.projectRef ?? "nothing"}, ` +
+        `expected ${LEGACY_PROJECT_REF} (HTTP ${f.status})`
+      );
+    }
+    return `  ${f.url}\n    HTTP ${f.status}`;
+  });
 
   return [
     `Legacy Supabase host FAILING. ${result.failures.length} of ${result.checked} URL(s) on ${LEGACY_SUPABASE_HOST} are no longer serving.`,
