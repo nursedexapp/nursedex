@@ -13,10 +13,11 @@ export const metadata: Metadata = {
 
 export default async function SavedNursesPage() {
   const user = await requireRole(UserRole.FAMILY);
-  const [saved, hasSub] = await Promise.all([
-    getSavedNurses(user.id),
-    hasActiveFamilyAccess(user.id),
-  ]);
+  // Entitlement has to be known before the cards are built, not alongside
+  // them: the shaper strips last_name unless the viewer is entitled, and a
+  // stripped card cannot be un-stripped afterward (#770).
+  const hasSub = await hasActiveFamilyAccess(user.id);
+  const saved = await getSavedNurses(user.id, { canSeeIdentity: hasSub });
 
   const available = saved.filter((n) => n.is_available);
   const unavailable = saved.filter((n) => !n.is_available);

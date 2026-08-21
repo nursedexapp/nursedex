@@ -2,14 +2,36 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
-import { getSignedPhotoUrl } from "@/lib/profile/photos";
-import type { NurseSearchCard } from "@/lib/nurses/search";
+import {
+  NURSE_CARD_COLUMNS,
+  attachNurseCardPhotos,
+  shapeNurseCards,
+  toPublicNurseCard,
+  type NurseSearchCard,
+} from "@/lib/nurses/card";
 
 export interface RevealedNurse extends NurseSearchCard {
   // The reveal's expiration date when set (i.e., the family has cancelled
   // their sub but is still in the 60-day window). Null means active access.
   access_expires_at: string | null;
   revealed_at: string;
+}
+
+/**
+ * True while the family still has access to this reveal. A null expiry means
+ * an active subscription; a set one means access ends at that moment.
+ *
+ * One predicate, used by both readers of the same fact. getRevealedNurses used
+ * to have no expiry test at all, so it rendered a nurse's full last name after
+ * the RPC behind the profile page had already started refusing the same
+ * family (#770).
+ */
+export function isRevealActive(
+  accessExpiresAt: string | null,
+  now: number = Date.now(),
+): boolean {
+  if (!accessExpiresAt) return true;
+  return new Date(accessExpiresAt).getTime() > now;
 }
 
 /**
@@ -28,11 +50,7 @@ export async function getRevealedNurseIds(
   const now = Date.now();
   return new Set(
     (data ?? [])
-      .filter(
-        (r) =>
-          !r.access_expires_at ||
-          new Date(r.access_expires_at).getTime() > now,
-      )
+      .filter((r) => isRevealActive(r.access_expires_at, now))
       .map((r) => r.nurse_user_id as string),
   );
 }
@@ -64,114 +82,66 @@ export async function getRevealedNurses(
   if (limit) revealQuery = revealQuery.limit(limit);
 
   const { data: revealRows, error: revealError } = await revealQuery;
-  if (revealError || !revealRows || revealRows.length === 0) return [];
+  if (revealError) {
+    console.error(
+      "getRevealedNurses reveal query failed:",
+      revealError.message,
+    );
+    return [];
+  }
+  if (!revealRows || revealRows.length === 0) return [];
 
-  const nurseIds = revealRows.map((r) => r.nurse_user_id);
+  // #770: a reveal past its access_expires_at is no longer the family's to
+  // see. getRevealedNurseIds and migration 057's RPC already refuse it; this
+  // reader used to disagree with both and render the nurse's full name.
+  const now = Date.now();
+  const activeReveals = revealRows.filter((r) =>
+    isRevealActive(r.access_expires_at, now),
+  );
+  if (activeReveals.length === 0) return [];
+
+  const nurseIds = activeReveals.map((r) => r.nurse_user_id);
 
   const cardsQuery = supabase
     .from("nurse_profiles")
-    .select(
-      `
-      user_id,
-      slug,
-      credential,
-      primary_care_type,
-      care_types,
-      tier,
-      has_photo,
-      photos,
-      avg_rating,
-      review_count,
-      is_available,
-      unavailable_visibility,
-      profile_completeness,
-      years_experience,
-      verification_status,
-      users!inner (
-        first_name,
-        last_name,
-        zip_code,
-        communication_preference,
-        is_deleted,
-        is_suspended
-      )
-    `,
-    )
+    .select(NURSE_CARD_COLUMNS)
     .in("user_id", nurseIds);
   const { data, error } = await applyVisibleNurseFilter(cardsQuery);
 
-  if (error || !data) return [];
+  if (error || !data) {
+    if (error) {
+      console.error("getRevealedNurses card query failed:", error.message);
+    }
+    return [];
+  }
 
-  type ProfileRow = {
-    user_id: string;
-    slug: string;
-    credential: string;
-    primary_care_type: string | null;
-    care_types: string[];
-    tier: "free" | "featured";
-    has_photo: boolean;
-    photos: string[];
-    avg_rating: number | null;
-    review_count: number;
-    is_available: boolean;
-    unavailable_visibility: string | null;
-    profile_completeness: number;
-    years_experience: number | null;
-    verification_status: string;
-    users: {
-      first_name: string | null;
-      last_name: string | null;
-      zip_code: string | null;
-      communication_preference: string | null;
-      is_deleted: boolean;
-      is_suspended: boolean;
-    } | null;
-  };
-
-  const byId = new Map<string, ProfileRow>();
-  for (const p of data as unknown as ProfileRow[]) byId.set(p.user_id, p);
+  // Every reveal left in activeReveals is one this family still has access to,
+  // so identity is theirs to see. #770 / #771: gated in the shared shaper, in
+  // the data, rather than by a prop on the page.
+  const shaped = shapeNurseCards(data, { canSeeIdentity: true });
+  const byId = new Map(shaped.map((c) => [c.user_id, c]));
 
   // Iterate reveals (already newest first) so order and access window come
   // from the reveal row, while the card fields come from nurse_profiles.
-  const out: RevealedNurse[] = [];
-  for (const r of revealRows) {
-    const n = byId.get(r.nurse_user_id);
-    if (!n || !n.users) continue;
-    const u = n.users;
-
-    let photo_url: string | null = null;
-    if (n.photos.length > 0) {
-      try {
-        photo_url = await getSignedPhotoUrl(n.photos[0]);
-      } catch {
-        // leave null
-      }
-    }
-
-    out.push({
-      user_id: n.user_id,
-      slug: n.slug,
-      first_name: u.first_name ?? "",
-      last_name: u.last_name ?? "",
-      credential: n.credential,
-      primary_care_type: n.primary_care_type,
-      care_types: n.care_types,
-      tier: n.tier,
-      has_photo: n.has_photo,
-      photo_url,
-      avg_rating: n.avg_rating,
-      review_count: n.review_count,
-      is_available: n.is_available,
-      unavailable_visibility: n.unavailable_visibility,
-      profile_completeness: n.profile_completeness,
-      zip_code: u.zip_code,
-      distance_miles: null,
-      communication_preference: u.communication_preference,
-      years_experience: n.years_experience,
+  const cards = [];
+  const meta = new Map<
+    string,
+    { access_expires_at: string | null; revealed_at: string }
+  >();
+  for (const r of activeReveals) {
+    const card = byId.get(r.nurse_user_id);
+    if (!card) continue;
+    cards.push(card);
+    meta.set(card.user_id, {
       access_expires_at: r.access_expires_at,
       revealed_at: r.revealed_at,
     });
   }
 
-  return out;
+  await attachNurseCardPhotos(cards);
+
+  return cards.map((card) => ({
+    ...toPublicNurseCard(card),
+    ...meta.get(card.user_id)!,
+  }));
 }

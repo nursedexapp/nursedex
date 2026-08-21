@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { NurseCard } from "@/components/nurses/NurseCard";
-import type { NurseSearchCard } from "@/lib/nurses/search";
+import type { NurseSearchCard } from "@/lib/nurses/card";
 
 interface SurveyResultCardProps {
   nurse: NurseSearchCard;

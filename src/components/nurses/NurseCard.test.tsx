@@ -3,7 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { NurseCard } from "./NurseCard";
-import type { NurseSearchCard } from "@/lib/nurses/search";
+import type { NurseSearchCard } from "@/lib/nurses/card";
 
 afterEach(cleanup);
 
