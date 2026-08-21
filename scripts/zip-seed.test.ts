@@ -211,6 +211,15 @@ describe("the committed zip seed", () => {
     expect(readFileSync(SEED_PATH, "utf8")).toBe(generated.seedSql);
   });
 
+  it("counts rows the repair migration has made countable", () => {
+    // 217 launch rows hold a state of "NY" plus a carriage return, so a
+    // state = 'NY' count misses them. Migration 064 trims them; this floor is
+    // only reachable because it runs first.
+    const migration = readFileSync(MIGRATION_PATH, "utf8");
+    expect(migration).toContain("WHERE state = 'NY'");
+    expect(MIGRATION_PATH).toContain("065_");
+  });
+
   it("names its license and where the attribution ships", () => {
     const migration = readFileSync(MIGRATION_PATH, "utf8");
     expect(migration).toContain("CC BY 4.0");

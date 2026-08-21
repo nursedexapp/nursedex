@@ -178,7 +178,7 @@ END
 $$;`;
 }
 
-export const MIGRATION_FILENAME = "064_seed_ny_zip_codes.sql";
+export const MIGRATION_FILENAME = "065_seed_ny_zip_codes.sql";
 
 export function renderMigration(rows: ZipRow[]): string {
   const geonames = rows.filter((r) => r.source === "geonames").length;

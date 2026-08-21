@@ -5,7 +5,7 @@
 -- BEGIN GENERATED zip_codes
 -- Rendered from data/ny_zip_codes.csv by scripts/generate-zip-seed.ts.
 -- Do not edit by hand: supabase/config.toml points db reset at this file,
--- so it and migration 064_seed_ny_zip_codes.sql must agree (#772).
+-- so it and migration 065_seed_ny_zip_codes.sql must agree (#772).
 
 INSERT INTO public.zip_codes (zip, latitude, longitude, city, county, state) VALUES
   ('00501', 40.8154, -73.0451, 'Holtsville', 'Suffolk', 'NY'),
