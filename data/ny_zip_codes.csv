@@ -1,0 +1,2159 @@
+zip,city,county,state,latitude,longitude,source
+00501,Holtsville,Suffolk,NY,40.8154,-73.0451,geonames
+00544,Holtsville,Suffolk,NY,40.8154,-73.0451,geonames
+06390,Fishers Island,Suffolk,NY,41.2639,-72.0178,geonames
+10001,New York,New York,NY,40.7484,-73.9967,geonames
+10002,New York,New York,NY,40.7152,-73.9877,geonames
+10003,New York,New York,NY,40.7313,-73.9892,geonames
+10004,New York,New York,NY,40.7143,-74.0060,geonames
+10005,New York,New York,NY,40.7056,-74.0083,geonames
+10006,New York,New York,NY,40.7085,-74.0135,geonames
+10007,New York,New York,NY,40.7139,-74.0070,geonames
+10008,New York,New York,NY,40.7143,-74.0060,geonames
+10009,New York,New York,NY,40.7262,-73.9796,geonames
+10010,New York,New York,NY,40.7375,-73.9813,geonames
+10011,New York,New York,NY,40.7402,-73.9996,geonames
+10012,New York,New York,NY,40.7255,-73.9983,geonames
+10013,New York,New York,NY,40.7185,-74.0025,geonames
+10014,New York,New York,NY,40.7339,-74.0054,geonames
+10016,New York,New York,NY,40.7443,-73.9781,geonames
+10017,New York,New York,NY,40.7517,-73.9707,geonames
+10018,New York,New York,NY,40.7547,-73.9925,geonames
+10019,New York,New York,NY,40.7651,-73.9858,geonames
+10020,New York,New York,NY,40.7354,-73.9968,geonames
+10021,New York,New York,NY,40.7685,-73.9588,geonames
+10022,New York,New York,NY,40.7571,-73.9657,geonames
+10023,New York,New York,NY,40.7764,-73.9827,geonames
+10024,New York,New York,NY,40.7864,-73.9764,geonames
+10025,New York,New York,NY,40.7975,-73.9683,geonames
+10026,New York,New York,NY,40.8019,-73.9531,geonames
+10027,New York,New York,NY,40.8116,-73.9550,geonames
+10028,New York,New York,NY,40.7763,-73.9529,geonames
+10029,New York,New York,NY,40.7918,-73.9447,geonames
+10030,New York,New York,NY,40.8183,-73.9426,geonames
+10031,New York,New York,NY,40.8246,-73.9507,geonames
+10032,New York,New York,NY,40.8382,-73.9420,geonames
+10033,New York,New York,NY,40.8496,-73.9356,geonames
+10034,New York,New York,NY,40.8662,-73.9221,geonames
+10035,New York,New York,NY,40.8011,-73.9371,geonames
+10036,New York,New York,NY,40.7597,-73.9918,geonames
+10037,New York,New York,NY,40.8135,-73.9381,geonames
+10038,New York,New York,NY,40.7101,-74.0013,geonames
+10039,New York,New York,NY,40.8265,-73.9383,geonames
+10040,New York,New York,NY,40.8583,-73.9296,geonames
+10041,New York,New York,NY,40.7038,-74.0098,geonames
+10043,New York,New York,NY,40.7143,-74.0060,geonames
+10044,New York,New York,NY,40.7618,-73.9505,geonames
+10045,New York,New York,NY,40.7086,-74.0087,geonames
+10055,New York,New York,NY,40.7808,-73.9772,geonames
+10060,New York,New York,NY,40.7808,-73.9772,geonames
+10065,New York,New York,NY,40.7651,-73.9638,geonames
+10069,New York,New York,NY,40.7780,-73.9884,geonames
+10075,New York,New York,NY,40.7143,-74.0060,geonames
+10080,New York,New York,NY,40.7143,-74.0060,geonames
+10081,New York,New York,NY,40.7143,-74.0060,geonames
+10087,New York,New York,NY,40.7808,-73.9772,geonames
+10090,New York,New York,NY,40.7808,-73.9772,geonames
+10101,New York,New York,NY,40.7808,-73.9772,geonames
+10102,New York,New York,NY,40.7808,-73.9772,geonames
+10103,New York,New York,NY,40.7603,-73.9762,geonames
+10104,New York,New York,NY,40.7609,-73.9799,geonames
+10105,New York,New York,NY,40.7628,-73.9785,geonames
+10106,New York,New York,NY,40.7652,-73.9804,geonames
+10107,New York,New York,NY,40.7664,-73.9827,geonames
+10108,New York,New York,NY,40.7808,-73.9772,geonames
+10109,New York,New York,NY,40.7808,-73.9772,geonames
+10110,New York,New York,NY,40.7540,-73.9808,geonames
+10111,New York,New York,NY,40.7592,-73.9778,geonames
+10112,New York,New York,NY,40.7593,-73.9798,geonames
+10113,New York,New York,NY,40.7808,-73.9772,geonames
+10114,New York,New York,NY,40.7808,-73.9772,geonames
+10115,New York,New York,NY,40.8111,-73.9642,geonames
+10116,New York,New York,NY,40.7808,-73.9772,geonames
+10117,New York,New York,NY,40.7808,-73.9772,geonames
+10118,New York,New York,NY,40.7490,-73.9865,geonames
+10119,New York,New York,NY,40.7808,-73.9772,geonames
+10120,New York,New York,NY,40.7506,-73.9894,geonames
+10121,New York,New York,NY,40.7496,-73.9919,geonames
+10122,New York,New York,NY,40.7518,-73.9922,geonames
+10123,New York,New York,NY,40.7515,-73.9905,geonames
+10124,New York,New York,NY,40.7808,-73.9772,geonames
+10125,New York,New York,NY,40.7808,-73.9772,geonames
+10126,New York,New York,NY,40.7808,-73.9772,geonames
+10128,New York,New York,NY,40.7816,-73.9511,geonames
+10129,New York,New York,NY,40.7808,-73.9772,geonames
+10130,New York,New York,NY,40.7808,-73.9772,geonames
+10131,New York,New York,NY,40.7808,-73.9772,geonames
+10132,New York,New York,NY,40.7808,-73.9772,geonames
+10133,New York,New York,NY,40.7808,-73.9772,geonames
+10138,New York,New York,NY,40.7808,-73.9772,geonames
+10150,New York,New York,NY,40.7808,-73.9772,geonames
+10151,New York,New York,NY,40.7634,-73.9740,geonames
+10152,New York,New York,NY,40.7589,-73.9730,geonames
+10153,New York,New York,NY,40.7641,-73.9735,geonames
+10154,New York,New York,NY,40.7583,-73.9735,geonames
+10155,New York,New York,NY,40.7611,-73.9680,geonames
+10156,New York,New York,NY,40.7808,-73.9772,geonames
+10157,New York,New York,NY,40.7808,-73.9772,geonames
+10158,New York,New York,NY,40.7494,-73.9758,geonames
+10159,New York,New York,NY,40.7808,-73.9772,geonames
+10160,New York,New York,NY,40.7808,-73.9772,geonames
+10161,New York,New York,NY,40.7808,-73.9772,geonames
+10162,New York,New York,NY,40.7699,-73.9511,geonames
+10163,New York,New York,NY,40.7808,-73.9772,geonames
+10164,New York,New York,NY,40.7808,-73.9772,geonames
+10165,New York,New York,NY,40.7524,-73.9791,geonames
+10166,New York,New York,NY,40.7546,-73.9762,geonames
+10167,New York,New York,NY,40.7549,-73.9750,geonames
+10168,New York,New York,NY,40.7519,-73.9768,geonames
+10169,New York,New York,NY,40.7547,-73.9766,geonames
+10170,New York,New York,NY,40.7526,-73.9755,geonames
+10171,New York,New York,NY,40.7564,-73.9748,geonames
+10172,New York,New York,NY,40.7558,-73.9753,geonames
+10173,New York,New York,NY,40.7543,-73.9796,geonames
+10174,New York,New York,NY,40.7517,-73.9752,geonames
+10175,New York,New York,NY,40.7543,-73.9798,geonames
+10176,New York,New York,NY,40.7556,-73.9789,geonames
+10177,New York,New York,NY,40.7553,-73.9761,geonames
+10178,New York,New York,NY,40.7514,-73.9785,geonames
+10179,New York,New York,NY,40.7808,-73.9772,geonames
+10185,New York,New York,NY,40.7808,-73.9772,geonames
+10199,New York,New York,NY,40.7503,-74.0006,geonames
+10203,New York,New York,NY,40.7143,-74.0060,geonames
+10211,New York,New York,NY,40.7808,-73.9772,geonames
+10212,New York,New York,NY,40.7143,-74.0060,geonames
+10213,New York,New York,NY,40.7143,-74.0060,geonames
+10242,New York,New York,NY,40.7143,-74.0060,geonames
+10249,New York,New York,NY,40.7143,-74.0060,geonames
+10256,New York,New York,NY,40.7143,-74.0060,geonames
+10258,New York,New York,NY,40.7143,-74.0060,geonames
+10259,New York,New York,NY,40.7143,-74.0060,geonames
+10260,New York,New York,NY,40.7143,-74.0060,geonames
+10261,New York,New York,NY,40.7808,-73.9772,geonames
+10265,New York,New York,NY,40.7143,-74.0060,geonames
+10268,New York,New York,NY,40.7808,-73.9772,geonames
+10269,New York,New York,NY,40.7808,-73.9772,geonames
+10270,New York,New York,NY,40.7069,-74.0082,geonames
+10271,New York,New York,NY,40.7089,-74.0111,geonames
+10272,New York,New York,NY,40.7808,-73.9772,geonames
+10273,New York,New York,NY,40.7143,-74.0060,geonames
+10274,New York,New York,NY,40.7808,-73.9772,geonames
+10275,New York,New York,NY,40.7808,-73.9772,geonames
+10276,New York,New York,NY,40.7808,-73.9772,geonames
+10277,New York,New York,NY,40.7808,-73.9772,geonames
+10278,New York,New York,NY,40.7152,-74.0038,geonames
+10279,New York,New York,NY,40.7127,-74.0078,geonames
+10280,New York,New York,NY,40.7105,-74.0163,geonames
+10281,New York,New York,NY,40.7146,-74.0150,geonames
+10282,New York,New York,NY,40.7166,-74.0146,geonames
+10285,New York,New York,NY,40.7143,-74.0060,geonames
+10286,New York,New York,NY,40.7142,-74.0119,geonames
+10301,Staten Island,Richmond,NY,40.6316,-74.0927,geonames
+10302,Staten Island,Richmond,NY,40.6306,-74.1379,geonames
+10303,Staten Island,Richmond,NY,40.6301,-74.1607,geonames
+10304,Staten Island,Richmond,NY,40.6102,-74.0878,geonames
+10305,Staten Island,Richmond,NY,40.5973,-74.0768,geonames
+10306,Staten Island,Richmond,NY,40.5682,-74.1184,geonames
+10307,Staten Island,Richmond,NY,40.5085,-74.2445,geonames
+10308,Staten Island,Richmond,NY,40.5518,-74.1526,geonames
+10309,Staten Island,Richmond,NY,40.5352,-74.2116,geonames
+10310,Staten Island,Richmond,NY,40.6324,-74.1171,geonames
+10311,Staten Island,Richmond,NY,40.6052,-74.1795,geonames
+10312,Staten Island,Richmond,NY,40.5457,-74.1792,geonames
+10313,Staten Island,Richmond,NY,40.5644,-74.1468,geonames
+10314,Staten Island,Richmond,NY,40.6039,-74.1472,geonames
+10451,Bronx,Bronx,NY,40.8222,-73.9217,geonames
+10452,Bronx,Bronx,NY,40.8376,-73.9216,geonames
+10453,Bronx,Bronx,NY,40.8520,-73.9129,geonames
+10454,Bronx,Bronx,NY,40.8085,-73.9198,geonames
+10455,Bronx,Bronx,NY,40.8153,-73.9072,geonames
+10456,Bronx,Bronx,NY,40.8316,-73.9099,geonames
+10457,Bronx,Bronx,NY,40.8486,-73.8999,geonames
+10458,Bronx,Bronx,NY,40.8633,-73.8895,geonames
+10459,Bronx,Bronx,NY,40.8247,-73.8940,geonames
+10460,Bronx,Bronx,NY,40.8409,-73.8794,geonames
+10461,Bronx,Bronx,NY,40.8465,-73.8410,geonames
+10462,Bronx,Bronx,NY,40.8434,-73.8602,geonames
+10463,Bronx,Bronx,NY,40.8798,-73.9067,geonames
+10464,Bronx,Bronx,NY,40.8469,-73.7874,geonames
+10465,Bronx,Bronx,NY,40.8261,-73.8196,geonames
+10466,Bronx,Bronx,NY,40.8904,-73.8503,geonames
+10467,Bronx,Bronx,NY,40.8737,-73.8712,geonames
+10468,Bronx,Bronx,NY,40.8662,-73.9003,geonames
+10469,Bronx,Bronx,NY,40.8702,-73.8495,geonames
+10470,Bronx,Bronx,NY,40.9000,-73.8622,geonames
+10471,Bronx,Bronx,NY,40.9011,-73.9053,geonames
+10472,Bronx,Bronx,NY,40.8295,-73.8716,geonames
+10473,Bronx,Bronx,NY,40.8194,-73.8606,geonames
+10474,Bronx,Bronx,NY,40.8139,-73.8841,geonames
+10475,Bronx,Bronx,NY,40.8729,-73.8278,geonames
+10501,Amawalk,Westchester,NY,41.2946,-73.7611,geonames
+10502,Ardsley,Westchester,NY,41.0113,-73.8413,geonames
+10503,Ardsley On Hudson,Westchester,NY,41.0259,-73.8718,geonames
+10504,Armonk,Westchester,NY,41.1360,-73.7009,geonames
+10505,Baldwin Place,Westchester,NY,41.3421,-73.7454,geonames
+10506,Bedford,Westchester,NY,41.1909,-73.6355,geonames
+10507,Bedford Hills,Westchester,NY,41.2344,-73.6915,geonames
+10509,Brewster,Putnam,NY,41.4097,-73.5992,geonames
+10510,Briarcliff Manor,Westchester,NY,41.1444,-73.8350,geonames
+10511,Buchanan,Westchester,NY,41.2583,-73.9412,geonames
+10512,Carmel,Putnam,NY,41.4432,-73.6815,geonames
+10514,Chappaqua,Westchester,NY,41.1705,-73.7715,geonames
+10516,Cold Spring,Putnam,NY,41.4414,-73.9335,geonames
+10517,Crompond,Westchester,NY,41.3006,-73.8612,geonames
+10518,Cross River,Westchester,NY,41.2722,-73.6020,geonames
+10519,Croton Falls,Westchester,NY,41.3477,-73.6610,geonames
+10520,Croton On Hudson,Westchester,NY,41.2180,-73.8924,geonames
+10521,Croton On Hudson,Westchester,NY,41.2343,-73.9262,geonames
+10522,Dobbs Ferry,Westchester,NY,41.0118,-73.8665,geonames
+10523,Elmsford,Westchester,NY,41.0572,-73.8136,geonames
+10524,Garrison,Putnam,NY,41.3621,-73.9200,geonames
+10526,Goldens Bridge,Westchester,NY,41.3004,-73.6479,geonames
+10527,Granite Springs,Westchester,NY,41.3098,-73.7530,geonames
+10528,Harrison,Westchester,NY,40.9719,-73.7181,geonames
+10530,Hartsdale,Westchester,NY,41.0197,-73.8074,geonames
+10532,Hawthorne,Westchester,NY,41.1073,-73.7960,geonames
+10533,Irvington,Westchester,NY,41.0381,-73.8597,geonames
+10535,Jefferson Valley,Westchester,NY,41.3385,-73.7947,geonames
+10536,Katonah,Westchester,NY,41.2709,-73.6841,geonames
+10537,Lake Peekskill,Putnam,NY,41.3374,-73.8838,geonames
+10538,Larchmont,Westchester,NY,40.9351,-73.7571,geonames
+10540,Lincolndale,Westchester,NY,41.3334,-73.7243,geonames
+10541,Mahopac,Putnam,NY,41.3717,-73.7508,geonames
+10542,Mahopac Falls,Putnam,NY,41.3726,-73.7601,geonames
+10543,Mamaroneck,Westchester,NY,40.9525,-73.7350,geonames
+10545,Maryknoll,Westchester,NY,41.1190,-73.7330,geonames
+10546,Millwood,Westchester,NY,41.2015,-73.7926,geonames
+10547,Mohegan Lake,Westchester,NY,41.3143,-73.8508,geonames
+10548,Montrose,Westchester,NY,41.2496,-73.9446,geonames
+10549,Mount Kisco,Westchester,NY,41.2050,-73.7299,geonames
+10550,Mount Vernon,Westchester,NY,40.9079,-73.8380,geonames
+10551,Mount Vernon,Westchester,NY,40.9126,-73.8371,geonames
+10552,Mount Vernon,Westchester,NY,40.9231,-73.8299,geonames
+10553,Mount Vernon,Westchester,NY,40.9086,-73.8221,geonames
+10560,North Salem,Westchester,NY,41.3414,-73.5929,geonames
+10562,Ossining,Westchester,NY,41.1673,-73.8538,geonames
+10566,Peekskill,Westchester,NY,41.2892,-73.9184,geonames
+10567,Cortlandt Manor,Westchester,NY,41.2840,-73.8931,geonames
+10570,Pleasantville,Westchester,NY,41.1350,-73.7845,geonames
+10573,Port Chester,Westchester,NY,41.0222,-73.6798,geonames
+10576,Pound Ridge,Westchester,NY,41.2042,-73.5732,geonames
+10577,Purchase,Westchester,NY,41.0384,-73.7156,geonames
+10578,Purdys,Westchester,NY,41.3259,-73.6551,geonames
+10579,Putnam Valley,Putnam,NY,41.3728,-73.8502,geonames
+10580,Rye,Westchester,NY,40.9734,-73.6907,geonames
+10583,Scarsdale,Westchester,NY,40.9927,-73.7995,geonames
+10587,Shenorock,Westchester,NY,41.3287,-73.7423,geonames
+10588,Shrub Oak,Westchester,NY,41.3286,-73.8273,geonames
+10589,Somers,Westchester,NY,41.3346,-73.6951,geonames
+10590,South Salem,Westchester,NY,41.2553,-73.5402,geonames
+10591,Tarrytown,Westchester,NY,41.0897,-73.8440,geonames
+10594,Thornwood,Westchester,NY,41.1182,-73.7733,geonames
+10595,Valhalla,Westchester,NY,41.0856,-73.7776,geonames
+10596,Verplanck,Westchester,NY,41.2548,-73.9587,geonames
+10597,Waccabuc,Westchester,NY,41.3032,-73.6032,geonames
+10598,Yorktown Heights,Westchester,NY,41.2999,-73.7924,geonames
+10601,White Plains,Westchester,NY,41.0330,-73.7652,geonames
+10602,White Plains,Westchester,NY,41.0340,-73.7629,geonames
+10603,White Plains,Westchester,NY,41.0499,-73.7776,geonames
+10604,West Harrison,Westchester,NY,41.0592,-73.7395,geonames
+10605,White Plains,Westchester,NY,41.0141,-73.7552,geonames
+10606,White Plains,Westchester,NY,41.0247,-73.7781,geonames
+10607,White Plains,Westchester,NY,41.0398,-73.8117,geonames
+10610,White Plains,Westchester,NY,41.1190,-73.7330,geonames
+10701,Yonkers,Westchester,NY,40.9461,-73.8669,geonames
+10702,Yonkers,Westchester,NY,40.9312,-73.8987,geonames
+10703,Yonkers,Westchester,NY,40.9518,-73.8852,geonames
+10704,Yonkers,Westchester,NY,40.9176,-73.8593,geonames
+10705,Yonkers,Westchester,NY,40.9177,-73.8950,geonames
+10706,Hastings On Hudson,Westchester,NY,40.9878,-73.8630,geonames
+10707,Tuckahoe,Westchester,NY,40.9569,-73.8198,geonames
+10708,Bronxville,Westchester,NY,40.9391,-73.8353,geonames
+10709,Eastchester,Westchester,NY,40.9550,-73.8086,geonames
+10710,Yonkers,Westchester,NY,40.9656,-73.8434,geonames
+10801,New Rochelle,Westchester,NY,40.9166,-73.7877,geonames
+10802,New Rochelle,Westchester,NY,40.9115,-73.7824,geonames
+10803,Pelham,Westchester,NY,40.9045,-73.8073,geonames
+10804,New Rochelle,Westchester,NY,40.9491,-73.7863,geonames
+10805,New Rochelle,Westchester,NY,40.9002,-73.7810,geonames
+10901,Suffern,Rockland,NY,41.1177,-74.1241,geonames
+10910,Arden,Orange,NY,41.2745,-74.1529,geonames
+10911,Bear Mountain,Rockland,NY,41.1609,-74.0608,geonames
+10912,Bellvale,Orange,NY,41.2504,-74.3107,geonames
+10913,Blauvelt,Rockland,NY,41.0626,-73.9629,geonames
+10914,Blooming Grove,Orange,NY,41.4093,-74.1951,geonames
+10915,Bullville,Orange,NY,41.5443,-74.3615,geonames
+10916,Campbell Hall,Orange,NY,41.4430,-74.2505,geonames
+10917,Central Valley,Orange,NY,41.3268,-74.1220,geonames
+10918,Chester,Orange,NY,41.3554,-74.2651,geonames
+10919,Circleville,Orange,NY,41.5244,-74.3850,geonames
+10920,Congers,Rockland,NY,41.1487,-73.9413,geonames
+10921,Florida,Orange,NY,41.3295,-74.3528,geonames
+10922,Fort Montgomery,Orange,NY,41.3346,-73.9917,geonames
+10923,Garnerville,Rockland,NY,41.2021,-74.0005,geonames
+10924,Goshen,Orange,NY,41.3946,-74.3302,geonames
+10925,Greenwood Lake,Orange,NY,41.2101,-74.3033,geonames
+10926,Harriman,Orange,NY,41.3005,-74.1249,geonames
+10927,Haverstraw,Rockland,NY,41.1971,-73.9690,geonames
+10928,Highland Falls,Orange,NY,41.3582,-73.9746,geonames
+10930,Highland Mills,Orange,NY,41.3536,-74.1197,geonames
+10931,Hillburn,Rockland,NY,41.1240,-74.1702,geonames
+10932,Howells,Orange,NY,41.4795,-74.4652,geonames
+10933,Johnson,Orange,NY,41.3653,-74.5109,geonames
+10940,Middletown,Orange,NY,41.4512,-74.4701,geonames
+10941,Middletown,Orange,NY,41.4886,-74.3450,geonames
+10949,Monroe,Orange,NY,41.3274,-74.1911,geonames
+10950,Monroe,Orange,NY,41.3286,-74.1885,geonames
+10952,Monsey,Rockland,NY,41.1163,-74.0736,geonames
+10953,Mountainville,Orange,NY,41.4009,-74.0785,geonames
+10954,Nanuet,Rockland,NY,41.0977,-74.0109,geonames
+10956,New City,Rockland,NY,41.1472,-73.9962,geonames
+10958,New Hampton,Orange,NY,41.3627,-74.4435,geonames
+10959,New Milford,Orange,NY,41.2345,-74.4138,geonames
+10960,Nyack,Rockland,NY,41.0914,-73.9252,geonames
+10962,Orangeburg,Rockland,NY,41.0442,-73.9609,geonames
+10963,Otisville,Orange,NY,41.4818,-74.5294,geonames
+10964,Palisades,Rockland,NY,41.0103,-73.9250,geonames
+10965,Pearl River,Rockland,NY,41.0629,-74.0159,geonames
+10968,Piermont,Rockland,NY,41.0395,-73.9192,geonames
+10969,Pine Island,Orange,NY,41.2926,-74.4888,geonames
+10970,Pomona,Rockland,NY,41.1901,-74.0436,geonames
+10973,Slate Hill,Orange,NY,41.3760,-74.4847,geonames
+10974,Sloatsburg,Rockland,NY,41.1575,-74.2008,geonames
+10975,Southfields,Orange,NY,41.2480,-74.1762,geonames
+10976,Sparkill,Rockland,NY,41.0256,-73.9229,geonames
+10977,Spring Valley,Rockland,NY,41.1158,-74.0474,geonames
+10979,Sterling Forest,Orange,NY,41.1823,-74.3184,geonames
+10980,Stony Point,Rockland,NY,41.2292,-73.9962,geonames
+10981,Sugar Loaf,Orange,NY,41.3232,-74.2886,geonames
+10982,Tallman,Rockland,NY,41.1112,-74.0999,geonames
+10983,Tappan,Rockland,NY,41.0278,-73.9491,geonames
+10984,Thiells,Rockland,NY,41.2078,-74.0154,geonames
+10985,Thompson Ridge,Orange,NY,41.5750,-74.3225,geonames
+10986,Tomkins Cove,Rockland,NY,41.2598,-73.9892,geonames
+10987,Tuxedo Park,Orange,NY,41.1925,-74.2159,geonames
+10988,Unionville,Orange,NY,41.3020,-74.5615,geonames
+10989,Valley Cottage,Rockland,NY,41.1183,-73.9430,geonames
+10990,Warwick,Orange,NY,41.2656,-74.3604,geonames
+10992,Washingtonville,Orange,NY,41.4237,-74.1601,geonames
+10993,West Haverstraw,Rockland,NY,41.2090,-73.9821,geonames
+10994,West Nyack,Rockland,NY,41.0973,-73.9768,geonames
+10996,West Point,Orange,NY,41.3945,-73.9737,geonames
+10997,West Point,Orange,NY,41.3915,-73.9560,geonames
+10998,Westtown,Orange,NY,41.3214,-74.5529,geonames
+11001,Floral Park,Nassau,NY,40.7236,-73.7058,geonames
+11002,Floral Park,Nassau,NY,40.7237,-73.7049,geonames
+11003,Elmont,Nassau,NY,40.6976,-73.7049,geonames
+11004,Glen Oaks,Queens,NY,40.7481,-73.7114,geonames
+11005,Floral Park,Queens,NY,40.7571,-73.7182,geonames
+11010,Franklin Square,Nassau,NY,40.7010,-73.6758,geonames
+11020,Great Neck,Nassau,NY,40.7742,-73.7189,geonames
+11021,Great Neck,Nassau,NY,40.7867,-73.7270,geonames
+11022,Great Neck,Nassau,NY,40.7548,-73.6018,geonames
+11023,Great Neck,Nassau,NY,40.7993,-73.7343,geonames
+11024,Great Neck,Nassau,NY,40.8171,-73.7416,geonames
+11026,Great Neck,Nassau,NY,40.7548,-73.6018,geonames
+11027,Great Neck,Nassau,NY,40.8007,-73.7285,geonames
+11030,Manhasset,Nassau,NY,40.7934,-73.6888,geonames
+11040,New Hyde Park,Nassau,NY,40.7294,-73.6828,geonames
+11042,New Hyde Park,Nassau,NY,40.7602,-73.6950,geonames
+11050,Port Washington,Nassau,NY,40.8350,-73.6964,geonames
+11051,Port Washington,Nassau,NY,40.7548,-73.6018,geonames
+11052,Port Washington,Nassau,NY,40.7548,-73.6018,geonames
+11053,Port Washington,Nassau,NY,40.7548,-73.6018,geonames
+11054,Port Washington,Nassau,NY,40.7548,-73.6018,geonames
+11055,Port Washington,Nassau,NY,40.7548,-73.6018,geonames
+11096,Inwood,Nassau,NY,40.6205,-73.7474,geonames
+11099,New Hyde Park,Nassau,NY,40.7548,-73.6018,nursedex_launch_seed
+11101,Long Island City,Queens,NY,40.7446,-73.9345,geonames
+11102,Astoria,Queens,NY,40.7706,-73.9265,geonames
+11103,Astoria,Queens,NY,40.7627,-73.9149,geonames
+11104,Sunnyside,Queens,NY,40.7436,-73.9216,geonames
+11105,Astoria,Queens,NY,40.7763,-73.9110,geonames
+11106,Astoria,Queens,NY,40.7608,-73.9295,geonames
+11109,Long Island City,Queens,NY,40.7454,-73.9575,geonames
+11120,Long Island City,Queens,NY,40.7448,-73.9487,geonames
+11201,Brooklyn,Kings,NY,40.6940,-73.9903,geonames
+11202,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11203,Brooklyn,Kings,NY,40.6505,-73.9349,geonames
+11204,Brooklyn,Kings,NY,40.6179,-73.9856,geonames
+11205,Brooklyn,Kings,NY,40.6924,-73.9666,geonames
+11206,Brooklyn,Kings,NY,40.7012,-73.9436,geonames
+11207,Brooklyn,Kings,NY,40.6705,-73.8940,geonames
+11208,Brooklyn,Kings,NY,40.6762,-73.8736,geonames
+11209,Brooklyn,Kings,NY,40.6251,-74.0303,geonames
+11210,Brooklyn,Kings,NY,40.6281,-73.9467,geonames
+11211,Brooklyn,Kings,NY,40.7095,-73.9563,geonames
+11212,Brooklyn,Kings,NY,40.6625,-73.9145,geonames
+11213,Brooklyn,Kings,NY,40.6700,-73.9367,geonames
+11214,Brooklyn,Kings,NY,40.6016,-73.9968,geonames
+11215,Brooklyn,Kings,NY,40.6669,-73.9828,geonames
+11216,Brooklyn,Kings,NY,40.6794,-73.9496,geonames
+11217,Brooklyn,Kings,NY,40.6816,-73.9798,geonames
+11218,Brooklyn,Kings,NY,40.6424,-73.9758,geonames
+11219,Brooklyn,Kings,NY,40.6336,-73.9960,geonames
+11220,Brooklyn,Kings,NY,40.6412,-74.0133,geonames
+11221,Brooklyn,Kings,NY,40.6907,-73.9274,geonames
+11222,Brooklyn,Kings,NY,40.7272,-73.9498,geonames
+11223,Brooklyn,Kings,NY,40.5979,-73.9743,geonames
+11224,Brooklyn,Kings,NY,40.5767,-73.9884,geonames
+11225,Brooklyn,Kings,NY,40.6628,-73.9546,geonames
+11226,Brooklyn,Kings,NY,40.6467,-73.9570,geonames
+11228,Brooklyn,Kings,NY,40.6174,-74.0121,geonames
+11229,Brooklyn,Kings,NY,40.6011,-73.9475,geonames
+11230,Brooklyn,Kings,NY,40.6225,-73.9650,geonames
+11231,Brooklyn,Kings,NY,40.6794,-74.0014,geonames
+11232,Brooklyn,Kings,NY,40.6521,-74.0018,geonames
+11233,Brooklyn,Kings,NY,40.6784,-73.9211,geonames
+11234,Brooklyn,Kings,NY,40.6205,-73.9239,geonames
+11235,Brooklyn,Kings,NY,40.5839,-73.9536,geonames
+11236,Brooklyn,Kings,NY,40.6407,-73.9028,geonames
+11237,Brooklyn,Kings,NY,40.7006,-73.9180,geonames
+11238,Brooklyn,Kings,NY,40.6790,-73.9644,geonames
+11239,Brooklyn,Kings,NY,40.6497,-73.8824,geonames
+11241,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11242,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11243,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11245,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11247,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11249,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11251,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11252,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11256,Brooklyn,Kings,NY,40.6451,-73.9450,geonames
+11351,Flushing,Queens,NY,40.7817,-73.8317,geonames
+11352,Flushing,Queens,NY,40.6514,-73.8708,geonames
+11354,Flushing,Queens,NY,40.7667,-73.8241,geonames
+11355,Flushing,Queens,NY,40.7536,-73.8226,geonames
+11356,College Point,Queens,NY,40.7855,-73.8450,geonames
+11357,Whitestone,Queens,NY,40.7851,-73.8096,geonames
+11358,Flushing,Queens,NY,40.7606,-73.7968,geonames
+11359,Bayside,Queens,NY,40.7928,-73.7767,geonames
+11360,Bayside,Queens,NY,40.7807,-73.7812,geonames
+11361,Bayside,Queens,NY,40.7627,-73.7745,geonames
+11362,Little Neck,Queens,NY,40.7591,-73.7326,geonames
+11363,Little Neck,Queens,NY,40.7722,-73.7454,geonames
+11364,Oakland Gardens,Queens,NY,40.7428,-73.7588,geonames
+11365,Fresh Meadows,Queens,NY,40.7374,-73.7951,geonames
+11366,Fresh Meadows,Queens,NY,40.7272,-73.7949,geonames
+11367,Flushing,Queens,NY,40.7280,-73.8195,geonames
+11368,Corona,Queens,NY,40.7453,-73.8611,geonames
+11369,East Elmhurst,Queens,NY,40.7613,-73.8739,geonames
+11370,East Elmhurst,Queens,NY,40.7611,-73.8916,geonames
+11371,Flushing,Queens,NY,40.7721,-73.8735,geonames
+11372,Jackson Heights,Queens,NY,40.7513,-73.8830,geonames
+11373,Elmhurst,Queens,NY,40.7351,-73.8776,geonames
+11374,Rego Park,Queens,NY,40.7278,-73.8602,geonames
+11375,Forest Hills,Queens,NY,40.7229,-73.8473,geonames
+11377,Woodside,Queens,NY,40.7450,-73.9069,geonames
+11378,Maspeth,Queens,NY,40.7239,-73.8997,geonames
+11379,Middle Village,Queens,NY,40.7173,-73.8792,geonames
+11380,Elmhurst,Queens,NY,40.7365,-73.8779,geonames
+11381,Flushing,Queens,NY,40.6514,-73.8708,geonames
+11385,Ridgewood,Queens,NY,40.7036,-73.8961,geonames
+11386,Ridgewood,Queens,NY,40.7001,-73.9057,geonames
+11405,Jamaica,Queens,NY,40.6514,-73.8708,geonames
+11411,Cambria Heights,Queens,NY,40.6947,-73.7374,geonames
+11412,Saint Albans,Queens,NY,40.6958,-73.7617,geonames
+11413,Springfield Gardens,Queens,NY,40.6645,-73.7559,geonames
+11414,Howard Beach,Queens,NY,40.6588,-73.8438,geonames
+11415,Kew Gardens,Queens,NY,40.7069,-73.8297,geonames
+11416,Ozone Park,Queens,NY,40.6838,-73.8514,geonames
+11417,Ozone Park,Queens,NY,40.6769,-73.8448,geonames
+11418,Richmond Hill,Queens,NY,40.6982,-73.8345,geonames
+11419,South Richmond Hill,Queens,NY,40.6868,-73.8230,geonames
+11420,South Ozone Park,Queens,NY,40.6744,-73.8190,geonames
+11421,Woodhaven,Queens,NY,40.6913,-73.8585,geonames
+11422,Rosedale,Queens,NY,40.6621,-73.7353,geonames
+11423,Hollis,Queens,NY,40.7142,-73.7677,geonames
+11424,Jamaica,Queens,NY,40.6514,-73.8708,geonames
+11425,Jamaica,Queens,NY,40.6514,-73.8708,geonames
+11426,Bellerose,Queens,NY,40.7347,-73.7230,geonames
+11427,Queens Village,Queens,NY,40.7277,-73.7489,geonames
+11428,Queens Village,Queens,NY,40.7208,-73.7433,geonames
+11429,Queens Village,Queens,NY,40.7090,-73.7401,geonames
+11430,Jamaica,Queens,NY,40.6472,-73.7827,geonames
+11431,Jamaica,Queens,NY,40.6869,-73.8501,geonames
+11432,Jamaica,Queens,NY,40.7119,-73.7944,geonames
+11433,Jamaica,Queens,NY,40.6969,-73.7877,geonames
+11434,Jamaica,Queens,NY,40.6775,-73.7758,geonames
+11435,Jamaica,Queens,NY,40.7029,-73.8111,geonames
+11436,Jamaica,Queens,NY,40.6763,-73.7966,geonames
+11437,Jamaica,Queens,NY,40.6763,-73.7966,geonames
+11439,Jamaica,Queens,NY,40.7220,-73.7908,geonames
+11451,Jamaica,Queens,NY,40.6514,-73.8708,geonames
+11499,Jamaica,Queens,NY,40.6514,-73.8708,geonames
+11501,Mineola,Nassau,NY,40.7469,-73.6398,geonames
+11507,Albertson,Nassau,NY,40.7703,-73.6514,geonames
+11509,Atlantic Beach,Nassau,NY,40.5887,-73.7255,geonames
+11510,Baldwin,Nassau,NY,40.6548,-73.6097,geonames
+11514,Carle Place,Nassau,NY,40.7512,-73.6119,geonames
+11516,Cedarhurst,Nassau,NY,40.6236,-73.7264,geonames
+11518,East Rockaway,Nassau,NY,40.6404,-73.6674,geonames
+11520,Freeport,Nassau,NY,40.6536,-73.5866,geonames
+11530,Garden City,Nassau,NY,40.7245,-73.6487,geonames
+11531,Garden City,Nassau,NY,40.7268,-73.6343,geonames
+11535,Garden City,Nassau,NY,40.7548,-73.6018,nursedex_launch_seed
+11536,Garden City,Nassau,NY,40.7548,-73.6018,nursedex_launch_seed
+11542,Glen Cove,Nassau,NY,40.8650,-73.6277,geonames
+11545,Glen Head,Nassau,NY,40.8281,-73.6076,geonames
+11547,Glenwood Landing,Nassau,NY,40.8307,-73.6387,geonames
+11548,Greenvale,Nassau,NY,40.8125,-73.6261,geonames
+11549,Hempstead,Nassau,NY,40.7172,-73.6027,geonames
+11550,Hempstead,Nassau,NY,40.7049,-73.6176,geonames
+11551,Hempstead,Nassau,NY,40.7062,-73.6187,geonames
+11552,West Hempstead,Nassau,NY,40.6929,-73.6539,geonames
+11553,Uniondale,Nassau,NY,40.7020,-73.5920,geonames
+11554,East Meadow,Nassau,NY,40.7149,-73.5561,geonames
+11555,Uniondale,Nassau,NY,40.7004,-73.5929,geonames
+11556,Uniondale,Nassau,NY,40.7548,-73.6018,geonames
+11557,Hewlett,Nassau,NY,40.6404,-73.6957,geonames
+11558,Island Park,Nassau,NY,40.6040,-73.6554,geonames
+11559,Lawrence,Nassau,NY,40.6140,-73.7330,geonames
+11560,Locust Valley,Nassau,NY,40.8817,-73.5927,geonames
+11561,Long Beach,Nassau,NY,40.5877,-73.6595,geonames
+11563,Lynbrook,Nassau,NY,40.6571,-73.6741,geonames
+11565,Malverne,Nassau,NY,40.6750,-73.6731,geonames
+11566,Merrick,Nassau,NY,40.6685,-73.5536,geonames
+11568,Old Westbury,Nassau,NY,40.7882,-73.5875,geonames
+11569,Point Lookout,Nassau,NY,40.5905,-73.5808,geonames
+11570,Rockville Centre,Nassau,NY,40.6637,-73.6380,geonames
+11571,Rockville Centre,Nassau,NY,40.6587,-73.6412,geonames
+11572,Oceanside,Nassau,NY,40.6362,-73.6375,geonames
+11575,Roosevelt,Nassau,NY,40.6802,-73.5867,geonames
+11576,Roslyn,Nassau,NY,40.7984,-73.6477,geonames
+11577,Roslyn Heights,Nassau,NY,40.7845,-73.6403,geonames
+11579,Sea Cliff,Nassau,NY,40.8460,-73.6436,geonames
+11580,Valley Stream,Nassau,NY,40.6742,-73.7057,geonames
+11581,Valley Stream,Nassau,NY,40.6523,-73.7118,geonames
+11582,Valley Stream,Nassau,NY,40.6643,-73.7085,geonames
+11590,Westbury,Nassau,NY,40.7557,-73.5723,geonames
+11596,Williston Park,Nassau,NY,40.7592,-73.6449,geonames
+11597,Westbury,Nassau,NY,40.7548,-73.6018,nursedex_launch_seed
+11598,Woodmere,Nassau,NY,40.6326,-73.7141,geonames
+11599,Garden City,Nassau,NY,40.7268,-73.6343,geonames
+11690,Far Rockaway,Queens,NY,40.6054,-73.7551,geonames
+11691,Far Rockaway,Queens,NY,40.6006,-73.7580,geonames
+11692,Arverne,Queens,NY,40.5923,-73.7933,geonames
+11693,Far Rockaway,Queens,NY,40.6076,-73.8198,geonames
+11694,Rockaway Park,Queens,NY,40.5766,-73.8428,geonames
+11695,Far Rockaway,Queens,NY,40.6514,-73.8708,geonames
+11697,Breezy Point,Queens,NY,40.5594,-73.9067,geonames
+11701,Amityville,Suffolk,NY,40.6842,-73.4171,geonames
+11702,Babylon,Suffolk,NY,40.6957,-73.3257,geonames
+11703,North Babylon,Suffolk,NY,40.7321,-73.3236,geonames
+11704,West Babylon,Suffolk,NY,40.7135,-73.3546,geonames
+11705,Bayport,Suffolk,NY,40.7444,-73.0542,geonames
+11706,Bay Shore,Suffolk,NY,40.7051,-73.2430,geonames
+11707,West Babylon,Suffolk,NY,40.7182,-73.3543,geonames
+11709,Bayville,Nassau,NY,40.9074,-73.5601,geonames
+11710,Bellmore,Nassau,NY,40.6729,-73.5365,geonames
+11713,Bellport,Suffolk,NY,40.7733,-72.9469,geonames
+11714,Bethpage,Nassau,NY,40.7400,-73.4857,geonames
+11715,Blue Point,Suffolk,NY,40.7501,-73.0352,geonames
+11716,Bohemia,Suffolk,NY,40.7678,-73.1163,geonames
+11717,Brentwood,Suffolk,NY,40.7809,-73.2503,geonames
+11718,Brightwaters,Suffolk,NY,40.7280,-73.2646,geonames
+11719,Brookhaven,Suffolk,NY,40.7843,-72.8921,geonames
+11720,Centereach,Suffolk,NY,40.8705,-73.0822,geonames
+11721,Centerport,Suffolk,NY,40.8929,-73.3754,geonames
+11722,Central Islip,Suffolk,NY,40.7866,-73.1961,geonames
+11724,Cold Spring Harbor,Suffolk,NY,40.8601,-73.4423,geonames
+11725,Commack,Suffolk,NY,40.8430,-73.2799,geonames
+11726,Copiague,Suffolk,NY,40.6778,-73.3963,geonames
+11727,Coram,Suffolk,NY,40.8850,-73.0069,geonames
+11729,Deer Park,Suffolk,NY,40.7591,-73.3257,geonames
+11730,East Islip,Suffolk,NY,40.7282,-73.1805,geonames
+11731,East Northport,Suffolk,NY,40.8570,-73.3146,geonames
+11732,East Norwich,Nassau,NY,40.8472,-73.5349,geonames
+11733,East Setauket,Suffolk,NY,40.9426,-73.1116,geonames
+11735,Farmingdale,Nassau,NY,40.7315,-73.4327,geonames
+11737,Farmingdale,Nassau,NY,40.7326,-73.4454,geonames
+11738,Farmingville,Suffolk,NY,40.8366,-73.0413,geonames
+11739,Great River,Suffolk,NY,40.7297,-73.1607,geonames
+11740,Greenlawn,Suffolk,NY,40.8621,-73.3646,geonames
+11741,Holbrook,Suffolk,NY,40.7964,-73.0718,geonames
+11742,Holtsville,Suffolk,NY,40.8105,-73.0416,geonames
+11743,Huntington,Suffolk,NY,40.8676,-73.4102,geonames
+11746,Huntington Station,Suffolk,NY,40.8143,-73.3634,geonames
+11747,Melville,Suffolk,NY,40.7946,-73.4030,geonames
+11749,Islandia,Suffolk,NY,40.8067,-73.1709,geonames
+11751,Islip,Suffolk,NY,40.7348,-73.2221,geonames
+11752,Islip Terrace,Suffolk,NY,40.7548,-73.1827,geonames
+11753,Jericho,Nassau,NY,40.7881,-73.5331,geonames
+11754,Kings Park,Suffolk,NY,40.8861,-73.2438,geonames
+11755,Lake Grove,Suffolk,NY,40.8567,-73.1168,geonames
+11756,Levittown,Nassau,NY,40.7254,-73.5166,geonames
+11757,Lindenhurst,Suffolk,NY,40.6884,-73.3745,geonames
+11758,Massapequa,Nassau,NY,40.6682,-73.4588,geonames
+11760,Melville,Suffolk,NY,40.7934,-73.4151,geonames
+11762,Massapequa Park,Nassau,NY,40.6807,-73.4444,geonames
+11763,Medford,Suffolk,NY,40.8174,-72.9852,geonames
+11764,Miller Place,Suffolk,NY,40.9436,-72.9913,geonames
+11765,Mill Neck,Nassau,NY,40.8857,-73.5526,geonames
+11766,Mount Sinai,Suffolk,NY,40.9271,-73.0127,geonames
+11767,Nesconset,Suffolk,NY,40.8462,-73.1482,geonames
+11768,Northport,Suffolk,NY,40.9051,-73.3309,geonames
+11769,Oakdale,Suffolk,NY,40.7382,-73.1297,geonames
+11770,Ocean Beach,Suffolk,NY,40.6443,-73.1613,geonames
+11771,Oyster Bay,Nassau,NY,40.8660,-73.5272,geonames
+11772,Patchogue,Suffolk,NY,40.7609,-72.9871,geonames
+11773,Syosset,Nassau,NY,40.8262,-73.5021,geonames
+11775,Melville,Suffolk,NY,40.7934,-73.4151,geonames
+11776,Port Jefferson Station,Suffolk,NY,40.9136,-73.0464,geonames
+11777,Port Jefferson,Suffolk,NY,40.9457,-73.0611,geonames
+11778,Rocky Point,Suffolk,NY,40.9492,-72.9357,geonames
+11779,Ronkonkoma,Suffolk,NY,40.8083,-73.1305,geonames
+11780,Saint James,Suffolk,NY,40.8813,-73.1591,geonames
+11782,Sayville,Suffolk,NY,40.7459,-73.0859,geonames
+11783,Seaford,Nassau,NY,40.6795,-73.4910,geonames
+11784,Selden,Suffolk,NY,40.8699,-73.0448,geonames
+11786,Shoreham,Suffolk,NY,40.9485,-72.8927,geonames
+11787,Smithtown,Suffolk,NY,40.8542,-73.2138,geonames
+11788,Hauppauge,Suffolk,NY,40.8231,-73.1958,geonames
+11789,Sound Beach,Suffolk,NY,40.9567,-72.9742,geonames
+11790,Stony Brook,Suffolk,NY,40.9068,-73.1277,geonames
+11791,Syosset,Nassau,NY,40.8146,-73.5024,geonames
+11792,Wading River,Suffolk,NY,40.9520,-72.8348,geonames
+11793,Wantagh,Nassau,NY,40.6850,-73.5103,geonames
+11794,Stony Brook,Suffolk,NY,40.9257,-73.1409,geonames
+11795,West Islip,Suffolk,NY,40.7117,-73.3007,geonames
+11796,West Sayville,Suffolk,NY,40.7320,-73.1000,geonames
+11797,Woodbury,Nassau,NY,40.8154,-73.4716,geonames
+11798,Wyandanch,Suffolk,NY,40.7523,-73.3761,geonames
+11801,Hicksville,Nassau,NY,40.7623,-73.5230,geonames
+11802,Hicksville,Nassau,NY,40.7684,-73.5251,geonames
+11803,Plainview,Nassau,NY,40.7781,-73.4816,geonames
+11804,Old Bethpage,Nassau,NY,40.7650,-73.4575,geonames
+11815,Hicksville,Nassau,NY,40.7548,-73.6018,geonames
+11819,Hicksville,Nassau,NY,40.7684,-73.5251,geonames
+11853,Jericho,Nassau,NY,40.7920,-73.5398,geonames
+11901,Riverhead,Suffolk,NY,40.9262,-72.6520,geonames
+11930,Amagansett,Suffolk,NY,40.9895,-72.0959,geonames
+11931,Aquebogue,Suffolk,NY,40.9445,-72.6270,geonames
+11932,Bridgehampton,Suffolk,NY,40.9339,-72.3077,geonames
+11933,Calverton,Suffolk,NY,40.9297,-72.7423,geonames
+11934,Center Moriches,Suffolk,NY,40.7997,-72.7970,geonames
+11935,Cutchogue,Suffolk,NY,41.0139,-72.4803,geonames
+11937,East Hampton,Suffolk,NY,40.9930,-72.1790,geonames
+11939,East Marion,Suffolk,NY,41.1264,-72.3419,geonames
+11940,East Moriches,Suffolk,NY,40.8090,-72.7538,geonames
+11941,Eastport,Suffolk,NY,40.8297,-72.7283,geonames
+11942,East Quogue,Suffolk,NY,40.8428,-72.5813,geonames
+11944,Greenport,Suffolk,NY,41.1039,-72.3674,geonames
+11946,Hampton Bays,Suffolk,NY,40.8726,-72.5202,geonames
+11947,Jamesport,Suffolk,NY,40.9495,-72.5815,geonames
+11948,Laurel,Suffolk,NY,40.9674,-72.5540,geonames
+11949,Manorville,Suffolk,NY,40.8421,-72.8002,geonames
+11950,Mastic,Suffolk,NY,40.8064,-72.8566,geonames
+11951,Mastic Beach,Suffolk,NY,40.7657,-72.8537,geonames
+11952,Mattituck,Suffolk,NY,40.9943,-72.5363,geonames
+11953,Middle Island,Suffolk,NY,40.8782,-72.9525,geonames
+11954,Montauk,Suffolk,NY,41.0459,-71.9440,geonames
+11955,Moriches,Suffolk,NY,40.8095,-72.8229,geonames
+11956,New Suffolk,Suffolk,NY,40.9915,-72.4759,geonames
+11957,Orient,Suffolk,NY,41.1437,-72.2879,geonames
+11958,Peconic,Suffolk,NY,41.0392,-72.4666,geonames
+11959,Quogue,Suffolk,NY,40.8226,-72.6012,geonames
+11960,Remsenburg,Suffolk,NY,40.8086,-72.7064,geonames
+11961,Ridge,Suffolk,NY,40.9018,-72.8881,geonames
+11962,Sagaponack,Suffolk,NY,40.9305,-72.2707,geonames
+11963,Sag Harbor,Suffolk,NY,40.9820,-72.3067,geonames
+11964,Shelter Island,Suffolk,NY,41.0640,-72.3366,geonames
+11965,Shelter Island Heights,Suffolk,NY,41.0840,-72.3559,geonames
+11967,Shirley,Suffolk,NY,40.8015,-72.8676,geonames
+11968,Southampton,Suffolk,NY,40.9043,-72.4103,geonames
+11969,Southampton,Suffolk,NY,40.8843,-72.3895,geonames
+11970,South Jamesport,Suffolk,NY,40.9365,-72.5773,geonames
+11971,Southold,Suffolk,NY,41.0555,-72.4290,geonames
+11972,Speonk,Suffolk,NY,40.8195,-72.7054,geonames
+11973,Upton,Suffolk,NY,40.8678,-72.8822,geonames
+11975,Wainscott,Suffolk,NY,40.9396,-72.2425,geonames
+11976,Water Mill,Suffolk,NY,40.9209,-72.3491,geonames
+11977,Westhampton,Suffolk,NY,40.8180,-72.6699,geonames
+11978,Westhampton Beach,Suffolk,NY,40.8295,-72.6473,geonames
+11980,Yaphank,Suffolk,NY,40.8370,-72.9174,geonames
+12007,Alcove,Albany,NY,42.4561,-73.9277,geonames
+12008,Alplaus,Schenectady,NY,42.8573,-73.9002,geonames
+12009,Altamont,Albany,NY,42.7063,-74.0193,geonames
+12010,Amsterdam,Montgomery,NY,42.9387,-74.1882,geonames
+12015,Athens,Greene,NY,42.2736,-73.8152,geonames
+12016,Auriesville,Montgomery,NY,42.9295,-74.3165,geonames
+12017,Austerlitz,Columbia,NY,42.3223,-73.4550,geonames
+12018,Averill Park,Rensselaer,NY,42.6365,-73.5504,geonames
+12019,Ballston Lake,Saratoga,NY,42.9192,-73.8552,geonames
+12020,Ballston Spa,Saratoga,NY,43.0050,-73.8486,geonames
+12022,Berlin,Rensselaer,NY,42.6919,-73.3702,geonames
+12023,Berne,Albany,NY,42.6108,-74.1466,geonames
+12024,Brainard,Rensselaer,NY,42.4950,-73.5107,geonames
+12025,Broadalbin,Fulton,NY,43.0727,-74.1684,geonames
+12027,Burnt Hills,Saratoga,NY,42.9329,-73.8960,geonames
+12028,Buskirk,Rensselaer,NY,42.9601,-73.4497,geonames
+12029,Canaan,Columbia,NY,42.4132,-73.4159,geonames
+12031,Carlisle,Schoharie,NY,42.7648,-74.4569,geonames
+12032,Caroga Lake,Fulton,NY,43.1922,-74.5169,geonames
+12033,Castleton On Hudson,Rensselaer,NY,42.5376,-73.7071,geonames
+12035,Central Bridge,Schoharie,NY,42.7370,-74.3451,geonames
+12036,Charlotteville,Schoharie,NY,42.5330,-74.6819,geonames
+12037,Chatham,Columbia,NY,42.3496,-73.5873,geonames
+12040,Cherry Plain,Rensselaer,NY,42.6467,-73.3716,geonames
+12041,Clarksville,Albany,NY,42.5759,-73.9640,geonames
+12042,Climax,Greene,NY,42.3659,-73.8510,geonames
+12043,Cobleskill,Schoharie,NY,42.6840,-74.4939,geonames
+12045,Coeymans,Albany,NY,42.4757,-73.7977,geonames
+12046,Coeymans Hollow,Albany,NY,42.4865,-73.9206,geonames
+12047,Cohoes,Albany,NY,42.7754,-73.7124,geonames
+12050,Columbiaville,Columbia,NY,42.3172,-73.7486,geonames
+12051,Coxsackie,Greene,NY,42.3501,-73.8199,geonames
+12052,Cropseyville,Rensselaer,NY,42.7667,-73.4719,geonames
+12053,Delanson,Schenectady,NY,42.7480,-74.1868,geonames
+12054,Delmar,Albany,NY,42.6158,-73.8373,geonames
+12055,Dormansville,Albany,NY,42.6149,-73.9708,geonames
+12056,Duanesburg,Schenectady,NY,42.7708,-74.0839,geonames
+12057,Eagle Bridge,Washington,NY,42.9808,-73.3522,geonames
+12058,Earlton,Greene,NY,42.3527,-73.9062,geonames
+12059,East Berne,Albany,NY,42.6191,-74.0555,geonames
+12060,East Chatham,Columbia,NY,42.4330,-73.4903,geonames
+12061,East Greenbush,Rensselaer,NY,42.5951,-73.6826,geonames
+12062,East Nassau,Rensselaer,NY,42.5352,-73.4984,geonames
+12063,East Schodack,Rensselaer,NY,42.5637,-73.6274,geonames
+12064,East Worcester,Otsego,NY,42.6321,-74.6674,geonames
+12065,Clifton Park,Saratoga,NY,42.8499,-73.7851,geonames
+12066,Esperance,Montgomery,NY,42.7717,-74.2882,geonames
+12067,Feura Bush,Albany,NY,42.5550,-73.9237,geonames
+12068,Fonda,Montgomery,NY,42.9571,-74.4021,geonames
+12069,Fort Hunter,Montgomery,NY,42.9423,-74.2851,geonames
+12070,Fort Johnson,Montgomery,NY,42.9765,-74.2484,geonames
+12071,Fultonham,Schoharie,NY,42.5923,-74.4381,geonames
+12072,Fultonville,Montgomery,NY,42.9036,-74.3598,geonames
+12073,Gallupville,Schoharie,NY,42.6626,-74.2326,geonames
+12074,Galway,Saratoga,NY,43.0217,-74.0290,geonames
+12075,Ghent,Columbia,NY,42.3036,-73.6486,geonames
+12076,Gilboa,Schoharie,NY,42.4108,-74.4003,geonames
+12077,Glenmont,Albany,NY,42.5971,-73.7959,geonames
+12078,Gloversville,Fulton,NY,43.0616,-74.3375,geonames
+12082,Grafton,Rensselaer,NY,42.7726,-73.4468,geonames
+12083,Greenville,Greene,NY,42.4113,-74.0222,geonames
+12084,Guilderland,Albany,NY,42.6973,-73.8975,geonames
+12085,Guilderland Center,Albany,NY,42.7020,-73.9662,geonames
+12086,Hagaman,Montgomery,NY,42.9695,-74.1556,geonames
+12087,Hannacroix,Greene,NY,42.4290,-73.8093,geonames
+12089,Hoosick,Rensselaer,NY,42.8667,-73.3181,geonames
+12090,Hoosick Falls,Rensselaer,NY,42.8937,-73.3581,geonames
+12092,Howes Cave,Schoharie,NY,42.7045,-74.3648,geonames
+12093,Jefferson,Schoharie,NY,42.4999,-74.6117,geonames
+12094,Johnsonville,Rensselaer,NY,42.8769,-73.4989,geonames
+12095,Johnstown,Fulton,NY,43.0069,-74.3715,geonames
+12106,Kinderhook,Columbia,NY,42.3767,-73.7183,geonames
+12107,Knox,Albany,NY,42.6600,-74.1168,geonames
+12108,Lake Pleasant,Hamilton,NY,43.6676,-74.4569,geonames
+12110,Latham,Albany,NY,42.7462,-73.7630,geonames
+12115,Malden Bridge,Columbia,NY,42.4725,-73.5807,geonames
+12116,Maryland,Otsego,NY,42.5371,-74.9030,geonames
+12117,Mayfield,Fulton,NY,43.1411,-74.2444,geonames
+12118,Mechanicville,Saratoga,NY,42.9168,-73.7214,geonames
+12120,Medusa,Albany,NY,42.4515,-74.1315,geonames
+12121,Melrose,Rensselaer,NY,42.8412,-73.6077,geonames
+12122,Middleburgh,Schoharie,NY,42.5637,-74.3292,geonames
+12123,Nassau,Rensselaer,NY,42.5271,-73.6118,geonames
+12124,New Baltimore,Greene,NY,42.4442,-73.7882,geonames
+12125,New Lebanon,Columbia,NY,42.4759,-73.3773,geonames
+12128,Newtonville,Albany,NY,42.7250,-73.7643,geonames
+12130,Niverville,Columbia,NY,42.4400,-73.6663,geonames
+12131,North Blenheim,Schoharie,NY,42.4899,-74.4282,geonames
+12132,North Chatham,Columbia,NY,42.4705,-73.6300,geonames
+12133,North Hoosick,Rensselaer,NY,42.9261,-73.3464,geonames
+12134,Northville,Fulton,NY,43.2662,-74.2288,geonames
+12136,Old Chatham,Columbia,NY,42.4357,-73.5545,geonames
+12137,Pattersonville,Schenectady,NY,42.8499,-74.1231,geonames
+12138,Petersburg,Rensselaer,NY,42.7495,-73.3401,geonames
+12139,Piseco,Hamilton,NY,43.4481,-74.5263,geonames
+12140,Poestenkill,Rensselaer,NY,42.6918,-73.5627,geonames
+12141,Quaker Street,Schenectady,NY,42.7318,-74.1854,geonames
+12143,Ravena,Albany,NY,42.4754,-73.8220,geonames
+12144,Rensselaer,Rensselaer,NY,42.6359,-73.7219,geonames
+12147,Rensselaerville,Albany,NY,42.5133,-74.1474,geonames
+12148,Rexford,Saratoga,NY,42.8524,-73.8701,geonames
+12149,Richmondville,Schoharie,NY,42.6424,-74.5710,geonames
+12150,Rotterdam Junction,Schenectady,NY,42.8745,-74.0465,geonames
+12151,Round Lake,Saratoga,NY,42.9247,-73.7859,geonames
+12153,Sand Lake,Rensselaer,NY,42.6379,-73.4989,geonames
+12154,Schaghticoke,Rensselaer,NY,42.9144,-73.6154,geonames
+12155,Schenevus,Otsego,NY,42.5900,-74.8149,geonames
+12156,Schodack Landing,Rensselaer,NY,42.4816,-73.7480,geonames
+12157,Schoharie,Schoharie,NY,42.6615,-74.3047,geonames
+12158,Selkirk,Albany,NY,42.5486,-73.8129,geonames
+12159,Slingerlands,Albany,NY,42.6485,-73.8711,geonames
+12160,Sloansville,Schoharie,NY,42.7599,-74.3642,geonames
+12161,South Bethlehem,Albany,NY,42.5317,-73.8473,geonames
+12164,Speculator,Hamilton,NY,43.5042,-74.3667,geonames
+12165,Spencertown,Columbia,NY,42.3091,-73.5008,geonames
+12166,Sprakers,Montgomery,NY,42.8484,-74.4536,geonames
+12167,Stamford,Delaware,NY,42.4174,-74.6098,geonames
+12168,Stephentown,Rensselaer,NY,42.5487,-73.3740,geonames
+12169,Stephentown,Rensselaer,NY,42.5855,-73.4154,geonames
+12170,Stillwater,Saratoga,NY,43.0019,-73.6609,geonames
+12172,Stottville,Columbia,NY,42.2857,-73.7335,geonames
+12173,Stuyvesant,Columbia,NY,42.3596,-73.7613,geonames
+12174,Stuyvesant Falls,Columbia,NY,42.3440,-73.7348,geonames
+12175,Summit,Schoharie,NY,42.5350,-74.5452,geonames
+12176,Surprise,Greene,NY,42.3851,-73.9587,geonames
+12177,Tribes Hill,Montgomery,NY,42.9554,-74.2851,geonames
+12180,Troy,Rensselaer,NY,42.7287,-73.6683,geonames
+12181,Troy,Rensselaer,NY,42.7387,-73.6739,geonames
+12182,Troy,Rensselaer,NY,42.7829,-73.6648,geonames
+12183,Troy,Albany,NY,42.7460,-73.6943,geonames
+12184,Valatie,Columbia,NY,42.4321,-73.6683,geonames
+12185,Valley Falls,Rensselaer,NY,42.8855,-73.5437,geonames
+12186,Voorheesville,Albany,NY,42.6431,-73.9448,geonames
+12187,Warnerville,Schoharie,NY,42.6604,-74.5074,geonames
+12188,Waterford,Saratoga,NY,42.8100,-73.6995,geonames
+12189,Watervliet,Albany,NY,42.7298,-73.7123,geonames
+12190,Wells,Hamilton,NY,43.4012,-74.2886,geonames
+12192,West Coxsackie,Greene,NY,42.4029,-73.8283,geonames
+12193,Westerlo,Albany,NY,42.5156,-74.0394,geonames
+12194,West Fulton,Schoharie,NY,42.5506,-74.4631,geonames
+12195,West Lebanon,Columbia,NY,42.4862,-73.4662,geonames
+12196,West Sand Lake,Rensselaer,NY,42.6380,-73.6109,geonames
+12197,Worcester,Otsego,NY,42.6049,-74.7299,geonames
+12198,Wynantskill,Rensselaer,NY,42.6878,-73.6383,geonames
+12201,Albany,Albany,NY,42.6526,-73.7562,geonames
+12202,Albany,Albany,NY,42.6413,-73.7641,geonames
+12203,Albany,Albany,NY,42.7003,-73.8575,geonames
+12204,Albany,Albany,NY,42.6847,-73.7354,geonames
+12205,Albany,Albany,NY,42.7198,-73.8207,geonames
+12206,Albany,Albany,NY,42.6683,-73.7744,geonames
+12207,Albany,Albany,NY,42.6526,-73.7562,geonames
+12208,Albany,Albany,NY,42.6560,-73.7964,geonames
+12209,Albany,Albany,NY,42.6417,-73.7854,geonames
+12210,Albany,Albany,NY,42.6568,-73.7605,geonames
+12211,Albany,Albany,NY,42.7130,-73.7739,geonames
+12212,Albany,Albany,NY,42.7168,-73.8104,geonames
+12214,Albany,Albany,NY,42.6526,-73.7562,geonames
+12220,Albany,Albany,NY,42.6526,-73.7562,geonames
+12222,Albany,Albany,NY,42.6853,-73.8253,geonames
+12223,Albany,Albany,NY,42.6526,-73.7562,geonames
+12224,Albany,Albany,NY,42.6526,-73.7562,geonames
+12225,Albany,Albany,NY,42.6526,-73.7562,geonames
+12226,Albany,Albany,NY,42.6526,-73.7562,geonames
+12227,Albany,Albany,NY,42.6526,-73.7562,geonames
+12228,Albany,Albany,NY,42.6526,-73.7562,geonames
+12229,Albany,Albany,NY,42.6526,-73.7562,geonames
+12230,Albany,Albany,NY,42.6526,-73.7562,geonames
+12231,Albany,Albany,NY,42.6526,-73.7562,geonames
+12232,Albany,Albany,NY,42.6526,-73.7562,geonames
+12233,Albany,Albany,NY,42.6526,-73.7562,geonames
+12234,Albany,Albany,NY,42.6526,-73.7562,geonames
+12235,Albany,Albany,NY,42.6526,-73.7562,geonames
+12236,Albany,Albany,NY,42.6526,-73.7562,geonames
+12237,Albany,Albany,NY,42.6526,-73.7562,geonames
+12238,Albany,Albany,NY,42.6526,-73.7562,geonames
+12239,Albany,Albany,NY,42.6526,-73.7562,geonames
+12240,Albany,Albany,NY,42.6526,-73.7562,geonames
+12241,Albany,Albany,NY,42.6526,-73.7562,geonames
+12242,Albany,Albany,NY,42.6526,-73.7562,geonames
+12243,Albany,Albany,NY,42.6526,-73.7562,geonames
+12244,Albany,Albany,NY,42.6526,-73.7562,geonames
+12245,Albany,Albany,NY,42.6526,-73.7562,geonames
+12246,Albany,Albany,NY,42.6471,-73.7503,geonames
+12247,Albany,Albany,NY,42.6526,-73.7562,geonames
+12248,Albany,Albany,NY,42.6526,-73.7562,geonames
+12249,Albany,Albany,NY,42.6526,-73.7562,geonames
+12250,Albany,Albany,NY,42.6526,-73.7562,geonames
+12252,Albany,Albany,NY,42.6526,-73.7562,geonames
+12255,Albany,Albany,NY,42.6526,-73.7562,geonames
+12256,Albany,Albany,NY,42.6526,-73.7562,geonames
+12257,Albany,Albany,NY,42.6526,-73.7562,geonames
+12260,Albany,Albany,NY,42.6526,-73.7562,geonames
+12261,Albany,Albany,NY,42.6526,-73.7562,geonames
+12288,Albany,Albany,NY,42.6526,-73.7562,geonames
+12301,Schenectady,Schenectady,NY,42.8142,-73.9396,geonames
+12302,Schenectady,Schenectady,NY,42.8800,-73.9913,geonames
+12303,Schenectady,Schenectady,NY,42.7823,-73.9448,geonames
+12304,Schenectady,Schenectady,NY,42.7841,-73.9094,geonames
+12305,Schenectady,Schenectady,NY,42.8161,-73.9398,geonames
+12306,Schenectady,Schenectady,NY,42.7904,-73.9809,geonames
+12307,Schenectady,Schenectady,NY,42.8047,-73.9363,geonames
+12308,Schenectady,Schenectady,NY,42.8179,-73.9206,geonames
+12309,Schenectady,Schenectady,NY,42.8091,-73.8693,geonames
+12325,Schenectady,Schenectady,NY,42.8333,-74.0580,geonames
+12345,Schenectady,Schenectady,NY,42.8142,-73.9396,geonames
+12401,Kingston,Ulster,NY,41.9697,-74.0668,geonames
+12402,Kingston,Ulster,NY,41.9270,-73.9974,geonames
+12404,Accord,Ulster,NY,41.8083,-74.2353,geonames
+12405,Acra,Greene,NY,42.3304,-74.0857,geonames
+12406,Arkville,Delaware,NY,42.1417,-74.5721,geonames
+12407,Ashland,Greene,NY,42.3037,-74.3335,geonames
+12409,Bearsville,Ulster,NY,42.0406,-74.1551,geonames
+12410,Big Indian,Ulster,NY,42.0740,-74.4530,geonames
+12411,Bloomington,Ulster,NY,41.8752,-74.0436,geonames
+12412,Boiceville,Ulster,NY,42.0048,-74.2658,geonames
+12413,Cairo,Greene,NY,42.3096,-74.0115,geonames
+12414,Catskill,Greene,NY,42.2276,-73.8985,geonames
+12416,Chichester,Ulster,NY,42.0950,-74.2717,geonames
+12417,Connelly,Ulster,NY,41.9076,-73.9893,geonames
+12418,Cornwallville,Greene,NY,42.3629,-74.1631,geonames
+12419,Cottekill,Ulster,NY,41.8467,-74.1038,geonames
+12420,Cragsmoor,Ulster,NY,41.6698,-74.3801,geonames
+12421,Denver,Delaware,NY,42.2522,-74.5407,geonames
+12422,Durham,Greene,NY,42.4020,-74.1849,geonames
+12423,East Durham,Greene,NY,42.3860,-74.1117,geonames
+12424,East Jewett,Greene,NY,42.2469,-74.1353,geonames
+12427,Elka Park,Greene,NY,42.1643,-74.1245,geonames
+12428,Ellenville,Ulster,NY,41.7218,-74.4141,geonames
+12429,Esopus,Ulster,NY,41.8279,-73.9651,geonames
+12430,Fleischmanns,Delaware,NY,42.1772,-74.5473,geonames
+12431,Freehold,Greene,NY,42.3815,-74.0623,geonames
+12432,Glasco,Ulster,NY,42.0437,-73.9474,geonames
+12433,Glenford,Ulster,NY,42.0053,-74.1532,geonames
+12434,Grand Gorge,Delaware,NY,42.3620,-74.4940,geonames
+12435,Greenfield Park,Ulster,NY,41.7281,-74.5201,geonames
+12436,Haines Falls,Greene,NY,42.1955,-74.1023,geonames
+12438,Halcottsville,Delaware,NY,42.2079,-74.6012,geonames
+12439,Hensonville,Greene,NY,42.2898,-74.2165,geonames
+12440,High Falls,Ulster,NY,41.8167,-74.1311,geonames
+12441,Highmount,Ulster,NY,42.1443,-74.4899,geonames
+12442,Hunter,Greene,NY,42.2333,-74.2416,geonames
+12443,Hurley,Ulster,NY,41.9327,-74.0687,geonames
+12444,Jewett,Greene,NY,42.2694,-74.2793,geonames
+12446,Kerhonkson,Ulster,NY,41.7939,-74.3035,geonames
+12448,Lake Hill,Ulster,NY,42.0733,-74.2123,geonames
+12449,Lake Katrine,Ulster,NY,41.9918,-73.9924,geonames
+12450,Lanesville,Greene,NY,42.1332,-74.2443,geonames
+12451,Leeds,Greene,NY,42.3045,-73.9457,geonames
+12452,Lexington,Greene,NY,42.2404,-74.3654,geonames
+12453,Malden On Hudson,Ulster,NY,42.0987,-73.9354,geonames
+12454,Maplecrest,Greene,NY,42.2995,-74.1655,geonames
+12455,Margaretville,Delaware,NY,42.1852,-74.6178,geonames
+12456,Mount Marion,Ulster,NY,42.0357,-74.0002,geonames
+12457,Mount Tremper,Ulster,NY,42.0435,-74.2485,geonames
+12458,Napanoch,Ulster,NY,41.7590,-74.3804,geonames
+12459,New Kingston,Delaware,NY,42.2094,-74.6837,geonames
+12460,Oak Hill,Greene,NY,42.4098,-74.1524,geonames
+12461,Olivebridge,Ulster,NY,41.8750,-74.2734,geonames
+12463,Palenville,Greene,NY,42.1729,-74.0167,geonames
+12464,Phoenicia,Ulster,NY,42.0848,-74.3154,geonames
+12465,Pine Hill,Ulster,NY,42.1331,-74.4802,geonames
+12466,Port Ewen,Ulster,NY,41.8948,-73.9767,geonames
+12468,Prattsville,Greene,NY,42.2979,-74.3895,geonames
+12469,Preston Hollow,Albany,NY,42.4563,-74.2420,geonames
+12470,Purling,Greene,NY,42.2959,-74.0773,geonames
+12471,Rifton,Ulster,NY,41.8403,-74.0306,geonames
+12472,Rosendale,Ulster,NY,41.8402,-74.0730,geonames
+12473,Round Top,Greene,NY,42.2678,-74.0523,geonames
+12474,Roxbury,Delaware,NY,42.2957,-74.5631,geonames
+12475,Ruby,Ulster,NY,42.0176,-74.0079,geonames
+12477,Saugerties,Ulster,NY,42.0738,-73.9797,geonames
+12480,Shandaken,Ulster,NY,42.1363,-74.3774,geonames
+12481,Shokan,Ulster,NY,41.9767,-74.2119,geonames
+12482,South Cairo,Greene,NY,42.2681,-73.9554,geonames
+12483,Spring Glen,Ulster,NY,41.6639,-74.4245,geonames
+12484,Stone Ridge,Ulster,NY,41.8616,-74.1697,geonames
+12485,Tannersville,Greene,NY,42.1956,-74.1338,geonames
+12486,Tillson,Ulster,NY,41.8338,-74.0626,geonames
+12487,Ulster Park,Ulster,NY,41.8651,-73.9948,geonames
+12489,Wawarsing,Ulster,NY,41.7606,-74.3535,geonames
+12490,West Camp,Ulster,NY,42.1231,-73.9349,geonames
+12491,West Hurley,Ulster,NY,41.9973,-74.1049,geonames
+12492,West Kill,Greene,NY,42.2046,-74.3620,geonames
+12493,West Park,Ulster,NY,41.7953,-73.9809,geonames
+12494,West Shokan,Ulster,NY,41.9673,-74.2871,geonames
+12495,Willow,Ulster,NY,42.0849,-74.2407,geonames
+12496,Windham,Greene,NY,42.3175,-74.2620,geonames
+12498,Woodstock,Ulster,NY,42.0348,-74.1120,geonames
+12501,Amenia,Dutchess,NY,41.8447,-73.5542,geonames
+12502,Ancram,Columbia,NY,42.0851,-73.6424,geonames
+12503,Ancramdale,Columbia,NY,42.0381,-73.5819,geonames
+12504,Annandale On Hudson,Dutchess,NY,42.0129,-73.9082,geonames
+12506,Bangall,Dutchess,NY,41.8756,-73.6912,geonames
+12507,Barrytown,Dutchess,NY,42.0005,-73.9199,geonames
+12508,Beacon,Dutchess,NY,41.5097,-73.9634,geonames
+12510,Billings,Dutchess,NY,41.6712,-73.7632,geonames
+12511,Castle Point,Dutchess,NY,41.5462,-73.9596,geonames
+12512,Chelsea,Dutchess,NY,41.5528,-73.9682,geonames
+12513,Claverack,Columbia,NY,42.2251,-73.7346,geonames
+12514,Clinton Corners,Dutchess,NY,41.8693,-73.7659,geonames
+12515,Clintondale,Ulster,NY,41.6749,-74.0557,geonames
+12516,Copake,Columbia,NY,42.1113,-73.5526,geonames
+12517,Copake Falls,Columbia,NY,42.1367,-73.5108,geonames
+12518,Cornwall,Orange,NY,41.4162,-74.0395,geonames
+12520,Cornwall On Hudson,Orange,NY,41.4330,-74.0061,geonames
+12521,Craryville,Columbia,NY,42.1760,-73.6571,geonames
+12522,Dover Plains,Dutchess,NY,41.7351,-73.5870,geonames
+12523,Elizaville,Columbia,NY,42.0902,-73.7818,geonames
+12524,Fishkill,Dutchess,NY,41.5404,-73.8979,geonames
+12525,Gardiner,Ulster,NY,41.6576,-74.1672,geonames
+12526,Germantown,Columbia,NY,42.1219,-73.8625,geonames
+12527,Glenham,Dutchess,NY,41.5202,-73.9333,geonames
+12528,Highland,Ulster,NY,41.7167,-73.9928,geonames
+12529,Hillsdale,Columbia,NY,42.1868,-73.5483,geonames
+12530,Hollowville,Columbia,NY,42.2054,-73.6912,geonames
+12531,Holmes,Dutchess,NY,41.5325,-73.6628,geonames
+12533,Hopewell Junction,Dutchess,NY,41.5603,-73.7939,geonames
+12534,Hudson,Columbia,NY,42.2470,-73.7552,geonames
+12537,Hughsonville,Dutchess,NY,41.5824,-73.9363,geonames
+12538,Hyde Park,Dutchess,NY,41.7887,-73.9063,geonames
+12540,Lagrangeville,Dutchess,NY,41.6615,-73.7450,geonames
+12541,Livingston,Columbia,NY,42.1421,-73.7574,geonames
+12542,Marlboro,Ulster,NY,41.6056,-73.9880,geonames
+12543,Maybrook,Orange,NY,41.4886,-74.2163,geonames
+12544,Mellenville,Columbia,NY,42.2596,-73.6680,geonames
+12545,Millbrook,Dutchess,NY,41.7803,-73.6885,geonames
+12546,Millerton,Dutchess,NY,41.9536,-73.5287,geonames
+12547,Milton,Ulster,NY,41.6535,-73.9772,geonames
+12548,Modena,Ulster,NY,41.6503,-74.1036,geonames
+12549,Montgomery,Orange,NY,41.5333,-74.2534,geonames
+12550,Newburgh,Orange,NY,41.5372,-74.0526,geonames
+12551,Newburgh,Orange,NY,41.5034,-74.0104,geonames
+12552,Newburgh,Orange,NY,41.5034,-74.0104,geonames
+12553,New Windsor,Orange,NY,41.4724,-74.0566,geonames
+12555,Newburgh,Orange,NY,41.5034,-74.0104,geonames
+12561,New Paltz,Ulster,NY,41.7464,-74.1092,geonames
+12563,Patterson,Putnam,NY,41.4888,-73.5815,geonames
+12564,Pawling,Dutchess,NY,41.5749,-73.5948,geonames
+12565,Philmont,Columbia,NY,42.2485,-73.6463,geonames
+12566,Pine Bush,Orange,NY,41.6178,-74.3263,geonames
+12567,Pine Plains,Dutchess,NY,41.9896,-73.6602,geonames
+12568,Plattekill,Ulster,NY,41.6412,-74.0781,geonames
+12569,Pleasant Valley,Dutchess,NY,41.7470,-73.8143,geonames
+12570,Poughquag,Dutchess,NY,41.6194,-73.6783,geonames
+12571,Red Hook,Dutchess,NY,42.0064,-73.8546,geonames
+12572,Rhinebeck,Dutchess,NY,41.9272,-73.8888,geonames
+12574,Rhinecliff,Dutchess,NY,41.9151,-73.9517,geonames
+12575,Rock Tavern,Orange,NY,41.4575,-74.1659,geonames
+12577,Salisbury Mills,Orange,NY,41.4497,-74.1214,geonames
+12578,Salt Point,Dutchess,NY,41.8050,-73.8013,geonames
+12580,Staatsburg,Dutchess,NY,41.8502,-73.8988,geonames
+12581,Stanfordville,Dutchess,NY,41.8877,-73.6945,geonames
+12582,Stormville,Dutchess,NY,41.5512,-73.7255,geonames
+12583,Tivoli,Dutchess,NY,42.0579,-73.9025,geonames
+12584,Vails Gate,Orange,NY,41.4641,-74.0591,geonames
+12585,Verbank,Dutchess,NY,41.7227,-73.7184,geonames
+12586,Walden,Orange,NY,41.5596,-74.1764,geonames
+12588,Walker Valley,Ulster,NY,41.6337,-74.3779,geonames
+12589,Wallkill,Ulster,NY,41.6160,-74.1439,geonames
+12590,Wappingers Falls,Dutchess,NY,41.5950,-73.8876,geonames
+12592,Wassaic,Dutchess,NY,41.7759,-73.5544,geonames
+12594,Wingdale,Dutchess,NY,41.6538,-73.5556,geonames
+12601,Poughkeepsie,Dutchess,NY,41.7035,-73.9117,geonames
+12602,Poughkeepsie,Dutchess,NY,41.7599,-73.7437,geonames
+12603,Poughkeepsie,Dutchess,NY,41.6907,-73.8621,geonames
+12604,Poughkeepsie,Dutchess,NY,41.7599,-73.7437,geonames
+12701,Monticello,Sullivan,NY,41.6516,-74.7007,geonames
+12719,Barryville,Sullivan,NY,41.4912,-74.9152,geonames
+12720,Bethel,Sullivan,NY,41.6693,-74.8940,geonames
+12721,Bloomingburg,Sullivan,NY,41.5644,-74.4304,geonames
+12722,Burlingham,Sullivan,NY,41.5901,-74.3821,geonames
+12723,Callicoon,Sullivan,NY,41.7673,-75.0563,geonames
+12724,Callicoon Center,Sullivan,NY,41.8368,-74.9466,geonames
+12725,Claryville,Sullivan,NY,41.9657,-74.5293,geonames
+12726,Cochecton,Sullivan,NY,41.6920,-74.9741,geonames
+12727,Cochecton Center,Sullivan,NY,41.6548,-74.9827,geonames
+12729,Cuddebackville,Orange,NY,41.4776,-74.5976,geonames
+12732,Eldred,Sullivan,NY,41.5328,-74.8968,geonames
+12733,Fallsburg,Sullivan,NY,41.7273,-74.6154,geonames
+12734,Ferndale,Sullivan,NY,41.7349,-74.7345,geonames
+12736,Fremont Center,Sullivan,NY,41.8782,-75.0343,geonames
+12737,Glen Spey,Sullivan,NY,41.4858,-74.7995,geonames
+12738,Glen Wild,Sullivan,NY,41.6545,-74.5833,geonames
+12740,Grahamsville,Sullivan,NY,41.8807,-74.5127,geonames
+12741,Hankins,Sullivan,NY,41.8391,-75.0534,geonames
+12742,Harris,Sullivan,NY,41.7143,-74.7263,geonames
+12743,Highland Lake,Sullivan,NY,41.5309,-74.8516,geonames
+12745,Hortonville,Sullivan,NY,41.7629,-75.0306,geonames
+12746,Huguenot,Orange,NY,41.4179,-74.6310,geonames
+12747,Hurleyville,Sullivan,NY,41.7356,-74.6743,geonames
+12748,Jeffersonville,Sullivan,NY,41.7784,-74.9196,geonames
+12749,Kauneonga Lake,Sullivan,NY,41.6874,-74.8358,geonames
+12750,Kenoza Lake,Sullivan,NY,41.7296,-74.9611,geonames
+12751,Kiamesha Lake,Sullivan,NY,41.6838,-74.6724,geonames
+12752,Lake Huntington,Sullivan,NY,41.6782,-74.9949,geonames
+12754,Liberty,Sullivan,NY,41.7962,-74.7484,geonames
+12758,Livingston Manor,Sullivan,NY,41.8778,-74.8270,geonames
+12759,Loch Sheldrake,Sullivan,NY,41.7789,-74.6614,geonames
+12760,Long Eddy,Sullivan,NY,41.8644,-75.0942,geonames
+12762,Mongaup Valley,Sullivan,NY,41.6810,-74.8028,geonames
+12763,Mountain Dale,Sullivan,NY,41.6918,-74.5358,geonames
+12764,Narrowsburg,Sullivan,NY,41.5921,-75.0107,geonames
+12765,Neversink,Sullivan,NY,41.8492,-74.6127,geonames
+12766,North Branch,Sullivan,NY,41.8142,-74.9824,geonames
+12767,Obernburg,Sullivan,NY,41.8448,-75.0071,geonames
+12768,Parksville,Sullivan,NY,41.8517,-74.7359,geonames
+12769,Phillipsport,Sullivan,NY,41.6515,-74.4362,geonames
+12770,Pond Eddy,Sullivan,NY,41.4511,-74.8410,geonames
+12771,Port Jervis,Orange,NY,41.3786,-74.6691,geonames
+12775,Rock Hill,Sullivan,NY,41.6134,-74.5872,geonames
+12776,Roscoe,Sullivan,NY,41.9609,-74.9346,geonames
+12777,Forestburgh,Sullivan,NY,41.5691,-74.7241,geonames
+12778,Smallwood,Sullivan,NY,41.6615,-74.8178,geonames
+12779,South Fallsburg,Sullivan,NY,41.7042,-74.6444,geonames
+12780,Sparrow Bush,Orange,NY,41.4443,-74.7213,geonames
+12781,Summitville,Sullivan,NY,41.6215,-74.4507,geonames
+12783,Swan Lake,Sullivan,NY,41.7285,-74.8341,geonames
+12784,Thompsonville,Sullivan,NY,41.6681,-74.6252,geonames
+12785,Westbrookville,Sullivan,NY,41.4987,-74.5585,geonames
+12786,White Lake,Sullivan,NY,41.6485,-74.8654,geonames
+12787,White Sulphur Springs,Sullivan,NY,41.8002,-74.8286,geonames
+12788,Woodbourne,Sullivan,NY,41.7708,-74.5928,geonames
+12789,Woodridge,Sullivan,NY,41.7170,-74.5815,geonames
+12790,Wurtsboro,Sullivan,NY,41.5877,-74.5039,geonames
+12791,Youngsville,Sullivan,NY,41.8032,-74.8888,geonames
+12792,Yulan,Sullivan,NY,41.5226,-74.9329,geonames
+12801,Glens Falls,Warren,NY,43.3115,-73.6448,geonames
+12803,South Glens Falls,Saratoga,NY,43.2836,-73.6294,geonames
+12804,Queensbury,Warren,NY,43.3290,-73.6818,geonames
+12808,Adirondack,Warren,NY,43.7165,-73.7825,geonames
+12809,Argyle,Washington,NY,43.2381,-73.4641,geonames
+12810,Athol,Warren,NY,43.4839,-73.8817,geonames
+12811,Bakers Mills,Warren,NY,43.6148,-74.0249,geonames
+12812,Blue Mountain Lake,Hamilton,NY,43.8553,-74.4435,geonames
+12814,Bolton Landing,Warren,NY,43.5766,-73.6714,geonames
+12815,Brant Lake,Warren,NY,43.6989,-73.7205,geonames
+12816,Cambridge,Washington,NY,43.0466,-73.3814,geonames
+12817,Chestertown,Warren,NY,43.6451,-73.8066,geonames
+12819,Clemons,Washington,NY,43.6435,-73.4326,geonames
+12820,Cleverdale,Warren,NY,43.4718,-73.6393,geonames
+12821,Comstock,Washington,NY,43.4614,-73.4033,geonames
+12822,Corinth,Saratoga,NY,43.2426,-73.8369,geonames
+12823,Cossayuna,Washington,NY,43.1837,-73.4268,geonames
+12824,Diamond Point,Warren,NY,43.5156,-73.7001,geonames
+12827,Fort Ann,Washington,NY,43.4285,-73.4784,geonames
+12828,Fort Edward,Washington,NY,43.2653,-73.5822,geonames
+12831,Gansevoort,Saratoga,NY,43.1803,-73.7053,geonames
+12832,Granville,Washington,NY,43.3776,-73.2978,geonames
+12833,Greenfield Center,Saratoga,NY,43.1401,-73.8398,geonames
+12834,Greenwich,Washington,NY,43.0947,-73.5030,geonames
+12835,Hadley,Saratoga,NY,43.3173,-73.8482,geonames
+12836,Hague,Warren,NY,43.7463,-73.5282,geonames
+12837,Hampton,Washington,NY,43.5248,-73.2518,geonames
+12838,Hartford,Washington,NY,43.3493,-73.4049,geonames
+12839,Hudson Falls,Washington,NY,43.3149,-73.5746,geonames
+12841,Huletts Landing,Washington,NY,43.6392,-73.5071,geonames
+12842,Indian Lake,Hamilton,NY,43.7606,-74.2766,geonames
+12843,Johnsburg,Warren,NY,43.5860,-73.9165,geonames
+12844,Kattskill Bay,Warren,NY,43.4754,-73.6272,geonames
+12845,Lake George,Warren,NY,43.4167,-73.6975,geonames
+12846,Lake Luzerne,Warren,NY,43.3165,-73.8228,geonames
+12847,Long Lake,Hamilton,NY,43.9477,-74.4662,geonames
+12848,Middle Falls,Washington,NY,43.1001,-73.5246,geonames
+12849,Middle Granville,Washington,NY,43.4508,-73.3031,geonames
+12850,Middle Grove,Saratoga,NY,43.0975,-74.0167,geonames
+12851,Minerva,Essex,NY,43.7811,-73.9835,geonames
+12852,Newcomb,Essex,NY,43.9460,-74.1299,geonames
+12853,North Creek,Warren,NY,43.6978,-73.9860,geonames
+12854,North Granville,Washington,NY,43.4525,-73.3410,geonames
+12855,North Hudson,Essex,NY,43.9869,-73.7121,geonames
+12856,North River,Warren,NY,43.7237,-74.0873,geonames
+12857,Olmstedville,Essex,NY,43.7799,-73.9335,geonames
+12858,Paradox,Essex,NY,43.8914,-73.6450,geonames
+12859,Porter Corners,Saratoga,NY,43.1724,-73.8839,geonames
+12860,Pottersville,Warren,NY,43.7312,-73.8193,geonames
+12861,Putnam Station,Washington,NY,43.7560,-73.4123,geonames
+12862,Riparius,Warren,NY,43.6617,-73.8971,geonames
+12863,Rock City Falls,Saratoga,NY,43.0662,-73.9215,geonames
+12864,Sabael,Hamilton,NY,43.7284,-74.3057,geonames
+12865,Salem,Washington,NY,43.1828,-73.3327,geonames
+12866,Saratoga Springs,Saratoga,NY,43.0708,-73.7408,geonames
+12870,Schroon Lake,Essex,NY,43.8412,-73.7674,geonames
+12871,Schuylerville,Saratoga,NY,43.0878,-73.6007,geonames
+12872,Severance,Essex,NY,43.8759,-73.7304,geonames
+12873,Shushan,Washington,NY,43.1106,-73.3231,geonames
+12874,Silver Bay,Warren,NY,43.6978,-73.5071,geonames
+12878,Stony Creek,Warren,NY,43.4214,-73.9495,geonames
+12879,Newcomb,Essex,NY,43.9697,-74.1662,geonames
+12883,Ticonderoga,Essex,NY,43.8463,-73.4426,geonames
+12884,Victory Mills,Saratoga,NY,43.0884,-73.5917,geonames
+12885,Warrensburg,Warren,NY,43.5003,-73.7920,geonames
+12886,Wevertown,Warren,NY,43.6313,-73.9364,geonames
+12887,Whitehall,Washington,NY,43.5531,-73.3864,geonames
+12901,Plattsburgh,Clinton,NY,44.6927,-73.4660,geonames
+12903,Plattsburgh,Clinton,NY,44.6854,-73.4474,geonames
+12910,Altona,Clinton,NY,44.8816,-73.6408,geonames
+12911,Keeseville,Clinton,NY,44.5050,-73.4801,geonames
+12912,Au Sable Forks,Clinton,NY,44.4499,-73.6857,geonames
+12913,Bloomingdale,Essex,NY,44.3985,-74.0829,geonames
+12914,Bombay,Franklin,NY,44.9479,-74.5947,geonames
+12915,Brainardsville,Franklin,NY,44.8578,-74.0335,geonames
+12916,Brushton,Franklin,NY,44.8282,-74.5223,geonames
+12917,Burke,Franklin,NY,44.9177,-74.1731,geonames
+12918,Cadyville,Clinton,NY,44.6862,-73.6702,geonames
+12919,Champlain,Clinton,NY,44.9773,-73.4466,geonames
+12920,Chateaugay,Franklin,NY,44.9088,-74.0741,geonames
+12921,Chazy,Clinton,NY,44.8884,-73.4501,geonames
+12922,Childwold,St. Lawrence,NY,44.2867,-74.6759,geonames
+12923,Churubusco,Clinton,NY,44.9432,-73.9355,geonames
+12924,Keeseville,Clinton,NY,44.4777,-73.5843,geonames
+12926,Constable,Franklin,NY,44.9417,-74.3297,geonames
+12927,Cranberry Lake,St. Lawrence,NY,44.2290,-74.8581,geonames
+12928,Crown Point,Essex,NY,43.9526,-73.4665,geonames
+12929,Dannemora,Clinton,NY,44.7200,-73.7192,geonames
+12930,Dickinson Center,Franklin,NY,44.7233,-74.5523,geonames
+12932,Elizabethtown,Essex,NY,44.2245,-73.6011,geonames
+12933,Ellenburg,Clinton,NY,44.8939,-73.8365,geonames
+12934,Ellenburg Center,Clinton,NY,44.8444,-73.8685,geonames
+12935,Ellenburg Depot,Clinton,NY,44.9163,-73.7876,geonames
+12936,Essex,Essex,NY,44.2807,-73.3731,geonames
+12937,Fort Covington,Franklin,NY,44.9731,-74.4929,geonames
+12939,Gabriels,Franklin,NY,44.4320,-74.1810,geonames
+12941,Jay,Essex,NY,44.3734,-73.7247,geonames
+12942,Keene,Essex,NY,44.2555,-73.7915,geonames
+12943,Keene Valley,Essex,NY,44.2024,-73.7731,geonames
+12944,Keeseville,Essex,NY,44.4999,-73.4745,geonames
+12945,Lake Clear,Franklin,NY,44.3375,-74.2381,geonames
+12946,Lake Placid,Essex,NY,44.2796,-73.9820,geonames
+12949,Lawrenceville,St. Lawrence,NY,44.7469,-74.6604,geonames
+12950,Lewis,Essex,NY,44.3075,-73.5491,geonames
+12952,Lyon Mountain,Clinton,NY,44.7255,-73.9195,geonames
+12953,Malone,Franklin,NY,44.8482,-74.2928,geonames
+12955,Lyon Mountain,Clinton,NY,44.8043,-73.9730,geonames
+12956,Mineville,Essex,NY,44.0876,-73.5236,geonames
+12957,Moira,Franklin,NY,44.8504,-74.5603,geonames
+12958,Mooers,Clinton,NY,44.9592,-73.5834,geonames
+12959,Mooers Forks,Clinton,NY,44.9602,-73.6730,geonames
+12960,Moriah,Essex,NY,44.0438,-73.5079,geonames
+12961,Moriah Center,Essex,NY,44.0612,-73.5098,geonames
+12962,Morrisonville,Clinton,NY,44.6894,-73.5772,geonames
+12964,New Russia,Essex,NY,44.1595,-73.6059,geonames
+12965,Nicholville,St. Lawrence,NY,44.7030,-74.6805,geonames
+12966,North Bangor,Franklin,NY,44.8532,-74.4191,geonames
+12967,North Lawrence,St. Lawrence,NY,44.7750,-74.6653,geonames
+12969,Owls Head,Franklin,NY,44.7308,-74.1342,geonames
+12970,Paul Smiths,Franklin,NY,44.4450,-74.2664,geonames
+12972,Peru,Clinton,NY,44.5851,-73.5293,geonames
+12973,Piercefield,St. Lawrence,NY,44.2343,-74.5560,geonames
+12974,Port Henry,Essex,NY,44.0465,-73.4705,geonames
+12975,Port Kent,Essex,NY,44.5264,-73.4092,geonames
+12976,Rainbow Lake,Franklin,NY,44.4670,-74.1729,geonames
+12977,Ray Brook,Essex,NY,44.2802,-74.0795,geonames
+12978,Redford,Clinton,NY,44.6164,-73.8087,geonames
+12979,Rouses Point,Clinton,NY,44.9884,-73.3691,geonames
+12980,Saint Regis Falls,Franklin,NY,44.6578,-74.5155,geonames
+12981,Saranac,Clinton,NY,44.7032,-73.7481,geonames
+12983,Saranac Lake,Franklin,NY,44.3243,-74.1330,geonames
+12985,Schuyler Falls,Clinton,NY,44.6287,-73.5579,geonames
+12986,Tupper Lake,Franklin,NY,44.2320,-74.4905,geonames
+12987,Upper Jay,Essex,NY,44.3364,-73.7757,geonames
+12989,Vermontville,Franklin,NY,44.4601,-74.0573,geonames
+12992,West Chazy,Clinton,NY,44.7970,-73.5112,geonames
+12993,Westport,Essex,NY,44.2050,-73.4702,geonames
+12995,Whippleville,Franklin,NY,44.8057,-74.2523,geonames
+12996,Willsboro,Essex,NY,44.3604,-73.3963,geonames
+12997,Wilmington,Essex,NY,44.3755,-73.8431,geonames
+12998,Witherbee,Essex,NY,44.0827,-73.5306,geonames
+13020,Apulia Station,Onondaga,NY,42.8187,-76.0724,geonames
+13021,Auburn,Cayuga,NY,42.9300,-76.5626,geonames
+13022,Auburn,Cayuga,NY,42.9317,-76.5661,geonames
+13024,Auburn,Cayuga,NY,42.9317,-76.5661,geonames
+13026,Aurora,Cayuga,NY,42.7472,-76.6775,geonames
+13027,Baldwinsville,Onondaga,NY,43.1620,-76.3237,geonames
+13028,Bernhards Bay,Oswego,NY,43.2717,-75.9373,geonames
+13029,Brewerton,Onondaga,NY,43.2252,-76.1351,geonames
+13030,Bridgeport,Onondaga,NY,43.1590,-75.9700,geonames
+13031,Camillus,Onondaga,NY,43.0417,-76.2807,geonames
+13032,Canastota,Madison,NY,43.0878,-75.7602,geonames
+13033,Cato,Cayuga,NY,43.1794,-76.5648,geonames
+13034,Cayuga,Cayuga,NY,42.9142,-76.7024,geonames
+13035,Cazenovia,Madison,NY,42.9380,-75.8392,geonames
+13036,Central Square,Oswego,NY,43.3090,-76.1849,geonames
+13037,Chittenango,Madison,NY,43.0552,-75.8768,geonames
+13039,Cicero,Onondaga,NY,43.1707,-76.0962,geonames
+13040,Cincinnatus,Cortland,NY,42.5385,-75.9030,geonames
+13041,Clay,Onondaga,NY,43.1737,-76.1707,geonames
+13042,Cleveland,Oswego,NY,43.2432,-75.8537,geonames
+13043,Clockville,Madison,NY,43.0420,-75.7408,geonames
+13044,Constantia,Oswego,NY,43.2728,-76.0042,geonames
+13045,Cortland,Cortland,NY,42.5952,-76.1857,geonames
+13051,Delphi Falls,Onondaga,NY,42.8765,-75.9135,geonames
+13052,De Ruyter,Madison,NY,42.7494,-75.8582,geonames
+13053,Dryden,Tompkins,NY,42.4861,-76.2872,geonames
+13054,Durhamville,Oneida,NY,43.1579,-75.6714,geonames
+13056,East Homer,Cortland,NY,42.6772,-76.1052,geonames
+13057,East Syracuse,Onondaga,NY,43.0734,-76.0558,geonames
+13060,Elbridge,Onondaga,NY,43.0252,-76.4352,geonames
+13061,Erieville,Madison,NY,42.8562,-75.7543,geonames
+13062,Etna,Tompkins,NY,42.4851,-76.3835,geonames
+13063,Fabius,Onondaga,NY,42.8531,-75.9836,geonames
+13064,Fair Haven,Oswego,NY,43.4313,-76.2004,geonames
+13065,Fayette,Seneca,NY,42.8227,-76.8020,geonames
+13066,Fayetteville,Onondaga,NY,43.0268,-76.0145,geonames
+13068,Freeville,Tompkins,NY,42.4998,-76.3636,geonames
+13069,Fulton,Oswego,NY,43.3211,-76.4034,geonames
+13071,Genoa,Cayuga,NY,42.6746,-76.5418,geonames
+13072,Georgetown,Madison,NY,42.7631,-75.7443,geonames
+13073,Groton,Tompkins,NY,42.5855,-76.3633,geonames
+13074,Hannibal,Oswego,NY,43.3111,-76.5460,geonames
+13076,Hastings,Oswego,NY,43.3527,-76.1477,geonames
+13077,Homer,Cortland,NY,42.6726,-76.1878,geonames
+13078,Jamesville,Onondaga,NY,42.9830,-76.0766,geonames
+13080,Jordan,Onondaga,NY,43.0651,-76.4598,geonames
+13081,King Ferry,Cayuga,NY,42.6635,-76.6216,geonames
+13082,Kirkville,Onondaga,NY,43.0981,-75.9550,geonames
+13083,Lacona,Oswego,NY,43.6429,-76.0503,geonames
+13084,La Fayette,Onondaga,NY,42.8910,-76.1061,geonames
+13087,Little York,Cortland,NY,42.7070,-76.1561,geonames
+13088,Liverpool,Onondaga,NY,43.1099,-76.1870,geonames
+13089,Liverpool,Onondaga,NY,43.0214,-76.1977,geonames
+13090,Liverpool,Onondaga,NY,43.1528,-76.2235,geonames
+13092,Locke,Cayuga,NY,42.6558,-76.4154,geonames
+13093,Lycoming,Oswego,NY,43.4987,-76.3858,geonames
+13101,Mc Graw,Cortland,NY,42.5948,-76.0820,geonames
+13102,Mc Lean,Tompkins,NY,42.5542,-76.2927,geonames
+13103,Mallory,Oswego,NY,43.3237,-76.1166,geonames
+13104,Manlius,Onondaga,NY,42.9904,-75.9703,geonames
+13107,Maple View,Oswego,NY,43.4578,-76.1534,geonames
+13108,Marcellus,Onondaga,NY,42.9821,-76.3323,geonames
+13110,Marietta,Onondaga,NY,42.8974,-76.2806,geonames
+13111,Martville,Cayuga,NY,43.2661,-76.6289,geonames
+13112,Memphis,Onondaga,NY,43.0934,-76.4030,geonames
+13113,Meridian,Cayuga,NY,43.1656,-76.5369,geonames
+13114,Mexico,Oswego,NY,43.4605,-76.2446,geonames
+13115,Minetto,Oswego,NY,43.3977,-76.4824,geonames
+13116,Minoa,Onondaga,NY,43.0772,-76.0098,geonames
+13117,Montezuma,Cayuga,NY,43.0101,-76.7033,geonames
+13118,Moravia,Cayuga,NY,42.7355,-76.3990,geonames
+13119,Mottville,Onondaga,NY,42.9745,-76.4408,geonames
+13120,Nedrow,Onondaga,NY,42.9559,-76.1529,geonames
+13121,New Haven,Oswego,NY,43.4834,-76.3150,geonames
+13122,New Woodstock,Madison,NY,42.8441,-75.8635,geonames
+13123,North Bay,Oneida,NY,43.2364,-75.7769,geonames
+13124,North Pitcher,Chenango,NY,42.6372,-75.8164,geonames
+13126,Oswego,Oswego,NY,43.4394,-76.4613,geonames
+13131,Parish,Oswego,NY,43.4153,-76.1000,geonames
+13132,Pennellville,Oswego,NY,43.2609,-76.2395,geonames
+13134,Peterboro,Madison,NY,42.9686,-75.6794,geonames
+13135,Phoenix,Oswego,NY,43.2468,-76.3064,geonames
+13136,Pitcher,Chenango,NY,42.5969,-75.8465,geonames
+13137,Plainville,Onondaga,NY,43.1577,-76.4470,geonames
+13138,Pompey,Onondaga,NY,42.8990,-76.0160,geonames
+13139,Poplar Ridge,Cayuga,NY,42.7421,-76.6285,geonames
+13140,Port Byron,Cayuga,NY,43.0427,-76.6449,geonames
+13141,Preble,Cortland,NY,42.7950,-76.2141,geonames
+13142,Pulaski,Oswego,NY,43.5562,-76.1252,geonames
+13143,Red Creek,Wayne,NY,43.2291,-76.7146,geonames
+13144,Richland,Oswego,NY,43.5776,-76.0029,geonames
+13145,Sandy Creek,Oswego,NY,43.6517,-76.1264,geonames
+13146,Savannah,Wayne,NY,43.0934,-76.7565,geonames
+13147,Scipio Center,Cayuga,NY,42.7708,-76.5862,geonames
+13148,Seneca Falls,Seneca,NY,42.9094,-76.7925,geonames
+13152,Skaneateles,Onondaga,NY,42.9258,-76.4052,geonames
+13153,Skaneateles Falls,Onondaga,NY,42.9931,-76.4560,geonames
+13154,South Butler,Wayne,NY,43.1344,-76.7656,geonames
+13155,South Otselic,Chenango,NY,42.6626,-75.7669,geonames
+13156,Sterling,Cayuga,NY,43.3296,-76.6747,geonames
+13157,Sylvan Beach,Oneida,NY,43.1965,-75.7305,geonames
+13158,Truxton,Cortland,NY,42.7085,-76.0189,geonames
+13159,Tully,Onondaga,NY,42.8070,-76.1394,geonames
+13160,Union Springs,Cayuga,NY,42.8335,-76.6740,geonames
+13162,Verona Beach,Oneida,NY,43.1885,-75.7126,geonames
+13163,Wampsville,Madison,NY,43.0753,-75.7069,geonames
+13164,Warners,Onondaga,NY,43.0932,-76.2904,geonames
+13165,Waterloo,Seneca,NY,42.9045,-76.8755,geonames
+13166,Weedsport,Cayuga,NY,43.0489,-76.5425,geonames
+13167,West Monroe,Oswego,NY,43.2882,-76.0797,geonames
+13201,Syracuse,Onondaga,NY,43.0481,-76.1474,geonames
+13202,Syracuse,Onondaga,NY,43.0410,-76.1489,geonames
+13203,Syracuse,Onondaga,NY,43.0607,-76.1369,geonames
+13204,Syracuse,Onondaga,NY,43.0444,-76.1758,geonames
+13205,Syracuse,Onondaga,NY,43.0123,-76.1452,geonames
+13206,Syracuse,Onondaga,NY,43.0677,-76.1102,geonames
+13207,Syracuse,Onondaga,NY,43.0195,-76.1650,geonames
+13208,Syracuse,Onondaga,NY,43.0730,-76.1486,geonames
+13209,Syracuse,Onondaga,NY,43.0847,-76.2405,geonames
+13210,Syracuse,Onondaga,NY,43.0354,-76.1282,geonames
+13211,Syracuse,Onondaga,NY,43.1036,-76.1195,geonames
+13212,Syracuse,Onondaga,NY,43.1226,-76.1284,geonames
+13214,Syracuse,Onondaga,NY,43.0397,-76.0722,geonames
+13215,Syracuse,Onondaga,NY,42.9722,-76.2276,geonames
+13217,Syracuse,Onondaga,NY,43.0214,-76.1977,geonames
+13218,Syracuse,Onondaga,NY,43.0214,-76.1977,geonames
+13219,Syracuse,Onondaga,NY,43.0409,-76.2262,geonames
+13220,Syracuse,Onondaga,NY,43.1234,-76.1282,geonames
+13221,Syracuse,Onondaga,NY,43.0481,-76.1474,geonames
+13224,Syracuse,Onondaga,NY,43.0421,-76.1046,geonames
+13225,Syracuse,Onondaga,NY,43.0214,-76.1977,geonames
+13235,Syracuse,Onondaga,NY,43.0559,-76.1526,geonames
+13244,Syracuse,Onondaga,NY,43.0377,-76.1396,geonames
+13250,Syracuse,Onondaga,NY,43.0214,-76.1977,geonames
+13251,Syracuse,Onondaga,NY,43.0214,-76.1977,geonames
+13252,Syracuse,Onondaga,NY,43.0510,-76.1567,geonames
+13261,Syracuse,Onondaga,NY,43.0481,-76.1474,geonames
+13290,Syracuse,Onondaga,NY,43.0676,-76.1714,geonames
+13301,Alder Creek,Oneida,NY,43.4157,-75.2137,geonames
+13302,Altmar,Oswego,NY,43.4970,-75.9719,geonames
+13303,Ava,Oneida,NY,43.3445,-75.4509,geonames
+13304,Barneveld,Oneida,NY,43.2237,-75.1612,geonames
+13305,Beaver Falls,Lewis,NY,43.8870,-75.4274,geonames
+13308,Blossvale,Oneida,NY,43.2303,-75.6873,geonames
+13309,Boonville,Oneida,NY,43.4786,-75.3440,geonames
+13310,Bouckville,Madison,NY,42.8940,-75.5678,geonames
+13312,Brantingham,Lewis,NY,43.6887,-75.2921,geonames
+13313,Bridgewater,Oneida,NY,42.8792,-75.2672,geonames
+13314,Brookfield,Madison,NY,42.8128,-75.3177,geonames
+13315,Burlington Flats,Otsego,NY,42.7516,-75.1690,geonames
+13316,Camden,Oneida,NY,43.3392,-75.7543,geonames
+13317,Canajoharie,Montgomery,NY,42.8671,-74.5956,geonames
+13318,Cassville,Oneida,NY,42.9069,-75.2607,geonames
+13319,Chadwicks,Oneida,NY,43.0226,-75.2656,geonames
+13320,Cherry Valley,Otsego,NY,42.7823,-74.7444,geonames
+13321,Clark Mills,Oneida,NY,43.0923,-75.3796,geonames
+13322,Clayville,Oneida,NY,42.9801,-75.2510,geonames
+13323,Clinton,Oneida,NY,43.0586,-75.3808,geonames
+13324,Cold Brook,Herkimer,NY,43.3024,-74.9977,geonames
+13325,Constableville,Lewis,NY,43.5630,-75.4584,geonames
+13326,Cooperstown,Otsego,NY,42.7005,-74.9243,geonames
+13327,Croghan,Lewis,NY,43.9095,-75.3542,geonames
+13328,Deansboro,Oneida,NY,42.9818,-75.4383,geonames
+13329,Dolgeville,Herkimer,NY,43.1042,-74.7643,geonames
+13331,Eagle Bay,Herkimer,NY,43.8167,-74.8862,geonames
+13332,Earlville,Chenango,NY,42.7197,-75.5589,geonames
+13333,East Springfield,Otsego,NY,42.8336,-74.8233,geonames
+13334,Eaton,Madison,NY,42.8484,-75.6314,geonames
+13335,Edmeston,Otsego,NY,42.6979,-75.2438,geonames
+13337,Fly Creek,Otsego,NY,42.7252,-74.9869,geonames
+13338,Forestport,Oneida,NY,43.4737,-75.1787,geonames
+13339,Fort Plain,Montgomery,NY,42.9372,-74.6433,geonames
+13340,Frankfort,Herkimer,NY,43.0440,-75.1072,geonames
+13341,Franklin Springs,Oneida,NY,43.0361,-75.3962,geonames
+13342,Garrattsville,Otsego,NY,42.6315,-75.1866,geonames
+13343,Glenfield,Lewis,NY,43.7323,-75.3669,geonames
+13345,Greig,Lewis,NY,43.6886,-75.3302,geonames
+13346,Hamilton,Madison,NY,42.8231,-75.5434,geonames
+13348,Hartwick,Otsego,NY,42.6950,-75.0550,geonames
+13350,Herkimer,Herkimer,NY,43.0307,-74.9876,geonames
+13352,Hinckley,Oneida,NY,43.3126,-75.1169,geonames
+13353,Hoffmeister,Hamilton,NY,43.3915,-74.7400,geonames
+13354,Holland Patent,Oneida,NY,43.2484,-75.2535,geonames
+13355,Hubbardsville,Madison,NY,42.8237,-75.4367,geonames
+13357,Ilion,Herkimer,NY,43.0064,-75.0484,geonames
+13360,Inlet,Hamilton,NY,43.7480,-74.7846,geonames
+13361,Jordanville,Herkimer,NY,42.9148,-74.9515,geonames
+13362,Knoxboro,Oneida,NY,42.9803,-75.5186,geonames
+13363,Lee Center,Oneida,NY,43.3148,-75.5055,geonames
+13364,Leonardsville,Madison,NY,42.8087,-75.2527,geonames
+13365,Little Falls,Herkimer,NY,43.0474,-74.8606,geonames
+13367,Lowville,Lewis,NY,43.7893,-75.4156,geonames
+13368,Lyons Falls,Lewis,NY,43.6262,-75.3553,geonames
+13401,Mc Connellsville,Oneida,NY,43.2672,-75.6882,geonames
+13402,Madison,Madison,NY,42.8969,-75.5076,geonames
+13403,Marcy,Oneida,NY,43.1639,-75.2783,geonames
+13404,Martinsburg,Lewis,NY,43.7376,-75.4696,geonames
+13406,Middleville,Herkimer,NY,43.1369,-74.9240,geonames
+13407,Mohawk,Herkimer,NY,42.9900,-74.9853,geonames
+13408,Morrisville,Madison,NY,42.9108,-75.6487,geonames
+13409,Munnsville,Madison,NY,42.9863,-75.5940,geonames
+13410,Nelliston,Montgomery,NY,42.9379,-74.6117,geonames
+13411,New Berlin,Chenango,NY,42.6224,-75.3474,geonames
+13413,New Hartford,Oneida,NY,43.0654,-75.2906,geonames
+13415,New Lisbon,Otsego,NY,42.5904,-75.1957,geonames
+13416,Newport,Herkimer,NY,43.1800,-74.9861,geonames
+13417,New York Mills,Oneida,NY,43.1000,-75.2937,geonames
+13418,North Brookfield,Madison,NY,42.8501,-75.3815,geonames
+13420,Old Forge,Herkimer,NY,43.7435,-74.8935,geonames
+13421,Oneida,Madison,NY,43.0862,-75.6508,geonames
+13424,Oriskany,Oneida,NY,43.1524,-75.3434,geonames
+13425,Oriskany Falls,Oneida,NY,42.9576,-75.4838,geonames
+13426,Orwell,Oswego,NY,43.5628,-75.9968,geonames
+13428,Palatine Bridge,Montgomery,NY,42.9221,-74.5708,geonames
+13431,Poland,Herkimer,NY,43.2115,-75.0731,geonames
+13433,Port Leyden,Lewis,NY,43.5802,-75.3263,geonames
+13435,Prospect,Oneida,NY,43.3052,-75.1502,geonames
+13436,Raquette Lake,Hamilton,NY,43.8131,-74.6574,geonames
+13437,Redfield,Oswego,NY,43.5658,-75.8242,geonames
+13438,Remsen,Oneida,NY,43.3385,-75.1616,geonames
+13439,Richfield Springs,Otsego,NY,42.8402,-74.9716,geonames
+13440,Rome,Oneida,NY,43.2193,-75.4498,geonames
+13441,Rome,Oneida,NY,43.2264,-75.4083,geonames
+13442,Rome,Oneida,NY,43.2128,-75.4557,geonames
+13449,Rome,Oneida,NY,43.2393,-75.4780,geonames
+13450,Roseboom,Otsego,NY,42.7080,-74.8025,geonames
+13452,Saint Johnsville,Montgomery,NY,43.0170,-74.6460,geonames
+13454,Salisbury Center,Herkimer,NY,43.1625,-74.7809,geonames
+13455,Sangerfield,Oneida,NY,42.9162,-75.3545,geonames
+13456,Sauquoit,Oneida,NY,43.0073,-75.2626,geonames
+13457,Schuyler Lake,Otsego,NY,42.7758,-75.0485,geonames
+13459,Sharon Springs,Schoharie,NY,42.7634,-74.5919,geonames
+13460,Sherburne,Chenango,NY,42.6859,-75.4830,geonames
+13461,Sherrill,Oneida,NY,43.0704,-75.5990,geonames
+13464,Smyrna,Chenango,NY,42.6896,-75.6121,geonames
+13465,Solsville,Madison,NY,42.9106,-75.5177,geonames
+13468,Springfield Center,Otsego,NY,42.8388,-74.8590,geonames
+13469,Stittville,Oneida,NY,43.2229,-75.2899,geonames
+13470,Stratford,Fulton,NY,43.1791,-74.6768,geonames
+13471,Taberg,Oneida,NY,43.3366,-75.6027,geonames
+13472,Thendara,Herkimer,NY,43.7001,-75.0018,geonames
+13473,Turin,Lewis,NY,43.6441,-75.4132,geonames
+13475,Van Hornesville,Herkimer,NY,42.8951,-74.8276,geonames
+13476,Vernon,Oneida,NY,43.0945,-75.5627,geonames
+13477,Vernon Center,Oneida,NY,43.0443,-75.5210,geonames
+13478,Verona,Oneida,NY,43.1473,-75.5724,geonames
+13479,Washington Mills,Oneida,NY,43.0538,-75.2716,geonames
+13480,Waterville,Oneida,NY,42.9332,-75.3815,geonames
+13482,West Burlington,Otsego,NY,42.7043,-75.1849,geonames
+13483,Westdale,Oneida,NY,43.4117,-75.8226,geonames
+13484,West Eaton,Madison,NY,42.8545,-75.6560,geonames
+13485,West Edmeston,Otsego,NY,42.7868,-75.3149,geonames
+13486,Westernville,Oneida,NY,43.3294,-75.3151,geonames
+13488,Westford,Otsego,NY,42.6809,-74.7653,geonames
+13489,West Leyden,Lewis,NY,43.4597,-75.5127,geonames
+13490,Westmoreland,Oneida,NY,43.1017,-75.4533,geonames
+13491,West Winfield,Herkimer,NY,42.8826,-75.1835,geonames
+13492,Whitesboro,Oneida,NY,43.1158,-75.3095,geonames
+13493,Williamstown,Oswego,NY,43.4106,-75.9044,geonames
+13494,Woodgate,Oneida,NY,43.5249,-75.1428,geonames
+13495,Yorkville,Oneida,NY,43.1116,-75.2756,geonames
+13501,Utica,Oneida,NY,43.0871,-75.2315,geonames
+13502,Utica,Oneida,NY,43.1067,-75.2314,geonames
+13503,Utica,Oneida,NY,43.1019,-75.2312,geonames
+13504,Utica,Oneida,NY,43.1009,-75.2327,geonames
+13505,Utica,Oneida,NY,43.1009,-75.2327,geonames
+13599,Utica,Oneida,NY,43.1009,-75.2327,geonames
+13601,Watertown,Jefferson,NY,43.9743,-75.9122,geonames
+13602,Fort Drum,Jefferson,NY,44.0354,-75.7540,geonames
+13603,Watertown,Jefferson,NY,43.9087,-75.8967,geonames
+13605,Adams,Jefferson,NY,43.8062,-76.0490,geonames
+13606,Adams Center,Jefferson,NY,43.8631,-76.0041,geonames
+13607,Alexandria Bay,Jefferson,NY,44.3359,-75.9177,geonames
+13608,Antwerp,Jefferson,NY,44.2358,-75.6005,geonames
+13611,Belleville,Jefferson,NY,43.7780,-76.1259,geonames
+13612,Black River,Jefferson,NY,44.0042,-75.7958,geonames
+13613,Brasher Falls,St. Lawrence,NY,44.8467,-74.7473,geonames
+13614,Brier Hill,St. Lawrence,NY,44.5525,-75.6722,geonames
+13615,Brownville,Jefferson,NY,44.0070,-75.9841,geonames
+13616,Calcium,Jefferson,NY,44.0265,-75.8499,geonames
+13617,Canton,St. Lawrence,NY,44.5924,-75.1628,geonames
+13618,Cape Vincent,Jefferson,NY,44.1244,-76.3164,geonames
+13619,Carthage,Jefferson,NY,43.9791,-75.6013,geonames
+13620,Castorland,Lewis,NY,43.8843,-75.4604,geonames
+13621,Chase Mills,St. Lawrence,NY,44.8672,-75.0730,geonames
+13622,Chaumont,Jefferson,NY,44.0848,-76.1232,geonames
+13623,Chippewa Bay,St. Lawrence,NY,44.4420,-75.7569,geonames
+13624,Clayton,Jefferson,NY,44.1442,-76.0620,geonames
+13625,Colton,St. Lawrence,NY,44.5016,-74.9327,geonames
+13626,Copenhagen,Lewis,NY,43.8801,-75.6839,geonames
+13627,Deer River,Lewis,NY,43.9298,-75.5891,geonames
+13628,Deferiet,Jefferson,NY,44.0356,-75.6838,geonames
+13630,De Kalb Junction,St. Lawrence,NY,44.4896,-75.2871,geonames
+13631,Denmark,Lewis,NY,43.8998,-75.5824,geonames
+13632,Depauville,Jefferson,NY,44.1395,-76.0616,geonames
+13633,De Peyster,St. Lawrence,NY,44.4989,-75.4772,geonames
+13634,Dexter,Jefferson,NY,44.0069,-76.0650,geonames
+13635,Edwards,St. Lawrence,NY,44.3110,-75.2522,geonames
+13636,Ellisburg,Jefferson,NY,43.7434,-76.1165,geonames
+13637,Evans Mills,Jefferson,NY,44.0817,-75.8305,geonames
+13638,Felts Mills,Jefferson,NY,44.0204,-75.7524,geonames
+13639,Fine,St. Lawrence,NY,44.2541,-75.1379,geonames
+13640,Wellesley Island,Jefferson,NY,44.3213,-76.0172,geonames
+13641,Fishers Landing,Jefferson,NY,44.2752,-76.0049,geonames
+13642,Gouverneur,St. Lawrence,NY,44.3283,-75.4651,geonames
+13643,Great Bend,Jefferson,NY,44.0342,-75.7188,geonames
+13645,Hailesboro,St. Lawrence,NY,44.3101,-75.4463,geonames
+13646,Hammond,St. Lawrence,NY,44.4502,-75.6727,geonames
+13647,Hannawa Falls,St. Lawrence,NY,44.6087,-74.9732,geonames
+13648,Harrisville,Lewis,NY,44.1613,-75.3252,geonames
+13649,Helena,St. Lawrence,NY,44.9217,-74.7068,geonames
+13650,Henderson,Jefferson,NY,43.8467,-76.2352,geonames
+13651,Henderson Harbor,Jefferson,NY,43.8708,-76.1809,geonames
+13652,Hermon,St. Lawrence,NY,44.4448,-75.1987,geonames
+13654,Heuvelton,St. Lawrence,NY,44.5930,-75.4203,geonames
+13655,Hogansburg,Franklin,NY,44.9825,-74.6626,geonames
+13656,La Fargeville,Jefferson,NY,44.1987,-75.9569,geonames
+13657,Limerick,Jefferson,NY,44.0292,-76.0430,geonames
+13658,Lisbon,St. Lawrence,NY,44.7184,-75.2694,geonames
+13659,Lorraine,Jefferson,NY,43.7568,-75.9053,geonames
+13660,Madrid,St. Lawrence,NY,44.7690,-75.1413,geonames
+13661,Mannsville,Jefferson,NY,43.7179,-76.0820,geonames
+13662,Massena,St. Lawrence,NY,44.9322,-74.8845,geonames
+13664,Morristown,St. Lawrence,NY,44.5843,-75.6453,geonames
+13665,Natural Bridge,Jefferson,NY,44.0630,-75.5039,geonames
+13666,Newton Falls,St. Lawrence,NY,44.2177,-74.9423,geonames
+13667,Norfolk,St. Lawrence,NY,44.8424,-74.9577,geonames
+13668,Norwood,St. Lawrence,NY,44.7472,-74.9992,geonames
+13669,Ogdensburg,St. Lawrence,NY,44.6902,-75.4774,geonames
+13670,Oswegatchie,St. Lawrence,NY,44.1933,-75.0659,geonames
+13671,Oxbow,Jefferson,NY,44.2873,-75.6230,geonames
+13672,Parishville,St. Lawrence,NY,44.5927,-74.7941,geonames
+13673,Philadelphia,Jefferson,NY,44.1589,-75.7099,geonames
+13674,Pierrepont Manor,Jefferson,NY,43.7334,-76.0543,geonames
+13675,Plessis,Jefferson,NY,44.2774,-75.8496,geonames
+13676,Potsdam,St. Lawrence,NY,44.6592,-74.9681,geonames
+13677,Pyrites,St. Lawrence,NY,44.5148,-75.1858,geonames
+13678,Raymondville,St. Lawrence,NY,44.8287,-74.9798,geonames
+13679,Redwood,Jefferson,NY,44.3211,-75.8150,geonames
+13680,Rensselaer Falls,St. Lawrence,NY,44.5943,-75.3237,geonames
+13681,Richville,St. Lawrence,NY,44.4400,-75.3777,geonames
+13682,Rodman,Jefferson,NY,43.8622,-75.8719,geonames
+13683,Rooseveltown,St. Lawrence,NY,44.9728,-74.7310,geonames
+13684,Russell,St. Lawrence,NY,44.3824,-75.1043,geonames
+13685,Sackets Harbor,Jefferson,NY,43.9398,-76.1050,geonames
+13687,South Colton,St. Lawrence,NY,44.5041,-74.8607,geonames
+13690,Star Lake,St. Lawrence,NY,44.1578,-75.0330,geonames
+13691,Theresa,Jefferson,NY,44.2113,-75.8014,geonames
+13692,Thousand Island Park,Jefferson,NY,44.2898,-76.0262,geonames
+13693,Three Mile Bay,Jefferson,NY,44.0551,-76.2689,geonames
+13694,Waddington,St. Lawrence,NY,44.8564,-75.2049,geonames
+13695,Wanakena,St. Lawrence,NY,44.1408,-74.9125,geonames
+13696,West Stockholm,St. Lawrence,NY,44.7137,-74.9008,geonames
+13697,Winthrop,St. Lawrence,NY,44.7583,-74.8066,geonames
+13699,Potsdam,St. Lawrence,NY,44.6698,-74.9813,geonames
+13730,Afton,Chenango,NY,42.2417,-75.5366,geonames
+13731,Andes,Delaware,NY,42.1569,-74.7887,geonames
+13732,Apalachin,Tioga,NY,42.0556,-76.1519,geonames
+13733,Bainbridge,Chenango,NY,42.3120,-75.4894,geonames
+13734,Barton,Tioga,NY,42.0695,-76.3983,geonames
+13736,Berkshire,Tioga,NY,42.3074,-76.1920,geonames
+13737,Bible School Park,Broome,NY,42.0805,-76.0973,geonames
+13738,Blodgett Mills,Cortland,NY,42.5673,-76.1238,geonames
+13739,Bloomville,Delaware,NY,42.3522,-74.8071,geonames
+13740,Bovina Center,Delaware,NY,42.2709,-74.7661,geonames
+13743,Candor,Tioga,NY,42.2063,-76.3322,geonames
+13744,Castle Creek,Broome,NY,42.2568,-75.9087,geonames
+13745,Chenango Bridge,Broome,NY,42.1738,-75.8728,geonames
+13746,Chenango Forks,Broome,NY,42.2778,-75.8462,geonames
+13747,Colliersville,Otsego,NY,42.5051,-74.9821,geonames
+13748,Conklin,Broome,NY,42.0454,-75.8076,geonames
+13749,Corbettsville,Broome,NY,42.0156,-75.7905,geonames
+13750,Davenport,Delaware,NY,42.4711,-74.8357,geonames
+13751,Davenport Center,Delaware,NY,42.4508,-74.9013,geonames
+13752,Delancey,Delaware,NY,42.2884,-75.1051,geonames
+13753,Delhi,Delaware,NY,42.2937,-74.9207,geonames
+13754,Deposit,Broome,NY,42.0666,-75.4287,geonames
+13755,Downsville,Delaware,NY,42.0716,-75.0152,geonames
+13756,East Branch,Delaware,NY,42.0039,-75.1226,geonames
+13757,East Meredith,Delaware,NY,42.4101,-74.8987,geonames
+13758,East Pharsalia,Chenango,NY,42.5835,-75.7219,geonames
+13760,Endicott,Broome,NY,42.1506,-76.0551,geonames
+13761,Endicott,Broome,NY,42.0984,-76.0494,geonames
+13762,Endwell,Broome,NY,42.1129,-76.0210,geonames
+13763,Endicott,Broome,NY,42.0984,-76.0494,geonames
+13774,Fishs Eddy,Delaware,NY,41.9654,-75.1594,geonames
+13775,Franklin,Delaware,NY,42.3421,-75.1485,geonames
+13776,Gilbertsville,Otsego,NY,42.4715,-75.3257,geonames
+13777,Glen Aubrey,Broome,NY,42.2573,-75.9805,geonames
+13778,Greene,Chenango,NY,42.3401,-75.7342,geonames
+13780,Guilford,Chenango,NY,42.4269,-75.4823,geonames
+13782,Hamden,Delaware,NY,42.1787,-74.9984,geonames
+13783,Hancock,Delaware,NY,41.9914,-75.2647,geonames
+13784,Harford,Cortland,NY,42.4262,-76.2266,geonames
+13786,Harpersfield,Delaware,NY,42.4499,-74.6871,geonames
+13787,Harpursville,Broome,NY,42.1823,-75.6545,geonames
+13788,Hobart,Delaware,NY,42.3594,-74.6759,geonames
+13790,Johnson City,Broome,NY,42.1267,-75.9685,geonames
+13794,Killawog,Broome,NY,42.4006,-76.0208,geonames
+13795,Kirkwood,Broome,NY,42.0695,-75.7967,geonames
+13796,Laurens,Otsego,NY,42.5383,-75.1279,geonames
+13797,Lisle,Broome,NY,42.3409,-76.0302,geonames
+13801,Mc Donough,Chenango,NY,42.5068,-75.7623,geonames
+13802,Maine,Broome,NY,42.2538,-76.0464,geonames
+13803,Marathon,Cortland,NY,42.4527,-76.0395,geonames
+13804,Masonville,Delaware,NY,42.2102,-75.3739,geonames
+13806,Meridale,Delaware,NY,42.3734,-74.9650,geonames
+13807,Milford,Otsego,NY,42.6148,-74.9685,geonames
+13808,Morris,Otsego,NY,42.5478,-75.2448,geonames
+13809,Mount Upton,Chenango,NY,42.4081,-75.4003,geonames
+13810,Mount Vision,Otsego,NY,42.6068,-75.1264,geonames
+13811,Newark Valley,Tioga,NY,42.2281,-76.1625,geonames
+13812,Nichols,Tioga,NY,42.0301,-76.3540,geonames
+13813,Nineveh,Broome,NY,42.1625,-75.5484,geonames
+13814,North Norwich,Chenango,NY,42.6036,-75.5282,geonames
+13815,Norwich,Chenango,NY,42.5414,-75.5274,geonames
+13820,Oneonta,Otsego,NY,42.4625,-75.0491,geonames
+13825,Otego,Otsego,NY,42.4133,-75.2079,geonames
+13826,Ouaquaga,Broome,NY,42.1262,-75.6471,geonames
+13827,Owego,Tioga,NY,42.1138,-76.2528,geonames
+13830,Oxford,Chenango,NY,42.4379,-75.5673,geonames
+13832,Plymouth,Chenango,NY,42.6336,-75.6172,geonames
+13833,Port Crane,Broome,NY,42.1958,-75.7591,geonames
+13834,Portlandville,Otsego,NY,42.5304,-74.9671,geonames
+13835,Richford,Tioga,NY,42.3945,-76.1865,geonames
+13838,Sidney,Delaware,NY,42.3074,-75.3908,geonames
+13839,Sidney Center,Delaware,NY,42.2441,-75.2871,geonames
+13840,Smithboro,Tioga,NY,42.0395,-76.4004,geonames
+13841,Smithville Flats,Chenango,NY,42.3989,-75.8237,geonames
+13842,South Kortright,Delaware,NY,42.3770,-74.7259,geonames
+13843,South New Berlin,Chenango,NY,42.5295,-75.3852,geonames
+13844,South Plymouth,Chenango,NY,42.6053,-75.6330,geonames
+13845,Tioga Center,Tioga,NY,42.0562,-76.3480,geonames
+13846,Treadwell,Delaware,NY,42.3630,-75.0588,geonames
+13847,Trout Creek,Delaware,NY,42.2037,-75.2793,geonames
+13848,Tunnel,Broome,NY,42.2147,-75.7277,geonames
+13849,Unadilla,Otsego,NY,42.3252,-75.3366,geonames
+13850,Vestal,Broome,NY,42.0771,-76.0118,geonames
+13851,Vestal,Broome,NY,42.0851,-76.0538,geonames
+13856,Walton,Delaware,NY,42.1756,-75.1532,geonames
+13859,Wells Bridge,Otsego,NY,42.3709,-75.2486,geonames
+13860,West Davenport,Delaware,NY,42.4459,-74.9632,geonames
+13861,West Oneonta,Otsego,NY,42.5011,-75.1409,geonames
+13862,Whitney Point,Broome,NY,42.3384,-75.9522,geonames
+13863,Willet,Cortland,NY,42.4520,-75.9014,geonames
+13864,Willseyville,Tioga,NY,42.3029,-76.3897,geonames
+13865,Windsor,Broome,NY,42.0759,-75.6405,geonames
+13901,Binghamton,Broome,NY,42.1463,-75.8865,geonames
+13902,Binghamton,Broome,NY,42.1054,-75.8876,geonames
+13903,Binghamton,Broome,NY,42.0811,-75.8977,geonames
+13904,Binghamton,Broome,NY,42.1171,-75.8653,geonames
+13905,Binghamton,Broome,NY,42.1151,-75.9309,geonames
+14001,Akron,Erie,NY,43.0249,-78.5084,geonames
+14004,Alden,Erie,NY,42.8984,-78.5257,geonames
+14005,Alexander,Genesee,NY,42.9159,-78.2589,geonames
+14006,Angola,Erie,NY,42.6366,-79.0497,geonames
+14008,Appleton,Niagara,NY,43.3105,-78.6372,geonames
+14009,Arcade,Wyoming,NY,42.5630,-78.4134,geonames
+14010,Athol Springs,Erie,NY,42.7684,-78.8871,geonames
+14011,Attica,Wyoming,NY,42.8499,-78.2798,geonames
+14012,Barker,Niagara,NY,43.3368,-78.5420,geonames
+14013,Basom,Genesee,NY,43.0807,-78.3951,geonames
+14020,Batavia,Genesee,NY,43.0003,-78.1929,geonames
+14021,Batavia,Genesee,NY,42.9981,-78.1848,geonames
+14024,Bliss,Wyoming,NY,42.5799,-78.2581,geonames
+14025,Boston,Erie,NY,42.6314,-78.7391,geonames
+14026,Bowmansville,Erie,NY,42.9410,-78.6880,geonames
+14027,Brant,Erie,NY,42.5707,-79.0308,geonames
+14028,Burt,Niagara,NY,43.3221,-78.7141,geonames
+14029,Centerville,Allegany,NY,42.4743,-78.2474,geonames
+14030,Chaffee,Erie,NY,42.5605,-78.5025,geonames
+14031,Clarence,Erie,NY,42.9810,-78.6162,geonames
+14032,Clarence Center,Erie,NY,43.0362,-78.6390,geonames
+14033,Colden,Erie,NY,42.6551,-78.6921,geonames
+14034,Collins,Erie,NY,42.5001,-78.8930,geonames
+14035,Collins Center,Erie,NY,42.4906,-78.8499,geonames
+14036,Corfu,Genesee,NY,42.9777,-78.3929,geonames
+14037,Cowlesville,Wyoming,NY,42.8112,-78.4481,geonames
+14038,Crittenden,Erie,NY,42.9473,-78.4744,geonames
+14039,Dale,Wyoming,NY,42.8263,-78.1749,geonames
+14040,Darien Center,Genesee,NY,42.8948,-78.3878,geonames
+14041,Dayton,Cattaraugus,NY,42.4086,-78.9844,geonames
+14042,Delevan,Cattaraugus,NY,42.4926,-78.4793,geonames
+14043,Depew,Erie,NY,42.9050,-78.7041,geonames
+14047,Derby,Erie,NY,42.6974,-78.9834,geonames
+14048,Dunkirk,Chautauqua,NY,42.4877,-79.3283,geonames
+14051,East Amherst,Erie,NY,43.0429,-78.6988,geonames
+14052,East Aurora,Erie,NY,42.7701,-78.6020,geonames
+14054,East Bethany,Genesee,NY,42.9166,-78.1342,geonames
+14055,East Concord,Erie,NY,42.5466,-78.6110,geonames
+14056,East Pembroke,Genesee,NY,42.9912,-78.3122,geonames
+14057,Eden,Erie,NY,42.6506,-78.8781,geonames
+14058,Elba,Genesee,NY,43.0897,-78.1704,geonames
+14059,Elma,Erie,NY,42.8340,-78.6343,geonames
+14060,Farmersville Station,Cattaraugus,NY,42.4276,-78.3608,geonames
+14061,Farnham,Erie,NY,42.5946,-79.0840,geonames
+14062,Forestville,Chautauqua,NY,42.4482,-79.1607,geonames
+14063,Fredonia,Chautauqua,NY,42.4333,-79.3339,geonames
+14065,Freedom,Cattaraugus,NY,42.4897,-78.3501,geonames
+14066,Gainesville,Wyoming,NY,42.6190,-78.1795,geonames
+14067,Gasport,Niagara,NY,43.2106,-78.5745,geonames
+14068,Getzville,Erie,NY,43.0240,-78.7532,geonames
+14069,Glenwood,Erie,NY,42.6001,-78.6386,geonames
+14070,Gowanda,Cattaraugus,NY,42.4712,-78.9339,geonames
+14072,Grand Island,Erie,NY,43.0183,-78.9591,geonames
+14075,Hamburg,Erie,NY,42.7334,-78.8389,geonames
+14080,Holland,Erie,NY,42.6396,-78.5439,geonames
+14081,Irving,Chautauqua,NY,42.5739,-79.0596,geonames
+14082,Java Center,Wyoming,NY,42.6634,-78.3925,geonames
+14083,Java Village,Wyoming,NY,42.6769,-78.4410,geonames
+14085,Lake View,Erie,NY,42.7215,-78.9327,geonames
+14086,Lancaster,Erie,NY,42.9017,-78.6631,geonames
+14091,Lawtons,Erie,NY,42.5404,-78.9212,geonames
+14092,Lewiston,Niagara,NY,43.1722,-79.0215,geonames
+14094,Lockport,Niagara,NY,43.1600,-78.6923,geonames
+14095,Lockport,Niagara,NY,43.1706,-78.6903,geonames
+14098,Lyndonville,Orleans,NY,43.3233,-78.3811,geonames
+14101,Machias,Cattaraugus,NY,42.4083,-78.5059,geonames
+14102,Marilla,Erie,NY,42.8332,-78.5587,geonames
+14103,Medina,Orleans,NY,43.2184,-78.3874,geonames
+14105,Middleport,Niagara,NY,43.2183,-78.4841,geonames
+14107,Model City,Niagara,NY,43.1851,-78.9837,geonames
+14108,Newfane,Niagara,NY,43.2724,-78.7070,geonames
+14109,Niagara University,Niagara,NY,43.1380,-79.0342,geonames
+14110,North Boston,Erie,NY,42.6856,-78.7767,geonames
+14111,North Collins,Erie,NY,42.5896,-78.9107,geonames
+14112,North Evans,Erie,NY,42.6970,-78.9414,geonames
+14113,North Java,Wyoming,NY,42.6776,-78.3380,geonames
+14120,North Tonawanda,Niagara,NY,43.0498,-78.8510,geonames
+14125,Oakfield,Genesee,NY,43.0717,-78.2702,geonames
+14126,Olcott,Niagara,NY,43.3378,-78.7148,geonames
+14127,Orchard Park,Erie,NY,42.7639,-78.7518,geonames
+14129,Perrysburg,Cattaraugus,NY,42.4723,-78.9981,geonames
+14130,Pike,Wyoming,NY,42.5565,-78.1528,geonames
+14131,Ransomville,Niagara,NY,43.2286,-78.8982,geonames
+14132,Sanborn,Niagara,NY,43.1419,-78.8785,geonames
+14133,Sandusky,Cattaraugus,NY,42.4891,-78.3670,geonames
+14134,Sardinia,Erie,NY,42.5323,-78.5172,geonames
+14135,Sheridan,Chautauqua,NY,42.4890,-79.2390,geonames
+14136,Silver Creek,Chautauqua,NY,42.5357,-79.1628,geonames
+14138,South Dayton,Cattaraugus,NY,42.3718,-79.0501,geonames
+14139,South Wales,Erie,NY,42.7063,-78.5452,geonames
+14140,Spring Brook,Erie,NY,42.8072,-78.6676,geonames
+14141,Springville,Erie,NY,42.5200,-78.6847,geonames
+14143,Stafford,Genesee,NY,42.9829,-78.0898,geonames
+14144,Stella Niagara,Niagara,NY,43.1995,-79.0425,geonames
+14145,Strykersville,Wyoming,NY,42.7249,-78.4347,geonames
+14150,Tonawanda,Erie,NY,43.0028,-78.8547,geonames
+14151,Tonawanda,Erie,NY,43.0203,-78.8803,geonames
+14166,Van Buren Point,Chautauqua,NY,42.4511,-79.4154,geonames
+14167,Varysburg,Wyoming,NY,42.7459,-78.3167,geonames
+14168,Versailles,Cattaraugus,NY,42.5189,-78.9959,geonames
+14169,Wales Center,Erie,NY,42.7684,-78.5300,geonames
+14170,West Falls,Erie,NY,42.7053,-78.6779,geonames
+14171,West Valley,Cattaraugus,NY,42.4315,-78.6280,geonames
+14172,Wilson,Niagara,NY,43.2968,-78.8244,geonames
+14173,Yorkshire,Cattaraugus,NY,42.5247,-78.4755,geonames
+14174,Youngstown,Niagara,NY,43.2461,-79.0245,geonames
+14201,Buffalo,Erie,NY,42.8967,-78.8846,geonames
+14202,Buffalo,Erie,NY,42.8870,-78.8779,geonames
+14203,Buffalo,Erie,NY,42.8939,-78.8681,geonames
+14204,Buffalo,Erie,NY,42.8840,-78.8597,geonames
+14205,Buffalo,Erie,NY,42.8864,-78.8784,geonames
+14206,Buffalo,Erie,NY,42.8811,-78.8104,geonames
+14207,Buffalo,Erie,NY,42.9491,-78.8978,geonames
+14208,Buffalo,Erie,NY,42.9154,-78.8505,geonames
+14209,Buffalo,Erie,NY,42.9130,-78.8656,geonames
+14210,Buffalo,Erie,NY,42.8614,-78.8205,geonames
+14211,Buffalo,Erie,NY,42.9082,-78.8225,geonames
+14212,Buffalo,Erie,NY,42.8946,-78.8245,geonames
+14213,Buffalo,Erie,NY,42.9167,-78.8895,geonames
+14214,Buffalo,Erie,NY,42.9414,-78.8374,geonames
+14215,Buffalo,Erie,NY,42.9335,-78.8115,geonames
+14216,Buffalo,Erie,NY,42.9499,-78.8599,geonames
+14217,Buffalo,Erie,NY,42.9719,-78.8769,geonames
+14218,Buffalo,Erie,NY,42.8146,-78.8078,geonames
+14219,Buffalo,Erie,NY,42.7863,-78.8264,geonames
+14220,Buffalo,Erie,NY,42.8441,-78.8182,geonames
+14221,Buffalo,Erie,NY,42.9685,-78.7492,geonames
+14222,Buffalo,Erie,NY,42.9164,-78.8763,geonames
+14223,Buffalo,Erie,NY,42.9731,-78.8450,geonames
+14224,Buffalo,Erie,NY,42.8371,-78.7484,geonames
+14225,Buffalo,Erie,NY,42.9255,-78.7481,geonames
+14226,Buffalo,Erie,NY,42.9744,-78.7949,geonames
+14227,Buffalo,Erie,NY,42.8853,-78.7462,geonames
+14228,Buffalo,Erie,NY,43.0408,-78.7812,geonames
+14231,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14233,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14240,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14241,Buffalo,Erie,NY,42.9383,-78.7441,geonames
+14260,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14261,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14263,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14264,Buffalo,Erie,NY,42.8856,-78.8735,geonames
+14265,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14267,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14269,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14270,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14272,Buffalo,Erie,NY,42.7684,-78.8871,geonames
+14273,Buffalo,Erie,NY,42.7550,-78.7849,geonames
+14276,Buffalo,Erie,NY,42.8864,-78.8784,geonames
+14280,Buffalo,Erie,NY,42.8864,-78.8784,geonames
+14301,Niagara Falls,Niagara,NY,43.0955,-79.0414,geonames
+14302,Niagara Falls,Niagara,NY,43.0945,-79.0567,geonames
+14303,Niagara Falls,Niagara,NY,43.0878,-79.0370,geonames
+14304,Niagara Falls,Niagara,NY,43.0908,-78.9644,geonames
+14305,Niagara Falls,Niagara,NY,43.1146,-79.0378,geonames
+14410,Adams Basin,Monroe,NY,43.1953,-77.8559,geonames
+14411,Albion,Orleans,NY,43.2398,-78.2068,geonames
+14413,Alton,Wayne,NY,43.2227,-76.9821,geonames
+14414,Avon,Livingston,NY,42.9030,-77.7274,geonames
+14415,Bellona,Yates,NY,42.7554,-77.0217,geonames
+14416,Bergen,Genesee,NY,43.0869,-77.9603,geonames
+14418,Branchport,Yates,NY,42.6065,-77.2052,geonames
+14420,Brockport,Monroe,NY,43.2128,-77.9368,geonames
+14422,Byron,Genesee,NY,43.0738,-78.0629,geonames
+14423,Caledonia,Livingston,NY,42.9567,-77.8493,geonames
+14424,Canandaigua,Ontario,NY,42.8689,-77.2846,geonames
+14425,Farmington,Ontario,NY,42.9580,-77.3083,geonames
+14427,Castile,Wyoming,NY,42.6359,-78.0547,geonames
+14428,Churchville,Monroe,NY,43.0749,-77.8350,geonames
+14429,Clarendon,Orleans,NY,43.1934,-78.0647,geonames
+14430,Clarkson,Monroe,NY,43.2331,-77.9275,geonames
+14432,Clifton Springs,Ontario,NY,42.9632,-77.1440,geonames
+14433,Clyde,Wayne,NY,43.0855,-76.8725,geonames
+14435,Conesus,Livingston,NY,42.7216,-77.6747,geonames
+14437,Dansville,Livingston,NY,42.5700,-77.7109,geonames
+14441,Dresden,Yates,NY,42.6846,-76.9564,geonames
+14443,East Bloomfield,Ontario,NY,42.9010,-77.4233,geonames
+14445,East Rochester,Monroe,NY,43.1128,-77.4906,geonames
+14449,East Williamson,Wayne,NY,43.2354,-77.1376,geonames
+14450,Fairport,Monroe,NY,43.0892,-77.4360,geonames
+14452,Fancher,Orleans,NY,43.2448,-78.0911,geonames
+14453,Fishers,Ontario,NY,43.0109,-77.4705,geonames
+14454,Geneseo,Livingston,NY,42.7938,-77.7996,geonames
+14456,Geneva,Ontario,NY,42.8637,-76.9913,geonames
+14461,Gorham,Ontario,NY,42.7990,-77.1316,geonames
+14462,Groveland,Livingston,NY,42.6760,-77.7573,geonames
+14463,Hall,Ontario,NY,42.7966,-77.0639,geonames
+14464,Hamlin,Monroe,NY,43.3076,-77.9270,geonames
+14466,Hemlock,Livingston,NY,42.7800,-77.5820,geonames
+14467,Henrietta,Monroe,NY,43.0483,-77.6122,geonames
+14468,Hilton,Monroe,NY,43.2923,-77.7905,geonames
+14469,Bloomfield,Ontario,NY,42.8851,-77.4600,geonames
+14470,Holley,Orleans,NY,43.2159,-78.0731,geonames
+14471,Honeoye,Ontario,NY,42.7901,-77.5169,geonames
+14472,Honeoye Falls,Monroe,NY,42.9695,-77.5781,geonames
+14475,Ionia,Ontario,NY,42.9380,-77.5009,geonames
+14476,Kendall,Orleans,NY,43.3284,-78.0304,geonames
+14477,Kent,Orleans,NY,43.3341,-78.1355,geonames
+14478,Keuka Park,Yates,NY,42.5708,-77.1226,geonames
+14479,Knowlesville,Orleans,NY,43.2363,-78.3138,geonames
+14480,Lakeville,Livingston,NY,42.8296,-77.7149,geonames
+14481,Leicester,Livingston,NY,42.7739,-77.8990,geonames
+14482,Le Roy,Genesee,NY,42.9774,-77.9851,geonames
+14485,Lima,Livingston,NY,42.9012,-77.6083,geonames
+14486,Linwood,Genesee,NY,42.8943,-77.9216,geonames
+14487,Livonia,Livingston,NY,42.8135,-77.6635,geonames
+14488,Livonia Center,Livingston,NY,42.8215,-77.6386,geonames
+14489,Lyons,Wayne,NY,43.0777,-76.9896,geonames
+14502,Macedon,Wayne,NY,43.0784,-77.3372,geonames
+14504,Manchester,Ontario,NY,42.9689,-77.2332,geonames
+14505,Marion,Wayne,NY,43.1546,-77.1863,geonames
+14506,Mendon,Monroe,NY,42.9953,-77.5001,geonames
+14507,Middlesex,Yates,NY,42.6976,-77.2805,geonames
+14508,Morton,Orleans,NY,43.3281,-77.9953,geonames
+14510,Mount Morris,Livingston,NY,42.6835,-77.8664,geonames
+14511,Mumford,Monroe,NY,42.9928,-77.8603,geonames
+14512,Naples,Ontario,NY,42.6404,-77.3901,geonames
+14513,Newark,Wayne,NY,43.0519,-77.0946,geonames
+14514,North Chili,Monroe,NY,43.1186,-77.8005,geonames
+14515,North Greece,Monroe,NY,43.2578,-77.7351,geonames
+14516,North Rose,Wayne,NY,43.1964,-76.9152,geonames
+14517,Nunda,Livingston,NY,42.5867,-77.9180,geonames
+14518,Oaks Corners,Ontario,NY,42.9319,-77.0118,geonames
+14519,Ontario,Wayne,NY,43.2291,-77.3088,geonames
+14520,Ontario Center,Wayne,NY,43.2259,-77.3058,geonames
+14521,Ovid,Seneca,NY,42.6898,-76.7941,geonames
+14522,Palmyra,Wayne,NY,43.0622,-77.2218,geonames
+14525,Pavilion,Genesee,NY,42.9102,-78.0269,geonames
+14526,Penfield,Monroe,NY,43.1396,-77.4560,geonames
+14527,Penn Yan,Yates,NY,42.6645,-77.0569,geonames
+14529,Perkinsville,Steuben,NY,42.5398,-77.6283,geonames
+14530,Perry,Wyoming,NY,42.7229,-78.0059,geonames
+14532,Phelps,Ontario,NY,42.9582,-77.0473,geonames
+14533,Piffard,Livingston,NY,42.8435,-77.8962,geonames
+14534,Pittsford,Monroe,NY,43.0695,-77.5141,geonames
+14536,Portageville,Wyoming,NY,42.5570,-78.0856,geonames
+14537,Port Gibson,Ontario,NY,43.0345,-77.1575,geonames
+14538,Pultneyville,Wayne,NY,43.2836,-77.1420,geonames
+14539,Retsof,Livingston,NY,42.8343,-77.8779,geonames
+14541,Romulus,Seneca,NY,42.7497,-76.8449,geonames
+14542,Rose,Wayne,NY,43.1448,-76.8608,geonames
+14543,Rush,Monroe,NY,42.9966,-77.6665,geonames
+14544,Rushville,Yates,NY,42.7597,-77.2395,geonames
+14545,Scottsburg,Livingston,NY,42.6649,-77.7010,geonames
+14546,Scottsville,Monroe,NY,43.0246,-77.7743,geonames
+14547,Seneca Castle,Ontario,NY,42.8870,-77.0961,geonames
+14548,Shortsville,Ontario,NY,42.9761,-77.2439,geonames
+14549,Silver Lake,Wyoming,NY,42.6929,-78.0224,geonames
+14550,Silver Springs,Wyoming,NY,42.6742,-78.0845,geonames
+14551,Sodus,Wayne,NY,43.2217,-77.0514,geonames
+14555,Sodus Point,Wayne,NY,43.2546,-76.9835,geonames
+14556,Sonyea,Livingston,NY,42.6790,-77.8272,geonames
+14557,South Byron,Genesee,NY,43.0416,-78.0573,geonames
+14558,South Lima,Livingston,NY,42.8554,-77.6876,geonames
+14559,Spencerport,Monroe,NY,43.1895,-77.8043,geonames
+14560,Springwater,Livingston,NY,42.6776,-77.5775,geonames
+14561,Stanley,Ontario,NY,42.8303,-77.1207,geonames
+14563,Union Hill,Wayne,NY,43.2228,-77.3717,geonames
+14564,Victor,Ontario,NY,42.9866,-77.4180,geonames
+14568,Walworth,Wayne,NY,43.1402,-77.2858,geonames
+14569,Warsaw,Wyoming,NY,42.7410,-78.1429,geonames
+14571,Waterport,Orleans,NY,43.3326,-78.2430,geonames
+14572,Wayland,Steuben,NY,42.5593,-77.5906,geonames
+14580,Webster,Monroe,NY,43.2196,-77.4616,geonames
+14585,West Bloomfield,Ontario,NY,42.9063,-77.5531,geonames
+14586,West Henrietta,Monroe,NY,43.0397,-77.6871,geonames
+14588,Willard,Seneca,NY,42.6835,-76.8724,geonames
+14589,Williamson,Wayne,NY,43.2421,-77.1700,geonames
+14590,Wolcott,Wayne,NY,43.2341,-76.8217,geonames
+14591,Wyoming,Wyoming,NY,42.8317,-78.0833,geonames
+14592,York,Livingston,NY,42.8757,-77.8835,geonames
+14602,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14603,Rochester,Monroe,NY,43.1616,-77.6068,geonames
+14604,Rochester,Monroe,NY,43.1577,-77.6080,geonames
+14605,Rochester,Monroe,NY,43.1698,-77.6007,geonames
+14606,Rochester,Monroe,NY,43.1685,-77.6845,geonames
+14607,Rochester,Monroe,NY,43.1501,-77.5890,geonames
+14608,Rochester,Monroe,NY,43.1521,-77.6258,geonames
+14609,Rochester,Monroe,NY,43.1740,-77.5637,geonames
+14610,Rochester,Monroe,NY,43.1452,-77.5495,geonames
+14611,Rochester,Monroe,NY,43.1484,-77.6394,geonames
+14612,Rochester,Monroe,NY,43.2566,-77.6652,geonames
+14613,Rochester,Monroe,NY,43.1831,-77.6393,geonames
+14614,Rochester,Monroe,NY,43.1558,-77.6142,geonames
+14615,Rochester,Monroe,NY,43.2058,-77.6521,geonames
+14616,Rochester,Monroe,NY,43.2346,-77.6577,geonames
+14617,Rochester,Monroe,NY,43.2203,-77.5994,geonames
+14618,Rochester,Monroe,NY,43.1122,-77.5618,geonames
+14619,Rochester,Monroe,NY,43.1367,-77.6481,geonames
+14620,Rochester,Monroe,NY,43.1317,-77.6062,geonames
+14621,Rochester,Monroe,NY,43.1834,-77.6043,geonames
+14622,Rochester,Monroe,NY,43.2140,-77.5555,geonames
+14623,Rochester,Monroe,NY,43.0834,-77.6344,geonames
+14624,Rochester,Monroe,NY,43.1216,-77.7311,geonames
+14625,Rochester,Monroe,NY,43.1522,-77.5057,geonames
+14626,Rochester,Monroe,NY,43.2126,-77.7040,geonames
+14627,Rochester,Monroe,NY,43.1275,-77.6277,geonames
+14638,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14639,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14642,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14643,Rochester,Monroe,NY,43.1548,-77.6156,geonames
+14644,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14646,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14647,Rochester,Monroe,NY,43.1548,-77.6156,geonames
+14649,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14650,Rochester,Monroe,NY,43.1548,-77.6156,geonames
+14651,Rochester,Monroe,NY,43.1548,-77.6156,geonames
+14652,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14653,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14692,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14694,Rochester,Monroe,NY,43.2860,-77.6843,geonames
+14701,Jamestown,Chautauqua,NY,42.0928,-79.2440,geonames
+14702,Jamestown,Chautauqua,NY,42.0970,-79.2353,geonames
+14706,Allegany,Cattaraugus,NY,42.0918,-78.4999,geonames
+14707,Allentown,Allegany,NY,42.0737,-78.0594,geonames
+14708,Alma,Allegany,NY,42.0126,-78.0578,geonames
+14709,Angelica,Allegany,NY,42.3263,-77.9947,geonames
+14710,Ashville,Chautauqua,NY,42.1084,-79.4056,geonames
+14711,Belfast,Allegany,NY,42.3200,-78.0943,geonames
+14712,Bemus Point,Chautauqua,NY,42.1513,-79.3581,geonames
+14714,Black Creek,Allegany,NY,42.2855,-78.2312,geonames
+14715,Bolivar,Allegany,NY,42.0704,-78.1448,geonames
+14716,Brocton,Chautauqua,NY,42.3940,-79.4344,geonames
+14717,Caneadea,Allegany,NY,42.3640,-78.1840,geonames
+14718,Cassadaga,Chautauqua,NY,42.3504,-79.2993,geonames
+14719,Cattaraugus,Cattaraugus,NY,42.3333,-78.8885,geonames
+14720,Celoron,Chautauqua,NY,42.1095,-79.2831,geonames
+14721,Ceres,Allegany,NY,42.0137,-78.2648,geonames
+14722,Chautauqua,Chautauqua,NY,42.2098,-79.4667,geonames
+14723,Cherry Creek,Chautauqua,NY,42.3127,-79.1203,geonames
+14724,Clymer,Chautauqua,NY,42.0557,-79.6685,geonames
+14726,Conewango Valley,Cattaraugus,NY,42.2625,-79.0220,geonames
+14727,Cuba,Allegany,NY,42.1882,-78.2751,geonames
+14728,Dewittville,Chautauqua,NY,42.2394,-79.4193,geonames
+14729,East Otto,Cattaraugus,NY,42.3971,-78.7432,geonames
+14730,East Randolph,Cattaraugus,NY,42.1747,-78.9473,geonames
+14731,Ellicottville,Cattaraugus,NY,42.2959,-78.6606,geonames
+14732,Ellington,Chautauqua,NY,42.2291,-79.1135,geonames
+14733,Falconer,Chautauqua,NY,42.1239,-79.1895,geonames
+14735,Fillmore,Allegany,NY,42.4508,-78.1043,geonames
+14736,Findley Lake,Chautauqua,NY,42.1204,-79.7349,geonames
+14737,Franklinville,Cattaraugus,NY,42.3388,-78.4400,geonames
+14738,Frewsburg,Chautauqua,NY,42.0528,-79.1318,geonames
+14739,Friendship,Allegany,NY,42.1907,-78.1359,geonames
+14740,Gerry,Chautauqua,NY,42.2147,-79.1649,geonames
+14741,Great Valley,Cattaraugus,NY,42.2083,-78.6208,geonames
+14742,Greenhurst,Chautauqua,NY,42.1205,-79.3096,geonames
+14743,Hinsdale,Cattaraugus,NY,42.1979,-78.4159,geonames
+14744,Houghton,Allegany,NY,42.4228,-78.2063,geonames
+14745,Hume,Allegany,NY,42.4777,-78.1403,geonames
+14747,Kennedy,Chautauqua,NY,42.1508,-79.0964,geonames
+14748,Kill Buck,Cattaraugus,NY,42.1450,-78.6466,geonames
+14750,Lakewood,Chautauqua,NY,42.0973,-79.3291,geonames
+14751,Leon,Cattaraugus,NY,42.2983,-79.0062,geonames
+14752,Lily Dale,Chautauqua,NY,42.3524,-79.3235,geonames
+14753,Limestone,Cattaraugus,NY,42.0639,-78.6320,geonames
+14754,Little Genesee,Allegany,NY,42.0319,-78.2097,geonames
+14755,Little Valley,Cattaraugus,NY,42.2541,-78.8093,geonames
+14756,Maple Springs,Chautauqua,NY,42.1967,-79.4239,geonames
+14757,Mayville,Chautauqua,NY,42.2409,-79.4963,geonames
+14758,Niobe,Chautauqua,NY,42.0126,-79.4495,geonames
+14760,Olean,Cattaraugus,NY,42.0821,-78.4260,geonames
+14766,Otto,Cattaraugus,NY,42.3575,-78.8073,geonames
+14767,Panama,Chautauqua,NY,42.0570,-79.4815,geonames
+14769,Portland,Chautauqua,NY,42.3858,-79.4589,geonames
+14770,Portville,Cattaraugus,NY,42.0273,-78.3314,geonames
+14772,Randolph,Cattaraugus,NY,42.1631,-78.9600,geonames
+14774,Richburg,Allegany,NY,42.0884,-78.1533,geonames
+14775,Ripley,Chautauqua,NY,42.2482,-79.7121,geonames
+14777,Rushford,Allegany,NY,42.3923,-78.2536,geonames
+14778,Saint Bonaventure,Cattaraugus,NY,42.0803,-78.4750,geonames
+14779,Salamanca,Cattaraugus,NY,42.1604,-78.7304,geonames
+14781,Sherman,Chautauqua,NY,42.1631,-79.5857,geonames
+14782,Sinclairville,Chautauqua,NY,42.2455,-79.2673,geonames
+14783,Steamburg,Cattaraugus,NY,42.0820,-78.9177,geonames
+14784,Stockton,Chautauqua,NY,42.3182,-79.3758,geonames
+14785,Stow,Chautauqua,NY,42.1557,-79.4122,geonames
+14786,West Clarksville,Allegany,NY,42.1227,-78.2213,geonames
+14787,Westfield,Chautauqua,NY,42.3220,-79.5726,geonames
+14788,Westons Mills,Cattaraugus,NY,42.0621,-78.3780,geonames
+14801,Addison,Steuben,NY,42.0983,-77.2660,geonames
+14802,Alfred,Allegany,NY,42.2534,-77.7893,geonames
+14803,Alfred Station,Allegany,NY,42.2558,-77.7781,geonames
+14804,Almond,Allegany,NY,42.3160,-77.7780,geonames
+14805,Alpine,Schuyler,NY,42.3510,-76.7348,geonames
+14806,Andover,Allegany,NY,42.1575,-77.7920,geonames
+14807,Arkport,Steuben,NY,42.4225,-77.6918,geonames
+14808,Atlanta,Steuben,NY,42.5596,-77.4669,geonames
+14809,Avoca,Steuben,NY,42.3679,-77.4641,geonames
+14810,Bath,Steuben,NY,42.3575,-77.3028,geonames
+14812,Beaver Dams,Schuyler,NY,42.2798,-76.9720,geonames
+14813,Belmont,Allegany,NY,42.2334,-78.0110,geonames
+14814,Big Flats,Chemung,NY,42.1455,-76.9527,geonames
+14815,Bradford,Steuben,NY,42.3825,-77.0913,geonames
+14816,Breesport,Chemung,NY,42.1939,-76.7361,geonames
+14817,Brooktondale,Tompkins,NY,42.3765,-76.3668,geonames
+14818,Burdett,Schuyler,NY,42.4394,-76.8292,geonames
+14819,Cameron,Steuben,NY,42.2128,-77.4403,geonames
+14820,Cameron Mills,Steuben,NY,42.1925,-77.3650,geonames
+14821,Campbell,Steuben,NY,42.2386,-77.2066,geonames
+14822,Canaseraga,Allegany,NY,42.4585,-77.7954,geonames
+14823,Canisteo,Steuben,NY,42.2635,-77.5897,geonames
+14824,Cayuta,Schuyler,NY,42.2774,-76.6974,geonames
+14825,Chemung,Chemung,NY,42.0392,-76.6202,geonames
+14826,Cohocton,Steuben,NY,42.5003,-77.4998,geonames
+14827,Coopers Plains,Steuben,NY,42.1785,-77.1414,geonames
+14830,Corning,Steuben,NY,42.1383,-77.0475,geonames
+14831,Corning,Steuben,NY,42.1429,-77.0547,geonames
+14836,Dalton,Livingston,NY,42.5449,-77.9289,geonames
+14837,Dundee,Yates,NY,42.5053,-77.0028,geonames
+14838,Erin,Chemung,NY,42.1859,-76.6819,geonames
+14839,Greenwood,Steuben,NY,42.1398,-77.6360,geonames
+14840,Hammondsport,Steuben,NY,42.4312,-77.1977,geonames
+14841,Hector,Schuyler,NY,42.4966,-76.8786,geonames
+14842,Himrod,Yates,NY,42.5945,-76.9508,geonames
+14843,Hornell,Steuben,NY,42.3274,-77.6569,geonames
+14845,Horseheads,Chemung,NY,42.1805,-76.8345,geonames
+14846,Hunt,Livingston,NY,42.5388,-77.9818,geonames
+14847,Interlaken,Seneca,NY,42.6165,-76.7268,geonames
+14850,Ithaca,Tompkins,NY,42.4406,-76.4966,geonames
+14851,Ithaca,Tompkins,NY,42.4607,-76.5054,geonames
+14852,Ithaca,Tompkins,NY,42.4451,-76.4672,geonames
+14853,Ithaca,Tompkins,NY,42.4474,-76.4837,geonames
+14854,Jacksonville,Tompkins,NY,42.5084,-76.6149,geonames
+14855,Jasper,Steuben,NY,42.1290,-77.4999,geonames
+14856,Kanona,Steuben,NY,42.3742,-77.3648,geonames
+14857,Lakemont,Yates,NY,42.5126,-76.9270,geonames
+14858,Lindley,Steuben,NY,42.0284,-77.1397,geonames
+14859,Lockwood,Tioga,NY,42.1149,-76.5366,geonames
+14860,Lodi,Seneca,NY,42.5966,-76.8339,geonames
+14861,Lowman,Chemung,NY,42.0694,-76.6930,geonames
+14863,Mecklenburg,Schuyler,NY,42.4516,-76.7067,geonames
+14864,Millport,Chemung,NY,42.2581,-76.8392,geonames
+14865,Montour Falls,Schuyler,NY,42.3437,-76.8396,geonames
+14867,Newfield,Tompkins,NY,42.3621,-76.5920,geonames
+14869,Odessa,Schuyler,NY,42.3609,-76.7717,geonames
+14870,Painted Post,Steuben,NY,42.1710,-77.1194,geonames
+14871,Pine City,Chemung,NY,42.0419,-76.8815,geonames
+14872,Pine Valley,Chemung,NY,42.2348,-76.8652,geonames
+14873,Prattsburgh,Steuben,NY,42.5224,-77.2983,geonames
+14874,Pulteney,Steuben,NY,42.5233,-77.1691,geonames
+14876,Reading Center,Schuyler,NY,42.4297,-76.9258,geonames
+14877,Rexville,Steuben,NY,42.0726,-77.6767,geonames
+14878,Rock Stream,Yates,NY,42.4485,-76.9364,geonames
+14879,Savona,Steuben,NY,42.3041,-77.2083,geonames
+14880,Scio,Allegany,NY,42.1697,-77.9900,geonames
+14881,Slaterville Springs,Tompkins,NY,42.4025,-76.3608,geonames
+14882,Lansing,Tompkins,NY,42.5645,-76.5375,geonames
+14883,Spencer,Tioga,NY,42.2467,-76.4899,geonames
+14884,Swain,Allegany,NY,42.4773,-77.8890,geonames
+14885,Troupsburg,Steuben,NY,42.0501,-77.5502,geonames
+14886,Trumansburg,Tompkins,NY,42.5210,-76.6681,geonames
+14887,Tyrone,Schuyler,NY,42.3994,-77.0268,geonames
+14889,Van Etten,Chemung,NY,42.2085,-76.5717,geonames
+14891,Watkins Glen,Schuyler,NY,42.3771,-76.9022,geonames
+14892,Waverly,Tioga,NY,42.0172,-76.5333,geonames
+14893,Wayne,Schuyler,NY,42.4741,-77.0977,geonames
+14894,Wellsburg,Chemung,NY,42.0273,-76.7723,geonames
+14895,Wellsville,Allegany,NY,42.1108,-77.9419,geonames
+14897,Whitesville,Allegany,NY,42.0456,-77.8106,geonames
+14898,Woodhull,Steuben,NY,42.0736,-77.4203,geonames
+14901,Elmira,Chemung,NY,42.1008,-76.8120,geonames
+14902,Elmira,Chemung,NY,42.1473,-76.7509,geonames
+14903,Elmira,Chemung,NY,42.1198,-76.8877,geonames
+14904,Elmira,Chemung,NY,42.0729,-76.8037,geonames
+14905,Elmira,Chemung,NY,42.0869,-76.8397,geonames

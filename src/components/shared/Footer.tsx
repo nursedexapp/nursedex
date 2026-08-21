@@ -43,6 +43,12 @@ export function Footer() {
           >
             Terms of Service
           </Link>
+          <Link
+            href="/attributions"
+            className="hover:text-soft-black underline underline-offset-2"
+          >
+            Data attributions
+          </Link>
         </div>
       </div>
     </footer>
