@@ -398,6 +398,96 @@ describe("shapeNurseCard detail gating", () => {
   });
 });
 
+describe("bio clamping by tier (decision D9)", () => {
+  const long = "word ".repeat(200).trim();
+
+  it("leaves a short bio alone", () => {
+    const card = shapeNurseCard(rawRow({ bio: "Short and plain." }), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+    expect(card.bio).toBe("Short and plain.");
+  });
+
+  it("caps a free nurse at 150 characters", () => {
+    const card = shapeNurseCard(rawRow({ bio: long }), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+    expect(card.bio!.length).toBeLessThanOrEqual(151);
+    expect(card.bio!.length).toBeGreaterThan(100);
+  });
+
+  // A single cap would cut the paid tier off on the page families browse.
+  it("gives a featured nurse more room than a free one", () => {
+    const free = shapeNurseCard(rawRow({ bio: long, tier: "free" }), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+    const featured = shapeNurseCard(rawRow({ bio: long, tier: "featured" }), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+    expect(featured.bio!.length).toBeGreaterThan(free.bio!.length);
+    expect(featured.bio!.length).toBeLessThanOrEqual(501);
+  });
+
+  it("does not ship the part it cut", () => {
+    const bio = `${"a ".repeat(80)}SECRETTAIL`;
+    const card = shapeNurseCard(rawRow({ bio }), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+    expect(JSON.stringify(card)).not.toContain("SECRETTAIL");
+  });
+
+  it("cuts on a word boundary and marks the cut", () => {
+    const card = shapeNurseCard(
+      rawRow({ bio: "Ronkonkoma ".repeat(40).trim() }),
+      { canSeeIdentity: true, canSeeDetails: true },
+    );
+    expect(card.bio!.endsWith("\u2026")).toBe(true);
+    expect(card.bio).not.toMatch(/Ronkon\u2026$/);
+  });
+});
+
+describe("has_rate and has_availability", () => {
+  // The locked footer wording is derived from these, so they must report the
+  // nurse's record even when the viewer may not see the values themselves.
+  it("are true for a logged out viewer when the nurse has set them", () => {
+    const card = shapeNurseCard(rawRow(), {
+      canSeeIdentity: false,
+      canSeeDetails: false,
+    });
+    expect(card.has_rate).toBe(true);
+    expect(card.has_availability).toBe(true);
+    expect(card.rate_min).toBeNull();
+    expect(card.availability_commitment).toEqual([]);
+  });
+
+  it("are false when the nurse has set neither", () => {
+    const card = shapeNurseCard(
+      rawRow({ rate_min: null, rate_max: null, availability_commitment: [] }),
+      { canSeeIdentity: false, canSeeDetails: false },
+    );
+    expect(card.has_rate).toBe(false);
+    expect(card.has_availability).toBe(false);
+  });
+
+  it("counts a rate with only one end set", () => {
+    const fromOnly = shapeNurseCard(rawRow({ rate_max: null }), {
+      canSeeIdentity: false,
+      canSeeDetails: false,
+    });
+    const toOnly = shapeNurseCard(rawRow({ rate_min: null }), {
+      canSeeIdentity: false,
+      canSeeDetails: false,
+    });
+    expect(fromOnly.has_rate).toBe(true);
+    expect(toOnly.has_rate).toBe(true);
+  });
+});
+
 describe("last initial", () => {
   it("is a single letter, whatever the viewer may see", () => {
     for (const canSeeIdentity of [true, false]) {

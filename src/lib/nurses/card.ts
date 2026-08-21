@@ -49,6 +49,18 @@ export interface NurseSearchCard {
   rate_min: number | null;
   rate_max: number | null;
   availability_commitment: string[];
+  /**
+   * Whether this nurse has set a rate / an availability at all, regardless of
+   * whether this viewer may see the value.
+   *
+   * The card's locked footer has to be derived from the nurse's own record
+   * rather than asserted (#774). Without these, a card promising "log in to
+   * see rate and availability" for a nurse who has set neither sends a family
+   * to sign up and meet a blank. The flag says the fact exists; it is
+   * deliberately not a way to recover the value.
+   */
+  has_rate: boolean;
+  has_availability: boolean;
   /** Town and state, from the zip lookup. Null until that lookup runs. */
   city: string | null;
   state: string | null;
@@ -179,17 +191,46 @@ export function shapeNurseCard(
     communication_preference: u.communication_preference as string | null,
     years_experience: r.years_experience as number | null,
     // #773 decision D1. Blanked in the data, not hidden in markup.
-    bio: canSeeDetails ? (r.bio as string | null) || null : null,
+    bio: canSeeDetails
+      ? clampBio((r.bio as string | null) || null, r.tier as string)
+      : null,
     rate_min: canSeeDetails ? numericOrNull(r.rate_min, "rate_min") : null,
     rate_max: canSeeDetails ? numericOrNull(r.rate_max, "rate_max") : null,
     availability_commitment: canSeeDetails
       ? ((r.availability_commitment as string[] | null) ?? [])
       : [],
+    has_rate: r.rate_min !== null || r.rate_max !== null,
+    has_availability:
+      ((r.availability_commitment as string[] | null) ?? []).length > 0,
     // Filled in by attachNurseCardTowns, which needs a second query.
     city: null,
     state: null,
     photos: (r.photos as string[] | null) ?? [],
   };
+}
+
+/**
+ * How much bio the card carries, by tier (decision D9).
+ *
+ * A single cap would cut the paid tier off on the page families actually
+ * browse. Applied in the data rather than only in CSS, so a free nurse's card
+ * does not ship 500 characters the browser will never draw.
+ */
+export const BIO_CAP_BY_TIER: Record<string, number> = {
+  free: 150,
+  featured: 500,
+};
+
+export function clampBio(bio: string | null, tier: string): string | null {
+  if (!bio) return null;
+  const cap = BIO_CAP_BY_TIER[tier] ?? BIO_CAP_BY_TIER.free;
+  const trimmed = bio.trim();
+  if (trimmed.length <= cap) return trimmed;
+  // Cut on a word boundary so the last word is not sliced in half.
+  const cut = trimmed.slice(0, cap);
+  const lastSpace = cut.lastIndexOf(" ");
+  const body = lastSpace > cap * 0.6 ? cut.slice(0, lastSpace) : cut;
+  return `${body.trimEnd()}\u2026`;
 }
 
 /**
