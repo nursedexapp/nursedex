@@ -5,9 +5,17 @@ vi.mock("@/lib/profile/photos", () => ({
   getSignedPhotoUrl: (path: string) => signPhoto(path),
 }));
 
+const supabaseFrom = vi.fn();
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({ from: (t: string) => supabaseFrom(t) }),
+}));
+
 import {
   NURSE_CARD_COLUMNS,
+  ZIP_LOOKUP_CAP,
+  applyTowns,
   attachNurseCardPhotos,
+  lookupZips,
   NURSE_CARD_ROW_KEYS,
   NURSE_CARD_USER_KEYS,
   shapeNurseCard,
@@ -32,6 +40,10 @@ function rawRow(overrides: Record<string, unknown> = {}) {
     unavailable_visibility: null,
     profile_completeness: 80,
     years_experience: 7,
+    bio: "Ten years with medically complex children.",
+    rate_min: 32,
+    rate_max: 48,
+    availability_commitment: ["part_time", "overnight"],
     users: {
       first_name: "Jane",
       last_name: "Rodriguez",
@@ -73,18 +85,27 @@ describe("shapeNurseCard identity gating", () => {
   // the component renders it, so the gate has to be inside the one shaper all
   // three producers call, not in a prop.
   it("blanks last_name for a viewer who is not entitled", () => {
-    const card = shapeNurseCard(rawRow(), { canSeeIdentity: false });
+    const card = shapeNurseCard(rawRow(), {
+      canSeeIdentity: false,
+      canSeeDetails: true,
+    });
     expect(card.last_name).toBe("");
     expect(card.first_name).toBe("Jane");
   });
 
   it("keeps last_name for an entitled viewer", () => {
-    const card = shapeNurseCard(rawRow(), { canSeeIdentity: true });
+    const card = shapeNurseCard(rawRow(), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
     expect(card.last_name).toBe("Rodriguez");
   });
 
   it("carries no raw last_name anywhere on the ungated card", () => {
-    const card = shapeNurseCard(rawRow(), { canSeeIdentity: false });
+    const card = shapeNurseCard(rawRow(), {
+      canSeeIdentity: false,
+      canSeeDetails: true,
+    });
     expect(JSON.stringify(card)).not.toContain("Rodriguez");
   });
 });
@@ -92,23 +113,26 @@ describe("shapeNurseCard identity gating", () => {
 describe("shapeNurseCard row assertion", () => {
   it("throws naming the missing profile column", () => {
     const { review_count: _dropped, ...row } = rawRow();
-    expect(() => shapeNurseCard(row, { canSeeIdentity: false })).toThrow(
-      /nurse card row is missing column\(s\): review_count/,
-    );
+    expect(() =>
+      shapeNurseCard(row, { canSeeIdentity: false, canSeeDetails: true }),
+    ).toThrow(/nurse card row is missing column\(s\): review_count/);
   });
 
   it("throws naming the missing user column", () => {
     const row = rawRow();
     const { zip_code: _dropped, ...users } = row.users;
     expect(() =>
-      shapeNurseCard({ ...row, users }, { canSeeIdentity: false }),
+      shapeNurseCard(
+        { ...row, users },
+        { canSeeIdentity: false, canSeeDetails: true },
+      ),
     ).toThrow(/nurse card row is missing user column\(s\): zip_code/);
   });
 
   it("names every missing column at once, not just the first", () => {
     const { review_count: _a, years_experience: _b, ...row } = rawRow();
     try {
-      shapeNurseCard(row, { canSeeIdentity: false });
+      shapeNurseCard(row, { canSeeIdentity: false, canSeeDetails: true });
       throw new Error("expected shapeNurseCard to throw");
     } catch (e) {
       const message = (e as Error).message;
@@ -128,7 +152,7 @@ describe("shapeNurseCard row assertion", () => {
         unavailable_visibility: null,
         years_experience: null,
       }),
-      { canSeeIdentity: true },
+      { canSeeIdentity: true, canSeeDetails: true },
     );
     expect(card.avg_rating).toBeNull();
     expect(card.has_photo).toBe(false);
@@ -138,15 +162,18 @@ describe("shapeNurseCard row assertion", () => {
   // own message.
   it("throws a distinct message when the users embed is absent", () => {
     const { users: _users, ...row } = rawRow();
-    expect(() => shapeNurseCard(row, { canSeeIdentity: false })).toThrow(
-      /nurse card row has no users embed/,
-    );
+    expect(() =>
+      shapeNurseCard(row, { canSeeIdentity: false, canSeeDetails: true }),
+    ).toThrow(/nurse card row has no users embed/);
   });
 });
 
 describe("shapeNurseCard field mapping", () => {
   it("maps profile and user columns onto the card", () => {
-    const card = shapeNurseCard(rawRow(), { canSeeIdentity: true });
+    const card = shapeNurseCard(rawRow(), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
     expect(card).toMatchObject({
       user_id: "nurse-1",
       slug: "jane-r",
@@ -174,7 +201,7 @@ describe("shapeNurseCard field mapping", () => {
       rawRow({
         users: { ...rawRow().users, first_name: null, last_name: null },
       }),
-      { canSeeIdentity: true },
+      { canSeeIdentity: true, canSeeDetails: true },
     );
     expect(card.first_name).toBe("");
     expect(card.last_name).toBe("");
@@ -184,7 +211,7 @@ describe("shapeNurseCard field mapping", () => {
 describe("toPublicNurseCard", () => {
   it("drops the raw photos array so it never reaches the browser", () => {
     const card = toPublicNurseCard(
-      shapeNurseCard(rawRow(), { canSeeIdentity: true }),
+      shapeNurseCard(rawRow(), { canSeeIdentity: true, canSeeDetails: true }),
     );
     expect("photos" in card).toBe(false);
     expect(JSON.stringify(card)).not.toContain("nurse-1/1.jpg");
@@ -195,7 +222,7 @@ describe("shapeNurseCards", () => {
   it("shapes every row", () => {
     const cards = shapeNurseCards(
       [rawRow({ user_id: "a" }), rawRow({ user_id: "b" })],
-      { canSeeIdentity: false },
+      { canSeeIdentity: false, canSeeDetails: true },
     );
     expect(cards.map((c) => c.user_id)).toEqual(["a", "b"]);
     expect(cards.every((c) => c.last_name === "")).toBe(true);
@@ -207,15 +234,16 @@ describe("shapeNurseCards", () => {
   it("drops a row whose users embed came back null", () => {
     const cards = shapeNurseCards([rawRow({ users: null })], {
       canSeeIdentity: false,
+      canSeeDetails: true,
     });
     expect(cards).toEqual([]);
   });
 
   it("still throws on a row that is missing a column", () => {
     const { slug: _dropped, ...row } = rawRow();
-    expect(() => shapeNurseCards([row], { canSeeIdentity: false })).toThrow(
-      /missing column\(s\): slug/,
-    );
+    expect(() =>
+      shapeNurseCards([row], { canSeeIdentity: false, canSeeDetails: true }),
+    ).toThrow(/missing column\(s\): slug/);
   });
 });
 
@@ -242,9 +270,11 @@ describe("attachNurseCardPhotos", () => {
     const cards = [
       shapeNurseCard(rawRow({ user_id: "a", photos: ["a/1.jpg"] }), {
         canSeeIdentity: true,
+        canSeeDetails: true,
       }),
       shapeNurseCard(rawRow({ user_id: "b", photos: [] }), {
         canSeeIdentity: true,
+        canSeeDetails: true,
       }),
     ];
     await attachNurseCardPhotos(cards);
@@ -261,6 +291,7 @@ describe("attachNurseCardPhotos", () => {
     const cards = [
       shapeNurseCard(rawRow({ photos: ["nurse-1/1.jpg"] }), {
         canSeeIdentity: true,
+        canSeeDetails: true,
       }),
     ];
     await attachNurseCardPhotos(cards);
@@ -279,14 +310,252 @@ describe("attachNurseCardPhotos", () => {
     const cards = [
       shapeNurseCard(rawRow({ user_id: "bad", photos: ["bad/1.jpg"] }), {
         canSeeIdentity: true,
+        canSeeDetails: true,
       }),
       shapeNurseCard(rawRow({ user_id: "good", photos: ["good/1.jpg"] }), {
         canSeeIdentity: true,
+        canSeeDetails: true,
       }),
     ];
     await attachNurseCardPhotos(cards);
     expect(cards[0].photo_url).toBeNull();
     expect(cards[1].photo_url).toBe("signed:good/1.jpg");
     expect(logged).toHaveLength(1);
+  });
+});
+
+// #773. Every field on a card ships in the RSC payload the browser downloads,
+// so the fields a logged out visitor may not see are blanked in the data, not
+// hidden in markup (decision D1).
+describe("shapeNurseCard detail gating", () => {
+  function shaped(canSeeDetails: boolean) {
+    return shapeNurseCard(rawRow(), { canSeeIdentity: false, canSeeDetails });
+  }
+
+  it("blanks bio, rate and availability for a logged out visitor", () => {
+    const card = shaped(false);
+    expect(card.bio).toBeNull();
+    expect(card.rate_min).toBeNull();
+    expect(card.rate_max).toBeNull();
+    expect(card.availability_commitment).toEqual([]);
+  });
+
+  it("ships none of those values anywhere in the payload", () => {
+    const payload = JSON.stringify(shaped(false));
+    expect(payload).not.toContain("medically complex");
+    expect(payload).not.toContain("32");
+    expect(payload).not.toContain("overnight");
+  });
+
+  it("ships them to a signed in viewer", () => {
+    const card = shaped(true);
+    expect(card.bio).toBe("Ten years with medically complex children.");
+    expect(card.rate_min).toBe(32);
+    expect(card.rate_max).toBe(48);
+    expect(card.availability_commitment).toEqual(["part_time", "overnight"]);
+  });
+
+  // Gating must not turn "this nurse set no rate" into "you cannot see it".
+  // The card has to be able to tell those apart, because the locked footer
+  // wording is derived from the nurse's own record (#774).
+  it("leaves a signed in viewer with nulls when the nurse set nothing", () => {
+    const card = shapeNurseCard(
+      rawRow({
+        bio: null,
+        rate_min: null,
+        rate_max: null,
+        availability_commitment: [],
+      }),
+      { canSeeIdentity: true, canSeeDetails: true },
+    );
+    expect(card.bio).toBeNull();
+    expect(card.rate_min).toBeNull();
+    expect(card.rate_max).toBeNull();
+    expect(card.availability_commitment).toEqual([]);
+  });
+
+  it("coerces a numeric rate that arrives as a string", () => {
+    // PostgREST can hand back numeric(6,2) as a string depending on the
+    // client. A string here would render as "32.00" and compare wrongly.
+    const card = shapeNurseCard(
+      rawRow({ rate_min: "32.00", rate_max: "48.50" }),
+      {
+        canSeeIdentity: true,
+        canSeeDetails: true,
+      },
+    );
+    expect(card.rate_min).toBe(32);
+    expect(card.rate_max).toBe(48.5);
+  });
+
+  it("refuses a rate it cannot read rather than showing a wrong one", () => {
+    expect(() =>
+      shapeNurseCard(rawRow({ rate_min: "about thirty" }), {
+        canSeeIdentity: true,
+        canSeeDetails: true,
+      }),
+    ).toThrow(/rate_min/);
+  });
+});
+
+describe("last initial", () => {
+  it("is a single letter, whatever the viewer may see", () => {
+    for (const canSeeIdentity of [true, false]) {
+      const card = shapeNurseCard(rawRow(), {
+        canSeeIdentity,
+        canSeeDetails: true,
+      });
+      expect(card.last_initial).toBe("R");
+    }
+  });
+
+  it("never carries the rest of the name", () => {
+    const card = shapeNurseCard(rawRow(), {
+      canSeeIdentity: false,
+      canSeeDetails: true,
+    });
+    expect(card.last_initial).toHaveLength(1);
+    expect(JSON.stringify(card)).not.toContain("Rodriguez");
+  });
+
+  it("uppercases a lowercase surname", () => {
+    const card = shapeNurseCard(
+      rawRow({ users: { ...rawRow().users, last_name: "rodriguez" } }),
+      { canSeeIdentity: false, canSeeDetails: true },
+    );
+    expect(card.last_initial).toBe("R");
+  });
+
+  it("is empty when the nurse has no last name on file", () => {
+    const card = shapeNurseCard(
+      rawRow({ users: { ...rawRow().users, last_name: null } }),
+      { canSeeIdentity: true, canSeeDetails: true },
+    );
+    expect(card.last_initial).toBe("");
+  });
+
+  it("skips leading whitespace rather than taking it as the initial", () => {
+    const card = shapeNurseCard(
+      rawRow({ users: { ...rawRow().users, last_name: "  Okafor" } }),
+      { canSeeIdentity: true, canSeeDetails: true },
+    );
+    expect(card.last_initial).toBe("O");
+  });
+});
+
+describe("town", () => {
+  it("starts empty, since it comes from the zip lookup", () => {
+    const card = shapeNurseCard(rawRow(), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+    expect(card.city).toBeNull();
+    expect(card.state).toBeNull();
+  });
+});
+
+describe("lookupZips", () => {
+  it("caps the zip list and says so rather than dropping towns silently", async () => {
+    const logged: unknown[][] = [];
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...args: unknown[]) => {
+        logged.push(args);
+      });
+    const asked: string[][] = [];
+    supabaseFrom.mockImplementation(() => ({
+      select: () => ({
+        in: (_column: string, zips: string[]) => {
+          asked.push(zips);
+          return Promise.resolve({ data: [], error: null });
+        },
+      }),
+    }));
+
+    const tooMany = Array.from({ length: ZIP_LOOKUP_CAP + 7 }, (_, i) =>
+      String(10000 + i),
+    );
+    await lookupZips(tooMany);
+
+    expect(asked[0]).toHaveLength(ZIP_LOOKUP_CAP);
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0][0])).toContain("7 zip(s) not looked up");
+    errorSpy.mockRestore();
+  });
+
+  it("asks once for a zip many nurses share", async () => {
+    const asked: string[][] = [];
+    supabaseFrom.mockImplementation(() => ({
+      select: () => ({
+        in: (_column: string, zips: string[]) => {
+          asked.push(zips);
+          return Promise.resolve({ data: [], error: null });
+        },
+      }),
+    }));
+    await lookupZips(["11779", "11779", "11751", "11779"]);
+    expect(asked[0]).toEqual(["11779", "11751"]);
+  });
+
+  it("runs no query at all when there is nothing to look up", async () => {
+    supabaseFrom.mockClear();
+    const rows = await lookupZips([]);
+    expect(rows.size).toBe(0);
+    expect(supabaseFrom).not.toHaveBeenCalled();
+  });
+
+  // A failed read and a set of zips we hold nothing for both leave the town
+  // blank, which is a designed state on the card. The difference has to be
+  // visible somewhere, so it is logged.
+  it("reports a failed read instead of passing it off as no rows", async () => {
+    const logged: unknown[][] = [];
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...args: unknown[]) => {
+        logged.push(args);
+      });
+    supabaseFrom.mockImplementation(() => ({
+      select: () => ({
+        in: () =>
+          Promise.resolve({
+            data: null,
+            error: { message: "connection lost" },
+          }),
+      }),
+    }));
+    const rows = await lookupZips(["11779"]);
+    expect(rows.size).toBe(0);
+    expect(String(logged[0]?.[1])).toContain("connection lost");
+    errorSpy.mockRestore();
+  });
+});
+
+describe("applyTowns", () => {
+  it("writes the town onto the cards that have a matching zip", () => {
+    const cards = [
+      shapeNurseCard(rawRow({ user_id: "a" }), {
+        canSeeIdentity: true,
+        canSeeDetails: true,
+      }),
+      shapeNurseCard(
+        rawRow({
+          user_id: "b",
+          users: { ...rawRow().users, zip_code: "06830" },
+        }),
+        { canSeeIdentity: true, canSeeDetails: true },
+      ),
+    ];
+    applyTowns(
+      cards,
+      new Map([
+        [
+          "11779",
+          { city: "Ronkonkoma", state: "NY", latitude: 1, longitude: 2 },
+        ],
+      ]),
+    );
+    expect(cards[0].city).toBe("Ronkonkoma");
+    expect(cards[0].state).toBe("NY");
+    expect(cards[1].city).toBeNull();
   });
 });

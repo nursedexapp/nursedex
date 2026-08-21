@@ -1,5 +1,4 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyVisibleNurseFilter } from "./visibility";
 import { SEARCH } from "@/lib/constants";
@@ -7,7 +6,9 @@ import { GENDER_FILTER_ANY, type SearchFilters } from "./search-params";
 import { rankNurses as rankNursesPure } from "./search-ranking";
 import {
   NURSE_CARD_COLUMNS,
+  applyTowns,
   attachNurseCardPhotos,
+  lookupZips,
   shapeNurseCards,
   toPublicNurseCard,
   type InternalNurseCard,
@@ -31,10 +32,21 @@ export interface SearchResult {
   page: number;
   totalPages: number;
   hitResultCap: boolean;
+  // The origin zip we were asked to measure from and could not find in
+  // zip_codes, or null when there was nothing to locate or we located it.
+  // When set, no card carries a distance and any distance constraint was
+  // ignored rather than silently emptying the results (#769). The page has to
+  // say so: "we could not locate 06830" is honest, returning zero is not.
+  unlocatableZip: string | null;
 }
 
 export interface SearchOptions {
   filters: SearchFilters;
+  // The viewer's own profile zip, used only as the fallback origin when they
+  // have typed no zip of their own. The typed zip always wins: it is the one
+  // the box on screen is labelled with. Callers must not pre-resolve this
+  // themselves, which is how /nurses and /survey/results came to disagree
+  // about which zip a distance was measured from (#769).
   viewerZip?: string | null;
   viewerCommPref?: string | null;
   // Nurse user_ids the viewing family has already revealed. When set, those
@@ -44,6 +56,12 @@ export interface SearchOptions {
   // a caller that forgets to pass it leaks nothing (#381). The profile page's
   // per-nurse license gating is separate; cards never carry license_number.
   viewerCanSeeIdentity?: boolean;
+  // Whether the viewer is signed in, which is what gates bio, rate and
+  // availability on the card (#773, decision D1). Required, with no default:
+  // a default of false would tell a paying family on their own dashboard to
+  // log in to see a rate, and a default of true would ship every nurse's rate
+  // to logged out visitors. Every call site states it.
+  viewerIsSignedIn: boolean;
 }
 
 // ── Public entry point ────────────────────────────────────────
@@ -57,11 +75,27 @@ export async function searchNurses(
     viewerCommPref,
     viewerRevealedIds,
     viewerCanSeeIdentity = false,
+    viewerIsSignedIn,
   } = options;
 
-  const fullRaw = await runQuery(filters, viewerCanSeeIdentity);
-  const fullWithDistance = await enrichWithDistance(fullRaw, viewerZip ?? null);
-  const fullAfterDistance = applyDistanceFilter(fullWithDistance, filters);
+  // One origin zip, derived here rather than by each caller.
+  const originZip = filters.zip ?? viewerZip ?? null;
+
+  const gate = {
+    canSeeIdentity: viewerCanSeeIdentity,
+    canSeeDetails: viewerIsSignedIn,
+  };
+
+  const fullRaw = await runQuery(filters, gate);
+  const { cards: fullWithDistance, originResolved } = await enrichWithLocation(
+    fullRaw,
+    originZip,
+  );
+  const fullAfterDistance = applyDistanceFilter(
+    fullWithDistance,
+    filters,
+    originResolved,
+  );
   let fullRanked = rankCards(fullAfterDistance, viewerCommPref ?? null);
 
   // Mark nurses the family already revealed and sink them below the rest,
@@ -86,8 +120,8 @@ export async function searchNurses(
     if (slotsToFill > 0) {
       partials = await getPartialMatches({
         filters,
-        canSeeIdentity: viewerCanSeeIdentity,
-        viewerZip: viewerZip ?? null,
+        gate,
+        originZip,
         viewerCommPref: viewerCommPref ?? null,
         excludeUserIds: items.map((n) => n.user_id),
         limit: slotsToFill,
@@ -111,10 +145,17 @@ export async function searchNurses(
     page,
     totalPages,
     hitResultCap: fullRaw.length >= SQL_FETCH_CAP,
+    unlocatableZip: originZip && !originResolved ? originZip : null,
   };
 }
 
 // ── Raw DB fetch ──────────────────────────────────────────────
+
+/** Which of the card's gated fields this viewer may see. */
+interface CardGate {
+  canSeeIdentity: boolean;
+  canSeeDetails: boolean;
+}
 
 interface QueryOptions {
   skipLocation?: boolean;
@@ -123,7 +164,7 @@ interface QueryOptions {
 
 async function runQuery(
   filters: SearchFilters,
-  canSeeIdentity: boolean,
+  gate: CardGate,
   opts: QueryOptions = {},
 ): Promise<InternalNurseCard[]> {
   // Search joins nurse_profiles to users for first_name / last_name /
@@ -197,55 +238,81 @@ async function runQuery(
   const { data, error } = await query;
   if (error || !data) return [];
 
-  return shapeNurseCards(data, { canSeeIdentity });
+  return shapeNurseCards(data, gate);
 }
 
 // ── Distance ──────────────────────────────────────────────────
 
-async function enrichWithDistance(
+/**
+ * Result of trying to measure every card from one origin zip.
+ *
+ * `originResolved` separates "we found the origin and measured" from "we could
+ * not find it, so no card has a distance". Those look identical on the cards
+ * themselves, and treating them the same is what let a distance filter drop
+ * every row in silence (#769).
+ */
+interface DistanceResult {
+  cards: InternalNurseCard[];
+  originResolved: boolean;
+}
+
+async function enrichWithLocation(
   nurses: InternalNurseCard[],
-  viewerZip: string | null,
-): Promise<InternalNurseCard[]> {
-  if (!viewerZip || nurses.length === 0) return nurses;
+  originZip: string | null,
+): Promise<DistanceResult> {
+  if (nurses.length === 0) return { cards: nurses, originResolved: true };
 
-  const nurseZips = Array.from(
-    new Set(nurses.map((n) => n.zip_code).filter((z): z is string => !!z)),
+  const nurseZips = nurses
+    .map((n) => n.zip_code)
+    .filter((z): z is string => !!z);
+
+  // One lookup serves both the town on every card and the distance from the
+  // origin, so the busiest public page pays for it once.
+  const zipRows = await lookupZips(
+    originZip ? [originZip, ...nurseZips] : nurseZips,
   );
-  if (nurseZips.length === 0) return nurses;
+  applyTowns(nurses, zipRows);
 
-  const supabase = await createClient();
-  const { data: zipRows } = await supabase
-    .from("zip_codes")
-    .select("zip, latitude, longitude")
-    .in("zip", [viewerZip, ...nurseZips]);
-  if (!zipRows || zipRows.length === 0) return nurses;
+  // Nothing to locate is not the same as failing to locate something.
+  if (!originZip) return { cards: nurses, originResolved: true };
 
-  const viewerLoc = zipRows.find((z) => z.zip === viewerZip);
-  if (!viewerLoc) return nurses;
+  const originLoc = zipRows.get(originZip);
+  if (!originLoc) return { cards: nurses, originResolved: false };
 
-  const coordByZip = new Map(
-    zipRows.map((z) => [z.zip, { lat: z.latitude, lng: z.longitude }]),
-  );
-
-  return nurses.map((n) => {
+  const cards = nurses.map((n) => {
     if (!n.zip_code) return n;
-    const loc = coordByZip.get(n.zip_code);
+    const loc = zipRows.get(n.zip_code);
+    // The nurse's own zip is the missing one here, not the origin. Her card
+    // keeps a null distance and is dropped by a radius filter, because
+    // claiming she is inside a radius nobody measured would be worse.
     if (!loc) return n;
     const miles = haversineMiles(
-      viewerLoc.latitude,
-      viewerLoc.longitude,
-      loc.lat,
-      loc.lng,
+      originLoc.latitude,
+      originLoc.longitude,
+      loc.latitude,
+      loc.longitude,
     );
     return { ...n, distance_miles: Math.round(miles) };
   });
+
+  return { cards, originResolved: true };
 }
 
+/**
+ * Keep only nurses inside the requested radius.
+ *
+ * Applied only when the origin actually resolved. With an unresolvable origin
+ * every card carries a null distance, so the filter would reject all of them
+ * and the page would read "no nurses match your filters" for a reason no
+ * family could act on.
+ */
 function applyDistanceFilter(
   nurses: InternalNurseCard[],
   filters: SearchFilters,
+  originResolved: boolean,
 ): InternalNurseCard[] {
-  if (!filters.zip || filters.distance === undefined) return nurses;
+  if (filters.distance === undefined) return nurses;
+  if (!originResolved) return nurses;
   const max = filters.distance;
   return nurses.filter((n) => {
     if (n.distance_miles === null) return false;
@@ -282,8 +349,8 @@ function rankCards(
 
 interface PartialOptions {
   filters: SearchFilters;
-  canSeeIdentity: boolean;
-  viewerZip: string | null;
+  gate: CardGate;
+  originZip: string | null;
   viewerCommPref: string | null;
   excludeUserIds: string[];
   limit: number;
@@ -292,14 +359,8 @@ interface PartialOptions {
 async function getPartialMatches(
   opts: PartialOptions,
 ): Promise<InternalNurseCard[]> {
-  const {
-    filters,
-    canSeeIdentity,
-    viewerZip,
-    viewerCommPref,
-    excludeUserIds,
-    limit,
-  } = opts;
+  const { filters, gate, originZip, viewerCommPref, excludeUserIds, limit } =
+    opts;
   const excluded = new Set(excludeUserIds);
 
   // Stage 1: relax location (drop distance filter). Only meaningful if the
@@ -307,10 +368,10 @@ async function getPartialMatches(
   const hasLocationFilter = filters.zip && filters.distance !== undefined;
   let stage1: InternalNurseCard[] = [];
   if (hasLocationFilter) {
-    const raw = await runQuery(filters, canSeeIdentity, {
+    const raw = await runQuery(filters, gate, {
       skipLocation: true,
     });
-    const enriched = await enrichWithDistance(raw, viewerZip);
+    const { cards: enriched } = await enrichWithLocation(raw, originZip);
     const ranked = rankCards(
       enriched.filter((n) => !excluded.has(n.user_id)),
       viewerCommPref,
@@ -323,8 +384,8 @@ async function getPartialMatches(
   // Stage 2: also relax availability.
   const stage2 = await runRelaxedAvailability(
     filters,
-    canSeeIdentity,
-    viewerZip,
+    gate,
+    originZip,
     viewerCommPref,
     excluded,
     limit - stage1.length,
@@ -334,18 +395,18 @@ async function getPartialMatches(
 
 async function runRelaxedAvailability(
   filters: SearchFilters,
-  canSeeIdentity: boolean,
-  viewerZip: string | null,
+  gate: CardGate,
+  originZip: string | null,
   viewerCommPref: string | null,
   excluded: Set<string>,
   limit: number,
 ): Promise<InternalNurseCard[]> {
   if (limit <= 0) return [];
-  const raw = await runQuery(filters, canSeeIdentity, {
+  const raw = await runQuery(filters, gate, {
     skipLocation: true,
     skipAvailability: true,
   });
-  const enriched = await enrichWithDistance(raw, viewerZip);
+  const { cards: enriched } = await enrichWithLocation(raw, originZip);
   const ranked = rankCards(
     enriched.filter((n) => !excluded.has(n.user_id)),
     viewerCommPref,

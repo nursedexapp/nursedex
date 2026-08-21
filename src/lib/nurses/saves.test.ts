@@ -29,6 +29,10 @@ function profileRow(overrides: Record<string, unknown> = {}) {
     profile_completeness: 50,
     years_experience: 4,
     verification_status: "verified",
+    bio: "Ten years with medically complex children.",
+    rate_min: 32,
+    rate_max: 48,
+    availability_commitment: ["part_time"],
     users: {
       first_name: "Jane",
       last_name: LAST_NAME,
@@ -54,8 +58,29 @@ vi.mock("@/lib/supabase/service-role", () => ({
   }),
 }));
 
+const ZIP_ROWS: Record<
+  string,
+  { city: string; state: string; latitude: number; longitude: number }
+> = {
+  "11779": {
+    city: "Ronkonkoma",
+    state: "NY",
+    latitude: 40.8151,
+    longitude: -73.1279,
+  },
+};
+
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ from: () => createQueryBuilder() }),
+  createClient: async () => ({
+    from: () =>
+      createQueryBuilder({
+        in: (_column: unknown, zips: unknown) => ({
+          data: (zips as string[])
+            .filter((z) => z in ZIP_ROWS)
+            .map((z) => ({ zip: z, ...ZIP_ROWS[z] })),
+        }),
+      }),
+  }),
 }));
 
 vi.mock("@/lib/auth/helpers", () => ({ getCurrentUser: async () => null }));
@@ -107,5 +132,39 @@ describe("getSavedNurses visibility", () => {
     ];
     const cards = await getSavedNurses("family-1", { canSeeIdentity: true });
     expect(cards).toHaveLength(1);
+  });
+});
+
+describe("getSavedNurses card fields", () => {
+  // A family reaches this page only through requireRole(FAMILY), so bio, rate
+  // and availability are theirs to see whether or not they subscribe (#773).
+  it("carries bio, rate and availability for the signed in family", async () => {
+    const [card] = await getSavedNurses("family-1", { canSeeIdentity: false });
+    expect(card.bio).toBe("Ten years with medically complex children.");
+    expect(card.rate_min).toBe(32);
+    expect(card.rate_max).toBe(48);
+    expect(card.availability_commitment).toEqual(["part_time"]);
+  });
+
+  it("carries the town from the nurse's zip", async () => {
+    const [card] = await getSavedNurses("family-1", { canSeeIdentity: false });
+    expect(card.city).toBe("Ronkonkoma");
+    expect(card.state).toBe("NY");
+  });
+
+  it("leaves the town blank for a zip we hold no row for", async () => {
+    state.profiles = [
+      profileRow({ users: { ...profileRow().users, zip_code: "06830" } }),
+    ];
+    const [card] = await getSavedNurses("family-1", { canSeeIdentity: false });
+    expect(card.city).toBeNull();
+    // Positive control: the card itself came through.
+    expect(card.first_name).toBe("Jane");
+  });
+
+  it("carries the last initial without the surname", async () => {
+    const [card] = await getSavedNurses("family-1", { canSeeIdentity: false });
+    expect(card.last_initial).toBe("R");
+    expect(card.last_name).toBe("");
   });
 });

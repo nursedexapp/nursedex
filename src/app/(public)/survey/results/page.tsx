@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SurveyResultCard } from "@/components/survey/SurveyResultCard";
+import { UnlocatableZipNotice } from "@/components/nurses/UnlocatableZipNotice";
 import { SurveyResultsAnalytics } from "@/components/survey/SurveyResultsAnalytics";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -28,11 +29,20 @@ export default async function SurveyResultsPage({
   const raw = await searchParams;
   const filters = parseSearchParams(raw);
 
+  // The viewer has to be known BEFORE the search, not after: the cards are
+  // shaped with bio, rate and availability blanked for a logged out visitor,
+  // and a blanked card cannot be un-blanked afterward. This page is reached by
+  // logged in families too, which is why it cannot assume anonymous (#773).
+  const viewer = await getCurrentUser();
+
   // First pass, strict filters
   const result = await searchNurses({
     filters,
-    viewerZip: filters.zip ?? null,
+    // No profile zip to fall back to here: the survey's own zip is in
+    // `filters` and searchNurses measures from it (#769).
+    viewerZip: null,
     viewerCommPref: null,
+    viewerIsSignedIn: !!viewer,
   });
 
   const isLowResult = result.totalFull < ZERO_RESULTS_THRESHOLD;
@@ -45,7 +55,6 @@ export default async function SurveyResultsPage({
   // If a family is logged in and reached results, mark survey_completed so
   // the dashboard prompt stops appearing. Fire-and-forget; failures don't
   // block the page.
-  const viewer = await getCurrentUser();
   if (viewer?.role === "family") {
     const supabase = await createClient();
     await supabase
@@ -101,6 +110,11 @@ export default async function SurveyResultsPage({
               : "We don't have anyone matching every filter yet. Try loosening a filter, or sign up to be notified when matching nurses join."}
           </p>
         </div>
+
+        <UnlocatableZipNotice
+          zip={result.unlocatableZip}
+          hadDistanceFilter={filters.distance !== undefined}
+        />
 
         {hasResults && (
           <div className="mb-8 flex flex-col items-center gap-3">

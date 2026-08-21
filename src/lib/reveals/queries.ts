@@ -5,6 +5,7 @@ import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import {
   NURSE_CARD_COLUMNS,
   attachNurseCardPhotos,
+  attachNurseCardTowns,
   shapeNurseCards,
   toPublicNurseCard,
   type NurseSearchCard,
@@ -118,7 +119,11 @@ export async function getRevealedNurses(
   // Every reveal left in activeReveals is one this family still has access to,
   // so identity is theirs to see. #770 / #771: gated in the shared shaper, in
   // the data, rather than by a prop on the page.
-  const shaped = shapeNurseCards(data, { canSeeIdentity: true });
+  // Behind requireRole(FAMILY), so the viewer is signed in by construction.
+  const shaped = shapeNurseCards(data, {
+    canSeeIdentity: true,
+    canSeeDetails: true,
+  });
   const byId = new Map(shaped.map((c) => [c.user_id, c]));
 
   // Iterate reveals (already newest first) so order and access window come
@@ -138,7 +143,10 @@ export async function getRevealedNurses(
     });
   }
 
-  await attachNurseCardPhotos(cards);
+  await Promise.all([
+    attachNurseCardPhotos(cards),
+    attachNurseCardTowns(cards),
+  ]);
 
   return cards.map((card) => ({
     ...toPublicNurseCard(card),
