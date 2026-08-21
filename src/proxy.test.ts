@@ -209,3 +209,39 @@ describe("proxy security headers (#393)", () => {
     expect(h.updateSession).not.toHaveBeenCalled();
   });
 });
+
+// #761. Sentry's session replay compresses events in a Web Worker created from
+// a blob URL. The CSP set script-src but no worker-src, so browsers fell back to
+// script-src, which does not permit blob:, and the worker was blocked. Measured
+// on production 2026-08-21: every visitor got a console error on every page and
+// replay was degraded. Loosening a security control, so it is scoped narrowly
+// and pinned here rather than left as a line nobody can explain.
+describe("CSP worker policy", () => {
+  it("allows the blob worker session replay needs", async () => {
+    const res = await proxy(fakeRequest("/login"));
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
+
+    expect(csp).toMatch(/worker-src[^;]*'self'/);
+    expect(csp).toMatch(/worker-src[^;]*blob:/);
+  });
+
+  it("does not let blob: leak into script-src", async () => {
+    // The lazy fix is adding blob: to script-src, which would permit arbitrary
+    // blob SCRIPTS across the whole app rather than just workers. The whole
+    // point of naming worker-src is that it stays narrower than that.
+    const res = await proxy(fakeRequest("/login"));
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
+    const scriptSrc = csp.match(/script-src([^;]*)/)?.[1] ?? "";
+
+    expect(scriptSrc).not.toContain("blob:");
+  });
+
+  it("still refuses workers from anywhere else", async () => {
+    const res = await proxy(fakeRequest("/login"));
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
+    const workerSrc = csp.match(/worker-src([^;]*)/)?.[1] ?? "";
+
+    expect(workerSrc).not.toContain("*");
+    expect(workerSrc).not.toContain("http");
+  });
+});
