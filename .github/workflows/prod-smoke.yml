@@ -66,3 +66,31 @@ jobs:
           supabase link --project-ref "$PROJECT_REF"
           supabase db query --linked --output-format json "$(cat scripts/prod-smoke.sql)" \
             | npx tsx scripts/check-prod-smoke.ts
+
+      # A second, independent question about production (#744). NurseDex has a
+      # custom domain but was deliberately never moved onto it, so the app still
+      # talks to the original project host for everything, and published blog
+      # images have that host baked into their stored addresses. The whole
+      # arrangement rests on Supabase's promise that a project domain keeps
+      # serving after a custom domain is activated, which was measured once at
+      # activation and never since.
+      #
+      # `if: always()` on purpose: this asks a different question than the grants
+      # step above it, and without its own failure boundary the first failure
+      # hides the second, on exactly the run where both answers matter most.
+      #
+      # It re-links rather than relying on the step above having done so, for the
+      # same reason: a step that only works when its predecessor succeeded is not
+      # independent of it.
+      - name: Check the Legacy Supabase host is still serving
+        if: always()
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$PROJECT_REF"
+          supabase db query --linked --output-format json "$(cat scripts/legacy-host.sql)" \
+            | npx tsx scripts/check-legacy-host.ts
