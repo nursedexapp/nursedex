@@ -6,6 +6,7 @@ import { FilterSheet } from "@/components/nurses/FilterSheet";
 import { SearchAnalytics } from "@/components/nurses/SearchAnalytics";
 import { SearchPagination } from "@/components/nurses/SearchPagination";
 import { SurveyAppliedBanner } from "@/components/nurses/SurveyAppliedBanner";
+import { UnlocatableZipNotice } from "@/components/nurses/UnlocatableZipNotice";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { searchNurses } from "@/lib/nurses/search";
 import { getSavedNurseIds } from "@/lib/nurses/saves";
@@ -40,6 +41,9 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
     (Array.isArray(raw.from) ? raw.from[0] : raw.from) === "survey";
   const user = await getCurrentUser();
 
+  // The zip the family typed is the one the box on screen is labelled with, so
+  // it is the one distances are measured from. searchNurses derives that; this
+  // page hands it only the profile zip to fall back to (#769).
   const viewerZip = user?.zip_code ?? null;
   const viewerCommPref = user?.communication_preference ?? null;
 
@@ -117,6 +121,10 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
           {/* Results column */}
           <div className="min-w-0">
             {fromSurvey && <SurveyAppliedBanner />}
+            <UnlocatableZipNotice
+              zip={result.unlocatableZip}
+              hadDistanceFilter={filters.distance !== undefined}
+            />
             {!user && hasResults && <AnonSignupBanner />}
 
             {hasResults ? (
