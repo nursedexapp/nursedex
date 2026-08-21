@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SurveyResultCard } from "@/components/survey/SurveyResultCard";
+import { UnlocatableZipNotice } from "@/components/nurses/UnlocatableZipNotice";
 import { SurveyResultsAnalytics } from "@/components/survey/SurveyResultsAnalytics";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -31,7 +32,9 @@ export default async function SurveyResultsPage({
   // First pass, strict filters
   const result = await searchNurses({
     filters,
-    viewerZip: filters.zip ?? null,
+    // No profile zip to fall back to here: the survey's own zip is in
+    // `filters` and searchNurses measures from it (#769).
+    viewerZip: null,
     viewerCommPref: null,
   });
 
@@ -101,6 +104,11 @@ export default async function SurveyResultsPage({
               : "We don't have anyone matching every filter yet. Try loosening a filter, or sign up to be notified when matching nurses join."}
           </p>
         </div>
+
+        <UnlocatableZipNotice
+          zip={result.unlocatableZip}
+          hadDistanceFilter={filters.distance !== undefined}
+        />
 
         {hasResults && (
           <div className="mb-8 flex flex-col items-center gap-3">
