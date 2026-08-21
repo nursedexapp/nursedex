@@ -70,22 +70,40 @@ const ZIP_ROWS: Record<
   },
 };
 
+const userClientRows: { rows: unknown[]; error: unknown } = {
+  rows: [],
+  error: null,
+};
+const limits: unknown[] = [];
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
-    from: () =>
-      createQueryBuilder({
-        in: (_column: unknown, zips: unknown) => ({
-          data: (zips as string[])
-            .filter((z) => z in ZIP_ROWS)
-            .map((z) => ({ zip: z, ...ZIP_ROWS[z] })),
-        }),
-      }),
+    from: (table: string) =>
+      createQueryBuilder(
+        table === "zip_codes"
+          ? {
+              in: (_column: unknown, zips: unknown) => ({
+                data: (zips as string[])
+                  .filter((z) => z in ZIP_ROWS)
+                  .map((z) => ({ zip: z, ...ZIP_ROWS[z] })),
+              }),
+            }
+          : {
+              limit: (n: unknown) => {
+                limits.push(n);
+                return {
+                  data: userClientRows.error ? null : userClientRows.rows,
+                  error: userClientRows.error,
+                };
+              },
+            },
+      ),
   }),
 }));
 
 vi.mock("@/lib/auth/helpers", () => ({ getCurrentUser: async () => null }));
 
-import { getSavedNurses } from "./saves";
+import { SAVED_LIST_CAP, getAllSavedNurseIds, getSavedNurses } from "./saves";
 
 beforeEach(() => {
   state.profiles = [profileRow()];
@@ -166,5 +184,86 @@ describe("getSavedNurses card fields", () => {
     const [card] = await getSavedNurses("family-1", { canSeeIdentity: false });
     expect(card.last_initial).toBe("R");
     expect(card.last_name).toBe("");
+  });
+});
+
+describe("getAllSavedNurseIds", () => {
+  beforeEach(() => {
+    userClientRows.rows = [];
+    userClientRows.error = null;
+    limits.length = 0;
+  });
+
+  it("returns the family's whole set", async () => {
+    userClientRows.rows = [{ nurse_user_id: "a" }, { nurse_user_id: "b" }];
+    const ids = await getAllSavedNurseIds("family-1");
+    expect([...(ids ?? [])].sort()).toEqual(["a", "b"]);
+  });
+
+  it("returns an empty set for a family with no saves", async () => {
+    expect((await getAllSavedNurseIds("family-1"))?.size).toBe(0);
+  });
+
+  // An empty set would silently widen a Saved only search to every nurse in
+  // the directory. null is a third answer: we could not read it. The page can
+  // then keep showing results AND say the Saved filter was not applied, rather
+  // than either lying or erroring the whole directory for a signed in family.
+  it("answers null on a failed read, never an empty set", async () => {
+    const logged: unknown[][] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...a: unknown[]) => {
+        logged.push(a);
+      });
+    userClientRows.error = { message: "connection lost" };
+    expect(await getAllSavedNurseIds("family-1")).toBeNull();
+    expect(logged.map(String).join(" ")).toContain("connection lost");
+    spy.mockRestore();
+  });
+
+  // PostgREST caps a request at 1,000 rows and says nothing when it truncates.
+  // A short list is as wrong as no list, so it is the same answer, with its own
+  // message: the remedy is the same but the cause is not.
+  it("answers null when the list reaches the cap, rather than a short one", async () => {
+    const logged: unknown[][] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...a: unknown[]) => {
+        logged.push(a);
+      });
+    userClientRows.rows = Array.from(
+      { length: SAVED_LIST_CAP + 1 },
+      (_, i) => ({ nurse_user_id: `n${i}` }),
+    );
+    expect(await getAllSavedNurseIds("family-1")).toBeNull();
+    expect(logged.map(String).join(" ")).toContain("more than 900");
+    spy.mockRestore();
+  });
+
+  it("tells the two failures apart in what it logs", async () => {
+    const logged: string[] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...a: unknown[]) => {
+        logged.push(a.map(String).join(" "));
+      });
+
+    userClientRows.error = { message: "connection lost" };
+    await getAllSavedNurseIds("family-1");
+    userClientRows.error = null;
+    userClientRows.rows = Array.from(
+      { length: SAVED_LIST_CAP + 1 },
+      (_, i) => ({ nurse_user_id: `n${i}` }),
+    );
+    await getAllSavedNurseIds("family-1");
+
+    expect(logged).toHaveLength(2);
+    expect(logged[0]).not.toBe(logged[1]);
+    spy.mockRestore();
+  });
+
+  it("asks for one more row than the cap, so a full list is detectable", async () => {
+    await getAllSavedNurseIds("family-1");
+    expect(limits).toEqual([SAVED_LIST_CAP + 1]);
   });
 });

@@ -18,7 +18,9 @@ import {
 interface NurseCardProps {
   nurse: NurseSearchCard;
   // When present, the heart button is shown (requires family auth upstream).
-  saveState?: { isSaved: boolean };
+  // inSavedOnlyView tells the heart that unsaving changes which cards belong
+  // in this grid, not just how this one looks (#776).
+  saveState?: { isSaved: boolean; inSavedOnlyView?: boolean };
   // Dim the card slightly to visually distinguish partial matches.
   dimmed?: boolean;
   // Anon survey-results mode: hide last name, suppress save button, no profile link.
@@ -206,6 +208,7 @@ export function NurseCard({
         <SaveHeartButton
           nurseUserId={nurse.user_id}
           initialIsSaved={saveState.isSaved}
+          inSavedOnlyView={saveState.inSavedOnlyView}
           className="absolute top-3 right-3"
         />
       )}

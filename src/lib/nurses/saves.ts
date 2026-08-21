@@ -13,6 +13,13 @@ import {
 } from "./card";
 
 /**
+ * The most saved nurses one family can have and still be read in one request.
+ * Comfortably above any real list; it exists so that passing it is a loud
+ * failure rather than a quietly shortened set.
+ */
+export const SAVED_LIST_CAP = 900;
+
+/**
  * Return the set of nurse_user_ids the current user has saved, out of a
  * given candidate list. Returns an empty set for non-family or anon viewers.
  */
@@ -31,6 +38,62 @@ export async function getSavedNurseIds(
     .in("nurse_user_id", candidateNurseUserIds);
 
   return new Set((data ?? []).map((r) => r.nurse_user_id));
+}
+
+/**
+ * Every nurse_user_id this family has saved.
+ *
+ * getSavedNurseIds takes a candidate list and is called with only the current
+ * page's ids, so it cannot produce a total. The "Saved only" chip needs the
+ * whole set: to count it, and to constrain the query (#776).
+ *
+ * Read through the user's own client, not the service role one, so the
+ * saved_nurses_select_own policy (family_user_id = auth.uid()) enforces the
+ * scoping at the database rather than only in this function. The explicit
+ * eq() stays as well: two independent statements of the same constraint, and
+ * the one that cannot be forgotten is the policy.
+ *
+ * The family comes from the caller's session, never from the URL. The URL flag
+ * only says whether to apply the constraint, never whose saves to apply.
+ *
+ * Returns null when the list could not be read completely. That is a third
+ * answer, distinct from an empty set: an empty set would silently widen a
+ * "Saved only" search to every nurse in the state, and throwing would take the
+ * whole directory down for a signed in family over a filter they may not even
+ * be using, since this runs on every load to count the chip. null lets the
+ * page keep showing results and say the filter was not applied.
+ */
+export async function getAllSavedNurseIds(
+  familyUserId: string,
+): Promise<Set<string> | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("saved_nurses")
+    .select("nurse_user_id")
+    .eq("family_user_id", familyUserId)
+    // PostgREST caps a request at 1,000 rows by default and says nothing when
+    // it truncates. A silently short set would drop saved nurses out of a
+    // Saved only search, so ask for one more than the cap and refuse a
+    // response that reaches it rather than answering with a partial list.
+    .limit(SAVED_LIST_CAP + 1);
+
+  // Two distinct causes, two messages, one answer: the page's remedy is the
+  // same either way, but nobody diagnosing this should have to guess which
+  // happened.
+  if (error) {
+    console.error("Could not read a family's saved nurses:", error.message);
+    return null;
+  }
+
+  const rows = data ?? [];
+  if (rows.length > SAVED_LIST_CAP) {
+    console.error(
+      `A family has more than ${SAVED_LIST_CAP} saved nurses, which this read cannot return completely.`,
+    );
+    return null;
+  }
+
+  return new Set(rows.map((r) => r.nurse_user_id as string));
 }
 
 /**

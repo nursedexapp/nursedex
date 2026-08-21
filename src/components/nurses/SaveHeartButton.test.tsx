@@ -9,7 +9,10 @@ import {
   fireEvent,
 } from "@testing-library/react";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh }),
+}));
 vi.mock("@/lib/nurses/saves-actions", () => ({ toggleSavedNurse: vi.fn() }));
 vi.mock("@/lib/posthog", () => ({
   posthog: { __loaded: false, capture: vi.fn() },
@@ -137,5 +140,47 @@ describe("saving a nurse", () => {
     expect(heart()).toHaveAttribute("aria-pressed", "true");
     expect(heart()).toBeEnabled();
     expect(toast.success).toHaveBeenCalledWith("Saved to your list");
+  });
+});
+
+// #776. In a grid constrained to saved nurses, unsaving changes which cards
+// belong there. Local state alone leaves the card sitting in a grid that
+// claims to show only saves.
+describe("unsaving inside a saved only view", () => {
+  it("refreshes the route so the card leaves the grid", async () => {
+    vi.mocked(toggleSavedNurse).mockResolvedValue({
+      success: true,
+      isSaved: false,
+    });
+    render(<SaveHeartButton nurseUserId="n1" initialIsSaved inSavedOnlyView />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+    });
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("does not refresh on an ordinary grid", async () => {
+    vi.mocked(toggleSavedNurse).mockResolvedValue({
+      success: true,
+      isSaved: false,
+    });
+    render(<SaveHeartButton nurseUserId="n1" initialIsSaved />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+    });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh when the action failed", async () => {
+    vi.mocked(toggleSavedNurse).mockResolvedValue({
+      success: false,
+      isSaved: true,
+      error: "unknown",
+    });
+    render(<SaveHeartButton nurseUserId="n1" initialIsSaved inSavedOnlyView />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+    });
+    expect(refresh).not.toHaveBeenCalled();
   });
 });

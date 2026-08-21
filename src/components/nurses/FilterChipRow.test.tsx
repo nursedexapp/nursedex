@@ -13,12 +13,12 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
 }));
 
-function show(search = "") {
+function show(search = "", savedCount: number | null = null) {
   window.history.replaceState({}, "", `/nurses${search}`);
   const filters = parseSearchParams(
     new URLSearchParams(search.replace(/^\?/, "")),
   );
-  return render(<FilterChipRow filters={filters} />);
+  return render(<FilterChipRow filters={filters} savedCount={savedCount} />);
 }
 
 const lastUrl = () => replace.mock.calls.at(-1)?.[0] ?? "";
@@ -148,5 +148,64 @@ describe("keyboard reach", () => {
       expect(button.tagName).toBe("BUTTON");
       expect(button).not.toHaveAttribute("disabled");
     }
+  });
+});
+
+// Decision D10. It earns its place by composing with the other filters, which
+// /dashboard/saved cannot do.
+describe("the Saved only chip", () => {
+  it("is absent for a viewer with no saved list", () => {
+    show("", null);
+    expect(
+      screen.queryByRole("button", { name: /Saved/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("carries the family's total, not the page's", () => {
+    show("", 12);
+    expect(screen.getByRole("button", { name: /Saved/ })).toHaveTextContent(
+      "(12)",
+    );
+  });
+
+  it("shows zero rather than hiding itself for a family with no saves", () => {
+    show("", 0);
+    expect(screen.getByRole("button", { name: /Saved/ })).toHaveTextContent(
+      "(0)",
+    );
+  });
+
+  it("turns the constraint on", () => {
+    show("", 3);
+    fireEvent.click(screen.getByRole("button", { name: /Saved/ }));
+    expect(lastUrl()).toBe("/nurses?saved=true");
+  });
+
+  it("turns it back off", () => {
+    show("?saved=true", 3);
+    fireEvent.click(screen.getByRole("button", { name: /Saved/ }));
+    expect(lastUrl()).toBe("/nurses");
+  });
+
+  it("says whether it is on", () => {
+    show("?saved=true", 3);
+    expect(screen.getByRole("button", { name: /Saved/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("composes with another filter rather than replacing it", () => {
+    show("?credential=rn", 3);
+    fireEvent.click(screen.getByRole("button", { name: /Saved/ }));
+    expect(lastUrl()).toContain("credential=rn");
+    expect(lastUrl()).toContain("saved=true");
+  });
+
+  it("counts towards Clear all", () => {
+    show("?saved=true", 3);
+    expect(
+      screen.getByRole("button", { name: "Clear all" }),
+    ).toBeInTheDocument();
   });
 });

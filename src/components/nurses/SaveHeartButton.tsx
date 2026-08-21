@@ -21,6 +21,13 @@ interface SaveHeartButtonProps {
   initialIsSaved: boolean;
   anonRedirectTo?: string;
   className?: string;
+  /**
+   * True when this card sits in a grid that only shows saved nurses. Unsaving
+   * there has to refresh the route: the card belongs to a list it is no longer
+   * a member of, and local state alone would leave it sitting in a grid that
+   * claims to show only saves (#776).
+   */
+  inSavedOnlyView?: boolean;
 }
 
 export function SaveHeartButton({
@@ -28,6 +35,7 @@ export function SaveHeartButton({
   initialIsSaved,
   anonRedirectTo,
   className,
+  inSavedOnlyView,
 }: SaveHeartButtonProps) {
   const router = useRouter();
   const [isSaved, setIsSaved] = useState(initialIsSaved);
@@ -83,6 +91,8 @@ export function SaveHeartButton({
       toast.success(
         result.isSaved ? "Saved to your list" : "Removed from your list",
       );
+      // The grid's membership changed, not just this heart.
+      if (inSavedOnlyView) router.refresh();
       if (posthog.__loaded) {
         posthog.capture(
           result.isSaved
