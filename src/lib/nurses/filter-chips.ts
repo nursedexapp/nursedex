@@ -52,7 +52,23 @@ export const SHEET_CHIP_IDS = [
 ] as const;
 
 export type SheetChipId = (typeof SHEET_CHIP_IDS)[number];
-export type ChipId = RowChipId | SheetChipId;
+
+/**
+ * The "Saved only" chip (decision D10). Not in either list: it is on the row,
+ * but only for a signed in family, so it is neither always present nor behind
+ * More filters. It earns its place by composing with the other filters, which
+ * /dashboard/saved cannot do.
+ */
+export const SAVED_CHIP_ID = "saved" as const;
+
+export type ChipId = RowChipId | SheetChipId | typeof SAVED_CHIP_ID;
+
+/** Every chip there is, for coverage checks. */
+export const ALL_CHIP_IDS: ChipId[] = [
+  ...ROW_CHIP_IDS,
+  ...SHEET_CHIP_IDS,
+  SAVED_CHIP_ID,
+];
 
 /** Every filter key a chip owns. Nothing may be owned by two chips, and
  *  nothing the URL carries may be owned by none. */
@@ -64,6 +80,7 @@ const KEYS_BY_CHIP: Record<ChipId, (keyof SearchFilters)[]> = {
   gender: ["gender"],
   rate_max: ["rate_min", "rate_max"],
   experience_min: ["experience_min"],
+  saved: ["saved"],
   location: ["zip", "distance"],
   availability_commitment: ["availability_commitment"],
   time_slots: ["time_slots"],
@@ -78,6 +95,7 @@ const RESTING_LABEL: Record<ChipId, string> = {
   gender: "Gender",
   rate_max: "Rate",
   experience_min: "Experience",
+  saved: "Saved only",
   location: "Location",
   availability_commitment: "Availability",
   time_slots: "Time of day",
@@ -101,6 +119,8 @@ export function isChipApplied(id: ChipId, filters: SearchFilters): boolean {
       return filters.rate_min !== undefined || filters.rate_max !== undefined;
     case "experience_min":
       return filters.experience_min !== undefined;
+    case "saved":
+      return filters.saved;
     case "location":
       return filters.zip !== undefined;
     case "availability_commitment":
@@ -136,6 +156,8 @@ export function chipLabel(id: ChipId, filters: SearchFilters): string {
       return `${resting}: ${rateSummary(filters)}`;
     case "experience_min":
       return `${resting}: ${filters.experience_min}+ years`;
+    case "saved":
+      return "Saved only";
     case "location":
       return filters.distance !== undefined
         ? `${resting}: ${filters.distance} miles of ${filters.zip}`
@@ -190,6 +212,7 @@ function defaultFor(key: keyof SearchFilters): unknown {
     case "gender":
       return GENDER_FILTER_ANY;
     case "show_unavailable":
+    case "saved":
       return false;
     default:
       return undefined;

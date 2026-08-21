@@ -1,6 +1,6 @@
 "use client";
 
-import { SlidersHorizontal } from "lucide-react";
+import { Heart, SlidersHorizontal } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
@@ -46,6 +46,12 @@ const FILTER_LANGUAGES = [
 
 interface FilterChipRowProps {
   filters: SearchFilters;
+  /**
+   * How many nurses this family has saved, or null for a viewer who has no
+   * saved list (logged out, or a nurse account). Null hides the chip entirely
+   * rather than offering a control that would do nothing (#776).
+   */
+  savedCount: number | null;
 }
 
 /**
@@ -58,12 +64,14 @@ interface FilterChipRowProps {
  * survey with a zip and a distance set would otherwise see an empty looking
  * row above a thin grid, with no visible cause (#775).
  */
-export function FilterChipRow({ filters }: FilterChipRowProps) {
+export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
   const { apply, clearAll } = useApplyFilters();
   const hidden = appliedSheetChips(filters);
   const moreCount = sheetAppliedCount(filters);
   const anyApplied =
-    moreCount > 0 || ROW_CHIP_IDS.some((id) => isChipApplied(id, filters));
+    moreCount > 0 ||
+    filters.saved ||
+    ROW_CHIP_IDS.some((id) => isChipApplied(id, filters));
 
   const clear = (id: ChipId) => () => apply(clearChipPatch(id));
 
@@ -83,6 +91,35 @@ export function FilterChipRow({ filters }: FilterChipRowProps) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {savedCount !== null && (
+        <button
+          type="button"
+          onClick={() => apply({ saved: !filters.saved })}
+          aria-pressed={filters.saved}
+          className={cn(
+            "inline-flex cursor-pointer items-center gap-1.5 rounded-full border py-1.5 pr-3 pl-3.5 text-sm transition-colors",
+            "focus-visible:ring-teal focus-visible:ring-2 focus-visible:outline-none",
+            filters.saved
+              ? "border-teal bg-teal text-white"
+              : "border-sage/50 text-soft-black hover:border-sage bg-white",
+          )}
+        >
+          <Heart
+            className={cn("size-3.5", filters.saved && "fill-current")}
+            aria-hidden="true"
+          />
+          Saved
+          <span
+            className={cn(
+              "text-xs",
+              filters.saved ? "text-white/90" : "text-soft-black-light",
+            )}
+          >
+            ({savedCount})
+          </span>
+        </button>
+      )}
+
       {chip("credential", (close) => (
         <ChoiceList
           name="Credential"

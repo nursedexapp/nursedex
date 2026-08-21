@@ -34,6 +34,36 @@ export async function getSavedNurseIds(
 }
 
 /**
+ * Every nurse_user_id this family has saved.
+ *
+ * getSavedNurseIds takes a candidate list and is called with only the current
+ * page's ids, so it cannot produce a total. The "Saved only" chip needs the
+ * whole set: to count it, and to constrain the query (#776).
+ *
+ * The family comes from the caller's session, never from the URL. The URL flag
+ * only says whether to apply the constraint, never whose saves to apply.
+ */
+export async function getAllSavedNurseIds(
+  familyUserId: string,
+): Promise<Set<string>> {
+  const supabase = createServiceRoleClient();
+  const { data, error } = await supabase
+    .from("saved_nurses")
+    .select("nurse_user_id")
+    .eq("family_user_id", familyUserId);
+
+  if (error) {
+    console.error("getAllSavedNurseIds failed:", error.message);
+    // An empty set here would silently widen a "Saved only" search to every
+    // nurse, which is the opposite of what was asked for. Throwing is loud;
+    // the page renders its error boundary rather than a wrong answer.
+    throw new Error(`Could not read saved nurses: ${error.message}`);
+  }
+
+  return new Set((data ?? []).map((r) => r.nurse_user_id as string));
+}
+
+/**
  * Fetch the full list of nurses a family has saved, newest first.
  * Includes unavailable nurses (but not hidden or deleted ones).
  */

@@ -62,6 +62,10 @@ export interface SearchOptions {
   // log in to see a rate, and a default of true would ship every nurse's rate
   // to logged out visitors. Every call site states it.
   viewerIsSignedIn: boolean;
+  // Every nurse this family has saved, when the "Saved only" chip is on.
+  // Always resolved from the session by the caller; the URL flag only says
+  // whether to apply the constraint (#776). Undefined means do not constrain.
+  viewerSavedIds?: Set<string>;
 }
 
 // ── Public entry point ────────────────────────────────────────
@@ -76,6 +80,7 @@ export async function searchNurses(
     viewerRevealedIds,
     viewerCanSeeIdentity = false,
     viewerIsSignedIn,
+    viewerSavedIds,
   } = options;
 
   // One origin zip, derived here rather than by each caller.
@@ -86,7 +91,13 @@ export async function searchNurses(
     canSeeDetails: viewerIsSignedIn,
   };
 
-  const fullRaw = await runQuery(filters, gate);
+  // Ignored for logged out and non-family viewers: the page passes no saved
+  // set for them, so the flag in the URL does nothing.
+  const savedOnly = filters.saved && viewerSavedIds !== undefined;
+
+  const fullRaw = await runQuery(filters, gate, {
+    savedIds: savedOnly ? viewerSavedIds : undefined,
+  });
   const { cards: fullWithDistance, originResolved } = await enrichWithLocation(
     fullRaw,
     originZip,
@@ -115,7 +126,10 @@ export async function searchNurses(
   const items = fullRanked.slice((page - 1) * pageSize, page * pageSize);
 
   let partials: InternalNurseCard[] = [];
-  if (totalFull < PARTIAL_MATCHES_THRESHOLD && page === 1) {
+  // Partials relax the filters to fill the page, and they know nothing about a
+  // saved constraint. A family with three saves would otherwise be shown seven
+  // nurses they never saved, under a grid that claims to show only saves.
+  if (!savedOnly && totalFull < PARTIAL_MATCHES_THRESHOLD && page === 1) {
     const slotsToFill = pageSize - items.length;
     if (slotsToFill > 0) {
       partials = await getPartialMatches({
@@ -160,6 +174,8 @@ interface CardGate {
 interface QueryOptions {
   skipLocation?: boolean;
   skipAvailability?: boolean;
+  /** Constrain to these nurse ids. An empty set means no nurse can match. */
+  savedIds?: Set<string>;
 }
 
 async function runQuery(
@@ -177,6 +193,13 @@ async function runQuery(
 
   let query = supabase.from("nurse_profiles").select(NURSE_CARD_COLUMNS);
   query = applyVisibleNurseFilter(query);
+
+  if (opts.savedIds) {
+    // A family with no saves matches nothing. PostgREST's .in() with an empty
+    // list is an error rather than an empty result, so answer directly.
+    if (opts.savedIds.size === 0) return [];
+    query = query.in("user_id", [...opts.savedIds]);
+  }
 
   // Availability visibility:
   // - unavailable_visibility='hidden' → NEVER in search.

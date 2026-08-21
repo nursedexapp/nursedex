@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  ALL_CHIP_IDS,
   ROW_CHIP_IDS,
+  SAVED_CHIP_ID,
   SHEET_CHIP_IDS,
   appliedSheetChips,
   chipLabel,
@@ -15,6 +17,8 @@ import {
   toURLSearchParams,
 } from "./search-params";
 
+const _unusedChipId: ChipId = "saved";
+
 const filters = (raw: Record<string, string> = {}) => parseSearchParams(raw);
 
 describe("the chip vocabulary", () => {
@@ -22,9 +26,7 @@ describe("the chip vocabulary", () => {
   // owned by none is invisible on the row and unclearable; one owned by two
   // gives the family two controls that fight over the same value.
   it("covers every filter the URL carries, once each", () => {
-    const owned = [...ROW_CHIP_IDS, ...SHEET_CHIP_IDS].flatMap((id) =>
-      Object.keys(clearChipPatch(id)),
-    );
+    const owned = ALL_CHIP_IDS.flatMap((id) => Object.keys(clearChipPatch(id)));
     expect(new Set(owned).size).toBe(owned.length);
 
     const schemaKeys = Object.keys(searchParamsSchema.shape).filter(
@@ -37,12 +39,20 @@ describe("the chip vocabulary", () => {
     expect(ROW_CHIP_IDS).toHaveLength(7);
     expect(SHEET_CHIP_IDS).toHaveLength(4);
   });
+
+  // Saved only sits on the row but only for a signed in family, so it belongs
+  // to neither fixed list and is easy to leave out of a coverage check.
+  it("counts the Saved only chip as its own thing", () => {
+    expect(ROW_CHIP_IDS).not.toContain(SAVED_CHIP_ID);
+    expect(SHEET_CHIP_IDS).not.toContain(SAVED_CHIP_ID);
+    expect(ALL_CHIP_IDS).toContain(SAVED_CHIP_ID);
+  });
 });
 
 describe("isChipApplied", () => {
   it("is false for every chip on an untouched search", () => {
     const f = filters();
-    for (const id of [...ROW_CHIP_IDS, ...SHEET_CHIP_IDS]) {
+    for (const id of ALL_CHIP_IDS) {
       expect(isChipApplied(id, f), `${id} should be unapplied`).toBe(false);
     }
   });
@@ -138,7 +148,7 @@ describe("chipLabel", () => {
       time_slots: "overnights",
       show_unavailable: "true",
     });
-    for (const id of [...ROW_CHIP_IDS, ...SHEET_CHIP_IDS] as ChipId[]) {
+    for (const id of ALL_CHIP_IDS) {
       expect(
         chipLabel(id, applied).length,
         `${id} has no label`,
@@ -198,8 +208,8 @@ describe("clearChipPatch", () => {
       time_slots: "overnights",
       show_unavailable: "true",
     });
-    let running = applied;
-    for (const id of [...ROW_CHIP_IDS, ...SHEET_CHIP_IDS] as ChipId[]) {
+    let running = { ...applied, saved: true };
+    for (const id of ALL_CHIP_IDS) {
       running = { ...running, ...clearChipPatch(id) };
     }
     expect(toURLSearchParams(running).toString()).toBe("");
@@ -217,5 +227,30 @@ describe("appliedSheetChips", () => {
     expect(
       appliedSheetChips(filters({ zip: "11779", time_slots: "overnights" })),
     ).toEqual(["location", "time_slots"]);
+  });
+});
+
+describe("the Saved only chip", () => {
+  it("is unapplied by default", () => {
+    expect(isChipApplied(SAVED_CHIP_ID, filters())).toBe(false);
+  });
+
+  it("is applied when the flag is on", () => {
+    expect(isChipApplied(SAVED_CHIP_ID, filters({ saved: "true" }))).toBe(true);
+  });
+
+  it("reads the same whether applied or not, since the count is separate", () => {
+    expect(chipLabel(SAVED_CHIP_ID, filters({ saved: "true" }))).toBe(
+      "Saved only",
+    );
+  });
+
+  it("clears back off", () => {
+    const after = {
+      ...filters({ saved: "true" }),
+      ...clearChipPatch(SAVED_CHIP_ID),
+    };
+    expect(after.saved).toBe(false);
+    expect(toURLSearchParams(after).toString()).toBe("");
   });
 });

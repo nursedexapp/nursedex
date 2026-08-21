@@ -83,6 +83,11 @@ export const searchParamsSchema = z.object({
   availability_commitment: commaArrayOfEnum(AvailabilityCommitment),
   time_slots: commaArrayOfEnum(TimeSlot),
   show_unavailable: boolFlag,
+  // Constrain results to nurses this family has saved (#776). The family is
+  // always taken from the session; this flag only says whether to apply the
+  // constraint, never whose saves to apply. Ignored for logged out and
+  // non-family viewers.
+  saved: boolFlag,
   page: pageNumber,
 });
 
@@ -150,6 +155,11 @@ export function toURLSearchParams(
     params.set("time_slots", filters.time_slots.join(","));
   }
   if (filters.show_unavailable) params.set("show_unavailable", "true");
+  // Without this, the chip clears itself the instant any other filter is
+  // touched and drops off every page-two link, because FilterPanel.apply,
+  // SearchPagination.hrefForPage and survey/results all rebuild the whole URL
+  // through this one function (#776).
+  if (filters.saved) params.set("saved", "true");
   if (filters.page && filters.page > 1)
     params.set("page", String(filters.page));
   return params;
@@ -173,6 +183,7 @@ export function isEmptyFilterSet(filters: SearchFilters): boolean {
     filters.rate_max === undefined &&
     filters.experience_min === undefined &&
     !filters.zip &&
+    !filters.saved &&
     filters.availability_commitment.length === 0 &&
     filters.time_slots.length === 0
   );
