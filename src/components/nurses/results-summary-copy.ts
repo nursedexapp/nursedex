@@ -45,8 +45,8 @@ export function resultsSummary(result: SearchResult): ResultsSummaryCopy {
     total === 0
       ? "No nurses match your filters yet."
       : shown === total
-        ? `${total} ${nurses(total)} found`
-        : `Showing ${shown} of ${total} ${nurses(total)}`;
+        ? `${total} ${nurses(total)} found.`
+        : `Showing ${shown} of ${total} ${nurses(total)}.`;
 
   return {
     headline,

@@ -49,17 +49,24 @@ function result(items: number, totalFull: number, partials = 0): SearchResult {
 }
 
 describe("the results headline", () => {
+  // Each sentence is its own line, so the headline and the order caption do
+  // not run together as one unpunctuated string on screen.
+  it("is a finished sentence", () => {
+    expect(resultsSummary(result(15, 98)).headline).toMatch(/\.$/);
+    expect(resultsSummary(result(0, 0)).headline).toMatch(/\.$/);
+  });
+
   it("says how many matched when they all fit on the page", () => {
-    expect(resultsSummary(result(3, 3)).headline).toBe("3 nurses found");
+    expect(resultsSummary(result(3, 3)).headline).toBe("3 nurses found.");
   });
 
   it("says one nurse rather than one nurses", () => {
-    expect(resultsSummary(result(1, 1)).headline).toBe("1 nurse found");
+    expect(resultsSummary(result(1, 1)).headline).toBe("1 nurse found.");
   });
 
   it("says which slice is on screen when there are more pages", () => {
     expect(resultsSummary(result(12, 40)).headline).toBe(
-      "Showing 12 of 40 nurses",
+      "Showing 12 of 40 nurses.",
     );
   });
 
@@ -74,7 +81,7 @@ describe("the results headline", () => {
   // read "Showing 12 of 3".
   it("never counts partials into either number", () => {
     const summary = resultsSummary(result(3, 3, 9));
-    expect(summary.headline).toBe("3 nurses found");
+    expect(summary.headline).toBe("3 nurses found.");
     expect(summary.headline).not.toContain("12");
   });
 

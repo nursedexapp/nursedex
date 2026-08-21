@@ -19,10 +19,8 @@ export function ResultsSummary({ result }: { result: SearchResult }) {
 
   return (
     <div className="text-soft-black-light text-sm">
-      <p>
-        {headline}
-        {order ? <span className="text-soft-black-light"> {order}</span> : null}
-      </p>
+      <p>{headline}</p>
+      {order ? <p className="mt-0.5">{order}</p> : null}
       {partials ? <p className="mt-0.5">{partials}</p> : null}
     </div>
   );
