@@ -17,6 +17,29 @@ Notes:
 - ESLint config lives in `eslint.config.mjs` (flat config, ESLint 9). There is no `.eslintrc`.
 - If `typecheck` or `lint` seems stuck, give it the first-run budget above before assuming it hung.
 
+## Which command runs which test
+
+There are three vitest commands and they do not overlap. A test in the wrong
+place runs nowhere, and running nowhere looks exactly like passing.
+
+| Where the file lives                                   | What runs it          | Where that runs                               |
+| ------------------------------------------------------ | --------------------- | --------------------------------------------- |
+| `src/**`, `test/**`, `scripts/**`, `eslint-rules/**`   | `npm test`            | `ci.yml`, on every push                       |
+| `src/lib/__tests__/**`, named in the `test:rls` script | `npm run test:rls`    | `e2e.yml`, against a throwaway local Supabase |
+| `src/lib/__tests__/**`, live service diagnostics       | `npm run test:health` | nowhere, on purpose (they ping real services) |
+| `e2e/**.spec.ts`                                       | `npm run test:e2e`    | `e2e.yml`                                     |
+
+`vitest.config.ts` EXCLUDES `src/lib/__tests__`, so a guard written there is not
+run by `npm test`. If it belongs in CI, add its path to the `test:rls` script.
+`test/every-test-runs.test.ts` enforces this: every file in that directory must
+either be named in `test:rls` or declared in its `LOCAL_ONLY` list with a
+reason, and the list may not name a file that no longer exists.
+
+The same trap exists in `e2e/`: a spec that calls `test.skip()` when its
+environment is absent reports a pass. `data-api.spec.ts` does this deliberately
+and is declared as an exception; the same guard fails any new spec that starts
+doing it silently.
+
 ## Deploying a migration
 
 **Merging a PR does not deploy its migration.** The code ships to Vercel on merge; the database does not change until someone pushes it. Code that calls a function production does not have yet will fail for real users, so push the migration first, or immediately after.
