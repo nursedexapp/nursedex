@@ -1,4 +1,3 @@
-
 export default function NursesLoading() {
   return (
     <div className="flex flex-1 flex-col">
@@ -31,21 +30,37 @@ export default function NursesLoading() {
   );
 }
 
+/**
+ * Mirrors the real card's anatomy: 52px round avatar, name and credential,
+ * a pill row, a location line, bio lines, and a bordered footer. A skeleton
+ * that draws a shape the page no longer has makes every navigation flash a
+ * layout that is about to be replaced.
+ */
 function NurseCardSkeleton() {
   return (
-    <div className="border-sage/20 bg-warm-white space-y-3 rounded-xl border p-4">
-      <div className="flex items-center gap-3">
-        <div className="bg-sage/15 size-12 animate-pulse rounded-full" />
-        <div className="flex-1 space-y-2">
-          <div className="bg-sage/15 h-4 w-3/4 animate-pulse rounded" />
-          <div className="bg-sage/10 h-3 w-1/2 animate-pulse rounded" />
+    <div className="border-sage/20 flex flex-col rounded-2xl border bg-white">
+      <div className="flex-1 space-y-3 p-4">
+        <div className="flex items-start gap-3">
+          <div className="bg-sage/15 size-13 shrink-0 animate-pulse rounded-full" />
+          <div className="flex-1 space-y-2 pt-1">
+            <div className="bg-sage/15 h-4 w-2/3 animate-pulse rounded" />
+            <div className="bg-sage/10 h-3 w-1/2 animate-pulse rounded" />
+          </div>
+        </div>
+        <div className="flex gap-1.5">
+          <div className="bg-sage/15 h-5 w-24 animate-pulse rounded-full" />
+          <div className="bg-sage/10 h-5 w-16 animate-pulse rounded-full" />
+        </div>
+        <div className="bg-sage/10 h-3 w-2/5 animate-pulse rounded" />
+        <div className="space-y-2">
+          <div className="bg-sage/10 h-3 w-full animate-pulse rounded" />
+          <div className="bg-sage/10 h-3 w-5/6 animate-pulse rounded" />
         </div>
       </div>
-      <div className="space-y-2">
-        <div className="bg-sage/10 h-3 w-full animate-pulse rounded" />
-        <div className="bg-sage/10 h-3 w-5/6 animate-pulse rounded" />
+      <div className="border-sage/20 flex items-center justify-between border-t px-4 py-3">
+        <div className="bg-sage/10 h-3 w-24 animate-pulse rounded" />
+        <div className="bg-sage/15 h-3 w-20 animate-pulse rounded" />
       </div>
-      <div className="bg-sage/15 h-8 w-24 animate-pulse rounded-lg" />
     </div>
   );
 }
