@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { CREDENTIAL_LABELS, CARE_TYPE_LABELS } from "@/types/enums";
 import type { Credential, CareType } from "@/types/enums";
-import type { NurseSearchCard } from "@/lib/nurses/search";
+import type { NurseSearchCard } from "@/lib/nurses/card";
 import { SaveHeartButton } from "./SaveHeartButton";
 
 interface NurseCardProps {
