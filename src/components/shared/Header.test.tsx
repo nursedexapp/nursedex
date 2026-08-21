@@ -25,6 +25,37 @@ describe("the site width", () => {
     expect(header).not.toContain("max-w-6xl");
   });
 
+  // Dan's call, taking decision D5 further than it stated: the header is
+  // chrome, so every page that shared its width keeps sharing it. Prose
+  // columns (about, blog) stay narrow, because line length is a readability
+  // decision rather than a chrome one.
+  it("is what the pages that shared the header's width now use", () => {
+    for (const file of [
+      "src/app/(public)/page.tsx",
+      "src/app/(public)/pricing/page.tsx",
+      "src/components/shared/Footer.tsx",
+      "src/components/shared/AppFooter.tsx",
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect(source, `${file} should use the shared width`).toContain(
+        "max-w-site",
+      );
+      expect(source, `${file} still caps itself`).not.toContain("max-w-6xl");
+    }
+  });
+
+  it("leaves prose columns narrow, where line length matters", () => {
+    for (const file of [
+      "src/app/(public)/about/page.tsx",
+      "src/app/(public)/blog/page.tsx",
+    ]) {
+      const source = readFileSync(file, "utf8");
+      expect(source, `${file} should stay a reading column`).toContain(
+        "max-w-3xl",
+      );
+    }
+  });
+
   it("is what the directory feed uses", () => {
     for (const file of [
       "src/app/(public)/nurses/page.tsx",

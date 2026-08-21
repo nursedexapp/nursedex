@@ -43,14 +43,14 @@ export default function HomePage() {
 function Hero() {
   return (
     <section className="border-sage-light/40 bg-warm-white border-b">
-      <div className="mx-auto max-w-6xl px-6 py-14 sm:py-20">
+      <div className="max-w-site mx-auto px-6 py-14 sm:py-20">
         <h1 className="font-heading text-soft-black mx-auto max-w-3xl text-center text-3xl font-semibold sm:text-5xl">
           New York&apos;s trusted nurse directory
         </h1>
         <p className="text-soft-black-light mx-auto mt-4 max-w-2xl text-center text-base sm:text-lg">
-          Trusted nurses and aides, real reviews, direct contact. Built for families
-          across New York looking for care, and for nurses who deserve to be
-          found.
+          Trusted nurses and aides, real reviews, direct contact. Built for
+          families across New York looking for care, and for nurses who deserve
+          to be found.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -60,9 +60,9 @@ function Hero() {
                 Are you looking for a nurse?
               </h2>
               <p className="text-soft-black-light text-sm">
-                Find the right nurse or aide near you. Search by credential, care type,
-                language, and availability, and see real reviews from other New
-                York families.
+                Find the right nurse or aide near you. Search by credential,
+                care type, language, and availability, and see real reviews from
+                other New York families.
               </p>
               <div className="mt-auto flex flex-wrap gap-2">
                 <Link
@@ -157,7 +157,7 @@ function TrustSignals() {
   ];
   return (
     <section className="border-sage-light/40 border-b bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="max-w-site mx-auto px-6 py-12">
         <div className="grid gap-6 sm:grid-cols-3">
           {items.map((item) => (
             <div key={item.title} className="flex items-start gap-3">
@@ -181,7 +181,7 @@ function TrustSignals() {
 function DualHowItWorks() {
   return (
     <section className="bg-warm-white">
-      <div className="mx-auto max-w-6xl px-6 py-16">
+      <div className="max-w-site mx-auto px-6 py-16">
         <h2 className="font-heading text-soft-black text-center text-2xl font-semibold sm:text-3xl">
           How NurseDex works
         </h2>
@@ -286,7 +286,7 @@ function Step({
 function FinalCTAs() {
   return (
     <section className="border-sage-light/40 border-t bg-white">
-      <div className="mx-auto max-w-6xl px-6 py-16">
+      <div className="max-w-site mx-auto px-6 py-16">
         <div className="grid gap-4 sm:grid-cols-2">
           <Card className="border-teal/20">
             <CardContent className="flex flex-1 flex-col gap-3 pt-6">

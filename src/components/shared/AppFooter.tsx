@@ -11,7 +11,7 @@ export function AppFooter({ className }: { className?: string }) {
     <footer
       className={`border-sage-light/50 bg-warm-white border-t px-6 py-6 ${className ?? ""}`}
     >
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
+      <div className="max-w-site mx-auto flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
         <div className="font-body text-soft-black-light flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-xs">
           <span>&copy; {year} NurseDex LLC</span>
           <Link

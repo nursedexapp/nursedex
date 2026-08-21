@@ -6,7 +6,7 @@ export function Footer() {
 
   return (
     <footer className="border-sage-light/50 bg-warm-white border-t px-6 py-12">
-      <div className="mx-auto max-w-6xl text-center">
+      <div className="max-w-site mx-auto text-center">
         <Link href="/" className="font-heading text-teal text-2xl">
           NurseDex
         </Link>
