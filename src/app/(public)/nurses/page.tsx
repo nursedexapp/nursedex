@@ -234,7 +234,12 @@ function AnonSignupBanner() {
   return (
     <div className="border-teal/30 bg-teal/5 mb-6 rounded-xl border p-4 text-sm">
       <p className="text-soft-black">
-        <Link href="/signup" className="text-teal font-medium hover:underline">
+        {/* teal-dark, not teal: on this tinted panel the lighter one measures
+            4.36:1 on the rendered page, under the 4.5:1 text floor (#778). */}
+        <Link
+          href="/signup"
+          className="text-teal-dark font-medium hover:underline"
+        >
           Create a free account
         </Link>{" "}
         to save nurses, message them, and see full profiles.

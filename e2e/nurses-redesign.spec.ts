@@ -162,7 +162,10 @@ const CONTRAST_PROBE = `() => {
     return base;
   };
   const out = [];
-  for (const el of document.querySelectorAll('article *, [data-results-summary] *')) {
+  // The WHOLE main region, not just the cards. A probe scoped to articles
+  // answers only for articles: the one element on this page that fell under
+  // the floor was the signup banner's link, outside every card (#778).
+  for (const el of document.querySelectorAll('main *')) {
     const hasOwnText = [...el.childNodes].some(
       (n) => n.nodeType === 3 && n.textContent.trim(),
     );
@@ -219,10 +222,13 @@ for (const size of WIDTHS) {
         ratio: number;
       }[];
 
-      // A probe that found nothing would report perfect contrast.
-      expect(measured.length, "nothing measurable on the page").toBeGreaterThan(
-        3,
-      );
+      // A probe that found nothing would report perfect contrast. The real
+      // page carries over a hundred pieces of text, so a handful means the
+      // probe is looking at the wrong thing.
+      expect(
+        measured.length,
+        "too little measurable text; the probe is probably scoped wrong",
+      ).toBeGreaterThan(20);
 
       const failures = measured
         .filter((m) => m.ratio < 4.5)

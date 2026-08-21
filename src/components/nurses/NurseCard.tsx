@@ -8,6 +8,7 @@ import { SaveHeartButton } from "./SaveHeartButton";
 import {
   availabilityLabel,
   careTypeLabel,
+  distanceLabel,
   credentialLine,
   displayName,
   lockedFooterLabel,
@@ -63,6 +64,7 @@ export function NurseCard({
   const credential = credentialLine(nurse);
   const careType = careTypeLabel(nurse);
   const town = townLabel(nurse);
+  const distance = distanceLabel(nurse);
   const showUnavailable = !nurse.is_available;
 
   // Signed out cards arrive with these blanked in the data, so the footer is
@@ -147,18 +149,13 @@ export function NurseCard({
         )}
 
         {/* Town and distance */}
-        {(town || nurse.distance_miles !== null) && (
+        {(town || distance) && (
           <p className="text-soft-black-light flex flex-wrap items-center gap-x-2 text-sm">
             <span className="inline-flex items-center gap-1">
               <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
               {town ?? "Town not listed"}
             </span>
-            {nurse.distance_miles !== null && (
-              <span>
-                {nurse.distance_miles}{" "}
-                {nurse.distance_miles === 1 ? "mile" : "miles"} away
-              </span>
-            )}
+            {distance && <span>{distance}</span>}
           </p>
         )}
 

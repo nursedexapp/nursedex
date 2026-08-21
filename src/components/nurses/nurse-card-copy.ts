@@ -74,6 +74,20 @@ export function careTypeLabel(nurse: NurseSearchCard): string | null {
   return CARE_TYPE_LABELS[value as CareType] ?? value;
 }
 
+/**
+ * How far away, in words, or null when there is no distance to state.
+ *
+ * distance_miles is rounded, so 0 means "under half a mile", not "exactly
+ * here". Printing "0 miles away" states something that is not true and reads
+ * as a bug to anyone who sees it.
+ */
+export function distanceLabel(nurse: NurseSearchCard): string | null {
+  const miles = nurse.distance_miles;
+  if (miles === null) return null;
+  if (miles === 0) return "Less than a mile away";
+  return `${miles} ${miles === 1 ? "mile" : "miles"} away`;
+}
+
 /** Town and state, or null when we could not place the nurse's zip. */
 export function townLabel(nurse: NurseSearchCard): string | null {
   if (!nurse.city) return null;
