@@ -1,7 +1,7 @@
 export default function NursesLoading() {
   return (
     <div className="flex flex-1 flex-col">
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
+      <main className="max-w-site mx-auto w-full flex-1 px-6 py-6">
         <div className="bg-sage/15 mb-4 h-8 w-48 animate-pulse rounded" />
         <div className="bg-sage/10 mb-6 h-4 w-72 animate-pulse rounded" />
 
@@ -18,7 +18,7 @@ export default function NursesLoading() {
           ))}
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <NurseCardSkeleton key={i} />
           ))}

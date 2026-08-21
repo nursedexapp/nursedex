@@ -9,14 +9,29 @@ export interface RankableNurse {
 }
 
 /**
- * Ranking tuple, compared left-to-right. Higher number wins.
+ * The ranking criteria, in the order they are compared, in words.
  *
- * 1. Featured tier
- * 2. Has photo
- * 3. Comm preference match (if viewer has one)
- * 4. Review count
- * 5. Avg rating (0 if null)
- * 6. Profile completeness
+ * Anything that TELLS a family how results are ordered reads from here rather
+ * than restating it, so a caption cannot claim an order the code does not use.
+ * The mockup's "Most complete profiles first" was exactly that: completeness
+ * is the LAST criterion, consulted only on an exact tie of everything above
+ * it (#777).
+ *
+ * Entries marked conditional do not apply to every viewer, so a sentence built
+ * for everyone may only use the unconditional ones.
+ */
+export const RANKING_CRITERIA = [
+  { phrase: "featured nurses", conditional: false },
+  { phrase: "nurses with a photo", conditional: false },
+  { phrase: "a match on how you prefer to be contacted", conditional: true },
+  { phrase: "more reviews", conditional: false },
+  { phrase: "a higher rating", conditional: false },
+  { phrase: "more complete profiles", conditional: false },
+] as const;
+
+/**
+ * Ranking tuple, compared left-to-right. Higher number wins, in the order
+ * RANKING_CRITERIA names.
  */
 export function rankingScore(
   n: RankableNurse,
