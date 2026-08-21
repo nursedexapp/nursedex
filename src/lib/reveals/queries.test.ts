@@ -33,6 +33,10 @@ function profileRow(userId: string, lastName: string) {
     profile_completeness: 50,
     years_experience: 4,
     verification_status: "verified",
+    bio: "Ten years with medically complex children.",
+    rate_min: 32,
+    rate_max: 48,
+    availability_commitment: ["part_time"],
     users: {
       first_name: "Jane",
       last_name: lastName,
@@ -55,9 +59,32 @@ vi.mock("@/lib/supabase/service-role", () => ({
   }),
 }));
 
+const ZIP_ROWS: Record<
+  string,
+  { city: string; state: string; latitude: number; longitude: number }
+> = {
+  "11779": {
+    city: "Ronkonkoma",
+    state: "NY",
+    latitude: 40.8151,
+    longitude: -73.1279,
+  },
+};
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
-    from: () => createQueryBuilder({ then: () => ({ data: state.reveals }) }),
+    from: (table: string) =>
+      createQueryBuilder(
+        table === "zip_codes"
+          ? {
+              in: (_column: unknown, zips: unknown) => ({
+                data: (zips as string[])
+                  .filter((z) => z in ZIP_ROWS)
+                  .map((z) => ({ zip: z, ...ZIP_ROWS[z] })),
+              }),
+            }
+          : { then: () => ({ data: state.reveals }) },
+      ),
   }),
 }));
 
@@ -166,5 +193,31 @@ describe("getRevealedNurses expiry", () => {
       revealed_at: "2026-03-01T00:00:00Z",
       access_expires_at: STILL_ACTIVE,
     });
+  });
+});
+
+describe("getRevealedNurses card fields", () => {
+  beforeEach(() => {
+    state.reveals = [
+      {
+        nurse_user_id: "active-nurse",
+        revealed_at: "2026-03-01T00:00:00Z",
+        access_expires_at: null,
+      },
+    ];
+    state.profiles = [profileRow("active-nurse", "Rodriguez")];
+  });
+
+  it("carries the town from the nurse's zip", async () => {
+    const [card] = await getRevealedNurses("family-1");
+    expect(card.city).toBe("Ronkonkoma");
+    expect(card.state).toBe("NY");
+  });
+
+  it("carries bio, rate and availability for the signed in family", async () => {
+    const [card] = await getRevealedNurses("family-1");
+    expect(card.bio).toBe("Ten years with medically complex children.");
+    expect(card.rate_min).toBe(32);
+    expect(card.availability_commitment).toEqual(["part_time"]);
   });
 });

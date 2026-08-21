@@ -13,13 +13,30 @@ import { parseSearchParams } from "./search-params";
 // viewerZip. A test that supplies viewerZip directly passes while the page
 // stays broken, because supplying it is precisely what the page fails to do.
 
-const ZIP_ROWS: Record<string, { latitude: number; longitude: number }> = {
-  // Ronkonkoma, NY
-  "11779": { latitude: 40.8151, longitude: -73.1279 },
-  // Islip, NY, about 5 miles away
-  "11751": { latitude: 40.7301, longitude: -73.2107 },
-  // Buffalo, NY, about 300 miles away
-  "14201": { latitude: 42.8925, longitude: -78.8797 },
+const ZIP_ROWS: Record<
+  string,
+  { city: string; state: string; latitude: number; longitude: number }
+> = {
+  "11779": {
+    city: "Ronkonkoma",
+    state: "NY",
+    latitude: 40.8151,
+    longitude: -73.1279,
+  },
+  // About 5 miles from Ronkonkoma.
+  "11751": {
+    city: "Islip",
+    state: "NY",
+    latitude: 40.7301,
+    longitude: -73.2107,
+  },
+  // About 300 miles away.
+  "14201": {
+    city: "Buffalo",
+    state: "NY",
+    latitude: 42.8925,
+    longitude: -78.8797,
+  },
 };
 
 const state: { profiles: unknown[] } = { profiles: [] };
@@ -41,6 +58,10 @@ function profileRow(userId: string, zip: string | null) {
     profile_completeness: 50,
     years_experience: 4,
     verification_status: "verified",
+    bio: "Ten years with medically complex children.",
+    rate_min: 32,
+    rate_max: 48,
+    availability_commitment: ["part_time"],
     users: {
       first_name: "Jane",
       last_name: "Rodriguez",
@@ -95,6 +116,7 @@ describe("distance filter for a logged out visitor", () => {
     const result = await searchNurses({
       filters: filters({ zip: "11779", distance: "25" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.items.map((n) => n.user_id)).toEqual(["near-nurse"]);
     expect(result.totalFull).toBe(1);
@@ -104,6 +126,7 @@ describe("distance filter for a logged out visitor", () => {
     const result = await searchNurses({
       filters: filters({ zip: "11779", distance: "25" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.items[0].distance_miles).toBeGreaterThan(0);
     expect(result.items[0].distance_miles).toBeLessThan(25);
@@ -113,6 +136,7 @@ describe("distance filter for a logged out visitor", () => {
     const result = await searchNurses({
       filters: filters({ zip: "11779", distance: "400" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.items.map((n) => n.user_id).sort()).toEqual([
       "far-nurse",
@@ -124,6 +148,7 @@ describe("distance filter for a logged out visitor", () => {
     const result = await searchNurses({
       filters: filters({ zip: "11779", distance: "25" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.items.map((n) => n.user_id)).not.toContain("far-nurse");
   });
@@ -136,6 +161,7 @@ describe("distance filter for a signed in family", () => {
     const result = await searchNurses({
       filters: filters({ zip: "11779", distance: "25" }),
       viewerZip: "14201",
+      viewerIsSignedIn: true,
     });
     expect(result.items.map((n) => n.user_id)).toEqual(["near-nurse"]);
   });
@@ -144,6 +170,7 @@ describe("distance filter for a signed in family", () => {
     const result = await searchNurses({
       filters: filters({}),
       viewerZip: "11779",
+      viewerIsSignedIn: true,
     });
     const near = result.items.find((n) => n.user_id === "near-nurse");
     expect(near?.distance_miles).toBeGreaterThan(0);
@@ -158,6 +185,7 @@ describe("a zip we cannot locate", () => {
     const result = await searchNurses({
       filters: filters({ zip: "06830", distance: "25" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.items.map((n) => n.user_id).sort()).toEqual([
       "far-nurse",
@@ -169,6 +197,7 @@ describe("a zip we cannot locate", () => {
     const result = await searchNurses({
       filters: filters({ zip: "06830", distance: "25" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.unlocatableZip).toBe("06830");
   });
@@ -177,6 +206,7 @@ describe("a zip we cannot locate", () => {
     const result = await searchNurses({
       filters: filters({ zip: "11779", distance: "25" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.unlocatableZip).toBeNull();
   });
@@ -185,6 +215,7 @@ describe("a zip we cannot locate", () => {
     const result = await searchNurses({
       filters: filters({}),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.unlocatableZip).toBeNull();
   });
@@ -193,6 +224,7 @@ describe("a zip we cannot locate", () => {
     const result = await searchNurses({
       filters: filters({}),
       viewerZip: "06830",
+      viewerIsSignedIn: true,
     });
     expect(result.unlocatableZip).toBe("06830");
   });
@@ -209,6 +241,7 @@ describe("a nurse whose own zip we cannot locate", () => {
     const result = await searchNurses({
       filters: filters({ zip: "11779", distance: "25" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.items.map((n) => n.user_id)).toEqual(["near-nurse"]);
   });
@@ -218,6 +251,7 @@ describe("a nurse whose own zip we cannot locate", () => {
     const result = await searchNurses({
       filters: filters({ zip: "11779" }),
       viewerZip: null,
+      viewerIsSignedIn: true,
     });
     expect(result.items.map((n) => n.user_id)).toEqual(["unlocatable-nurse"]);
     expect(result.items[0].distance_miles).toBeNull();

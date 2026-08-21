@@ -68,6 +68,9 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
     viewerZip,
     viewerCommPref,
     viewerCanSeeIdentity: hasSub,
+    // Signed in of any role, not just a subscribing family: bio, rate and
+    // availability are the free tier's reason to create an account (#773).
+    viewerIsSignedIn: !!user,
   });
 
   if (viewerRevealedIds && viewerRevealedIds.size > 0) {

@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/helpers";
 import {
   NURSE_CARD_COLUMNS,
   attachNurseCardPhotos,
+  attachNurseCardTowns,
   shapeNurseCards,
   toPublicNurseCard,
   type NurseSearchCard,
@@ -73,7 +74,9 @@ export async function getSavedNurses(
 
   // #770 / #771: one shared shaper, with the identity gate inside it, so this
   // producer cannot ship a last name the viewer is not entitled to.
-  const shaped = shapeNurseCards(data, { canSeeIdentity });
+  // The saved list is behind requireRole(FAMILY), so the viewer is signed in
+  // by construction and sees bio, rate and availability (#773).
+  const shaped = shapeNurseCards(data, { canSeeIdentity, canSeeDetails: true });
   const byId = new Map(shaped.map((c) => [c.user_id, c]));
 
   // Iterate saved rows (already newest first) so card order follows saved_at.
@@ -88,7 +91,10 @@ export async function getSavedNurses(
     cards.push(card);
   }
 
-  await attachNurseCardPhotos(cards);
+  await Promise.all([
+    attachNurseCardPhotos(cards),
+    attachNurseCardTowns(cards),
+  ]);
 
   return cards.map(toPublicNurseCard);
 }

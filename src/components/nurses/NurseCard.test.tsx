@@ -13,6 +13,7 @@ function makeNurse(overrides: Partial<NurseSearchCard> = {}): NurseSearchCard {
     slug: "jane-doe-rn",
     first_name: "Jane",
     last_name: "Doe",
+    last_initial: "D",
     credential: "rn",
     primary_care_type: null,
     care_types: [],
@@ -28,6 +29,12 @@ function makeNurse(overrides: Partial<NurseSearchCard> = {}): NurseSearchCard {
     distance_miles: null,
     communication_preference: null,
     years_experience: null,
+    bio: null,
+    rate_min: null,
+    rate_max: null,
+    availability_commitment: [],
+    city: null,
+    state: null,
     ...overrides,
   };
 }
