@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { TiptapDoc } from "@/types/database";
 import { BUCKET, collectImagePaths } from "./images";
+import { readAllRows } from "./read-all-rows";
 
 /**
  * Every blog-images path referenced by any post (all statuses: drafts and
@@ -11,20 +12,38 @@ import { BUCKET, collectImagePaths } from "./images";
 export async function collectReferencedPaths(): Promise<Set<string>> {
   const supabase = createServiceRoleClient();
   const referenced = new Set<string>();
-  const { data, error } = await supabase
-    .from("blog_posts")
-    .select("cover_image_url, content");
 
-  if (error) {
-    // Surface to the caller so it can abort rather than risk deleting
-    // images whose owning posts we failed to read.
-    throw new Error(`failed to read posts: ${error.message}`);
-  }
-
-  for (const row of (data ?? []) as {
+  // Paginated and completeness-checked on purpose (#745). This used to be a
+  // single unbounded select, which PostgREST caps. Past that cap it returned a
+  // healthy-looking SUBSET with no error at all, every post missing from it
+  // looked unreferenced, and the nightly sweep below would have permanently
+  // deleted those images. Storage deletion has no undo, so the read that drives
+  // it either proves it is complete or throws.
+  const rows = await readAllRows<{
     cover_image_url: string | null;
     content: TiptapDoc | null;
-  }[]) {
+  }>(async (from, to) => {
+    const { data, error, count } = await supabase
+      .from("blog_posts")
+      .select("cover_image_url, content", { count: "exact" })
+      .range(from, to);
+
+    if (error) {
+      // Surface to the caller so it can abort rather than risk deleting
+      // images whose owning posts we failed to read.
+      throw new Error(`failed to read posts: ${error.message}`);
+    }
+
+    return {
+      rows: (data ?? []) as {
+        cover_image_url: string | null;
+        content: TiptapDoc | null;
+      }[],
+      total: count,
+    };
+  });
+
+  for (const row of rows) {
     for (const p of collectImagePaths(row)) referenced.add(p);
   }
   return referenced;
@@ -49,8 +68,14 @@ export async function listAllBlogImages(): Promise<
         .from(BUCKET)
         .list(prefix, { limit: PAGE, offset });
       if (error) {
-        console.error("[blog] image GC list failed:", error.message);
-        return;
+        // Throw rather than return. Returning left `out` PARTIAL, and a partial
+        // object list is indistinguishable from a bucket that genuinely holds
+        // fewer files. That direction happens to be the safe one for deletion
+        // (fewer candidates), but it silently under-reports the bucket to every
+        // other caller and reads as a complete answer (#745).
+        throw new Error(
+          `failed to list ${BUCKET} under "${prefix}": ${error.message}`,
+        );
       }
       if (!data || data.length === 0) return;
       for (const entry of data) {

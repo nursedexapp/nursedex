@@ -36,6 +36,35 @@ beforeEach(() => {
 });
 
 describe("blog-image-gc cron", () => {
+  // #745. The listing used to swallow a storage error and return a PARTIAL
+  // list, which reads as a smaller bucket rather than as a failure. It now
+  // throws. What matters is not that it throws but what does NOT happen next:
+  // nothing may be deleted on the strength of a read that failed.
+  it("deletes nothing when the object listing fails", async () => {
+    h.collectReferencedPaths.mockResolvedValue(new Set<string>());
+    h.listAllBlogImages.mockRejectedValue(new Error("storage list failed"));
+
+    const res = await GET(req);
+
+    expect(h.remove).not.toHaveBeenCalled();
+    expect(res.status).not.toBe(200);
+  });
+
+  // The sibling failure, kept distinct on purpose: a posts read that fails and
+  // a listing that fails are different causes with different remedies, and each
+  // must independently stop the deletion.
+  it("deletes nothing when the posts read fails", async () => {
+    h.collectReferencedPaths.mockRejectedValue(new Error("read failed"));
+    h.listAllBlogImages.mockResolvedValue([
+      { path: "blog/2026/orphan.jpg", createdAt: OLD },
+    ]);
+
+    const res = await GET(req);
+
+    expect(h.remove).not.toHaveBeenCalled();
+    expect(res.status).not.toBe(200);
+  });
+
   // Previously this test stubbed verifyCronAuth and asserted the route returned
   // the stub's own 401 object: circular, and blind to the real secret check.
   describeCronAuthGuard({
