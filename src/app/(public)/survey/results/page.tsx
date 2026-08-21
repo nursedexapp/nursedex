@@ -29,6 +29,12 @@ export default async function SurveyResultsPage({
   const raw = await searchParams;
   const filters = parseSearchParams(raw);
 
+  // The viewer has to be known BEFORE the search, not after: the cards are
+  // shaped with bio, rate and availability blanked for a logged out visitor,
+  // and a blanked card cannot be un-blanked afterward. This page is reached by
+  // logged in families too, which is why it cannot assume anonymous (#773).
+  const viewer = await getCurrentUser();
+
   // First pass, strict filters
   const result = await searchNurses({
     filters,
@@ -36,6 +42,7 @@ export default async function SurveyResultsPage({
     // `filters` and searchNurses measures from it (#769).
     viewerZip: null,
     viewerCommPref: null,
+    viewerIsSignedIn: !!viewer,
   });
 
   const isLowResult = result.totalFull < ZERO_RESULTS_THRESHOLD;
@@ -48,7 +55,6 @@ export default async function SurveyResultsPage({
   // If a family is logged in and reached results, mark survey_completed so
   // the dashboard prompt stops appearing. Fire-and-forget; failures don't
   // block the page.
-  const viewer = await getCurrentUser();
   if (viewer?.role === "family") {
     const supabase = await createClient();
     await supabase

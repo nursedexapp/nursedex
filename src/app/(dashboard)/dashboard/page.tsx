@@ -51,6 +51,9 @@ export default async function DashboardPage() {
           filters: parseSearchParams(new URLSearchParams()),
           viewerZip: user.zip_code ?? null,
           viewerCommPref: user.communication_preference ?? null,
+          // Behind requireAuth, so the viewer is signed in by construction and
+          // sees bio, rate and availability (#773).
+          viewerIsSignedIn: true,
         }),
         getActiveSubscription(user.id, "family_access"),
       ]);
