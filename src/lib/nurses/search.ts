@@ -31,10 +31,21 @@ export interface SearchResult {
   page: number;
   totalPages: number;
   hitResultCap: boolean;
+  // The origin zip we were asked to measure from and could not find in
+  // zip_codes, or null when there was nothing to locate or we located it.
+  // When set, no card carries a distance and any distance constraint was
+  // ignored rather than silently emptying the results (#769). The page has to
+  // say so: "we could not locate 06830" is honest, returning zero is not.
+  unlocatableZip: string | null;
 }
 
 export interface SearchOptions {
   filters: SearchFilters;
+  // The viewer's own profile zip, used only as the fallback origin when they
+  // have typed no zip of their own. The typed zip always wins: it is the one
+  // the box on screen is labelled with. Callers must not pre-resolve this
+  // themselves, which is how /nurses and /survey/results came to disagree
+  // about which zip a distance was measured from (#769).
   viewerZip?: string | null;
   viewerCommPref?: string | null;
   // Nurse user_ids the viewing family has already revealed. When set, those
@@ -59,9 +70,19 @@ export async function searchNurses(
     viewerCanSeeIdentity = false,
   } = options;
 
+  // One origin zip, derived here rather than by each caller.
+  const originZip = filters.zip ?? viewerZip ?? null;
+
   const fullRaw = await runQuery(filters, viewerCanSeeIdentity);
-  const fullWithDistance = await enrichWithDistance(fullRaw, viewerZip ?? null);
-  const fullAfterDistance = applyDistanceFilter(fullWithDistance, filters);
+  const { cards: fullWithDistance, originResolved } = await enrichWithDistance(
+    fullRaw,
+    originZip,
+  );
+  const fullAfterDistance = applyDistanceFilter(
+    fullWithDistance,
+    filters,
+    originResolved,
+  );
   let fullRanked = rankCards(fullAfterDistance, viewerCommPref ?? null);
 
   // Mark nurses the family already revealed and sink them below the rest,
@@ -87,7 +108,7 @@ export async function searchNurses(
       partials = await getPartialMatches({
         filters,
         canSeeIdentity: viewerCanSeeIdentity,
-        viewerZip: viewerZip ?? null,
+        originZip,
         viewerCommPref: viewerCommPref ?? null,
         excludeUserIds: items.map((n) => n.user_id),
         limit: slotsToFill,
@@ -111,6 +132,7 @@ export async function searchNurses(
     page,
     totalPages,
     hitResultCap: fullRaw.length >= SQL_FETCH_CAP,
+    unlocatableZip: originZip && !originResolved ? originZip : null,
   };
 }
 
@@ -202,50 +224,83 @@ async function runQuery(
 
 // ── Distance ──────────────────────────────────────────────────
 
+/**
+ * Result of trying to measure every card from one origin zip.
+ *
+ * `originResolved` separates "we found the origin and measured" from "we could
+ * not find it, so no card has a distance". Those look identical on the cards
+ * themselves, and treating them the same is what let a distance filter drop
+ * every row in silence (#769).
+ */
+interface DistanceResult {
+  cards: InternalNurseCard[];
+  originResolved: boolean;
+}
+
 async function enrichWithDistance(
   nurses: InternalNurseCard[],
-  viewerZip: string | null,
-): Promise<InternalNurseCard[]> {
-  if (!viewerZip || nurses.length === 0) return nurses;
+  originZip: string | null,
+): Promise<DistanceResult> {
+  // Nothing to locate is not the same as failing to locate something.
+  if (!originZip) return { cards: nurses, originResolved: true };
+  if (nurses.length === 0) return { cards: nurses, originResolved: true };
 
   const nurseZips = Array.from(
     new Set(nurses.map((n) => n.zip_code).filter((z): z is string => !!z)),
   );
-  if (nurseZips.length === 0) return nurses;
 
   const supabase = await createClient();
-  const { data: zipRows } = await supabase
+  const { data: zipRows, error } = await supabase
     .from("zip_codes")
     .select("zip, latitude, longitude")
-    .in("zip", [viewerZip, ...nurseZips]);
-  if (!zipRows || zipRows.length === 0) return nurses;
+    .in("zip", [originZip, ...nurseZips]);
 
-  const viewerLoc = zipRows.find((z) => z.zip === viewerZip);
-  if (!viewerLoc) return nurses;
+  if (error) {
+    console.error("zip_codes lookup failed:", error.message);
+    return { cards: nurses, originResolved: false };
+  }
+
+  const originLoc = (zipRows ?? []).find((z) => z.zip === originZip);
+  if (!originLoc) return { cards: nurses, originResolved: false };
 
   const coordByZip = new Map(
-    zipRows.map((z) => [z.zip, { lat: z.latitude, lng: z.longitude }]),
+    (zipRows ?? []).map((z) => [z.zip, { lat: z.latitude, lng: z.longitude }]),
   );
 
-  return nurses.map((n) => {
+  const cards = nurses.map((n) => {
     if (!n.zip_code) return n;
     const loc = coordByZip.get(n.zip_code);
+    // The nurse's own zip is the missing one here, not the origin. Her card
+    // keeps a null distance and is dropped by a radius filter, because
+    // claiming she is inside a radius nobody measured would be worse.
     if (!loc) return n;
     const miles = haversineMiles(
-      viewerLoc.latitude,
-      viewerLoc.longitude,
+      originLoc.latitude,
+      originLoc.longitude,
       loc.lat,
       loc.lng,
     );
     return { ...n, distance_miles: Math.round(miles) };
   });
+
+  return { cards, originResolved: true };
 }
 
+/**
+ * Keep only nurses inside the requested radius.
+ *
+ * Applied only when the origin actually resolved. With an unresolvable origin
+ * every card carries a null distance, so the filter would reject all of them
+ * and the page would read "no nurses match your filters" for a reason no
+ * family could act on.
+ */
 function applyDistanceFilter(
   nurses: InternalNurseCard[],
   filters: SearchFilters,
+  originResolved: boolean,
 ): InternalNurseCard[] {
-  if (!filters.zip || filters.distance === undefined) return nurses;
+  if (filters.distance === undefined) return nurses;
+  if (!originResolved) return nurses;
   const max = filters.distance;
   return nurses.filter((n) => {
     if (n.distance_miles === null) return false;
@@ -283,7 +338,7 @@ function rankCards(
 interface PartialOptions {
   filters: SearchFilters;
   canSeeIdentity: boolean;
-  viewerZip: string | null;
+  originZip: string | null;
   viewerCommPref: string | null;
   excludeUserIds: string[];
   limit: number;
@@ -295,7 +350,7 @@ async function getPartialMatches(
   const {
     filters,
     canSeeIdentity,
-    viewerZip,
+    originZip,
     viewerCommPref,
     excludeUserIds,
     limit,
@@ -310,7 +365,7 @@ async function getPartialMatches(
     const raw = await runQuery(filters, canSeeIdentity, {
       skipLocation: true,
     });
-    const enriched = await enrichWithDistance(raw, viewerZip);
+    const { cards: enriched } = await enrichWithDistance(raw, originZip);
     const ranked = rankCards(
       enriched.filter((n) => !excluded.has(n.user_id)),
       viewerCommPref,
@@ -324,7 +379,7 @@ async function getPartialMatches(
   const stage2 = await runRelaxedAvailability(
     filters,
     canSeeIdentity,
-    viewerZip,
+    originZip,
     viewerCommPref,
     excluded,
     limit - stage1.length,
@@ -335,7 +390,7 @@ async function getPartialMatches(
 async function runRelaxedAvailability(
   filters: SearchFilters,
   canSeeIdentity: boolean,
-  viewerZip: string | null,
+  originZip: string | null,
   viewerCommPref: string | null,
   excluded: Set<string>,
   limit: number,
@@ -345,7 +400,7 @@ async function runRelaxedAvailability(
     skipLocation: true,
     skipAvailability: true,
   });
-  const enriched = await enrichWithDistance(raw, viewerZip);
+  const { cards: enriched } = await enrichWithDistance(raw, originZip);
   const ranked = rankCards(
     enriched.filter((n) => !excluded.has(n.user_id)),
     viewerCommPref,
