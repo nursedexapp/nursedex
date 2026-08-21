@@ -40,8 +40,13 @@ describe("the site width", () => {
 
   it("is wide enough for four cards across", () => {
     const css = readFileSync("src/app/globals.css", "utf8");
-    const value = css.match(/--container-site:\s*(\d+)px/)?.[1];
-    expect(Number(value)).toBeGreaterThanOrEqual(1400);
+    const match = css.match(/--container-site:\s*(\d+)px/);
+    // Assert the read succeeded before comparing it. An unmatched regex would
+    // otherwise reach the comparison as NaN, which is false against every
+    // threshold: the test would still fail, but it would report the width as
+    // too small rather than saying the token could not be read.
+    expect(match, "--container-site is not declared in px").not.toBeNull();
+    expect(Number(match![1])).toBeGreaterThanOrEqual(1400);
   });
 
   it("puts a four column grid on the feed at the widest breakpoint", () => {
