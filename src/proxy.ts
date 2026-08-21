@@ -53,6 +53,17 @@ function buildCsp(nonce: string): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com`,
+    // Named explicitly so it does NOT fall back to script-src (#761). Sentry's
+    // session replay compresses events in a Web Worker created from a blob URL.
+    // Without this directive the browser falls back to script-src, which does
+    // not permit blob:, so the worker was blocked: every visitor got a console
+    // error on every page and replay was degraded. Measured on production
+    // 2026-08-21.
+    //
+    // Deliberately narrower than the lazy fix. Adding blob: to script-src would
+    // have permitted arbitrary blob SCRIPTS everywhere; this permits blob
+    // WORKERS only, and no remote origin.
+    "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     `img-src 'self' ${SUPABASE_HTTP} data:`,
     "font-src 'self' data:",
