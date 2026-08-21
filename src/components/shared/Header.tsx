@@ -8,7 +8,7 @@ export async function Header() {
 
   return (
     <header className="border-sage-light/50 bg-warm-white border-b">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+      <div className="max-w-site mx-auto flex items-center justify-between px-6 py-3">
         {/* Logo */}
         <Link href="/" className="font-heading text-teal text-xl">
           NurseDex

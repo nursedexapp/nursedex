@@ -5,6 +5,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* ── Layout ────────────────────────────────────────────────── */
+  /* The widest the site's chrome and its widest page ever get. One value, so
+     the header and the directory feed cannot drift apart and leave the logo
+     sitting visibly inside the edges of the card grid (#777, decision D5).
+     1600px lets the nurse grid reach four cards across. */
+  --container-site: 1600px;
+
   /* ── Brand Colors (keep for direct use: bg-teal, text-sage, etc.) ── */
   --color-teal: #2a7b6f;
   --color-teal-dark: #1f5c53;
