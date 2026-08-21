@@ -222,8 +222,10 @@ export function toPublicNurseCard(card: InternalNurseCard): NurseSearchCard {
 /**
  * Sign the first photo of every card that has one, in parallel.
  *
- * A signing failure leaves photo_url null so the card still renders its
- * no-photo state; it is not a reason to drop the nurse.
+ * A signing failure leaves photo_url null, so the card falls back to its
+ * no-photo state rather than dropping the nurse. That fallback is
+ * indistinguishable on screen from a nurse who never uploaded a photo, so the
+ * failure is logged: otherwise a broken bucket looks like an onboarding gap.
  */
 export async function attachNurseCardPhotos(
   cards: InternalNurseCard[],
@@ -233,8 +235,12 @@ export async function attachNurseCardPhotos(
       if (card.photos.length === 0) return;
       try {
         card.photo_url = await getSignedPhotoUrl(card.photos[0]);
-      } catch {
+      } catch (e) {
         card.photo_url = null;
+        console.error(
+          `Could not sign nurse photo ${card.photos[0]}:`,
+          e instanceof Error ? e.message : e,
+        );
       }
     }),
   );

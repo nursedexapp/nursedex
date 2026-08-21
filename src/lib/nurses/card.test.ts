@@ -1,6 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+const signPhoto = vi.fn();
+vi.mock("@/lib/profile/photos", () => ({
+  getSignedPhotoUrl: (path: string) => signPhoto(path),
+}));
+
 import {
   NURSE_CARD_COLUMNS,
+  attachNurseCardPhotos,
   NURSE_CARD_ROW_KEYS,
   NURSE_CARD_USER_KEYS,
   shapeNurseCard,
@@ -209,5 +216,77 @@ describe("shapeNurseCards", () => {
     expect(() => shapeNurseCards([row], { canSeeIdentity: false })).toThrow(
       /missing column\(s\): slug/,
     );
+  });
+});
+
+describe("attachNurseCardPhotos", () => {
+  let logged: unknown[][];
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logged = [];
+    signPhoto.mockReset();
+    errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...args: unknown[]) => {
+        logged.push(args);
+      });
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  it("signs the first photo of every card that has one", async () => {
+    signPhoto.mockImplementation((path: string) => `signed:${path}`);
+    const cards = [
+      shapeNurseCard(rawRow({ user_id: "a", photos: ["a/1.jpg"] }), {
+        canSeeIdentity: true,
+      }),
+      shapeNurseCard(rawRow({ user_id: "b", photos: [] }), {
+        canSeeIdentity: true,
+      }),
+    ];
+    await attachNurseCardPhotos(cards);
+    expect(cards[0].photo_url).toBe("signed:a/1.jpg");
+    expect(cards[1].photo_url).toBeNull();
+    expect(logged).toEqual([]);
+  });
+
+  // A signing failure and a nurse who never uploaded a photo look identical on
+  // the card, so the failure has to say so somewhere. Without this a broken
+  // bucket reads as an onboarding gap.
+  it("leaves the card usable but reports a signing failure", async () => {
+    signPhoto.mockRejectedValue(new Error("bucket unreachable"));
+    const cards = [
+      shapeNurseCard(rawRow({ photos: ["nurse-1/1.jpg"] }), {
+        canSeeIdentity: true,
+      }),
+    ];
+    await attachNurseCardPhotos(cards);
+    expect(cards[0].photo_url).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0][0])).toContain("nurse-1/1.jpg");
+    expect(String(logged[0][1])).toContain("bucket unreachable");
+  });
+
+  // One failing photo must not cost the other nurses their photos.
+  it("still signs the other cards when one fails", async () => {
+    signPhoto.mockImplementation((path: string) => {
+      if (path === "bad/1.jpg") return Promise.reject(new Error("nope"));
+      return Promise.resolve(`signed:${path}`);
+    });
+    const cards = [
+      shapeNurseCard(rawRow({ user_id: "bad", photos: ["bad/1.jpg"] }), {
+        canSeeIdentity: true,
+      }),
+      shapeNurseCard(rawRow({ user_id: "good", photos: ["good/1.jpg"] }), {
+        canSeeIdentity: true,
+      }),
+    ];
+    await attachNurseCardPhotos(cards);
+    expect(cards[0].photo_url).toBeNull();
+    expect(cards[1].photo_url).toBe("signed:good/1.jpg");
+    expect(logged).toHaveLength(1);
   });
 });
