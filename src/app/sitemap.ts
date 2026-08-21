@@ -25,6 +25,7 @@ const STATIC_PAGES: Array<{
   { path: "/contact", changeFrequency: "yearly", priority: 0.4 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.3 },
   { path: "/terms", changeFrequency: "yearly", priority: 0.3 },
+  { path: "/attributions", changeFrequency: "yearly", priority: 0.2 },
   { path: "/survey", changeFrequency: "monthly", priority: 0.6 },
 ];
 
@@ -48,15 +49,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let nurseEntries: MetadataRoute.Sitemap = [];
   try {
     const supabase = createServiceRoleClient();
-    const nurseQuery = supabase
-      .from("nurse_profiles")
-      .select(
-        `
+    const nurseQuery = supabase.from("nurse_profiles").select(
+      `
         slug,
         updated_at,
         users!inner ( is_deleted, is_suspended )
       `,
-      );
+    );
     const { data } = await applyVisibleNurseFilter(nurseQuery);
 
     type Row = {

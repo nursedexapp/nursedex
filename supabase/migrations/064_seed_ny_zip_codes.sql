@@ -1,11 +1,33 @@
 -- ============================================================
--- Seed Data
+-- Seed the full New York zip list
 -- ============================================================
-
--- BEGIN GENERATED zip_codes
--- Rendered from data/ny_zip_codes.csv by scripts/generate-zip-seed.ts.
--- Do not edit by hand: supabase/config.toml points db reset at this file,
--- so it and migration 064_seed_ny_zip_codes.sql must agree (#772).
+--
+-- GENERATED FILE. Edit data/ny_zip_codes.csv and run
+--   npx tsx scripts/generate-zip-seed.ts
+-- This file and the matching block in supabase/seed.sql are both rendered
+-- from that CSV, so a migration-only change can no longer leave every
+-- locally reset database on the old rows (#772).
+--
+-- Source: GeoNames postal code data (2154 rows), licensed CC BY 4.0.
+-- Attribution ships to users on /attributions. GeoNames was chosen over the
+-- Census gazetteer, which is public domain and needs no attribution, because
+-- the gazetteer carries neither a county (zip_codes.county is NOT NULL) nor a
+-- place name, and the place name is what the directory shows families as a
+-- nurse's town.
+--
+-- 4 rows are carried over from the launch seed instead, because
+-- GeoNames has no entry for them: they are PO box only or single recipient
+-- zips, which postal reference datasets routinely omit. That is the shape of
+-- the residual gap, measured rather than assumed: 4 of the 218 zips this
+-- product had already seeded (1.8%) are absent from GeoNames. Expect a
+-- comparable share of New York's PO box zips to be missing. A zip we hold no
+-- coordinates for is not silently dropped from search: the page says it could
+-- not locate it and ignores the distance constraint (#769).
+--
+-- ON CONFLICT DO NOTHING, never DO UPDATE. The 218 launch rows carry hand-set
+-- coordinates and 21 of them sit more than three miles from the GeoNames
+-- centroid for the same zip. Overwriting them would move existing families'
+-- saved distance searches. Changing them is a separate decision.
 
 INSERT INTO public.zip_codes (zip, latitude, longitude, city, county, state) VALUES
   ('00501', 40.8154, -73.0451, 'Holtsville', 'Suffolk', 'NY'),
@@ -2168,14 +2190,15 @@ INSERT INTO public.zip_codes (zip, latitude, longitude, city, county, state) VAL
   ('14905', 42.0869, -76.8397, 'Elmira', 'Chemung', 'NY')
 ON CONFLICT (zip) DO NOTHING;
 
--- END GENERATED zip_codes
-
--- NY State License Verification URLs
-
-INSERT INTO public.license_verification_urls (credential, state, url, display_name) VALUES
-  ('hha', 'NY', 'https://www.health.ny.gov/professionals/home_health_aides/', 'NY Department of Health'),
-  ('cna', 'NY', 'https://www.health.ny.gov/professionals/nursing_home_administrator/narse.htm', 'NY Nurse Aide Registry'),
-  ('lpn', 'NY', 'http://www.op.nysed.gov/opsearches.htm', 'NY State Education Department'),
-  ('rn', 'NY', 'http://www.op.nysed.gov/opsearches.htm', 'NY State Education Department'),
-  ('np', 'NY', 'http://www.op.nysed.gov/opsearches.htm', 'NY State Education Department')
-ON CONFLICT (credential, state) DO NOTHING;
+DO $$
+DECLARE
+  seeded integer;
+BEGIN
+  SELECT count(*) INTO seeded FROM public.zip_codes WHERE state = 'NY';
+  IF seeded < 2158 THEN
+    RAISE EXCEPTION
+      'zip_codes holds % New York rows, expected at least 2158. The seed did not land.',
+      seeded;
+  END IF;
+END
+$$;
