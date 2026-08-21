@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Input } from "@/components/ui/input";
+import { useTransition } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { DebouncedFilterInput, parseFilterInt } from "./DebouncedFilterInput";
+import { useApplyFilters } from "./useApplyFilters";
 import {
   CREDENTIAL_LABELS,
   CARE_TYPE_LABELS,
@@ -23,7 +23,6 @@ import {
 } from "@/types/enums";
 import {
   GENDER_FILTER_ANY,
-  toURLSearchParams,
   type SearchFilters,
   type GenderFilter,
 } from "@/lib/nurses/search-params";
@@ -53,28 +52,23 @@ export function FilterPanel({
   initialFilters,
   onAfterChange,
 }: FilterPanelProps) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const { apply: applyToUrl, clearAll: clearAllInUrl } = useApplyFilters();
 
+  // Merges over the URL as it stands at the moment of the click, not over
+  // initialFilters, which is a prop from the last completed server render.
+  // The panel is no longer disabled while a transition is in flight, so a
+  // second change made before the first resolves has to build on it (#775).
   const apply = (next: Partial<SearchFilters>) => {
-    // Always reset page to 1 on filter change, the new result set likely
-    // has a different size than the previous one.
-    const merged: Partial<SearchFilters> = {
-      ...initialFilters,
-      ...next,
-      page: 1,
-    };
-    const params = toURLSearchParams(merged);
-    const query = params.toString();
     startTransition(() => {
-      router.replace(query ? `/nurses?${query}` : "/nurses", { scroll: false });
+      applyToUrl(next);
       onAfterChange?.();
     });
   };
 
   const clearAll = () => {
     startTransition(() => {
-      router.replace("/nurses", { scroll: false });
+      clearAllInUrl();
       onAfterChange?.();
     });
   };
@@ -85,12 +79,7 @@ export function FilterPanel({
       : [...current, value];
 
   return (
-    <div
-      className={cn(
-        "space-y-6 text-sm",
-        isPending && "pointer-events-none opacity-70",
-      )}
-    >
+    <div className={cn("space-y-6 text-sm", isPending && "opacity-70")}>
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-soft-black text-base font-medium">
           Filters
@@ -388,89 +377,6 @@ export function FilterPanel({
         </Button>
       </div>
     </div>
-  );
-}
-
-const COMMIT_DELAY_MS = 400;
-
-const parseFilterInt = (raw: string): number | undefined => {
-  const trimmed = raw.trim();
-  if (trimmed === "") return undefined;
-  const parsed = Number.parseInt(trimmed, 10);
-  return Number.isNaN(parsed) ? undefined : parsed;
-};
-
-// Free text filter inputs cannot be controlled directly by the URL state:
-// every keystroke starts a router transition, and the re-render that follows
-// would reset the input to the stale URL value, eating fast keystrokes
-// (e.g. the second digit of "15 years"). The typed text lives in local state
-// and is committed to the URL after a short pause.
-function DebouncedFilterInput({
-  value,
-  onCommit,
-  sanitize,
-  renderHint,
-  ...inputProps
-}: {
-  value: string;
-  onCommit: (raw: string) => void;
-  sanitize?: (raw: string) => string;
-  renderHint?: (text: string) => React.ReactNode;
-} & Omit<React.ComponentProps<typeof Input>, "value" | "onChange">) {
-  const [text, setText] = useState(value);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const commitPendingRef = useRef(false);
-  const lastValueRef = useRef(value);
-  const onCommitRef = useRef(onCommit);
-
-  useEffect(() => {
-    onCommitRef.current = onCommit;
-  }, [onCommit]);
-
-  // Adopt external URL changes (clear all, back/forward navigation) unless
-  // the user has an uncommitted edit in flight.
-  useEffect(() => {
-    if (value !== lastValueRef.current) {
-      lastValueRef.current = value;
-      if (!commitPendingRef.current) setText(value);
-    }
-  }, [value]);
-
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
-  const hint = renderHint?.(text);
-  const hintId = inputProps.id ? `${inputProps.id}-hint` : undefined;
-
-  return (
-    <>
-      <Input
-        {...inputProps}
-        aria-describedby={
-          hint && hintId ? hintId : inputProps["aria-describedby"]
-        }
-        value={text}
-        onChange={(e) => {
-          const raw = sanitize ? sanitize(e.target.value) : e.target.value;
-          setText(raw);
-          commitPendingRef.current = true;
-          clearTimeout(timerRef.current);
-          timerRef.current = setTimeout(() => {
-            commitPendingRef.current = false;
-            onCommitRef.current(raw);
-          }, COMMIT_DELAY_MS);
-        }}
-      />
-      {renderHint ? (
-        <p
-          id={hintId}
-          role="status"
-          aria-live="polite"
-          className="text-soft-black-light mt-1 min-h-4 text-xs"
-        >
-          {hint}
-        </p>
-      ) : null}
-    </>
   );
 }
 

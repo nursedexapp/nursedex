@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NurseCard } from "@/components/nurses/NurseCard";
-import { FilterPanel } from "@/components/nurses/FilterPanel";
-import { FilterSheet } from "@/components/nurses/FilterSheet";
+import { FilterChipRow } from "@/components/nurses/FilterChipRow";
 import { SearchAnalytics } from "@/components/nurses/SearchAnalytics";
 import { SearchPagination } from "@/components/nurses/SearchPagination";
 import { SurveyAppliedBanner } from "@/components/nurses/SurveyAppliedBanner";
@@ -98,30 +97,22 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
   return (
     <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-        {/* Title + mobile filter trigger */}
-        <div className="mb-6 flex items-end justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-soft-black text-2xl font-semibold sm:text-3xl">
-              Find a Nurse
-            </h1>
-            <p className="text-soft-black-light mt-1 text-sm">
-              {result.totalFull === 0
-                ? "No nurses match your filters yet."
-                : `${result.totalFull} ${result.totalFull === 1 ? "nurse" : "nurses"} found`}
-            </p>
-          </div>
-          <div className="lg:hidden">
-            <FilterSheet initialFilters={filters} />
-          </div>
+        <div className="mb-5">
+          <h1 className="font-heading text-soft-black text-2xl font-semibold sm:text-3xl">
+            Find a Nurse
+          </h1>
+          <p className="text-soft-black-light mt-1 text-sm">
+            {result.totalFull === 0
+              ? "No nurses match your filters yet."
+              : `${result.totalFull} ${result.totalFull === 1 ? "nurse" : "nurses"} found`}
+          </p>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[240px_minmax(0,1fr)]">
-          {/* Desktop filters */}
-          <aside className="hidden lg:block">
-            <FilterPanel initialFilters={filters} />
-          </aside>
+        <div className="mb-6">
+          <FilterChipRow filters={filters} />
+        </div>
 
-          {/* Results column */}
+        <div>
           <div className="min-w-0">
             {fromSurvey && <SurveyAppliedBanner />}
             <UnlocatableZipNotice

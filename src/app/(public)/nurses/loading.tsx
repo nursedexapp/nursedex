@@ -5,25 +5,23 @@ export default function NursesLoading() {
         <div className="bg-sage/15 mb-4 h-8 w-48 animate-pulse rounded" />
         <div className="bg-sage/10 mb-6 h-4 w-72 animate-pulse rounded" />
 
-        <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-          <aside className="hidden lg:block">
-            <div className="space-y-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-sage/10 h-9 w-full animate-pulse rounded-lg"
-                />
-              ))}
-            </div>
-          </aside>
+        {/* Chip row. Rewritten alongside the sidebar's removal: a skeleton
+            drawing a layout the page no longer has flashes that layout on
+            every navigation (#775). */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {[88, 96, 72, 104, 80, 76, 108, 116].map((w, i) => (
+            <div
+              key={i}
+              className="bg-sage/10 h-8 animate-pulse rounded-full"
+              style={{ width: w }}
+            />
+          ))}
+        </div>
 
-          <div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <NurseCardSkeleton key={i} />
-              ))}
-            </div>
-          </div>
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <NurseCardSkeleton key={i} />
+          ))}
         </div>
       </main>
     </div>
