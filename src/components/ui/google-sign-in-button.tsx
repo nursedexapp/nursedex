@@ -94,7 +94,13 @@ export function GoogleSignInButton() {
         icon={<GoogleMark />}
         idleLabel="Continue with Google"
         workingLabel="Connecting..."
-        className="bg-warm-white border-sage-dark/50 hover:bg-sage-light/30 h-11 w-full text-base font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+        // text-soft-black is not decoration, it is required. The shared Button's
+        // default variant pairs bg-primary with text-primary-foreground, and
+        // that foreground token resolves to warm-white. Overriding only the
+        // background to bg-warm-white therefore left the label painted in its
+        // own background colour: contrast 1.0, invisible (#751). A background
+        // override on this variant must always bring its foreground with it.
+        className="bg-warm-white text-soft-black border-sage-dark/50 hover:bg-sage-light/30 h-11 w-full text-base font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
       />
     </div>
   );
