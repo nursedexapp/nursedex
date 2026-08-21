@@ -13,6 +13,13 @@ import {
 } from "./card";
 
 /**
+ * The most saved nurses one family can have and still be read in one request.
+ * Comfortably above any real list; it exists so that passing it is a loud
+ * failure rather than a quietly shortened set.
+ */
+export const SAVED_LIST_CAP = 900;
+
+/**
  * Return the set of nurse_user_ids the current user has saved, out of a
  * given candidate list. Returns an empty set for non-family or anon viewers.
  */
@@ -40,17 +47,28 @@ export async function getSavedNurseIds(
  * page's ids, so it cannot produce a total. The "Saved only" chip needs the
  * whole set: to count it, and to constrain the query (#776).
  *
+ * Read through the user's own client, not the service role one, so the
+ * saved_nurses_select_own policy (family_user_id = auth.uid()) enforces the
+ * scoping at the database rather than only in this function. The explicit
+ * eq() stays as well: two independent statements of the same constraint, and
+ * the one that cannot be forgotten is the policy.
+ *
  * The family comes from the caller's session, never from the URL. The URL flag
  * only says whether to apply the constraint, never whose saves to apply.
  */
 export async function getAllSavedNurseIds(
   familyUserId: string,
 ): Promise<Set<string>> {
-  const supabase = createServiceRoleClient();
+  const supabase = await createClient();
   const { data, error } = await supabase
     .from("saved_nurses")
     .select("nurse_user_id")
-    .eq("family_user_id", familyUserId);
+    .eq("family_user_id", familyUserId)
+    // PostgREST caps a request at 1,000 rows by default and says nothing when
+    // it truncates. A silently short set would drop saved nurses out of a
+    // Saved only search, so ask for one more than the cap and refuse a
+    // response that reaches it rather than answering with a partial list.
+    .limit(SAVED_LIST_CAP + 1);
 
   if (error) {
     console.error("getAllSavedNurseIds failed:", error.message);
@@ -60,7 +78,14 @@ export async function getAllSavedNurseIds(
     throw new Error(`Could not read saved nurses: ${error.message}`);
   }
 
-  return new Set((data ?? []).map((r) => r.nurse_user_id as string));
+  const rows = data ?? [];
+  if (rows.length > SAVED_LIST_CAP) {
+    throw new Error(
+      `A family has more than ${SAVED_LIST_CAP} saved nurses, which this read cannot return completely.`,
+    );
+  }
+
+  return new Set(rows.map((r) => r.nurse_user_id as string));
 }
 
 /**
