@@ -29,6 +29,33 @@ describe("legacy host check wiring", () => {
     expect(EXECUTABLE).toContain("scripts/check-legacy-host.ts");
   });
 
+  // Shipped broken once (run 32506446037). The SQL was passed positionally as
+  // "$(cat file)", and because the file opens with a `--` comment the CLI read
+  // the leading dashes as a flag, printed its help text, and the check failed
+  // with "Expected a JSON array of rows, got object". Passing the path with
+  // --file removes the class rather than stepping around it by reformatting
+  // the comment.
+  it("passes the SQL by path, not as a string that can start with dashes", () => {
+    const step = EXECUTABLE.slice(EXECUTABLE.indexOf("Legacy Supabase host"));
+    expect(step).toMatch(/--file\s+scripts\/legacy-host\.sql/);
+    expect(step).not.toContain('"$(cat scripts/legacy-host.sql)"');
+  });
+
+  it("keeps the neighbouring positional SQL safe from the same trap", () => {
+    // prod-smoke.sql IS still passed positionally and works only because it
+    // opens with a block comment. Nothing recorded that dependency before this,
+    // so a tidy-up to line comments would have broken production's grants check
+    // with a help dump and no obvious cause.
+    const sql = readFileSync(
+      join(process.cwd(), "scripts/prod-smoke.sql"),
+      "utf8",
+    );
+    const positional = EXECUTABLE.includes('"$(cat scripts/prod-smoke.sql)"');
+    if (positional) {
+      expect(sql.trimStart().startsWith("--")).toBe(false);
+    }
+  });
+
   it("runs even when the grants step above it has already failed", () => {
     // Two independent questions about production share this one job. Without an
     // always() boundary the first failure hides the second, and the run that
