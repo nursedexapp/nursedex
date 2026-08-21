@@ -5,6 +5,7 @@ import { FilterChipRow } from "@/components/nurses/FilterChipRow";
 import { SearchAnalytics } from "@/components/nurses/SearchAnalytics";
 import { SearchPagination } from "@/components/nurses/SearchPagination";
 import { SurveyAppliedBanner } from "@/components/nurses/SurveyAppliedBanner";
+import { SavedListUnavailableNotice } from "@/components/nurses/SavedListUnavailableNotice";
 import { UnlocatableZipNotice } from "@/components/nurses/UnlocatableZipNotice";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { searchNurses } from "@/lib/nurses/search";
@@ -15,6 +16,7 @@ import { logSearchGap } from "@/lib/nurses/search-gap";
 import {
   parseSearchParams,
   isEmptyFilterSet,
+  toURLSearchParams,
 } from "@/lib/nurses/search-params";
 
 export const metadata: Metadata = {
@@ -75,8 +77,22 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
     // Signed in of any role, not just a subscribing family: bio, rate and
     // availability are the free tier's reason to create an account (#773).
     viewerIsSignedIn: !!user,
-    viewerSavedIds,
+    // null means the list could not be read. Passing undefined leaves the
+    // search unconstrained, which is why the page has to say so below.
+    viewerSavedIds: viewerSavedIds ?? undefined,
   });
+
+  // The family asked for Saved only and we could not read their list, so the
+  // results they are looking at are not limited to their saves.
+  const savedFilterNotApplied = filters.saved && viewerSavedIds === null;
+  const withoutSavedHref = (() => {
+    const query = toURLSearchParams({
+      ...filters,
+      saved: false,
+      page: 1,
+    }).toString();
+    return query ? `/nurses?${query}` : "/nurses";
+  })();
 
   if (viewerRevealedIds && viewerRevealedIds.size > 0) {
     for (const c of result.items) c.revealed = viewerRevealedIds.has(c.user_id);
@@ -119,13 +135,17 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
         <div className="mb-6">
           <FilterChipRow
             filters={filters}
-            savedCount={viewerSavedIds?.size ?? null}
+            savedCount={viewerSavedIds ? viewerSavedIds.size : null}
           />
         </div>
 
         <div>
           <div className="min-w-0">
             {fromSurvey && <SurveyAppliedBanner />}
+            <SavedListUnavailableNotice
+              show={savedFilterNotApplied}
+              withoutSavedHref={withoutSavedHref}
+            />
             <UnlocatableZipNotice
               zip={result.unlocatableZip}
               hadDistanceFilter={filters.distance !== undefined}

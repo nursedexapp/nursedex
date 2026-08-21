@@ -55,10 +55,17 @@ export async function getSavedNurseIds(
  *
  * The family comes from the caller's session, never from the URL. The URL flag
  * only says whether to apply the constraint, never whose saves to apply.
+ *
+ * Returns null when the list could not be read completely. That is a third
+ * answer, distinct from an empty set: an empty set would silently widen a
+ * "Saved only" search to every nurse in the state, and throwing would take the
+ * whole directory down for a signed in family over a filter they may not even
+ * be using, since this runs on every load to count the chip. null lets the
+ * page keep showing results and say the filter was not applied.
  */
 export async function getAllSavedNurseIds(
   familyUserId: string,
-): Promise<Set<string>> {
+): Promise<Set<string> | null> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("saved_nurses")
@@ -70,19 +77,20 @@ export async function getAllSavedNurseIds(
     // response that reaches it rather than answering with a partial list.
     .limit(SAVED_LIST_CAP + 1);
 
+  // Two distinct causes, two messages, one answer: the page's remedy is the
+  // same either way, but nobody diagnosing this should have to guess which
+  // happened.
   if (error) {
-    console.error("getAllSavedNurseIds failed:", error.message);
-    // An empty set here would silently widen a "Saved only" search to every
-    // nurse, which is the opposite of what was asked for. Throwing is loud;
-    // the page renders its error boundary rather than a wrong answer.
-    throw new Error(`Could not read saved nurses: ${error.message}`);
+    console.error("Could not read a family's saved nurses:", error.message);
+    return null;
   }
 
   const rows = data ?? [];
   if (rows.length > SAVED_LIST_CAP) {
-    throw new Error(
+    console.error(
       `A family has more than ${SAVED_LIST_CAP} saved nurses, which this read cannot return completely.`,
     );
+    return null;
   }
 
   return new Set(rows.map((r) => r.nurse_user_id as string));

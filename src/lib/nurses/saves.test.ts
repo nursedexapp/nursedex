@@ -196,36 +196,70 @@ describe("getAllSavedNurseIds", () => {
 
   it("returns the family's whole set", async () => {
     userClientRows.rows = [{ nurse_user_id: "a" }, { nurse_user_id: "b" }];
-    expect([...(await getAllSavedNurseIds("family-1"))].sort()).toEqual([
-      "a",
-      "b",
-    ]);
+    const ids = await getAllSavedNurseIds("family-1");
+    expect([...(ids ?? [])].sort()).toEqual(["a", "b"]);
   });
 
   it("returns an empty set for a family with no saves", async () => {
-    expect((await getAllSavedNurseIds("family-1")).size).toBe(0);
+    expect((await getAllSavedNurseIds("family-1"))?.size).toBe(0);
   });
 
-  // An empty set on a failed read would silently widen a Saved only search to
-  // every nurse in the directory, which is the opposite of what was asked.
-  it("throws on a failed read rather than answering with nothing", async () => {
+  // An empty set would silently widen a Saved only search to every nurse in
+  // the directory. null is a third answer: we could not read it. The page can
+  // then keep showing results AND say the Saved filter was not applied, rather
+  // than either lying or erroring the whole directory for a signed in family.
+  it("answers null on a failed read, never an empty set", async () => {
+    const logged: unknown[][] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...a: unknown[]) => {
+        logged.push(a);
+      });
     userClientRows.error = { message: "connection lost" };
-    await expect(getAllSavedNurseIds("family-1")).rejects.toThrow(
-      /connection lost/,
-    );
+    expect(await getAllSavedNurseIds("family-1")).toBeNull();
+    expect(logged.map(String).join(" ")).toContain("connection lost");
+    spy.mockRestore();
   });
 
   // PostgREST caps a request at 1,000 rows and says nothing when it truncates.
-  it("refuses a list that reaches the cap rather than returning a short one", async () => {
+  // A short list is as wrong as no list, so it is the same answer, with its own
+  // message: the remedy is the same but the cause is not.
+  it("answers null when the list reaches the cap, rather than a short one", async () => {
+    const logged: unknown[][] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...a: unknown[]) => {
+        logged.push(a);
+      });
     userClientRows.rows = Array.from(
       { length: SAVED_LIST_CAP + 1 },
-      (_, i) => ({
-        nurse_user_id: `n${i}`,
-      }),
+      (_, i) => ({ nurse_user_id: `n${i}` }),
     );
-    await expect(getAllSavedNurseIds("family-1")).rejects.toThrow(
-      /more than 900 saved nurses/,
+    expect(await getAllSavedNurseIds("family-1")).toBeNull();
+    expect(logged.map(String).join(" ")).toContain("more than 900");
+    spy.mockRestore();
+  });
+
+  it("tells the two failures apart in what it logs", async () => {
+    const logged: string[] = [];
+    const spy = vi
+      .spyOn(console, "error")
+      .mockImplementation((...a: unknown[]) => {
+        logged.push(a.map(String).join(" "));
+      });
+
+    userClientRows.error = { message: "connection lost" };
+    await getAllSavedNurseIds("family-1");
+    userClientRows.error = null;
+    userClientRows.rows = Array.from(
+      { length: SAVED_LIST_CAP + 1 },
+      (_, i) => ({ nurse_user_id: `n${i}` }),
     );
+    await getAllSavedNurseIds("family-1");
+
+    expect(logged).toHaveLength(2);
+    expect(logged[0]).not.toBe(logged[1]);
+    spy.mockRestore();
   });
 
   it("asks for one more row than the cap, so a full list is detectable", async () => {
