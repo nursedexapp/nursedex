@@ -45,10 +45,13 @@ export default async function RevealedPage() {
             const hire = hiresByNurse.get(nurse.user_id) ?? null;
             return (
               <div key={nurse.user_id} className="space-y-3">
-                <div className="relative">
-                  <NurseCard nurse={nurse} showLastName />
-                  {nurse.access_expires_at && (
-                    <div className="absolute top-2 right-2 z-10">
+                <NurseCard
+                  nurse={nurse}
+                  showLastName
+                  // In the card's badge row, not pinned over its top right
+                  // corner, which is where the rating sits (#774).
+                  extraBadge={
+                    nurse.access_expires_at ? (
                       <Badge
                         variant="outline"
                         className="border-amber-200 bg-amber-50 text-amber-900"
@@ -59,9 +62,9 @@ export default async function RevealedPage() {
                           { month: "short", day: "numeric" },
                         )}
                       </Badge>
-                    </div>
-                  )}
-                </div>
+                    ) : null
+                  }
+                />
                 <HireButton
                   nurseUserId={nurse.user_id}
                   nurseFirstName={nurse.first_name}

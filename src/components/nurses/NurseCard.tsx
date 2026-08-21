@@ -32,6 +32,13 @@ interface NurseCardProps {
   // In anonymousMode, show the hover/pointer affordance because an ancestor
   // (e.g. a dialog trigger) handles the click. Does not add a link itself.
   interactive?: boolean;
+  /**
+   * A badge the surrounding page needs on the card, rendered in the card's own
+   * badge row. A slot rather than an overlay: the revealed page used to pin its
+   * "Access until" badge to the top right corner, which on this card is where
+   * the rating sits (#774).
+   */
+  extraBadge?: React.ReactNode;
 }
 
 /**
@@ -48,6 +55,7 @@ export function NurseCard({
   anonymousMode,
   interactive,
   showLastName,
+  extraBadge,
 }: NurseCardProps) {
   const name = displayName(nurse, {
     showLastName: !!showLastName && !anonymousMode,
@@ -99,7 +107,8 @@ export function NurseCard({
         {(careType ||
           nurse.tier === "featured" ||
           showUnavailable ||
-          nurse.revealed) && (
+          nurse.revealed ||
+          extraBadge) && (
           <div className="flex flex-wrap items-center gap-1.5">
             {careType && (
               <Badge
@@ -133,6 +142,7 @@ export function NurseCard({
                 Revealed
               </Badge>
             )}
+            {extraBadge}
           </div>
         )}
 

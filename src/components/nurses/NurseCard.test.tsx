@@ -206,3 +206,51 @@ describe("NurseCard locked footer", () => {
     expect(screen.getByText("Rate not set")).toBeInTheDocument();
   });
 });
+
+// The revealed page needs an "Access until" badge on the card. It used to be
+// pinned to the top right corner, which on this card is where the rating sits.
+describe("NurseCard extra badge", () => {
+  it("renders it in the card's own badge row", () => {
+    render(
+      <NurseCard
+        nurse={makeNurse({ avg_rating: 4.8, review_count: 6 })}
+        extraBadge={<span>Access until Jul 1</span>}
+      />,
+    );
+    expect(screen.getByText("Access until Jul 1")).toBeInTheDocument();
+  });
+
+  it("does not overlap the rating", () => {
+    const { container } = render(
+      <NurseCard
+        nurse={makeNurse({ avg_rating: 4.8, review_count: 6 })}
+        extraBadge={<span data-testid="access">Access until Jul 1</span>}
+      />,
+    );
+    // Nothing on this card is absolutely positioned except the save heart,
+    // which is not rendered here. An overlay would reintroduce the collision.
+    const positioned = [...container.querySelectorAll("*")].filter((el) =>
+      el.className?.toString().includes("absolute"),
+    );
+    expect(positioned).toHaveLength(0);
+  });
+
+  it("draws the badge row for it even when there is nothing else to show", () => {
+    render(
+      <NurseCard
+        nurse={makeNurse({ primary_care_type: null, care_types: [] })}
+        extraBadge={<span>Access until Jul 1</span>}
+      />,
+    );
+    expect(screen.getByText("Access until Jul 1")).toBeVisible();
+  });
+
+  it("draws no badge row when there is nothing at all", () => {
+    const { container } = render(
+      <NurseCard
+        nurse={makeNurse({ primary_care_type: null, care_types: [] })}
+      />,
+    );
+    expect(container.textContent).not.toContain("Access until");
+  });
+});
