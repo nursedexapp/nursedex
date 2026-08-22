@@ -85,7 +85,9 @@ export function FilterChip({
           type="button"
           onClick={onClear}
           aria-label={`Clear ${label}`}
-          className="cursor-pointer rounded-full py-1.5 pr-3 pl-1 text-white/90 hover:text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+          // Full white, not 90%: on the teal chip that measures 5.05:1 rather
+          // than 4.43:1, which clears the text floor as well as the icon one.
+          className="cursor-pointer rounded-full py-1.5 pr-3 pl-1 text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
         >
           <X className="size-3.5" aria-hidden="true" />
         </button>

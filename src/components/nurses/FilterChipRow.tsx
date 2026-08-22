@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, SlidersHorizontal } from "lucide-react";
+import { Heart, SlidersHorizontal, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
@@ -112,7 +112,7 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
           <span
             className={cn(
               "text-xs",
-              filters.saved ? "text-white/90" : "text-soft-black-light",
+              filters.saved ? "text-white" : "text-soft-black-light",
             )}
           >
             ({savedCount})
@@ -247,9 +247,9 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
             type="button"
             onClick={clear(id)}
             aria-label={`Clear ${chipLabel(id, filters)}`}
-            className="cursor-pointer rounded-full py-1.5 pr-3 pl-1 text-white/90 hover:text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+            className="cursor-pointer rounded-full py-1.5 pr-3 pl-1 text-white focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
           >
-            <span aria-hidden="true">&times;</span>
+            <X className="size-3.5" aria-hidden="true" />
           </button>
         </span>
       ))}
