@@ -209,3 +209,34 @@ describe("the Saved only chip", () => {
     ).toBeInTheDocument();
   });
 });
+
+// Both clear controls are the same thing, drawn the same way. One of them used
+// a text times character where the other used an icon, which is an
+// inconsistency a screen reader cannot see and a contrast probe reads as text.
+describe("the clear controls", () => {
+  it("draw an icon, never a text character", () => {
+    const { container } = render(
+      <FilterChipRow
+        filters={parseSearchParams(
+          new URLSearchParams("credential=rn&zip=11779"),
+        )}
+        savedCount={null}
+      />,
+    );
+    expect(container.textContent).not.toContain("\u00d7");
+    // Both chips are applied, so both clear controls are on screen.
+    expect(
+      container.querySelectorAll("svg.lucide-x, svg[class*='lucide-x']").length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("labels each one with what it clears", () => {
+    show("?credential=rn&zip=11779");
+    expect(
+      screen.getByRole("button", { name: /Clear Credential/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Clear Location/ }),
+    ).toBeInTheDocument();
+  });
+});

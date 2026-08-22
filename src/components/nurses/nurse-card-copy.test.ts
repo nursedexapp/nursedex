@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   availabilityLabel,
   careTypeLabel,
+  distanceLabel,
   credentialLine,
   displayName,
   lockedFooterLabel,
@@ -198,5 +199,27 @@ describe("displayName", () => {
     expect(
       displayName(nurse({ last_initial: "" }), { showLastName: false }),
     ).toBe("Jane");
+  });
+});
+
+describe("distanceLabel", () => {
+  it("says nothing when there is no distance", () => {
+    expect(distanceLabel(nurse({ distance_miles: null }))).toBeNull();
+  });
+
+  it("says one mile rather than one miles", () => {
+    expect(distanceLabel(nurse({ distance_miles: 1 }))).toBe("1 mile away");
+  });
+
+  it("counts miles", () => {
+    expect(distanceLabel(nurse({ distance_miles: 17 }))).toBe("17 miles away");
+  });
+
+  // The distance is rounded, so zero means under half a mile, not exactly
+  // here. "0 miles away" states something untrue and reads as a bug.
+  it("does not say zero miles", () => {
+    expect(distanceLabel(nurse({ distance_miles: 0 }))).toBe(
+      "Less than a mile away",
+    );
   });
 });

@@ -18,7 +18,7 @@ export function ResultsSummary({ result }: { result: SearchResult }) {
   const { headline, order, partials } = resultsSummary(result);
 
   return (
-    <div className="text-soft-black-light text-sm">
+    <div data-results-summary className="text-soft-black-light text-sm">
       <p>{headline}</p>
       {order ? <p className="mt-0.5">{order}</p> : null}
       {partials ? <p className="mt-0.5">{partials}</p> : null}

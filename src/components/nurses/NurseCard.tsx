@@ -8,6 +8,7 @@ import { SaveHeartButton } from "./SaveHeartButton";
 import {
   availabilityLabel,
   careTypeLabel,
+  distanceLabel,
   credentialLine,
   displayName,
   lockedFooterLabel,
@@ -32,6 +33,13 @@ interface NurseCardProps {
   // In anonymousMode, show the hover/pointer affordance because an ancestor
   // (e.g. a dialog trigger) handles the click. Does not add a link itself.
   interactive?: boolean;
+  /**
+   * A badge the surrounding page needs on the card, rendered in the card's own
+   * badge row. A slot rather than an overlay: the revealed page used to pin its
+   * "Access until" badge to the top right corner, which on this card is where
+   * the rating sits (#774).
+   */
+  extraBadge?: React.ReactNode;
 }
 
 /**
@@ -48,6 +56,7 @@ export function NurseCard({
   anonymousMode,
   interactive,
   showLastName,
+  extraBadge,
 }: NurseCardProps) {
   const name = displayName(nurse, {
     showLastName: !!showLastName && !anonymousMode,
@@ -55,6 +64,7 @@ export function NurseCard({
   const credential = credentialLine(nurse);
   const careType = careTypeLabel(nurse);
   const town = townLabel(nurse);
+  const distance = distanceLabel(nurse);
   const showUnavailable = !nurse.is_available;
 
   // Signed out cards arrive with these blanked in the data, so the footer is
@@ -68,14 +78,14 @@ export function NurseCard({
 
   const inner = (
     <>
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="flex flex-1 flex-col gap-3 p-5">
         {/* Header: avatar, name, credential, rating */}
         <div className="flex items-start gap-3">
           <Avatar nurse={nurse} name={name} />
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-heading text-soft-black truncate text-base font-medium">
+              <h3 className="font-heading text-soft-black truncate text-lg font-medium">
                 {name}
               </h3>
               {nurse.avg_rating !== null && nurse.review_count > 0 && (
@@ -99,7 +109,8 @@ export function NurseCard({
         {(careType ||
           nurse.tier === "featured" ||
           showUnavailable ||
-          nurse.revealed) && (
+          nurse.revealed ||
+          extraBadge) && (
           <div className="flex flex-wrap items-center gap-1.5">
             {careType && (
               <Badge
@@ -133,22 +144,18 @@ export function NurseCard({
                 Revealed
               </Badge>
             )}
+            {extraBadge}
           </div>
         )}
 
         {/* Town and distance */}
-        {(town || nurse.distance_miles !== null) && (
+        {(town || distance) && (
           <p className="text-soft-black-light flex flex-wrap items-center gap-x-2 text-sm">
             <span className="inline-flex items-center gap-1">
               <MapPin className="size-3.5 shrink-0" aria-hidden="true" />
               {town ?? "Town not listed"}
             </span>
-            {nurse.distance_miles !== null && (
-              <span>
-                {nurse.distance_miles}{" "}
-                {nurse.distance_miles === 1 ? "mile" : "miles"} away
-              </span>
-            )}
+            {distance && <span>{distance}</span>}
           </p>
         )}
 
@@ -166,7 +173,7 @@ export function NurseCard({
       </div>
 
       {/* Footer: availability and rate */}
-      <div className="border-sage/20 text-soft-black-light mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-4 py-3 text-sm">
+      <div className="border-sage/20 text-soft-black-light mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-5 py-3.5 text-sm">
         {isLocked ? (
           <span className="inline-flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden="true" />
@@ -217,7 +224,7 @@ export function NurseCard({
 }
 
 /**
- * 52px round avatar, cropped to the upper third so a head sits in frame rather
+ * 64px round avatar, cropped to the upper third so a head sits in frame rather
  * than a chin. A nurse with no photo gets her initial, not an empty grey
  * circle: the card should still read as a person.
  */
@@ -225,19 +232,19 @@ function Avatar({ nurse, name }: { nurse: NurseSearchCard; name: string }) {
   const initial = nurse.first_name.charAt(0).toUpperCase();
 
   return (
-    <div className="bg-sage-light relative size-13 shrink-0 overflow-hidden rounded-full">
+    <div className="bg-sage-light relative size-16 shrink-0 overflow-hidden rounded-full">
       {nurse.photo_url ? (
         <Image
           src={nurse.photo_url}
           alt={name}
           fill
-          sizes="52px"
+          sizes="64px"
           className="object-cover object-[50%_25%]"
         />
       ) : (
         <span
           aria-hidden="true"
-          className="font-heading text-soft-black flex h-full w-full items-center justify-center text-lg font-medium"
+          className="font-heading text-soft-black flex h-full w-full items-center justify-center text-xl font-medium"
         >
           {initial}
         </span>
