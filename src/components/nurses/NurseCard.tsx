@@ -78,14 +78,14 @@ export function NurseCard({
 
   const inner = (
     <>
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="flex flex-1 flex-col gap-3 p-5">
         {/* Header: avatar, name, credential, rating */}
         <div className="flex items-start gap-3">
           <Avatar nurse={nurse} name={name} />
 
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-heading text-soft-black truncate text-base font-medium">
+              <h3 className="font-heading text-soft-black truncate text-lg font-medium">
                 {name}
               </h3>
               {nurse.avg_rating !== null && nurse.review_count > 0 && (
@@ -173,7 +173,7 @@ export function NurseCard({
       </div>
 
       {/* Footer: availability and rate */}
-      <div className="border-sage/20 text-soft-black-light mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-4 py-3 text-sm">
+      <div className="border-sage/20 text-soft-black-light mt-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t px-5 py-3.5 text-sm">
         {isLocked ? (
           <span className="inline-flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden="true" />
@@ -224,7 +224,7 @@ export function NurseCard({
 }
 
 /**
- * 52px round avatar, cropped to the upper third so a head sits in frame rather
+ * 64px round avatar, cropped to the upper third so a head sits in frame rather
  * than a chin. A nurse with no photo gets her initial, not an empty grey
  * circle: the card should still read as a person.
  */
@@ -232,19 +232,19 @@ function Avatar({ nurse, name }: { nurse: NurseSearchCard; name: string }) {
   const initial = nurse.first_name.charAt(0).toUpperCase();
 
   return (
-    <div className="bg-sage-light relative size-13 shrink-0 overflow-hidden rounded-full">
+    <div className="bg-sage-light relative size-16 shrink-0 overflow-hidden rounded-full">
       {nurse.photo_url ? (
         <Image
           src={nurse.photo_url}
           alt={name}
           fill
-          sizes="52px"
+          sizes="64px"
           className="object-cover object-[50%_25%]"
         />
       ) : (
         <span
           aria-hidden="true"
-          className="font-heading text-soft-black flex h-full w-full items-center justify-center text-lg font-medium"
+          className="font-heading text-soft-black flex h-full w-full items-center justify-center text-xl font-medium"
         >
           {initial}
         </span>

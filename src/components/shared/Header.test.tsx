@@ -80,8 +80,12 @@ describe("the site width", () => {
     expect(Number(match![1])).toBeGreaterThanOrEqual(1400);
   });
 
-  it("puts a four column grid on the feed at the widest breakpoint", () => {
+  // Three across, not four. The extra width goes into the cards rather than
+  // into more of them: at four the cards were cramped enough that bios and
+  // rates ran short.
+  it("puts a three column grid on the feed at the widest breakpoint", () => {
     const page = readFileSync("src/app/(public)/nurses/page.tsx", "utf8");
-    expect(page).toContain("2xl:grid-cols-4");
+    expect(page).toContain("lg:grid-cols-3");
+    expect(page).not.toContain("grid-cols-4");
   });
 });
