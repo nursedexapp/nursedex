@@ -106,6 +106,12 @@ const IGNORED = [
   /vercel\.live/,
   // Next's dev-time fast refresh chatter.
   /\[Fast Refresh\]/,
+  // React in DEVELOPMENT asks for eval() to rebuild call stacks, and the CSP
+  // refuses it. Allowing unsafe-eval to silence this would weaken a real
+  // security control to quieten a message that cannot occur in production,
+  // where React never calls eval at all. The e2e suite runs the dev server, so
+  // this appears there and nowhere a family will ever be.
+  /eval\(\) is not supported in this environment/,
 ];
 
 function collectConsole(page: Page): { errors: string[]; warnings: string[] } {
@@ -217,7 +223,11 @@ for (const size of WIDTHS) {
       await page.goto("/nurses");
       await expect(page.locator("article").first()).toBeVisible();
 
-      const measured = (await page.evaluate(CONTRAST_PROBE)) as {
+      // Invoked, not merely named. page.evaluate() treats a string as an
+      // expression, so handing it "() => {...}" yields a function object and
+      // the probe never runs. The count assertion below is what turned that
+      // into a failure rather than a green "no contrast problems found".
+      const measured = (await page.evaluate(`(${CONTRAST_PROBE})()`)) as {
         text: string;
         ratio: number;
       }[];
@@ -315,8 +325,13 @@ test.describe("the filter chips", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/nurses?credential=rn");
 
+    // exact: the clear button's label CONTAINS the chip's own name, so a
+    // substring match resolves to both and fails on strict mode.
     await expect(
-      page.getByRole("button", { name: "Credential: Registered Nurse" }),
+      page.getByRole("button", {
+        name: "Credential: Registered Nurse",
+        exact: true,
+      }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Clear Credential: Registered Nurse" }),
