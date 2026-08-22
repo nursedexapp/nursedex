@@ -82,7 +82,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       {user && <PostHogIdentify userId={user.id} email={user.email} />}
       <main className="flex-1">
         <section className="border-sage-light/40 border-b">
-          <div className="mx-auto max-w-6xl px-6 py-12 sm:py-16">
+          <div className="max-w-site mx-auto px-6 py-12 sm:py-16">
             <h1 className="font-heading text-soft-black text-center text-3xl font-semibold sm:text-4xl">
               Simple pricing
             </h1>
@@ -96,7 +96,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
         </section>
 
         <section className="bg-warm-white">
-          <div className="mx-auto max-w-6xl px-6 py-12">
+          <div className="max-w-site mx-auto px-6 py-12">
             {audience === "families" ? (
               <FamilyAccessCard
                 isLoggedInFamily={user?.role === "family"}

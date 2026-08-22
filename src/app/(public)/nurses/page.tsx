@@ -3,6 +3,7 @@ import Link from "next/link";
 import { NurseCard } from "@/components/nurses/NurseCard";
 import { FilterChipRow } from "@/components/nurses/FilterChipRow";
 import { SearchAnalytics } from "@/components/nurses/SearchAnalytics";
+import { ResultsSummary } from "@/components/nurses/ResultsSummary";
 import { SearchPagination } from "@/components/nurses/SearchPagination";
 import { SurveyAppliedBanner } from "@/components/nurses/SurveyAppliedBanner";
 import { SavedListUnavailableNotice } from "@/components/nurses/SavedListUnavailableNotice";
@@ -120,16 +121,14 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+      <main className="max-w-site mx-auto w-full flex-1 px-4 py-8 sm:px-6">
         <div className="mb-5">
           <h1 className="font-heading text-soft-black text-2xl font-semibold sm:text-3xl">
             Find a Nurse
           </h1>
-          <p className="text-soft-black-light mt-1 text-sm">
-            {result.totalFull === 0
-              ? "No nurses match your filters yet."
-              : `${result.totalFull} ${result.totalFull === 1 ? "nurse" : "nurses"} found`}
-          </p>
+          <div className="mt-1">
+            <ResultsSummary result={result} />
+          </div>
         </div>
 
         <div className="mb-6">
@@ -155,7 +154,7 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
             {hasResults ? (
               <>
                 {result.items.length > 0 && (
-                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                     {result.items.map((nurse) => (
                       <NurseCard
                         key={nurse.user_id}
@@ -185,7 +184,7 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
                         what you&apos;re looking for.
                       </p>
                     </div>
-                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                       {result.partials.map((nurse) => (
                         <NurseCard
                           key={`partial-${nurse.user_id}`}
