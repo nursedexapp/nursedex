@@ -222,13 +222,15 @@ for (const size of WIDTHS) {
         ratio: number;
       }[];
 
-      // A probe that found nothing would report perfect contrast. The real
-      // page carries over a hundred pieces of text, so a handful means the
-      // probe is looking at the wrong thing.
+      // A probe that found nothing, or almost nothing, would report perfect
+      // contrast. The floor is set against a MIS-SCOPED probe (a selector that
+      // matches nothing returns zero), not against the size of the fixture:
+      // this page carries two nurses here and around a hundred in production,
+      // so a threshold tuned to the real page would fail on the test one.
       expect(
         measured.length,
         "too little measurable text; the probe is probably scoped wrong",
-      ).toBeGreaterThan(20);
+      ).toBeGreaterThan(10);
 
       const failures = measured
         .filter((m) => m.ratio < 4.5)
