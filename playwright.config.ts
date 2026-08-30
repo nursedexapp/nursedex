@@ -88,7 +88,14 @@ export default defineConfig({
       : []),
   ],
   webServer: {
-    command: "npm run dev",
+    // EXPERIMENT ONLY (#806b). Never to be merged as-is.
+    // Every spec today drives a Turbopack dev server that compiles each route
+    // on first request, which is a cost inside every spec and the class of
+    // failure global-setup.ts exists to work around (#623, and the flake fixed
+    // in #805). A production build precompiles every route, so that race
+    // disappears by construction. The question is whether the build minute is
+    // repaid by the specs.
+    command: process.env.CI ? "npm run build && npm run start" : "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     // The Turbopack dev server's cold start in CI can exceed the default 60s.
