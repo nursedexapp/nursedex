@@ -6,6 +6,30 @@ on:
   push:
     branches: [main]
 
+# What a push to main MEANS here, decided in #801.
+#
+# It is a GATE, not a post-hoc signal. Production must not reach a family
+# until the checks on that commit are green.
+#
+# That was a real choice with a real alternative. Vercel promotes production
+# about 55 seconds after a push and is gated on no workflow, so before this
+# decision anything these jobs found was found after it had shipped, and the
+# red run that said so was read by nobody. The alternative was to keep that and
+# record it as intended, on the grounds that the pull request already ran both
+# gates on a tree byte for byte identical to the merged one.
+#
+# The gate itself is #817: Vercel builds a STAGED production deployment on
+# push, serving nobody, and a workflow promotes it once these jobs pass.
+# Until #817 lands, these runs are still post-hoc, so do not read a green tick
+# here as proof that what is live was tested.
+#
+# The reason this is affordable is #812: on the normal path these jobs are
+# satisfied in about 30 seconds by proving the merged tree is the tree the
+# pull request already tested, and only an unproven merge pays the full 8 to
+# 12 minutes. So do not optimise these runs on the assumption that nothing
+# waits for them, and do not make the proof looser to make them faster: it
+# fails closed on purpose.
+
 # The merged tree proof (#812) asks GitHub three questions on a push to main:
 # which pull request carries this commit, what tree its head had, and whether
 # the required check was green there. The default workflow token could answer
