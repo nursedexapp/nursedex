@@ -11,6 +11,7 @@
 import { proveMergedTree, type ProofFacts } from "./merged-tree-proof";
 import { gatherProofFacts, type GetJson } from "./merged-tree-proof-facts";
 import { appendFileSync } from "node:fs";
+import { ANNOTATION_TITLES } from "./ci-annotations";
 
 export type RunOptions = {
   gather: () => Promise<ProofFacts>;
@@ -50,6 +51,11 @@ export async function runProofCheck(options: RunOptions): Promise<boolean> {
     // permanently broken token otherwise look identical, and the second means
     // every merge is paying the full run for nothing (L77). Counting the RATE
     // across runs is #818; this is the per-run half of it.
+    // Both: the notice so #818 can count this run at all, the warning so a
+    // person sees it. Without the notice, a run with no annotation means both
+    // "the proof was not evaluated here" and "this predates the annotations",
+    // and the counter reads every older run as healthy (L223).
+    log(`::notice title=${ANNOTATION_TITLES.mergedTreeProof}::OUTCOME=unavailable`);
     log(`::warning title=Merged tree proof unavailable::${message}`);
     log(`Merged tree proof could not be evaluated: ${message}`);
     return false;
@@ -72,6 +78,7 @@ export async function runProofCheck(options: RunOptions): Promise<boolean> {
       "The suite is not re-run on this tree. Nothing was skipped that has " +
         "not already passed on exactly these bytes.",
     );
+    log(`::notice title=${ANNOTATION_TITLES.mergedTreeProof}::OUTCOME=held PULL=${result.pull}`);
     log(`Merged tree proof held against #${result.pull} (${result.headSha}).`);
     return true;
   }
@@ -80,6 +87,7 @@ export async function runProofCheck(options: RunOptions): Promise<boolean> {
   writeSummary("### Merged tree proof: did not hold");
   writeSummary("");
   writeSummary(result.reason);
+  log(`::notice title=${ANNOTATION_TITLES.mergedTreeProof}::OUTCOME=refused`);
   log(`Merged tree proof did not hold: ${result.reason}`);
   return false;
 }

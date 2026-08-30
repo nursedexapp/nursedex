@@ -16,6 +16,7 @@ import type {
 import { appendFileSync } from "node:fs";
 import { relative } from "node:path";
 import { summariseFlakes, type SpecOutcome } from "../scripts/flake-summary";
+import { ANNOTATION_TITLES } from "../scripts/ci-annotations";
 
 export default class FlakeReporter implements Reporter {
   private readonly specs: SpecOutcome[] = [];
@@ -43,10 +44,23 @@ export default class FlakeReporter implements Reporter {
     const path = process.env.GITHUB_STEP_SUMMARY;
     if (path) appendFileSync(path, `\n${summary.markdown}\n`);
 
-    // An annotation, so a flaky run is visibly different from a clean one in
-    // the run list rather than only to somebody who opens it. A green tick that
-    // cost three minutes of retries should not look like a green tick that did
-    // not.
+    // Annotations, because they are queryable through the checks API without
+    // downloading a log, which is what lets #818 count these across runs.
+    //
+    // A notice on EVERY run, carrying the count even when it is zero. Without
+    // it, a run with no annotation means both "no flakes" and "this run
+    // predates the reporter", and a counter cannot tell those apart: it would
+    // read every older run as clean and report a flake rate far below the real
+    // one (L98, L223). Found by trying to count them and getting 3 in 13 from
+    // a population that mostly could not have reported at all.
+    process.stdout.write(
+      `::notice title=${ANNOTATION_TITLES.flakeCount}::FLAKY_COUNT=${summary.count} ` +
+        `EXECUTED=${summary.executed}\n`,
+    );
+
+    // And a warning when there were any, so a flaky run is visibly different
+    // in the run list rather than only to somebody who opens it. A green tick
+    // that cost three minutes of retries should not look like one that did not.
     if (summary.count > 0) {
       process.stdout.write(
         `::warning title=Playwright flakes::${summary.count} spec(s) passed ` +

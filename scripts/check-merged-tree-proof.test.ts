@@ -105,6 +105,45 @@ describe("runProofCheck", () => {
     expect(calls.logs.some((line) => line.startsWith("::warning"))).toBe(false);
   });
 
+  // Every outcome announces itself, so a counter can tell "the proof was not
+  // evaluated on this run" from "this run predates the annotations". Without
+  // it, absence means both and every older run reads as healthy (L223, L98).
+  it.each([
+    ["held", async () => provenFacts],
+    ["refused", async () => ({ ...provenFacts, pulls: [] })],
+    [
+      "unavailable",
+      async () => {
+        throw new Error("403 rate limit exceeded");
+      },
+    ],
+  ])("announces the %s outcome for counting", async (_name, gather) => {
+    const { calls, options } = deps(gather as never);
+    await runProofCheck(options);
+    const notices = calls.logs.filter((line) =>
+      line.startsWith("::notice title=Merged tree proof::"),
+    );
+    expect(notices).toHaveLength(1);
+  });
+
+  it("distinguishes the three outcomes in what it announces", async () => {
+    const seen: string[] = [];
+    for (const gather of [
+      async () => provenFacts,
+      async () => ({ ...provenFacts, pulls: [] }),
+      async () => {
+        throw new Error("boom");
+      },
+    ]) {
+      const { calls, options } = deps(gather as never);
+      await runProofCheck(options);
+      seen.push(
+        calls.logs.find((l) => l.startsWith("::notice title=Merged tree proof::"))!,
+      );
+    }
+    expect(new Set(seen.map((l) => l.match(/OUTCOME=(\w+)/)![1])).size).toBe(3);
+  });
+
   it("never rejects, whatever happens, because a crash would fail the job", async () => {
     const { options } = deps(async () => {
       throw new Error("boom");

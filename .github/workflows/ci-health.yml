@@ -1,0 +1,66 @@
+name: CI Health
+
+# Two outcomes in this repo are classified as tolerable, and both go green:
+# a Playwright spec that passed only on a retry, and a merged tree proof that
+# could not be evaluated. Each is visible on its own run and neither was
+# counted, so one blip and a permanent fault arrived on the same path and were
+# indistinguishable (#818, L77).
+#
+# That is not hypothetical here. The merged tree proof shipped in exactly that
+# state: the workflow token could not read a commit's pull requests, so it never
+# once held, every merge paid the full 8 to 12 minutes, and nothing went red.
+#
+# This reads the annotations recent runs left and reports the rate. It reads
+# annotations rather than logs, so it costs a handful of API calls rather than
+# a log download per run.
+
+on:
+  # Monday morning, so a week of merges is in view and there is a whole week to
+  # act before the next one.
+  #
+  # KNOWN GAP, tracked separately: nothing notices if this job stops running.
+  # GitHub disables scheduled workflows after 60 days without repository
+  # activity, and a counter that has silently stopped counting is exactly the
+  # failure this job exists to catch, turned on itself (L13). The partial
+  # mitigation today is that GitHub emails the repository owner when it
+  # disables one, and that `workflow_dispatch` lets it be re-run by hand. That
+  # is not the same as an alert on an absent run.
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+# Read-only, and listed rather than granted wholesale: an over-broad permission
+# is invisible, because the code never attempts what it is not meant to do,
+# while a missing one fails loudly on the first run (L503).
+permissions:
+  contents: read   # checkout
+  actions: read    # listing recent workflow runs
+  checks: read     # the annotations those runs left
+
+concurrency:
+  group: ci-health
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: Count the tolerated outcomes
+    runs-on: ubuntu-latest
+    # Measured: the reader makes a few dozen small API calls. Five minutes is
+    # far more than it needs and far less than the six hour default, which
+    # would let a hung request hold a runner and bill 360 minutes (#809, L110).
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install tsx
+        uses: ./.github/actions/setup-tsx
+
+      - name: Count flakes and unevaluable proofs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tsx scripts/check-ci-health.ts
