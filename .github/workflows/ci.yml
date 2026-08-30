@@ -80,6 +80,24 @@ jobs:
           REQUIRED_CHECK: "lint, typecheck, test"
         run: tsx scripts/check-merged-tree-proof.ts
 
+      # Vitest's transform cache and its results store (which orders test
+      # files slowest first) live in .vitest-cache, outside node_modules, so
+      # they survive `npm ci` (#811). The vitest step is 66 to 111 seconds on
+      # the runner against 12 locally, of which the CI log attributes 32s to
+      # import and 18s to environment setup for the happy-dom files.
+      #
+      # Keyed on the lockfile and the vitest config, because a dependency or a
+      # config change is what invalidates a transform. Restored on a partial
+      # key too: a stale cache is still most of the work, and vitest checks
+      # each entry rather than trusting the directory wholesale.
+      - name: Cache the vitest transform and results store
+        uses: actions/cache@v4
+        with:
+          path: .vitest-cache
+          key: vitest-${{ runner.os }}-${{ hashFiles('package-lock.json', 'vitest.config.ts') }}
+          restore-keys: |
+            vitest-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
