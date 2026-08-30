@@ -108,7 +108,13 @@ describe("laneCountFor", () => {
 
   // Past four the lanes contend for the same cores: each vitest boot gets
   // slower, so the sweep stops getting faster while the copies keep costing
-  // disk. The CI runner has four.
+  // disk.
+  //
+  // The CI runner reports TWO cores, measured from os.cpus().length on a real
+  // run: the sweep chose two lanes and logged it. So this cap is inert there.
+  // An earlier version of this comment said four, taken from the issue text
+  // rather than from the machine, which is exactly the kind of number that
+  // reads as measured when it never was (L316).
   it("caps at four however many cores there are", () => {
     expect(laneCountFor(16)).toBe(4);
   });

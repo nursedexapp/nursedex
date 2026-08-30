@@ -18,6 +18,15 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
+  // One worker in CI, deliberately (#806). Two was measured on the same suite
+  // and was SLOWER: 233s against 221s, with the same 69 specs and no flakes.
+  //
+  // The runner has TWO cores, measured from os.cpus().length on a real run
+  // (#807 derived two sweep lanes from it). Both #806 and #807 originally said
+  // four, taken from the issue text rather than from the machine. Two cores is
+  // why a second worker loses: the app server is on the same machine, so the
+  // worker and the server contend for the pair. Recorded rather than left
+  // blank, so this is not re-run as a new idea.
   workers: process.env.CI ? 1 : undefined,
   // html for the artifact, list so the log says what ran, and the flake
   // reporter so a run that was green only because of retries says so on the
@@ -88,10 +97,35 @@ export default defineConfig({
       : []),
   ],
   webServer: {
-    command: "npm run dev",
+    // A production build in CI, not the dev server (#806, measured).
+    //
+    // Every spec used to drive a Turbopack dev server that compiles each route
+    // on first request. That cost sits inside every spec, and it is the class
+    // of failure global-setup.ts exists to work around (#623) and the cause of
+    // the flake fixed in #805. A production build precompiles every route, so
+    // that race disappears by construction rather than by warming a list of
+    // routes somebody has to remember to extend.
+    //
+    // Measured on one run each, against a 221s baseline for the Playwright
+    // step, both running the same 69 specs:
+    //
+    //   two workers, dev server   233s   slower, rejected
+    //   one worker, prebuilt      177s   kept
+    //
+    // The 177s INCLUDES the build. It also included one flaky spec (#831),
+    // so the clean figure is lower still.
+    //
+    // Locally this stays `npm run dev`, where the fast refresh loop is the
+    // whole point and a build per run would be intolerable.
+    command: process.env.CI ? "npm run build && npm run start" : "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
-    // The Turbopack dev server's cold start in CI can exceed the default 60s.
-    timeout: 120 * 1000,
+    // The build now happens inside this window, so the old 120s (sized for a
+    // Turbopack cold start) no longer describes what is being waited for. The
+    // measured run needed well under 120s, but a timeout that trips
+    // occasionally on a slow runner would be a new flake, and this is the one
+    // place in the config where being generous costs nothing: it is a ceiling
+    // on a hang, not a delay anybody waits out.
+    timeout: 300 * 1000,
   },
 });
