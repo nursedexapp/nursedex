@@ -53,7 +53,16 @@ boundary mistake, a bad query) that typecheck and the build miss and that
 otherwise only surface in production. It is read-only, but loads admin routes,
 so it runs under the same `E2E_AUTH=1` authenticated project as the blog specs.
 
-Note: the GitHub Actions CI job (`.github/workflows/ci.yml`) currently runs only
-lint, typecheck, and the vitest suite, not Playwright. To have these smoke tests
-gate CI, an e2e job pointed at a dedicated test Supabase (with its secrets) is
-needed.
+These run in CI. `.github/workflows/e2e.yml` runs the authenticated Playwright
+suite on every pull request and on every push to main, under the job name
+`authenticated e2e`, which the `Protect main` ruleset requires before a merge.
+
+It needs no secrets and touches no real database: the job starts a throwaway
+local Supabase in Docker, which applies the migrations and the seed, and points
+the app at that. The dedicated test Supabase this section used to say was needed
+was never necessary.
+
+The job name is load bearing. The ruleset requires it by name, and
+`scripts/check-merged-tree-proof.ts` asks about that same name when deciding
+whether a merged tree has already been tested, so renaming the job silently
+stops it gating merges.
