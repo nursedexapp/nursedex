@@ -2,6 +2,17 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
+  // Outside node_modules on purpose (#811). Vitest keeps two things here: the
+  // transform cache, and the results store it uses to order test files slowest
+  // first. Both default to node_modules/.vite, which `npm ci` deletes on every
+  // CI run, so the runner re-transformed everything and ordered by file size
+  // every time. Here they survive the install and can be restored by
+  // actions/cache, and the ordering is what a four core runner needs most.
+  //
+  // It also happens to suit the guard mutation lanes (#807): each lane is an
+  // rsync copy of the working tree, so each gets its own copy of this
+  // directory rather than four of them writing to one shared cache.
+  cacheDir: ".vitest-cache",
   test: {
     // Default to `node` — most tests need no DOM. For a test that does (e.g.
     // the Tiptap editor specs), add `// @vitest-environment happy-dom` at the
