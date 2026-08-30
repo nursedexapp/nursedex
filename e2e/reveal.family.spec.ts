@@ -69,13 +69,38 @@ test("a subscribed family reveals a nurse, and spends exactly one slot", async (
 
   await reveal.click();
 
-  // The contact details actually arrive. This is the thing that would break if
-  // the app called a database function production did not have.
-  await expect(page.getByText("e2e-reveal-nurse@nursedex.test")).toBeVisible({
-    timeout: 15_000,
-  });
+  // Two separate questions, asked in order, because the flake in #831 could not
+  // tell them apart.
+  //
+  // This used to be one assertion: wait fifteen seconds for the email to appear
+  // on screen. When that timed out (twice in two runs) the only thing it said
+  // was "element(s) not found", which is true whether the reveal never
+  // happened at all or happened and the page had not rendered it yet. Those are
+  // completely different bugs, and one assertion that covers both diagnoses
+  // neither (L11, L239).
+  //
+  // First: did the reveal ACTUALLY happen? That is a row, not a rendering. A
+  // spent slot is the durable record of it, it is what this test is named
+  // after, and polling it waits on the condition rather than on a fixed budget
+  // (L290).
+  await expect
+    .poll(() => slotsSpent(familyId), {
+      timeout: 15_000,
+      message:
+        "the reveal never reached the database: no slot was spent. The click " +
+        "was swallowed, or the reveal itself failed. This is not a rendering " +
+        "problem",
+    })
+    .toBe(1);
 
-  expect(await slotsSpent(familyId)).toBe(1);
+  // Only then: did the contact details reach the screen? This is the thing that
+  // would break if the app called a database function production did not have.
+  // Reaching this line means the reveal is recorded, so a failure here is a
+  // rendering fault and nothing else.
+  await expect(
+    page.getByText("e2e-reveal-nurse@nursedex.test"),
+    "the reveal is recorded in the database but the contact details never appeared on screen",
+  ).toBeVisible({ timeout: 15_000 });
 
   // Coming back later must not charge them again. The reveal is already theirs,
   // and re-viewing it is not a second reveal.
