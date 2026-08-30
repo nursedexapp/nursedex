@@ -30,6 +30,13 @@ jobs:
   drift:
     name: Check production migration drift
     runs-on: ubuntu-latest
+    # Measured over the last five successful runs: the slowest was 67s. Five
+    # minutes is about four times that. Without a timeout a job inherits
+    # GitHub's six hour default, so a Supabase CLI download that hangs, or a
+    # link that never answers, holds a runner and bills 360 minutes, and a hang
+    # is worse than a failure because it is indistinguishable from slowness
+    # (#809, L110).
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
