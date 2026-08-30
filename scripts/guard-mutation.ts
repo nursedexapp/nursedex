@@ -28,9 +28,29 @@ import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join, dirname, relative, sep } from "node:path";
 import { spawn, execSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
+import { cpus } from "node:os";
+import {
+  createLaneWorkspaces,
+  hasRsync,
+  laneCountFor,
+  partitionByCost,
+} from "./sweep-lanes";
+import { checkSweepHeadroom, readJobTimeoutMinutes } from "./sweep-headroom";
 import { tmpdir } from "node:os";
 
 const REPO_ROOT = join(dirname(new URL(import.meta.url).pathname), "..");
+
+/**
+ * The share of ci.yml's job timeout the sweep may use before it is called a
+ * problem (#807).
+ *
+ * Half, not a rounder number, because of where the real value sits: the
+ * sequential sweep used about 23% (211s of 900s) and the lanes bring that well
+ * under 10%. A threshold inside the dense middle turns the check into noise, so
+ * this sits far above today's value and still leaves the sweep unable to reach
+ * the timeout without being reported first (L172).
+ */
+const SWEEP_DEADLINE_FRACTION = 0.5;
 
 /** How each guard says "this caller may proceed". */
 type Admits =
@@ -486,7 +506,7 @@ export async function withMutation<T>(
 
 /* ------------------------------------------------------------------ runner */
 
-function runVitest(suite: string): Promise<RunResult> {
+function runVitest(suite: string, root: string = REPO_ROOT): Promise<RunResult> {
   const dir = mkdtempSync(join(tmpdir(), "guard-mutation-"));
   const outFile = join(dir, "result.json");
 
@@ -501,7 +521,7 @@ function runVitest(suite: string): Promise<RunResult> {
         `--outputFile=${outFile}`,
         "--silent",
       ],
-      { cwd: REPO_ROOT, stdio: "ignore" },
+      { cwd: root, stdio: "ignore" },
     );
 
     child.on("close", (code) => {
@@ -645,31 +665,106 @@ async function main() {
 
   const suites = [...new Set(sites.map((s) => suiteFor(s.file, s.guard)!))];
   console.log(`Checking ${suites.length} suites are green first...`);
-  await assertBaselineGreen(suites, runVitest);
 
-  const findings: Finding[] = [];
-  let done = 0;
+  // Time the baseline runs. They run every suite once anyway, so this is the
+  // cost of each suite measured in THIS run on THIS machine, which is what the
+  // lanes are then divided by. A fixed table of weights would be a measurement
+  // of whatever machine wrote it (L224, L296).
+  const suiteMs = new Map<string, number>();
+  await assertBaselineGreen(suites, async (suite) => {
+    const started = Date.now();
+    const result = await runVitest(suite);
+    suiteMs.set(suite, Math.max(1, Date.now() - started));
+    return result;
+  });
 
-  for (const site of sites) {
-    const suite = suiteFor(site.file, site.guard)!;
-    const full = join(REPO_ROOT, site.file);
-    const source = readFileSync(full, "utf8");
+  const sweepStarted = Date.now();
 
-    const result = await withMutation(full, mutate(source, site), () =>
-      runVitest(suite),
-    );
-    const verdict = classifyRun(result);
-    findings.push({ site, suite, verdict, hollow: hollowRiskTests(result) });
-
-    done++;
-    const mark = {
-      killed: "ok",
-      weak: "WEAK",
-      survived: "SURVIVED",
-      error: "ERROR",
-    }[verdict];
+  // Lanes, each with its own copy of the working tree, because a mutation is a
+  // write to a real file and lanes cannot share one (#807).
+  let laneCount = laneCountFor(cpus().length, process.env.GUARD_MUTATION_LANES);
+  if (laneCount > 1 && !hasRsync()) {
+    // Said out loud rather than quietly falling back: a sweep that silently
+    // stopped parallelising would just get slower, with nothing red (L289).
     console.log(
-      `[${done}/${sites.length}] ${mark}  ${site.file}:${site.line} ${site.guard} (${suite})`,
+      "rsync is not available, so lane workspaces cannot be made. Running the " +
+        "sweep in one lane, which is correct but slower.",
+    );
+    laneCount = 1;
+  }
+  laneCount = Math.min(laneCount, Math.max(1, sites.length));
+
+  const lanes = partitionByCost(
+    sites,
+    (site) => suiteMs.get(suiteFor(site.file, site.guard)!) ?? 1,
+    laneCount,
+  );
+
+  let done = 0;
+  const runLane = async (root: string, laneSites: typeof sites) => {
+    const found: Finding[] = [];
+    for (const site of laneSites) {
+      const suite = suiteFor(site.file, site.guard)!;
+      const full = join(root, site.file);
+      const source = readFileSync(full, "utf8");
+
+      const result = await withMutation(full, mutate(source, site), () =>
+        runVitest(suite, root),
+      );
+      const verdict = classifyRun(result);
+      found.push({ site, suite, verdict, hollow: hollowRiskTests(result) });
+
+      done++;
+      const mark = {
+        killed: "ok",
+        weak: "WEAK",
+        survived: "SURVIVED",
+        error: "ERROR",
+      }[verdict];
+      console.log(
+        `[${done}/${sites.length}] ${mark}  ${site.file}:${site.line} ${site.guard} (${suite})`,
+      );
+    }
+    return found;
+  };
+
+  let byLane: Finding[][];
+  if (laneCount === 1) {
+    // No copy at all for a single lane: identical to how this ran before, and
+    // the path a machine without rsync takes.
+    console.log(`Mutating ${sites.length} sites in one lane.`);
+    byLane = [await runLane(REPO_ROOT, lanes[0])];
+  } else {
+    console.log(
+      `Mutating ${sites.length} sites across ${laneCount} lanes ` +
+        `(${lanes.map((l) => l.length).join(", ")} sites, divided by measured suite time).`,
+    );
+    const workspaces = createLaneWorkspaces(REPO_ROOT, laneCount);
+    try {
+      byLane = await Promise.all(
+        lanes.map((laneSites, i) => runLane(workspaces.lanes[i], laneSites)),
+      );
+    } finally {
+      // Always: a lane left behind holds a copy of the source with a guard
+      // possibly still neutralised in it.
+      workspaces.cleanup();
+    }
+  }
+
+  // Back into the original site order, so the report does not depend on which
+  // lane happened to finish first and two runs can be diffed.
+  const order = new Map(sites.map((site, index) => [site, index]));
+  const findings: Finding[] = byLane
+    .flat()
+    .sort((a, b) => order.get(a.site)! - order.get(b.site)!);
+
+  // Every mutant must be accounted for. A lane that lost its share would still
+  // print a verdict, and a check for zero survivors catches none of it (L288).
+  if (findings.length !== sites.length) {
+    throw new Error(
+      `The sweep ran ${findings.length} mutants but had ${sites.length} sites. ` +
+        `A lane lost its share, so this result is about a partial sweep and ` +
+        `means nothing.`,
     );
   }
 
@@ -766,6 +861,20 @@ async function main() {
       "",
     );
   }
+
+  // How much of its deadline this sweep used (#807). Reported on EVERY run,
+  // not only when it is in trouble: a number that only appears once it is too
+  // late leaves nobody able to see the growth coming. 105 mutants took about
+  // 211 seconds sequentially under a 15 minute timeout, and every new guard
+  // site adds about two seconds.
+  const headroom = checkSweepHeadroom({
+    elapsedMs: Date.now() - sweepStarted,
+    timeoutMinutes: readJobTimeoutMinutes(
+      readFileSync(join(REPO_ROOT, ".github/workflows/ci.yml"), "utf8"),
+    ),
+    maxFraction: SWEEP_DEADLINE_FRACTION,
+  });
+  lines.push("", headroom.message);
 
   const summary = lines.join("\n");
   console.log(`\n${summary}`);

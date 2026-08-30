@@ -51,3 +51,7 @@ AGENTS.md
 
 # Skill manager lockfile (generated, local-only)
 skills-lock.json
+
+# Vitest's transform and results caches. Set outside node_modules in #811 so
+# they survive npm ci; never committed.
+.vitest-cache/

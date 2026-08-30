@@ -26,9 +26,14 @@ permissions:
   pull-requests: read  # which pull request carries the pushed commit
   checks: read         # whether that pull request's required check was green
 
+# Same reasoning as ci.yml. #807 named only that workflow, because at the time
+# a main run gated nothing and the loss was a report nobody read. Since #801
+# production waits for this job (#817), so cancelling a main run here strands a
+# merge as a deployment that never gets promoted, which is the quiet failure
+# that change has to avoid.
 concurrency:
   group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   e2e:
