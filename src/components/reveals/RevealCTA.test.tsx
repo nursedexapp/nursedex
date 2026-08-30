@@ -129,6 +129,26 @@ describe("a reveal that never comes back", () => {
     );
   }
 
+  // Belt and braces with revealNurse's own try/catch. That function's contract
+  // is to return rather than throw, but this component is what the person is
+  // looking at: if anything ever does reject, the spinner must not be left
+  // turning with no message. A control that looks identical whether the work is
+  // progressing, hung or dead is a defect.
+  it("clears the pending state and says so if the action rejects", async () => {
+    vi.mocked(revealNurse).mockRejectedValue(new Error("boom"));
+    renderSubscribed();
+
+    await clickReveal();
+
+    // Flush the rejection's microtasks rather than polling with waitFor: this
+    // block runs on fake timers, so a poller that sleeps on the real clock
+    // would hang until the test's own deadline (L290, L524).
+    await act(async () => {});
+
+    expect(screen.getByRole("button")).not.toBeDisabled();
+    expect(toast.error).toHaveBeenCalled();
+  });
+
   it("blocks a second reveal while the first is running", async () => {
     vi.mocked(revealNurse).mockReturnValue(hang());
     renderSubscribed();

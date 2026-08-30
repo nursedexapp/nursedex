@@ -55,6 +55,24 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
     setIsPending(true);
 
     void (async () => {
+      try {
+        await runReveal(attempt, turnstileToken);
+      } catch (error) {
+        // revealNurse's contract is to return rather than throw, and it has its
+        // own guard. This is the second half of that: the person is looking at
+        // this button, and if anything ever does reject, the spinner must not be
+        // left turning with no message. A control that looks identical whether
+        // the work is progressing, hung or dead is a defect.
+        console.error("[reveal] the reveal button caught a rejection:", error);
+        if (!isLatest(attempt)) return;
+        setIsPending(false);
+        toast.error("Couldn't reveal contact info. Try again.");
+      }
+    })();
+  };
+
+  const runReveal = async (attempt: number, turnstileToken?: string) => {
+    {
       if (posthog.__loaded) {
         posthog.capture(ANALYTICS_EVENTS.REVEAL_ATTEMPTED, {
           nurse_user_id: nurseUserId,
@@ -96,7 +114,7 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
         });
       }
       router.refresh();
-    })();
+    }
   };
 
   const handleCaptchaSolved = (token: string) => {

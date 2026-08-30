@@ -48,6 +48,31 @@ export async function revealNurse(
   nurseUserId: string,
   turnstileToken?: string,
 ): Promise<RevealResult> {
+  // This function's contract is to RETURN a RevealResult, never to throw, and
+  // that is not a stylistic preference. RevealCTA awaits it inside a void async
+  // IIFE with no catch, so a rejection skips setIsPending(false) and leaves the
+  // button's spinner turning forever with no message: a control that looks
+  // identical whether the work is progressing, hung or dead.
+  //
+  // It matters now because the reads underneath it were changed to throw rather
+  // than silently answer "no" (#831). That is right for a page render, which
+  // sits behind an error screen, and wrong here.
+  //
+  // "unknown" deliberately, not "no_subscription": the latter sends the family
+  // to the paywall, which is a confident claim about their account made from a
+  // read that failed.
+  try {
+    return await revealNurseOrThrow(nurseUserId, turnstileToken);
+  } catch (error) {
+    console.error("[reveal] revealNurse failed:", error);
+    return { success: false, error: "unknown" };
+  }
+}
+
+async function revealNurseOrThrow(
+  nurseUserId: string,
+  turnstileToken?: string,
+): Promise<RevealResult> {
   const user = await getCurrentUser();
   if (!user) return { success: false, error: "not_authenticated" };
   if (user.role !== "family") return { success: false, error: "wrong_role" };
