@@ -10,7 +10,21 @@ import { waitForRouteReady } from "../test/route-ready";
 // first spec runs, every route below has been compiled and is being served.
 // The routes are the ones observed 404ing (/admin/blog) plus the ones the
 // specs navigate to first.
-const ROUTES = ["/", "/login", "/blog", "/nurses", "/admin/blog"];
+// Warmed before any spec runs, because Turbopack compiles a route on its first
+// request and a spec that lands there first pays that compile out of its own
+// budget. The nurse onboarding funnel was the flake in #805: `waitForURL` after
+// role selection timed out at 20s waiting for /dashboard/onboarding to exist,
+// which nothing here had warmed.
+const ROUTES = [
+  "/",
+  "/login",
+  "/blog",
+  "/nurses",
+  "/admin/blog",
+  "/role-select",
+  "/dashboard",
+  "/dashboard/onboarding",
+];
 
 export default async function globalSetup() {
   const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";

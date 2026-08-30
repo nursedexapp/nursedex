@@ -19,7 +19,12 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: "html",
+  // html for the artifact, list so the log says what ran, and the flake
+  // reporter so a run that was green only because of retries says so on the
+  // run itself and in the step summary (#805). Without it, `retries: 2`
+  // absorbs a failure and a reviewer sees the same green tick either way,
+  // while the job quietly takes twice as long.
+  reporter: [["html"], ["list"], ["./e2e/flake-reporter.ts"]],
   use: {
     baseURL: "http://localhost:3000",
     trace: "on-first-retry",
