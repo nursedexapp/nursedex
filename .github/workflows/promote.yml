@@ -1,0 +1,64 @@
+name: Promote
+
+# Puts a merged commit live, once the checks on that commit are green.
+#
+# #801 decided a push to main is a GATE: production must not reach a family
+# until those checks pass. Vercel builds a STAGED production deployment on every
+# push and, with "Auto-assign Custom Production Domains" turned off, serves it to
+# nobody. This is what promotes it.
+#
+# It waits for BOTH required checks, including the guard mutation sweep, which is
+# Dan's decision on #839 taken with the numbers in front of him: about 4 minutes
+# to live, against 55 seconds when nothing was gated at all.
+#
+# It fires once per finishing check, so it runs repeatedly by design. The second
+# arrival finds the deployment already promoted and says so rather than failing.
+
+on:
+  workflow_run:
+    workflows: [CI, E2E]
+    types: [completed]
+    branches: [main]
+
+# Read-only against GitHub; the Vercel write is authorised by VERCEL_TOKEN.
+# Listed rather than granted wholesale: an over-broad permission is invisible,
+# because the code never attempts what it is not meant to do (L503).
+permissions:
+  contents: read # reading the commit
+  checks: read   # whether the required checks passed on it
+
+# Never cancel. A cancelled promotion leaves a merge built but not live, which
+# is the silent failure this whole workflow exists to avoid (L98).
+concurrency:
+  group: promote-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote the merged commit to production
+    runs-on: ubuntu-latest
+    # Measured: the reader makes three API calls. Five minutes is far more than
+    # it needs and far less than the six hour default, which would hold a runner
+    # and bill 360 minutes on a hang (#809, L110).
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install tsx
+        uses: ./.github/actions/setup-tsx
+
+      # COMMIT_SHA is the commit the finished workflow ran on, not the tip of
+      # main. Those differ the moment a second merge lands while this one is
+      # still being checked, and promoting the tip would put a commit live that
+      # nothing in this run ever looked at (L237).
+      - name: Promote if the checks on that commit are green
+        env:
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: tsx scripts/check-promote-production.ts
