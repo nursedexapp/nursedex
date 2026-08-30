@@ -1,0 +1,26 @@
+name: Setup tsx
+description: >
+  Install tsx alone, at the version the lockfile holds, without building the
+  repository's dependency tree. For jobs whose whole job is to run one
+  TypeScript script.
+
+runs:
+  using: composite
+  steps:
+    # `--prefix` is load bearing, not tidiness. `npm install tsx@x` run inside
+    # the repo installs the named package AND everything in package.json:
+    # measured in a clean clone at 1171 packages and 14 seconds, which is no
+    # saving at all. A directory outside the repo has no package.json to read,
+    # so it fetches tsx and its four dependencies in about 4 seconds.
+    #
+    # The version is READ from the lockfile, never written here, so a dependabot
+    # bump cannot leave a job on a different tsx than the repo. `node -p` throws
+    # when the lockfile has no tsx entry, and pipefail turns that into a failed
+    # step rather than an unpinned `tsx@` meaning latest.
+    - name: Install tsx
+      shell: bash
+      run: |
+        set -euo pipefail
+        version=$(node -p "require('./package-lock.json').packages['node_modules/tsx'].version")
+        npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/tsx" "tsx@$version"
+        echo "$RUNNER_TEMP/tsx/node_modules/.bin" >> "$GITHUB_PATH"

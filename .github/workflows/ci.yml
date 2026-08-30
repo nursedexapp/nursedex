@@ -30,19 +30,52 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # On a push to main, ask whether this exact tree has already been through
+      # this suite on the pull request it came from (#812). The `Protect main`
+      # ruleset requires linear history and an up-to-date branch and merges are
+      # squashes, so the merged commit's tree IS the pull request head's tree:
+      # identical on all six merges checked (#789 to #794).
+      #
+      # Since #801 the production promotion waits for this job (#817), so this
+      # is not a saving bolted onto a pointless run: it is what lets the gate be
+      # real without making every deploy wait 8 to 12 minutes. It fails closed.
+      # A direct push, a tree that does not match, a check that was not green,
+      # or a lookup that fell over all run the suite in full.
+      # continue-on-error on both proof steps: the proof is an optimisation, and
+      # an optimisation that can fail the job is worse than no optimisation. A
+      # failed tsx install or a failed lookup leaves `proven` empty, which reads
+      # as "not proven" and runs everything, which is exactly right. The step
+      # summary still says a lookup failed, so this is not silent (L289).
+      - name: Install tsx
+        if: github.event_name == 'push'
+        continue-on-error: true
+        uses: ./.github/actions/setup-tsx
+
+      - name: Check the merged tree proof
+        id: proof
+        if: github.event_name == 'push'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUIRED_CHECK: "lint, typecheck, test"
+        run: tsx scripts/check-merged-tree-proof.ts
+
       - name: Install dependencies
         run: npm ci
 
       - name: Lint
+        if: steps.proof.outputs.proven != 'true'
         run: npm run lint
 
       - name: Typecheck
+        if: steps.proof.outputs.proven != 'true'
         # npm run typecheck = `next typegen && tsc --noEmit`. typegen regenerates
         # route types so this also catches route-type errors that previously only
         # surfaced in `next build`.
         run: npm run typecheck
 
       - name: Run tests
+        if: steps.proof.outputs.proven != 'true'
         run: npm test
 
       # #642. `npm test` proves every guarded surface HAS a test. It cannot prove

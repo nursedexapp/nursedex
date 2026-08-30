@@ -1,21 +1,21 @@
 // @vitest-environment node
 //
-// The two production-watching workflows (Migration Drift, Production Smoke) do
-// nothing but run a TypeScript checker script through tsx. Both used to run
-// `npm ci` first (22 to 38 seconds) to rebuild the entire dependency tree for
-// it, which pushed Production Smoke just over the billed minute on every one of
-// its 48 monthly runs (#808).
+// Jobs whose whole job is to run one TypeScript script used to run `npm ci`
+// first (22 to 38 seconds) to rebuild the entire dependency tree for it, which
+// pushed Production Smoke just over the billed minute on every one of its 48
+// monthly runs (#808).
 //
-// The checkers import only their own siblings and src/lib/slack/constants.ts,
-// so tsx is the whole tree they need. These tests pin that: no full install,
-// and a tsx version READ from the lockfile rather than written beside it, so a
-// dependabot bump cannot leave these jobs on a different tsx than the repo.
+// They now install tsx alone through one composite action. These tests cover
+// the action (where the saving lives) and the workflows that use it (where it
+// would silently stop applying).
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
-/** The workflows whose only dependency is tsx. */
+const ACTION = ".github/actions/setup-tsx/action.yml";
+
+/** Workflows whose only dependency is tsx, so none of them may install more. */
 const LEAN_WORKFLOWS = [
   ".github/workflows/migration-drift.yml",
   ".github/workflows/prod-smoke.yml",
@@ -34,13 +34,13 @@ function executable(yaml: string): string {
 }
 
 /**
- * The lockfile's tsx version, read independently of the workflow. Comparing the
- * workflow's own expression against a value derived by that same expression
- * would only prove the expression is self-consistent, never that it is right.
+ * The lockfile's tsx version, read independently of the action. Comparing the
+ * action's own expression against a value derived by that same expression would
+ * only prove the expression is self-consistent, never that it is right (L70).
  *
  * It refuses rather than returning undefined: an undefined expected value
  * compares false against every actual one, so the version test would fail with
- * a message about the workflow when the fault is in this reader (L50, L11).
+ * a message about the action when the fault is in this reader (L50, L11).
  */
 function lockedTsxVersion(): string {
   const lockfile = JSON.parse(read("package-lock.json")) as {
@@ -50,8 +50,8 @@ function lockedTsxVersion(): string {
   if (typeof version !== "string" || version.length === 0) {
     throw new Error(
       "package-lock.json has no version for node_modules/tsx, so there is " +
-        "nothing to pin these workflows against. Fix the lockfile, not the " +
-        "workflows.",
+        "nothing to pin the setup-tsx action against. Fix the lockfile, not " +
+        "the action.",
     );
   }
   return version;
@@ -59,13 +59,8 @@ function lockedTsxVersion(): string {
 
 const LOCKED_TSX_VERSION = lockedTsxVersion();
 
-describe.each(LEAN_WORKFLOWS)("%s installs only what it runs", (workflow) => {
-  const yaml = read(workflow);
-  const code = executable(yaml);
-
-  it("does not rebuild the whole dependency tree", () => {
-    expect(code).not.toMatch(/npm\s+ci\b/);
-  });
+describe("the setup-tsx composite action", () => {
+  const code = executable(read(ACTION));
 
   it("installs tsx without writing it into package.json", () => {
     expect(code).toMatch(/npm\s+install\s[^\n]*--no-save/);
@@ -75,32 +70,25 @@ describe.each(LEAN_WORKFLOWS)("%s installs only what it runs", (workflow) => {
   // The whole saving lives in this flag. `npm install tsx@x` run inside the
   // repo installs everything in package.json as well: measured at 1171
   // packages and 14 seconds against 5 packages and 4 seconds, so without
-  // --prefix this change saves nothing while looking exactly like it does.
+  // --prefix this saves nothing while looking exactly like it does (L102).
   it("installs outside the repo, where there is no package.json to expand", () => {
     expect(code).toMatch(/npm\s+install\s[^\n]*--prefix\s+"\$RUNNER_TEMP/);
   });
 
-  it("puts that install on PATH so the checker can find it", () => {
+  it("puts that install on PATH so the calling job can find it", () => {
     expect(code).toMatch(/RUNNER_TEMP\/tsx\/node_modules\/\.bin"?\s*>>\s*"\$GITHUB_PATH"/);
   });
 
-  // `npx tsx` would resolve nothing locally now and fetch tsx from the
-  // registry at whatever version is latest that day, defeating the pin.
-  it("runs its checker through the installed tsx, not through npx", () => {
-    expect(code).toMatch(/(?<!npx )tsx scripts\/check-[a-z-]+\.ts/);
-    expect(code).not.toMatch(/npx\s+tsx/);
-  });
-
   // L41: a version maintained by hand beside the lockfile drifts from it
-  // silently, and the drift is invisible precisely because the job goes on
-  // passing against whatever tsx it happened to install.
+  // silently, and the drift is invisible because the job goes on passing
+  // against whatever tsx it happened to install.
   it("takes the tsx version from the lockfile, never from a literal", () => {
     expect(code).not.toMatch(/tsx@\d/);
     expect(code).toMatch(/package-lock\.json/);
   });
 
   it("resolves that version to the one the lockfile actually holds", () => {
-    // Run the workflow's own derivation, so this fails if the expression is
+    // Run the action's own derivation, so this fails if the expression is
     // edited into something that no longer names tsx.
     const expression = code.match(
       /node -p "(require\('\.\/package-lock\.json'\)[^"]*)"/,
@@ -118,5 +106,26 @@ describe.each(LEAN_WORKFLOWS)("%s installs only what it runs", (workflow) => {
   // npm would install whatever `tsx@` alone means, which is latest.
   it("fails the step when the derivation fails", () => {
     expect(code).toMatch(/set -euo pipefail\n\s+version=/);
+  });
+});
+
+describe.each(LEAN_WORKFLOWS)("%s installs only what it runs", (workflow) => {
+  const code = executable(read(workflow));
+
+  it("does not rebuild the whole dependency tree", () => {
+    expect(code).not.toMatch(/npm\s+ci\b/);
+  });
+
+  // A workflow that stopped using the action and grew its own install would
+  // pass every assertion above, because those are about the action.
+  it("gets tsx from the one shared action", () => {
+    expect(code).toMatch(/uses:\s*\.\/\.github\/actions\/setup-tsx/);
+  });
+
+  // `npx tsx` would resolve nothing locally now and fetch tsx from the
+  // registry at whatever version is latest that day, defeating the pin.
+  it("runs its checker through the installed tsx, not through npx", () => {
+    expect(code).toMatch(/(?<!npx )tsx scripts\/check-[a-z-]+\.ts/);
+    expect(code).not.toMatch(/npx\s+tsx/);
   });
 });
