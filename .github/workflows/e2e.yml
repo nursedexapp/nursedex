@@ -75,15 +75,48 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # A throwaway local Supabase (Docker) so the run needs no secrets and
-      # never touches a real database. start applies migrations + seed; reset
-      # guarantees a clean known state (and surfaces a broken migration).
+      # never touches a real database.
+      #
+      # This used to be followed by `supabase db reset`, which applied the
+      # identical migrations and seed a second time, 32 to 38 seconds per run
+      # (#803). The comment here credited reset with surfacing a broken
+      # migration, so that was measured rather than assumed before dropping it:
+      # a branch with a migration that cannot apply (#821) made THIS step fail,
+      # naming the migration and the SQL error, and reset never ran at all.
+      # A successful run's log shows this step applying 001 through 065 and
+      # `Seeding data from supabase/seed.sql`, so nothing else was lost either.
+      # Seven of the twelve images `supabase start` pulls are for services
+      # nothing in the suite reaches (#802): no edge functions exist in the
+      # repo, nothing subscribes to Realtime, the e2e setups create users
+      # through the admin API with email_confirm true, and nobody opens Studio
+      # on a runner. Storage stays, for nurse photos and blog images.
+      #
+      # --exclude is a cobra string slice and silently ignores a name it does
+      # not know, so a typo, or a service renamed in a later CLI (this job
+      # tracks `latest`), would exclude nothing, cost the same 115 seconds, and
+      # look exactly like this working.
+      #
+      # So the exclusions are checked by what ends up RUNNING, after the fact,
+      # rather than by asking the CLI which names it likes. An earlier version
+      # did the latter, by parsing `supabase start --help`, and it broke on its
+      # first run: the runner's 2.116 prints that list differently from the 2.75
+      # it was written against. The count refuses in both directions, because a
+      # filter matching nothing would otherwise read as everything excluded.
+      #
+      # A spec that needed an excluded service fails on connection refused, so
+      # the list is proved by the run itself as well.
       - name: Start Supabase
         if: steps.proof.outputs.proven != 'true'
-        run: supabase start
-
-      - name: Reset database (migrations + seed)
-        if: steps.proof.outputs.proven != 'true'
-        run: supabase db reset
+        env:
+          EXCLUDED_SERVICES: >-
+            studio logflare vector edge-runtime realtime mailpit postgres-meta
+        run: |
+          set -euo pipefail
+          exclude=$(npx tsx scripts/check-supabase-exclusions.ts check)
+          echo "Excluding: $exclude"
+          supabase start -x "$exclude"
+          docker ps --filter name=supabase --format '{{.Names}}' \
+            | npx tsx scripts/check-supabase-exclusions.ts count
 
       # Map the local stack's URL/keys onto the names the app reads. The
       # anon key doubles as the publishable key for supabase-js locally.
@@ -113,6 +146,28 @@ jobs:
         if: steps.proof.outputs.proven != 'true'
         run: npm run test:rls
 
+      # The browser download is 23 to 41 seconds on every run (#804). Cache it
+      # on the exact @playwright/test version from the lockfile, read rather
+      # than written here so a version bump changes the key and re-downloads
+      # instead of running new Playwright against an old browser (L41).
+      - name: Resolve the Playwright version
+        id: playwright
+        if: steps.proof.outputs.proven != 'true'
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser download
+        if: steps.proof.outputs.proven != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # Still runs on a cache hit, and must: --with-deps installs system
+      # packages that live outside the cached directory. It costs a few seconds
+      # and skips the download when the browser is already there.
       - name: Install Playwright browsers
         if: steps.proof.outputs.proven != 'true'
         run: npx playwright install --with-deps chromium
