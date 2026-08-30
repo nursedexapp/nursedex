@@ -112,6 +112,24 @@ jobs:
           REQUIRED_CHECK: "lint, typecheck, test"
         run: tsx scripts/check-merged-tree-proof.ts
 
+      # Vitest's transform cache and its results store (which orders test
+      # files slowest first) live in .vitest-cache, outside node_modules, so
+      # they survive `npm ci` (#811). The vitest step is 66 to 111 seconds on
+      # the runner against 12 locally, of which the CI log attributes 32s to
+      # import and 18s to environment setup for the happy-dom files.
+      #
+      # Keyed on the lockfile and the vitest config, because a dependency or a
+      # config change is what invalidates a transform. Restored on a partial
+      # key too: a stale cache is still most of the work, and vitest checks
+      # each entry rather than trusting the directory wholesale.
+      - name: Cache the vitest transform and results store
+        uses: actions/cache@v4
+        with:
+          path: .vitest-cache
+          key: vitest-${{ runner.os }}-${{ hashFiles('package-lock.json', 'vitest.config.ts') }}
+          restore-keys: |
+            vitest-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm ci
 
@@ -129,6 +147,26 @@ jobs:
       - name: Run tests
         if: steps.proof.outputs.proven != 'true'
         run: npm test
+
+      # A tool only honours a directory setting if it actually writes there
+      # (L322, #811). This cannot be a unit test: vitest writes its results
+      # store when the run ENDS, so a test inside that run can only ever read
+      # the previous one's artefact, and would pass or fail on ambient state.
+      #
+      # Checked here, after the suite, where the answer is about this run. If
+      # vitest ever stops honouring cacheDir the cache silently caches nothing
+      # and CI just gets slower, with everything still green (L289).
+      - name: Check vitest used its cache directory
+        if: steps.proof.outputs.proven != 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -d .vitest-cache ] || [ -z "$(ls -A .vitest-cache)" ]; then
+            echo "vitest wrote nothing to .vitest-cache, so cacheDir is not" \
+                 "being honoured and the cache step above is preserving an" \
+                 "empty directory."
+            exit 1
+          fi
+          echo "vitest cache: $(du -sh .vitest-cache | cut -f1)"
 
       # #642. `npm test` proves every guarded surface HAS a test. It cannot prove
       # the test would FAIL if the guard were deleted, and every gap closed in
