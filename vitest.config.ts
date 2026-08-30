@@ -2,16 +2,27 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
-  // Outside node_modules on purpose (#811). Vitest keeps two things here: the
-  // transform cache, and the results store it uses to order test files slowest
-  // first. Both default to node_modules/.vite, which `npm ci` deletes on every
-  // CI run, so the runner re-transformed everything and ordered by file size
-  // every time. Here they survive the install and can be restored by
-  // actions/cache, and the ordering is what a four core runner needs most.
+  // Outside node_modules on purpose (#811), so it survives `npm ci` and can be
+  // restored by actions/cache.
   //
-  // It also happens to suit the guard mutation lanes (#807): each lane is an
-  // rsync copy of the working tree, so each gets its own copy of this
-  // directory rather than four of them writing to one shared cache.
+  // What is actually in here, measured rather than assumed: ONE file,
+  // vitest/<hash>/results.json, about 24KB, which is the store vitest uses to
+  // order test files slowest first. There is no transform cache on disk. The
+  // issue asked for "a vitest transform cache" and the first version of this
+  // comment claimed to be caching one; a full run writes nothing of the kind.
+  // A comment that misdescribes why something works is worse than no comment,
+  // because it is the explanation the next person reasons from.
+  //
+  // The saving is real even so: measured over six CI runs on one unchanged
+  // tree, alternating a deleted and a restored cache, the vitest step was
+  // 112, 112, 114 seconds cold against 96, 110, 95 warm. About 12 to 17
+  // seconds most runs. Re-measure the same way before changing this, because
+  // comparing across branches cannot answer it: each branch runs a different
+  // amount of work.
+  //
+  // It also suits the guard mutation lanes (#807): each lane is an rsync copy
+  // of the working tree, so each gets its own copy of this directory rather
+  // than several writing to one shared cache.
   cacheDir: ".vitest-cache",
   test: {
     // Default to `node` — most tests need no DOM. For a test that does (e.g.
