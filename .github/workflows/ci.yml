@@ -26,9 +26,17 @@ permissions:
   pull-requests: read  # which pull request carries the pushed commit
   checks: read         # whether that pull request's required check was green
 
+# Cancelling superseded runs is right on a branch, where only the latest commit
+# matters. On main it destroys the only report there will ever be: the full
+# guard mutation sweep runs ONLY on a push, so a second merge inside its 6.5
+# minute window used to cancel the first merge's sweep, and a mutant that
+# survived on that commit was then reported nowhere at all (#807, L98).
+#
+# Since #801 it is worse than losing a report: production waits for this job
+# (#817), so a cancelled run leaves a merge that never goes live.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ci:
