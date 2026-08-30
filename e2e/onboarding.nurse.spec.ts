@@ -90,7 +90,18 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
   await page.goto("/role-select");
   await chooseRadio(page, "Account type", "I am a nurse");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.waitForURL(/onboarding|dashboard/, { timeout: 20_000 });
+  // Wait for the profile ROW, not for the URL. Role selection is what creates
+  // the row, the next line navigates explicitly anyway, and the URL is a
+  // transient surface: waiting on it could not tell "the redirect never
+  // happened" from "it happened and we already moved on" (L239). It was also
+  // the flake in #805, timing out at 20s while Turbopack compiled a route that
+  // global-setup now warms.
+  await expect
+    .poll(async () => (await profileOf(nurseId)) !== null, {
+      timeout: 30_000,
+      message: "role selection did not create the nurse profile row",
+    })
+    .toBe(true);
 
   // ── Step 1: basics
   await page.goto("/dashboard/onboarding");
