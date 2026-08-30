@@ -27,37 +27,20 @@ const REQUIRED_BY_THE_SUITE: Record<string, string> = {
   supavisor: "connection pooling for the database the suite reads",
 };
 
-/** The names `supabase start --exclude` says it accepts, read from its help. */
-export function parseAcceptedExclusions(help: string): string[] {
-  const match = help.match(/--exclude\s+strings[^\n[]*\[([^\]]*)\]/);
-  if (!match) {
-    throw new Error(
-      "Could not find the --exclude list in `supabase start --help`. The CLI " +
-        "has changed its help format, so the exclusion names cannot be " +
-        "checked against anything. Fix this before trusting the exclusions.",
-    );
-  }
-  const names = match[1]
-    .split(",")
-    .map((name) => name.trim())
-    .filter((name) => name.length > 0);
-  if (names.length === 0) {
-    // An empty accepted list would make every name look invalid, which reads
-    // as a broken exclusion list rather than as a broken parse (L11).
-    throw new Error(
-      "`supabase start --help` listed no names for --exclude. That is a " +
-        "parsing failure, not an empty CLI: refusing rather than guessing.",
-    );
-  }
-  return names;
-}
-
 /**
- * Check the services we want excluded against what the CLI accepts and against
- * what the suite needs. Returns the list on success so the caller cannot use an
- * unchecked one by accident.
+ * Check the services we want excluded against what the suite needs. Returns the
+ * list on success, so a caller cannot use an unchecked one by accident.
+ *
+ * This deliberately does NOT check the names against the CLI's vocabulary. An
+ * earlier version parsed them out of `supabase start --help`, which broke on
+ * the first run: the runner tracks `latest` (2.116) and prints that list
+ * differently from the 2.75 the parser was written against. Coupling a check to
+ * the exact rendering of a value fails on the first legitimate change to it
+ * (L103), and the thing actually worth knowing is not whether the CLI likes the
+ * name but whether the service ended up running. That is measured after the
+ * fact by countRunningServices below.
  */
-export function checkExclusions(wanted: string[], accepted: string[]): string[] {
+export function checkExclusions(wanted: string[]): string[] {
   if (wanted.length === 0) {
     throw new Error(
       "No services were named, so there is nothing to exclude. An empty " +
@@ -90,14 +73,56 @@ export function checkExclusions(wanted: string[], accepted: string[]): string[] 
     );
   }
 
-  const unknown = wanted.filter((name) => !accepted.includes(name));
-  if (unknown.length > 0) {
+  return wanted;
+}
+
+/**
+ * What actually ended up running, checked against what should have.
+ *
+ * This is the real guard. `--exclude` is a cobra string slice and silently
+ * ignores a name it does not know, so a typo, or a service renamed in a later
+ * CLI, excludes nothing while the step reads as successful. Rather than ask the
+ * CLI what names it likes, count the containers it left running: that measures
+ * the outcome instead of a proxy for it (L63).
+ *
+ * Refuses in BOTH directions. Too many means the exclusions stopped working.
+ * Too few, including none at all, means this is not measuring what it thinks it
+ * is: a count of zero would otherwise be the healthiest possible reading of a
+ * filter that matches nothing (L98).
+ */
+export function countRunningServices(
+  dockerPsOutput: string,
+  bounds: { atLeast: number; atMost: number },
+): { count: number; names: string[]; message: string } {
+  const names = dockerPsOutput
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const count = names.length;
+  const listed = names.join(", ") || "none";
+
+  if (count < bounds.atLeast) {
     throw new Error(
-      `\`supabase start --exclude\` does not accept: ${unknown.join(", ")}. ` +
-        `It accepts: ${accepted.join(", ")}. An unaccepted name is silently ` +
-        `ignored, so this would have excluded nothing and looked like it worked.`,
+      `Only ${count} Supabase containers are running (${listed}), fewer than ` +
+        `the ${bounds.atLeast} this stack needs. Either the stack did not come ` +
+        `up, or this is no longer counting the right containers, and an ` +
+        `undercount reads as a very successful exclusion.`,
     );
   }
 
-  return wanted;
+  if (count > bounds.atMost) {
+    throw new Error(
+      `${count} Supabase containers are running (${listed}), more than the ` +
+        `${bounds.atMost} expected after the exclusions. A name --exclude does ` +
+        `not recognise is silently ignored, so the services are still starting ` +
+        `and the run is paying for them.`,
+    );
+  }
+
+  return {
+    count,
+    names,
+    message: `${count} Supabase containers running after the exclusions: ${listed}.`,
+  };
 }

@@ -9,23 +9,26 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseAcceptedExclusions, checkExclusions } from "./supabase-exclusions";
+import { checkExclusions } from "./supabase-exclusions";
 
 const E2E = readFileSync(
   join(process.cwd(), ".github/workflows/e2e.yml"),
   "utf8",
 );
 
+/**
+ * Comments explain the workflow; only executed lines start a service or
+ * download a browser. Several comments here name the very commands they exist
+ * to say were removed, and a check over the raw file cannot tell the line
+ * doing a thing from the line explaining it (L103, L135).
+ */
+const EXECUTABLE = E2E.split("\n")
+  .filter((line) => !line.trim().startsWith("#"))
+  .join("\n");
+
 const LOCKFILE = JSON.parse(
   readFileSync(join(process.cwd(), "package-lock.json"), "utf8"),
 ) as { packages?: Record<string, { version?: string } | undefined> };
-
-// From `supabase start --help` on CLI 2.75.0.
-const ACCEPTED = parseAcceptedExclusions(
-  "  -x, --exclude strings       Names of containers to not start. " +
-    "[gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest," +
-    "postgres-meta,studio,edge-runtime,logflare,vector,supavisor]",
-);
 
 /** The services the workflow actually asks to exclude. */
 function excludedInWorkflow(): string[] {
@@ -35,11 +38,11 @@ function excludedInWorkflow(): string[] {
 }
 
 describe("what the E2E job starts (#802)", () => {
-  // The real check, run against the workflow's real list with the same
-  // function CI uses. A second copy of the rule written here would drift from
-  // the one that actually runs (L263).
-  it("excludes only names the CLI accepts and the suite does not use", () => {
-    expect(() => checkExclusions(excludedInWorkflow(), ACCEPTED)).not.toThrow();
+  // Run against the workflow's real list with the same function CI uses. A
+  // second copy of the rule written here would drift from the one that
+  // actually runs (L263).
+  it("excludes nothing the suite itself uses", () => {
+    expect(() => checkExclusions(excludedInWorkflow())).not.toThrow();
   });
 
   it("excludes the seven services identified as unreachable", () => {
@@ -63,15 +66,27 @@ describe("what the E2E job starts (#802)", () => {
     expect(excludedInWorkflow()).not.toContain("storage-api");
   });
 
-  // Checking the names is the whole point: without it a typo excludes nothing
-  // and the step looks identical to a working one.
-  it("checks the names against the CLI before using them", () => {
-    expect(E2E).toContain("scripts/check-supabase-exclusions.ts");
-    expect(E2E).toMatch(/supabase start --help/);
+  // The check that matters happens AFTER the stack starts: a name --exclude
+  // does not recognise is silently ignored, so only what ended up running can
+  // tell you whether the exclusions took effect.
+  it("counts what is actually running once the stack is up", () => {
+    expect(E2E).toMatch(/docker ps --filter name=supabase/);
+    expect(E2E).toMatch(/check-supabase-exclusions\.ts count/);
   });
 
-  it("fails the step when the check fails, rather than starting everything", () => {
-    expect(E2E).toMatch(/set -euo pipefail\n\s+exclude=\$\(supabase start --help/);
+  it("checks the list before starting, as well", () => {
+    expect(E2E).toMatch(/check-supabase-exclusions\.ts check/);
+  });
+
+  // The previous version asked the CLI which names it accepted, by parsing its
+  // help. That broke on the first run, because the runner's CLI prints that
+  // list differently. Nothing should couple to it again.
+  it("does not depend on how the CLI words its help", () => {
+    expect(EXECUTABLE).not.toMatch(/supabase start --help/);
+  });
+
+  it("fails the step when either check fails, rather than carrying on", () => {
+    expect(E2E).toMatch(/set -euo pipefail\n\s+exclude=\$\(npx tsx/);
   });
 });
 
@@ -105,13 +120,6 @@ describe("what the E2E job downloads (#804)", () => {
 });
 
 describe("how many times the E2E job builds the database (#803)", () => {
-  // Comments explain the workflow; only executed lines build a database. The
-  // comment recording WHY reset was dropped names the command it dropped, and
-  // a check over the raw file cannot tell that line from a line that runs it.
-  const EXECUTABLE = E2E.split("\n")
-    .filter((line) => !line.trim().startsWith("#"))
-    .join("\n");
-
   /** Steps whose command applies migrations and the seed. */
   function applyingSteps(): string[] {
     return EXECUTABLE.split(/\n(?=      - name: )/)

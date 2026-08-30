@@ -91,14 +91,20 @@ jobs:
       # through the admin API with email_confirm true, and nobody opens Studio
       # on a runner. Storage stays, for nurse photos and blog images.
       #
-      # The names are checked against the CLI's OWN list before use, because
       # --exclude is a cobra string slice and silently ignores a name it does
-      # not know. A typo, or a service renamed in a later CLI (this job tracks
-      # `latest`), would otherwise exclude nothing, cost the same 115 seconds,
-      # and look exactly like this working.
+      # not know, so a typo, or a service renamed in a later CLI (this job
+      # tracks `latest`), would exclude nothing, cost the same 115 seconds, and
+      # look exactly like this working.
+      #
+      # So the exclusions are checked by what ends up RUNNING, after the fact,
+      # rather than by asking the CLI which names it likes. An earlier version
+      # did the latter, by parsing `supabase start --help`, and it broke on its
+      # first run: the runner's 2.116 prints that list differently from the 2.75
+      # it was written against. The count refuses in both directions, because a
+      # filter matching nothing would otherwise read as everything excluded.
       #
       # A spec that needed an excluded service fails on connection refused, so
-      # the exclusion list is proved by the run itself.
+      # the list is proved by the run itself as well.
       - name: Start Supabase
         if: steps.proof.outputs.proven != 'true'
         env:
@@ -106,9 +112,11 @@ jobs:
             studio logflare vector edge-runtime realtime mailpit postgres-meta
         run: |
           set -euo pipefail
-          exclude=$(supabase start --help 2>&1 | npx tsx scripts/check-supabase-exclusions.ts)
+          exclude=$(npx tsx scripts/check-supabase-exclusions.ts check)
           echo "Excluding: $exclude"
           supabase start -x "$exclude"
+          docker ps --filter name=supabase --format '{{.Names}}' \
+            | npx tsx scripts/check-supabase-exclusions.ts count
 
       # Map the local stack's URL/keys onto the names the app reads. The
       # anon key doubles as the publishable key for supabase-js locally.

@@ -1,10 +1,26 @@
-// Reads `supabase start --help` on stdin, checks the services named in
-// EXCLUDED_SERVICES against what the CLI actually accepts, and prints the
-// comma-joined list for `supabase start -x` (#802).
+// Two jobs for the E2E job's Supabase start (#802), split by when they run.
 //
-// Exits non-zero on any problem, so the E2E job fails loudly rather than
-// starting everything and paying the 115 seconds this exists to avoid.
-import { parseAcceptedExclusions, checkExclusions } from "./supabase-exclusions";
+//   before   `check`  the services named must not be ones the suite uses
+//   after    `count`  the services excluded must actually not be running
+//
+// The second is the real guard. `--exclude` is a cobra string slice and
+// silently ignores a name it does not know, so a typo, or a service renamed in
+// a later CLI (this job tracks `latest`), excludes nothing while the step reads
+// as successful.
+//
+// An earlier version asked the CLI which names it accepted, by parsing
+// `supabase start --help`. That broke on its first run: the runner's 2.116
+// prints that list differently from the 2.75 it was written against. Measuring
+// the outcome needs no agreement about how a help page is worded (L63, L103).
+import { checkExclusions, countRunningServices } from "./supabase-exclusions";
+
+/**
+ * The stack should be five containers with the seven exclusions in force, and
+ * twelve without them. The bounds sit either side of five with room for
+ * Supabase to add or merge a service without a false alarm, and far below
+ * twelve, which is the reading that means the exclusions stopped working.
+ */
+const BOUNDS = { atLeast: 3, atMost: 8 };
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -12,31 +28,36 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function main(): Promise<void> {
+function wantedServices(): string[] {
   const raw = process.env.EXCLUDED_SERVICES;
   if (!raw) {
-    process.stderr.write(
+    throw new Error(
       "EXCLUDED_SERVICES is not set. Refusing rather than starting every " +
-        "service, which would be slow and silent.\n",
+        "service, which would be slow and silent.",
     );
-    process.exit(1);
   }
+  return raw.split(/[\s,]+/).filter((name) => name.length > 0);
+}
 
-  const help = await readStdin();
-  if (help.trim().length === 0) {
-    // An empty help text and a CLI that answered are different situations, and
-    // only one of them means the names are unchecked (L11).
-    process.stderr.write(
-      "`supabase start --help` produced nothing on stdin, so the exclusion " +
-        "names could not be checked against anything.\n",
-    );
-    process.exit(1);
-  }
-
+async function main(): Promise<void> {
+  const mode = process.argv[2];
   try {
-    const wanted = raw.split(/[\s,]+/).filter((name) => name.length > 0);
-    const checked = checkExclusions(wanted, parseAcceptedExclusions(help));
-    process.stdout.write(checked.join(","));
+    if (mode === "check") {
+      // Prints the comma-joined list for `supabase start -x`.
+      process.stdout.write(checkExclusions(wantedServices()).join(","));
+      return;
+    }
+
+    if (mode === "count") {
+      const result = countRunningServices(await readStdin(), BOUNDS);
+      process.stdout.write(`${result.message}\n`);
+      return;
+    }
+
+    throw new Error(
+      `Unknown mode "${mode ?? ""}". Expected "check" before the stack starts ` +
+        `or "count" after it.`,
+    );
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : error}\n`);
     process.exit(1);
