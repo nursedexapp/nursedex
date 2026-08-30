@@ -36,10 +36,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      # This job runs one TypeScript checker and nothing else. Its imports are
+      # its own siblings plus src/lib/slack/constants.ts, so tsx is the entire
+      # dependency tree it needs; `npm ci` rebuilt all of node_modules for it,
+      # 22 to 38 seconds, and pushed Production Smoke just over the billed
+      # minute on every one of its 48 monthly runs (#808).
+      #
+      # `--prefix` is load-bearing, not tidiness. `npm install tsx@x` run inside
+      # the repo installs the named package AND everything in package.json:
+      # measured at 1171 packages and 14 seconds, which is no saving at all.
+      # Installing into a directory outside the repo has no package.json to
+      # read, so it fetches tsx and its four dependencies and nothing else.
+      #
+      # The version is READ from the lockfile, never written here, so a
+      # dependabot bump cannot leave this job on a different tsx than the repo.
+      # `node -p` throws when the lockfile has no tsx entry, and pipefail turns
+      # that into a failed step rather than an unpinned `tsx@` meaning latest.
+      - name: Install tsx
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package-lock.json').packages['node_modules/tsx'].version")
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/tsx" "tsx@$version"
+          echo "$RUNNER_TEMP/tsx/node_modules/.bin" >> "$GITHUB_PATH"
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v2
@@ -61,4 +80,4 @@ jobs:
           set -euo pipefail
           supabase link --project-ref "$PROJECT_REF"
           supabase migration list --linked --output-format json \
-            | npx tsx scripts/check-migration-drift.ts
+            | tsx scripts/check-migration-drift.ts
