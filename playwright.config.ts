@@ -18,7 +18,13 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // EXPERIMENT ONLY (#806a). Never to be merged as-is.
+  // The runner has four cores and the three storageState projects (admin,
+  // family, nurse) are independent journeys, so two workers is the natural
+  // unit. Judged by the flaky count from #805 and, before that, by the count
+  // of specs EXECUTED: a parallel change that silently drops a worker's share
+  // still prints a verdict, and the failures are the visible half (L288).
+  workers: process.env.CI ? 2 : undefined,
   // html for the artifact, list so the log says what ran, and the flake
   // reporter so a run that was green only because of retries says so on the
   // run itself and in the step summary (#805). Without it, `retries: 2`
