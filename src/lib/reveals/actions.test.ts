@@ -21,6 +21,7 @@ const h = vi.hoisted(() => {
     // Result of the atomic reveal RPC (migration 059). `allowed: false` means
     // the family was already at the hard cap. `already_revealed: true` means the
     // reveal was already there, so the function spent nothing.
+    revealReadError: null as { message: string } | null,
     revealRow: {
       allowed: true,
       current_count: 1,
@@ -72,7 +73,10 @@ const h = vi.hoisted(() => {
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.eq = () => b;
-    b.maybeSingle = async () => ({ data: state.existingReveal });
+    b.maybeSingle = async () =>
+      state.revealReadError
+        ? { data: null, error: state.revealReadError }
+        : { data: state.existingReveal };
     b.insert = async (payload: unknown) => {
       calls.revealInsert.push(payload);
       return { error: null };
@@ -435,5 +439,27 @@ describe("hasRevealedNurse", () => {
       access_expires_at: new Date(Date.now() - 86_400_000).toISOString(),
     };
     expect(await hasRevealedNurse(NURSE_ID)).toBe(false);
+  });
+
+  // The money path. This used to read only `data` and ignore `error`, so ANY
+  // failure to read the table (a permission change, RLS, a dropped connection)
+  // came back as a confident "you have not revealed this nurse": the family had
+  // spent a capped daily reveal, owned the contact, and was shown the button
+  // again with no sign anything was wrong.
+  //
+  // That is the shape of #700, where migration 052 revoked EXECUTE and a family
+  // who clicked reveal was charged and shown an empty card, green everywhere for
+  // weeks. A reader that answers the same way for "no row" and "could not look"
+  // cannot be told apart from a correct one (L215, L10).
+  it("refuses rather than reporting no reveal when the read itself fails", async () => {
+    h.state.revealReadError = { message: "permission denied for table reveals" };
+    await expect(hasRevealedNurse(NURSE_ID)).rejects.toThrow(
+      /permission denied for table reveals/,
+    );
+  });
+
+  it("says it could not read, rather than naming the reveal state", async () => {
+    h.state.revealReadError = { message: "connection terminated" };
+    await expect(hasRevealedNurse(NURSE_ID)).rejects.toThrow(/could not be read/i);
   });
 });

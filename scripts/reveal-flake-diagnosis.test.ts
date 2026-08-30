@@ -26,15 +26,26 @@ const CODE = SPEC.split("\n")
   .join("\n");
 
 describe("the family reveal spec", () => {
-  // The durable record of a reveal is a spent slot, which is what the test is
-  // named after. Polling it waits on the condition rather than on a fixed
-  // budget (L290).
-  it("checks the reveal reached the database before checking the screen", () => {
-    const pollAt = CODE.indexOf("expect\n    .poll(() => slotsSpent");
+  // The durable record of a reveal is the row in `reveals`, NOT the spent slot.
+  // They are different tables: reveal_nurse spends a slot, inserts the reveal,
+  // and refunds the slot if the insert did nothing, and hasRevealedNurse reads
+  // the reveal row. An earlier version of this polled the quota counter while
+  // its message claimed the reveal was recorded, which is a guard asserting a
+  // proxy for the thing it exists to protect (L63).
+  it("checks the reveal row, not the quota counter, before checking the screen", () => {
+    const pollAt = CODE.indexOf(".poll(async () => (await revealRow(");
     const renderAt = CODE.indexOf('getByText("e2e-reveal-nurse@nursedex.test")');
-    expect(pollAt, "no poll on the durable record").toBeGreaterThan(-1);
+    expect(pollAt, "the poll is not on the reveal row").toBeGreaterThan(-1);
     expect(renderAt).toBeGreaterThan(-1);
     expect(pollAt).toBeLessThan(renderAt);
+  });
+
+  // The render failure has to carry the state the page's own check reads, or
+  // the next occurrence is as undiagnosable as the last one: hasRevealedNurse
+  // returns false both for a missing row and for a passed expiry.
+  it("reports the reveal row's expiry when the screen does not update", () => {
+    expect(CODE).toMatch(/access_expires_at=\$\{/);
+    expect(CODE).toMatch(/slot\(s\) are spent/);
   });
 
   // Each of the two failures has to name its own cause, or the split has

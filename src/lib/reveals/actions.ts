@@ -206,12 +206,29 @@ export async function hasRevealedNurse(nurseUserId: string): Promise<boolean> {
   if (!user || user.role !== "family") return false;
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("reveals")
     .select("access_expires_at")
     .eq("family_user_id", user.id)
     .eq("nurse_user_id", nurseUserId)
     .maybeSingle();
+
+  // A failed read is NOT "no reveal". This used to ignore `error`, so any
+  // failure to read the table (a permission change, RLS, a dropped connection)
+  // came back as a confident "you have not revealed this nurse": the family had
+  // spent a capped daily reveal, owned the contact, and was shown the button
+  // again with nothing anywhere reporting a problem.
+  //
+  // That is the shape of #700, where a revoked grant charged a family and showed
+  // them an empty card, green everywhere for weeks. A reader that answers the
+  // same way for "no row" and "could not look" is indistinguishable from a
+  // correct one (L215, L10), and this one sits on the money path.
+  if (error) {
+    throw new Error(
+      `Whether this family has revealed nurse ${nurseUserId} could not be ` +
+        `read: ${error.message}`,
+    );
+  }
 
   if (!data) return false;
   if (!data.access_expires_at) return true;
