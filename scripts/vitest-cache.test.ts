@@ -69,10 +69,22 @@ describe("the CI cache step", () => {
 
   // It has to be restored BEFORE the install, or npm ci would run first and
   // the ordering the cache exists to restore would arrive too late to matter.
+  //
+  // The step is found by what it DOES (an actions/cache step whose path is the
+  // configured directory), not by its name. An earlier version matched the name
+  // and broke the moment the step was renamed to describe the cache correctly,
+  // which is a test coupled to wording rather than to behaviour (L103).
   it("restores the cache before the install, not after", () => {
-    const cacheAt = CI.indexOf("Cache the vitest transform");
-    const installAt = CI.indexOf("- name: Install dependencies");
-    expect(cacheAt).toBeGreaterThan(-1);
+    const dir = configuredCacheDir();
+    const steps = CI.split(/\n(?=      - name: )/);
+    const cacheAt = steps.findIndex(
+      (step) => step.includes("actions/cache@") && step.includes(`path: ${dir}`),
+    );
+    const installAt = steps.findIndex((step) =>
+      step.includes("- name: Install dependencies"),
+    );
+    expect(cacheAt, "no actions/cache step for the vitest directory").toBeGreaterThan(-1);
+    expect(installAt).toBeGreaterThan(-1);
     expect(cacheAt).toBeLessThan(installAt);
   });
 });
