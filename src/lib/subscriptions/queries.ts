@@ -22,7 +22,7 @@ export async function getActiveSubscription(
   planType: "nurse_featured" | "family_access",
 ): Promise<SubscriptionRow | null> {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("subscriptions")
     .select(
       "id, user_id, plan_type, status, current_period_end, cancel_at_period_end, stripe_customer_id, stripe_subscription_id",
@@ -33,6 +33,20 @@ export async function getActiveSubscription(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // A failed read is NOT "no subscription". This used to ignore `error`, so any
+  // failure to read the table came back as a confident "this family has no
+  // subscription": a paying family would be shown the paywall, and revealNurse
+  // would refuse them with no_subscription, with nothing anywhere reporting a
+  // fault. It decides whether somebody who has paid gets what they paid for
+  // (L215, L10), and it is the same defect fixed in hasRevealedNurse.
+  if (error) {
+    throw new Error(
+      `The ${planType} subscription for ${userId} could not be read: ` +
+        `${error.message}`,
+    );
+  }
+
   return (data as SubscriptionRow | null) ?? null;
 }
 

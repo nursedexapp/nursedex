@@ -20,7 +20,10 @@ type Row = {
   stripe_subscription_id: string;
 };
 
-const h = vi.hoisted(() => ({ rows: [] as Row[] }));
+const h = vi.hoisted(() => ({
+  rows: [] as Row[],
+  readError: null as { message: string } | null,
+}));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
@@ -51,6 +54,7 @@ vi.mock("@/lib/supabase/server", () => ({
               ),
             )
             .sort((a, b) => b.created_at.localeCompare(a.created_at));
+          if (h.readError) return { data: null, error: h.readError };
           return { data: matches[0] ?? null };
         },
       });
@@ -77,6 +81,7 @@ function seedRow(overrides: Partial<Row>): Row {
 
 beforeEach(() => {
   h.rows = [];
+  h.readError = null;
 });
 
 describe("hasActiveFamilyAccess", () => {
@@ -102,6 +107,7 @@ describe("hasActiveFamilyAccess", () => {
 
   it("returns false when the user has no subscription", async () => {
     h.rows = [];
+  h.readError = null;
     expect(await hasActiveFamilyAccess("u1")).toBe(false);
   });
 
@@ -144,5 +150,36 @@ describe("getActiveSubscription", () => {
     ];
     const sub = await getActiveSubscription("u1", "family_access");
     expect(sub?.id).toBe("new");
+  });
+});
+
+describe("a subscription read that fails", () => {
+  // The access gate. This used to read only `data` and ignore `error`, so any
+  // failure to read the table came back as "this family has no subscription":
+  // a paying family would be shown the paywall, and revealNurse would refuse
+  // them with no_subscription, with nothing anywhere reporting a fault.
+  //
+  // A reader that answers the same way for "no row" and "could not look" is
+  // indistinguishable from a correct one (L215), and this one decides whether
+  // somebody who has paid gets what they paid for.
+  it("refuses rather than reporting no subscription", async () => {
+    h.readError = { message: "permission denied for table subscriptions" };
+    await expect(getActiveSubscription("u1", "family_access")).rejects.toThrow(
+      /permission denied for table subscriptions/,
+    );
+  });
+
+  it("says it could not read, rather than naming the subscription state", async () => {
+    h.readError = { message: "connection terminated" };
+    await expect(getActiveSubscription("u1", "family_access")).rejects.toThrow(
+      /could not be read/i,
+    );
+  });
+
+  // hasActiveFamilyAccess is the one the reveal path actually calls, so the
+  // refusal has to survive that wrapper rather than being flattened to false.
+  it("carries the refusal through hasActiveFamilyAccess", async () => {
+    h.readError = { message: "permission denied for table subscriptions" };
+    await expect(hasActiveFamilyAccess("u1")).rejects.toThrow(/could not be read/i);
   });
 });

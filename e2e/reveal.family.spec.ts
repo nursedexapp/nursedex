@@ -44,6 +44,29 @@ test.beforeEach(async () => {
   await db.from("rate_limit_reveals").delete().eq("family_user_id", familyId);
 });
 
+/**
+ * The reveal row itself, which is what unlocks the contact.
+ *
+ * The spent slot and the reveal are DIFFERENT tables, and #831 turned on that
+ * difference: the failure message claimed "the reveal is recorded in the
+ * database" while only ever checking the daily quota counter. reveal_nurse
+ * (migration 059) spends a slot, inserts the reveal, and refunds the slot if
+ * the insert did nothing, so a spent slot is strong evidence but not the thing
+ * itself, and hasRevealedNurse reads THIS row.
+ */
+async function revealRow(
+  familyId: string,
+  nurseId: string,
+): Promise<{ access_expires_at: string | null } | null> {
+  const { data } = await service()
+    .from("reveals")
+    .select("access_expires_at")
+    .eq("family_user_id", familyId)
+    .eq("nurse_user_id", nurseId)
+    .maybeSingle();
+  return data as { access_expires_at: string | null } | null;
+}
+
 /** How many of today's capped daily reveals this family has spent. */
 async function slotsSpent(familyId: string): Promise<number> {
   const { data } = await service()
@@ -58,7 +81,7 @@ async function slotsSpent(familyId: string): Promise<number> {
 test("a subscribed family reveals a nurse, and spends exactly one slot", async ({
   page,
 }) => {
-  const { familyId, nurseSlug } = fixture();
+  const { familyId, nurseId, nurseSlug } = fixture();
 
   expect(await slotsSpent(familyId)).toBe(0);
 
@@ -79,27 +102,34 @@ test("a subscribed family reveals a nurse, and spends exactly one slot", async (
   // completely different bugs, and one assertion that covers both diagnoses
   // neither (L11, L239).
   //
-  // First: did the reveal ACTUALLY happen? That is a row, not a rendering. A
-  // spent slot is the durable record of it, it is what this test is named
-  // after, and polling it waits on the condition rather than on a fixed budget
-  // (L290).
+  // First: did the reveal ACTUALLY happen? That is a row, not a rendering, and
+  // it is the REVEAL row rather than the spent slot. The two are different
+  // tables and #831 turned on the difference: the earlier version of this
+  // checked the daily quota counter while its message claimed the reveal was
+  // recorded. Polling waits on the condition rather than a fixed budget (L290).
   await expect
-    .poll(() => slotsSpent(familyId), {
+    .poll(async () => (await revealRow(familyId, nurseId)) !== null, {
       timeout: 15_000,
       message:
-        "the reveal never reached the database: no slot was spent. The click " +
-        "was swallowed, or the reveal itself failed. This is not a rendering " +
-        "problem",
+        "the reveal never reached the database: no row in `reveals`. " +
+        "The click was swallowed, or reveal_nurse refused. " +
+        "This is not a rendering problem",
     })
-    .toBe(1);
+    .toBe(true);
 
-  // Only then: did the contact details reach the screen? This is the thing that
-  // would break if the app called a database function production did not have.
-  // Reaching this line means the reveal is recorded, so a failure here is a
-  // rendering fault and nothing else.
+  // Only then: did the contact details reach the screen?
+  //
+  // The failure message carries the state the page's own check reads, because
+  // #831 could not be diagnosed without it: hasRevealedNurse returns false both
+  // when the row is missing and when access_expires_at has passed, and a bare
+  // "element not found" tells a reader neither.
+  const recorded = await revealRow(familyId, nurseId);
   await expect(
     page.getByText("e2e-reveal-nurse@nursedex.test"),
-    "the reveal is recorded in the database but the contact details never appeared on screen",
+    `the reveal row exists (access_expires_at=${JSON.stringify(
+      recorded?.access_expires_at,
+    )}) and ${await slotsSpent(familyId)} slot(s) are spent, but the contact ` +
+      `details never appeared on screen`,
   ).toBeVisible({ timeout: 15_000 });
 
   // Coming back later must not charge them again. The reveal is already theirs,
