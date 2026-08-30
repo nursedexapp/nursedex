@@ -22,6 +22,7 @@ const h = vi.hoisted(() => {
     // the family was already at the hard cap. `already_revealed: true` means the
     // reveal was already there, so the function spent nothing.
     revealReadError: null as { message: string } | null,
+    subscriptionError: null as { message: string } | null,
     revealRow: {
       allowed: true,
       current_count: 1,
@@ -127,7 +128,10 @@ const h = vi.hoisted(() => {
     serverClient,
     serviceRoleClient,
     getCurrentUser: vi.fn(async () => state.user),
-    hasActiveFamilyAccess: vi.fn(async () => state.hasAccess),
+    hasActiveFamilyAccess: vi.fn(async () => {
+      if (state.subscriptionError) throw new Error(state.subscriptionError.message);
+      return state.hasAccess;
+    }),
     getNurseContactInfo: vi.fn(async () => state.contact),
     verifyTurnstileToken: vi.fn(async (token: string, ip?: string) => {
       calls.verifyTurnstile.push({ token, ip });
@@ -403,6 +407,33 @@ describe("revealNurse happy path", () => {
     };
     const res = await revealNurse(NURSE_ID);
     expect(res).toEqual({ success: false, error: "unknown" });
+  });
+});
+
+// The action's contract is to RETURN a RevealResult. A throw breaks that for
+// every caller, and the one caller that matters is a button: RevealCTA awaits
+// this inside a void async IIFE with no catch, so a rejection would skip
+// setIsPending(false) and leave the spinner turning forever with no message.
+//
+// A control that looks identical whether the work is progressing, hung or dead
+// is a defect. This came in with the fix that made the subscription read throw
+// rather than silently answer "no", which is right for a page render behind an
+// error screen and wrong for a server action.
+describe("revealNurse when a read underneath it fails", () => {
+  it("returns a failure rather than throwing", async () => {
+    h.state.subscriptionError = { message: "permission denied" };
+    await expect(revealNurse(NURSE_ID)).resolves.toEqual({
+      success: false,
+      error: "unknown",
+    });
+  });
+
+  it("does not report it as a missing subscription", async () => {
+    // "no_subscription" sends the family to the paywall, which is a confident
+    // claim about their account made from a failed read.
+    h.state.subscriptionError = { message: "connection terminated" };
+    const res = await revealNurse(NURSE_ID);
+    expect(res.error).not.toBe("no_subscription");
   });
 });
 
