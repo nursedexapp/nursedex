@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PHOTO_UPLOAD } from "@/lib/constants";
@@ -36,6 +37,35 @@ export async function getSignedUploadUrl(
   }
 
   return { path, signedUrl: data.signedUrl };
+}
+
+/**
+ * Short, stable, non-reversible id for one stored photo.
+ *
+ * Keyed on the storage path, so it is the same for as long as the photo is and
+ * different the moment the nurse uploads a new one. Deliberately not the path
+ * itself: the raw storage path must never ship to the browser (see
+ * `toPublicNurseCard`, and the guard in saves.test.ts), and a URL is markup.
+ */
+export function nursePhotoId(path: string): string {
+  return createHash("sha256").update(path).digest("hex").slice(0, 16);
+}
+
+/**
+ * The stable, cacheable URL a nurse photo is displayed through (#871).
+ *
+ * Never embed a signed URL in rendered markup: Supabase mints a fresh token on
+ * every call, so the URL differs on every render, and Vercel's image optimizer
+ * keys its cache on the source URL. In production that meant a cache MISS on
+ * every photo request forever, re-fetching and re-encoding each photo on every
+ * visit, and defeating the visitor's own browser cache too.
+ *
+ * The nurse's id is already on the card, and the photo id is a hash, so this
+ * reveals nothing the browser did not already have. `/api/nurse-photo` resolves
+ * the pair back to a path and signs it, once, behind the cache.
+ */
+export function nursePhotoUrl(userId: string, path: string): string {
+  return `/api/nurse-photo/${encodeURIComponent(userId)}/${nursePhotoId(path)}`;
 }
 
 /**

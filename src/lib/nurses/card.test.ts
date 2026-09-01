@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const signPhoto = vi.fn();
-vi.mock("@/lib/profile/photos", () => ({
+// Only the signer is stubbed: it needs a service-role client. nursePhotoUrl is
+// pure and is the thing under test here, so it stays real.
+vi.mock("@/lib/profile/photos", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/profile/photos")>()),
   getSignedPhotoUrl: (path: string) => signPhoto(path),
 }));
 
@@ -10,6 +13,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ from: (t: string) => supabaseFrom(t) }),
 }));
 
+import { nursePhotoId } from "@/lib/profile/photos";
 import {
   NURSE_CARD_COLUMNS,
   ZIP_LOOKUP_CAP,
@@ -265,8 +269,7 @@ describe("attachNurseCardPhotos", () => {
     errorSpy.mockRestore();
   });
 
-  it("signs the first photo of every card that has one", async () => {
-    signPhoto.mockImplementation((path: string) => `signed:${path}`);
+  it("points the first photo of every card that has one at the photo route", async () => {
     const cards = [
       shapeNurseCard(rawRow({ user_id: "a", photos: ["a/1.jpg"] }), {
         canSeeIdentity: true,
@@ -278,49 +281,87 @@ describe("attachNurseCardPhotos", () => {
       }),
     ];
     await attachNurseCardPhotos(cards);
-    expect(cards[0].photo_url).toBe("signed:a/1.jpg");
+    expect(cards[0].photo_url).toBe(
+      `/api/nurse-photo/a/${nursePhotoId("a/1.jpg")}`,
+    );
     expect(cards[1].photo_url).toBeNull();
     expect(logged).toEqual([]);
   });
 
-  // A signing failure and a nurse who never uploaded a photo look identical on
-  // the card, so the failure has to say so somewhere. Without this a broken
-  // bucket reads as an onboarding gap.
-  it("leaves the card usable but reports a signing failure", async () => {
-    signPhoto.mockRejectedValue(new Error("bucket unreachable"));
+  // Shaping must not touch Supabase at all any more. A page of 15 nurses used
+  // to make 15 signing round trips before it could stream (#871).
+  it("signs nothing while shaping", async () => {
     const cards = [
-      shapeNurseCard(rawRow({ photos: ["nurse-1/1.jpg"] }), {
+      shapeNurseCard(rawRow({ user_id: "a", photos: ["a/1.jpg"] }), {
         canSeeIdentity: true,
         canSeeDetails: true,
       }),
     ];
     await attachNurseCardPhotos(cards);
-    expect(cards[0].photo_url).toBeNull();
-    expect(logged).toHaveLength(1);
-    expect(String(logged[0][0])).toContain("nurse-1/1.jpg");
-    expect(String(logged[0][1])).toContain("bucket unreachable");
+    expect(signPhoto).not.toHaveBeenCalled();
   });
 
-  // One failing photo must not cost the other nurses their photos.
-  it("still signs the other cards when one fails", async () => {
-    signPhoto.mockImplementation((path: string) => {
-      if (path === "bad/1.jpg") return Promise.reject(new Error("nope"));
-      return Promise.resolve(`signed:${path}`);
-    });
-    const cards = [
-      shapeNurseCard(rawRow({ user_id: "bad", photos: ["bad/1.jpg"] }), {
+  // The two tests that used to live here covered a signing failure leaving the
+  // card usable and saying so, and one bad photo not costing the other nurses
+  // theirs. Neither behaviour is gone: signing moved to /api/nurse-photo, and
+  // both are asserted in src/app/api/nurse-photo/route.test.ts. They are not
+  // reproducible here because nothing here signs anything.
+
+  // #871. Supabase mints a fresh token on every signing call, so a card
+  // carrying a signed URL is a NEW url on every render. Vercel's image
+  // optimizer keys its cache on that url, so it missed on 30 of 30 requests in
+  // production and re-fetched and re-encoded every photo on every visit. The
+  // signer being unstable is the real condition, which is why it is stubbed
+  // unstable here: the card's url must not inherit that instability.
+  it("gives the same photo url on every render, though signing is not stable", async () => {
+    let call = 0;
+    signPhoto.mockImplementation(
+      (path: string) => `signed:${path}?token=${++call}`,
+    );
+    const make = () => [
+      shapeNurseCard(rawRow({ user_id: "a", photos: ["a/1.jpg"] }), {
         canSeeIdentity: true,
         canSeeDetails: true,
       }),
-      shapeNurseCard(rawRow({ user_id: "good", photos: ["good/1.jpg"] }), {
+    ];
+
+    const firstRender = make();
+    const secondRender = make();
+    await attachNurseCardPhotos(firstRender);
+    await attachNurseCardPhotos(secondRender);
+
+    expect(firstRender[0].photo_url).not.toBeNull();
+    expect(firstRender[0].photo_url).toBe(secondRender[0].photo_url);
+  });
+
+  // The raw storage path must never reach the browser (saves.test.ts guards
+  // this too), so the url names the photo by a hash rather than by its path.
+  it("never puts the storage path in the url", async () => {
+    const cards = [
+      shapeNurseCard(
+        rawRow({ user_id: "a", photos: ["a/private-headshot.jpg"] }),
+        { canSeeIdentity: true, canSeeDetails: true },
+      ),
+    ];
+    await attachNurseCardPhotos(cards);
+    expect(cards[0].photo_url).not.toContain("private-headshot");
+  });
+
+  // The url has to change when the PHOTO changes, or a nurse who replaces her
+  // picture keeps serving the old one out of the optimizer's cache forever.
+  it("gives a different url for a different photo", async () => {
+    const cards = [
+      shapeNurseCard(rawRow({ user_id: "a", photos: ["a/1.jpg"] }), {
+        canSeeIdentity: true,
+        canSeeDetails: true,
+      }),
+      shapeNurseCard(rawRow({ user_id: "a", photos: ["a/2.jpg"] }), {
         canSeeIdentity: true,
         canSeeDetails: true,
       }),
     ];
     await attachNurseCardPhotos(cards);
-    expect(cards[0].photo_url).toBeNull();
-    expect(cards[1].photo_url).toBe("signed:good/1.jpg");
-    expect(logged).toHaveLength(1);
+    expect(cards[0].photo_url).not.toBe(cards[1].photo_url);
   });
 });
 

@@ -1,4 +1,4 @@
-import { getSignedPhotoUrl } from "@/lib/profile/photos";
+import { nursePhotoUrl } from "@/lib/profile/photos";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -340,12 +340,17 @@ export function toPublicNurseCard(card: InternalNurseCard): NurseSearchCard {
 // ── Photos ────────────────────────────────────────────────────
 
 /**
- * Sign the first photo of every card that has one, in parallel.
+ * Point every card that has a photo at the stable photo route (#871).
  *
- * A signing failure leaves photo_url null, so the card falls back to its
- * no-photo state rather than dropping the nurse. That fallback is
- * indistinguishable on screen from a nurse who never uploaded a photo, so the
- * failure is logged: otherwise a broken bucket looks like an onboarding gap.
+ * This used to sign each photo here, which put a freshly minted token in the
+ * markup and made the URL different on every render. That is a new cache key
+ * every time, so Vercel's image optimizer never once hit its cache and
+ * re-encoded every photo on every visit. `nursePhotoUrl` is stable while the
+ * photo is, and `/api/nurse-photo` signs it once behind the cache.
+ *
+ * No Supabase call happens here any more, so a page of 15 nurses no longer
+ * makes 15 signing round trips before it can stream. A photo that cannot be
+ * served fails at the route, which is where it is now reported.
  */
 export async function attachNurseCardPhotos(
   cards: InternalNurseCard[],
@@ -353,15 +358,7 @@ export async function attachNurseCardPhotos(
   await Promise.all(
     cards.map(async (card) => {
       if (card.photos.length === 0) return;
-      try {
-        card.photo_url = await getSignedPhotoUrl(card.photos[0]);
-      } catch (e) {
-        card.photo_url = null;
-        console.error(
-          `Could not sign nurse photo ${card.photos[0]}:`,
-          e instanceof Error ? e.message : e,
-        );
-      }
+      card.photo_url = nursePhotoUrl(card.user_id, card.photos[0]);
     }),
   );
 }
