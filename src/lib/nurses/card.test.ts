@@ -13,7 +13,6 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ from: (t: string) => supabaseFrom(t) }),
 }));
 
-import { nursePhotoId } from "@/lib/profile/photos";
 import {
   NURSE_CARD_COLUMNS,
   ZIP_LOOKUP_CAP,
@@ -254,8 +253,10 @@ describe("shapeNurseCards", () => {
 describe("attachNurseCardPhotos", () => {
   let logged: unknown[][];
   let errorSpy: ReturnType<typeof vi.spyOn>;
+  const originalKey = process.env.SUPABASE_SECRET_KEY;
 
   beforeEach(() => {
+    process.env.SUPABASE_SECRET_KEY = "test-secret-key-for-photo-tokens";
     logged = [];
     signPhoto.mockReset();
     errorSpy = vi
@@ -267,6 +268,24 @@ describe("attachNurseCardPhotos", () => {
 
   afterEach(() => {
     errorSpy.mockRestore();
+    process.env.SUPABASE_SECRET_KEY = originalKey;
+  });
+
+  // Losing a photo is bad. Taking the whole directory down with a 500 because
+  // one address could not be minted is worse, and it is what an unconfigured
+  // deploy would have done. Same fallback the old signing failure had.
+  it("leaves the card usable but reports a url it could not build", async () => {
+    delete process.env.SUPABASE_SECRET_KEY;
+    const cards = [
+      shapeNurseCard(rawRow({ photos: ["nurse-1/1.jpg"] }), {
+        canSeeIdentity: true,
+        canSeeDetails: true,
+      }),
+    ];
+    await attachNurseCardPhotos(cards);
+    expect(cards[0].photo_url).toBeNull();
+    expect(logged).toHaveLength(1);
+    expect(String(logged[0][0])).toContain("nurse-1/1.jpg");
   });
 
   it("points the first photo of every card that has one at the photo route", async () => {
@@ -281,9 +300,7 @@ describe("attachNurseCardPhotos", () => {
       }),
     ];
     await attachNurseCardPhotos(cards);
-    expect(cards[0].photo_url).toBe(
-      `/api/nurse-photo/a/${nursePhotoId("a/1.jpg")}`,
-    );
+    expect(cards[0].photo_url).toMatch(/^\/api\/nurse-photo\/[A-Za-z0-9_-]+$/);
     expect(cards[1].photo_url).toBeNull();
     expect(logged).toEqual([]);
   });

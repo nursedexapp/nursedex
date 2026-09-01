@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSignedPhotoUrl } from "@/lib/profile/photos";
-import { resolveVisibleNursePhoto } from "@/lib/nurses/photo-owner";
+import { decodePhotoToken } from "@/lib/profile/photo-token";
 
 export const runtime = "nodejs";
 
@@ -14,35 +14,28 @@ export const runtime = "nodejs";
  * re-fetched and re-encoded every photo on every visit, which is what made the
  * directory take about thirty seconds on a phone.
  *
- * This path is stable while the photo is, so the optimizer caches it and the
- * signing happens once behind that cache rather than once per visitor.
- *
  * Who may call it: anyone. Nurse photos are public on the directory (decision,
- * 1 September 2026, #873). Whose photos it will serve: only nurses the public
- * may see, checked by the shared visibility filter, so this cannot be used to
- * reach a photo the directory withholds.
+ * 1 September 2026, #873). What it will serve: only a path our own server
+ * encrypted into a token, so a caller cannot name a path or reach anything the
+ * app did not itself put in a page. It does NOT look anything up, deliberately:
+ * one page produces fifteen concurrent requests here, and a version that
+ * queried the database on each one lost six of fifteen photos under that
+ * fan-out.
+ *
+ * The cost of that choice, stated rather than hidden: a token minted while a
+ * nurse was listed keeps working if she is later hidden, until the cache
+ * expires. That is acceptable while photos are public and the token is
+ * unguessable; it would not be if that decision were reversed.
  */
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ path: string[] }> },
+  { params }: { params: Promise<{ token: string }> },
 ): Promise<NextResponse> {
-  const { path: segments } = await params;
+  const { token } = await params;
 
-  // The address is exactly `<nurse id>/<photo id>`. Anything else is refused
-  // before it reaches Supabase rather than being sanitised into something
-  // plausible. Neither segment is ever used to build a storage path, so a
-  // traversal attempt cannot reach the bucket even if one got this far: the
-  // path comes back from the nurse's own record.
-  const badSegment = (s: string) =>
-    !s || s === "." || s === ".." || s.includes("\\") || s.includes("/");
-  if (segments.length !== 2 || segments.some(badSegment)) {
-    return new NextResponse(null, { status: 400 });
-  }
-  const [userId, photoId] = segments;
-
-  const path = await resolveVisibleNursePhoto(userId, photoId);
+  const path = decodePhotoToken(token);
   if (!path) {
-    return new NextResponse(null, { status: 404 });
+    return new NextResponse(null, { status: 400 });
   }
 
   let signed: string | null;

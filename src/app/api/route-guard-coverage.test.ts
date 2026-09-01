@@ -52,8 +52,8 @@ const PUBLIC_ROUTES: Record<string, string> = {
     "Reached from a one-click link in an email by someone who is not signed in. The unguessable token in the URL is the credential.",
   "stripe/checkout-success/route.ts":
     "The page Stripe redirects a paying customer back to. It reads a session_id and verifies it with Stripe rather than authenticating the caller.",
-  "nurse-photo/[...path]/route.ts":
-    "Serves nurse photos, which are public on the directory (decision 2026-09-01, #873), so there is no caller to authenticate. It is scoped instead of guarded: isPhotoOfVisibleNurse applies the shared visibility filter, so it will only sign a photo belonging to a nurse the directory itself would list, and fails closed. See its colocated route.test.ts (#871).",
+  "nurse-photo/[token]/route.ts":
+    "Serves nurse photos, which are public on the directory (decision 2026-09-01, #873), so there is no caller to authenticate. It is scoped instead of guarded: it will only sign a path our own server encrypted into the token, so a caller cannot name a path or reach anything the app did not itself put in a page, and an unverifiable token is refused. See its colocated route.test.ts (#871).",
 };
 
 const API_ROOT = dirname(fileURLToPath(import.meta.url));

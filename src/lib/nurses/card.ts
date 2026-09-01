@@ -358,7 +358,22 @@ export async function attachNurseCardPhotos(
   await Promise.all(
     cards.map(async (card) => {
       if (card.photos.length === 0) return;
-      card.photo_url = nursePhotoUrl(card.user_id, card.photos[0]);
+      try {
+        card.photo_url = nursePhotoUrl(card.photos[0]);
+      } catch (e) {
+        // Minting the address needs the server key. Losing a photo is bad;
+        // throwing here would take the whole directory down with a 500 for
+        // every visitor, so the card falls back to its no-photo state exactly
+        // as it did when a signing failure happened here. Logged, because that
+        // state is indistinguishable on screen from a nurse who never uploaded
+        // one, and a misconfigured deploy would otherwise read as an
+        // onboarding gap.
+        card.photo_url = null;
+        console.error(
+          `Could not build a photo URL for ${card.photos[0]}:`,
+          e instanceof Error ? e.message : e,
+        );
+      }
     }),
   );
 }

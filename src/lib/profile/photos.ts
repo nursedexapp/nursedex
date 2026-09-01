@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { encodePhotoToken } from "./photo-token";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PHOTO_UPLOAD } from "@/lib/constants";
@@ -40,18 +40,6 @@ export async function getSignedUploadUrl(
 }
 
 /**
- * Short, stable, non-reversible id for one stored photo.
- *
- * Keyed on the storage path, so it is the same for as long as the photo is and
- * different the moment the nurse uploads a new one. Deliberately not the path
- * itself: the raw storage path must never ship to the browser (see
- * `toPublicNurseCard`, and the guard in saves.test.ts), and a URL is markup.
- */
-export function nursePhotoId(path: string): string {
-  return createHash("sha256").update(path).digest("hex").slice(0, 16);
-}
-
-/**
  * The stable, cacheable URL a nurse photo is displayed through (#871).
  *
  * Never embed a signed URL in rendered markup: Supabase mints a fresh token on
@@ -60,12 +48,15 @@ export function nursePhotoId(path: string): string {
  * every photo request forever, re-fetching and re-encoding each photo on every
  * visit, and defeating the visitor's own browser cache too.
  *
- * The nurse's id is already on the card, and the photo id is a hash, so this
- * reveals nothing the browser did not already have. `/api/nurse-photo` resolves
- * the pair back to a path and signs it, once, behind the cache.
+ * The token is an encrypted form of the storage path, so `/api/nurse-photo`
+ * can sign it with no lookup of its own. That matters: a page of fifteen
+ * nurses produces fifteen concurrent optimizer requests, and an earlier
+ * version that hit the database on each one lost six of the fifteen photos
+ * under that fan-out. See photo-token.ts for why it is encrypted rather than
+ * signed.
  */
-export function nursePhotoUrl(userId: string, path: string): string {
-  return `/api/nurse-photo/${encodeURIComponent(userId)}/${nursePhotoId(path)}`;
+export function nursePhotoUrl(path: string): string {
+  return `/api/nurse-photo/${encodePhotoToken(path)}`;
 }
 
 /**
