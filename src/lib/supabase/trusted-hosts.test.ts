@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   supabaseCspSources,
   supabaseImageRemotePatterns,
@@ -119,5 +119,47 @@ describe("supabaseImageRemotePatterns", () => {
         pathname: "/storage/v1/object/**",
       },
     ]);
+  });
+});
+
+describe("reporting a misconfigured value", () => {
+  // Kept unique per test: the module reports each distinct bad value once, so
+  // a value another test already used would report nothing here.
+  let warn: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Absent and malformed reach the same fallback but are different causes, and
+  // only one of them is a mistake. A typo in the Vercel value would otherwise
+  // ship the fail-open wildcard silently: the CSP and remotePatterns would
+  // quietly widen back to every Supabase tenant and nothing would say so.
+  it("says nothing when the value is simply absent", () => {
+    supabaseCspSources(undefined);
+    supabaseImageRemotePatterns(undefined);
+    trustedSupabaseHosts(undefined);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("names the value and the consequence when it does not parse", () => {
+    supabaseCspSources("broken one, not a url");
+    expect(warn).toHaveBeenCalledTimes(1);
+    const message = String(warn.mock.calls[0][0]);
+    expect(message).toContain("broken one, not a url");
+    expect(message).toContain("*.supabase.co");
+  });
+
+  // A bad value is read on every render of every blog image. One report per
+  // distinct value, so the signal is not buried under its own repetition.
+  it("reports each distinct bad value once", () => {
+    supabaseCspSources("broken two, not a url");
+    supabaseImageRemotePatterns("broken two, not a url");
+    trustedSupabaseHosts("broken two, not a url");
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

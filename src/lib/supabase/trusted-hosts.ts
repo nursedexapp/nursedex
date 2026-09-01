@@ -60,12 +60,35 @@ export interface SupabaseImagePattern {
   pathname: string;
 }
 
-/** The configured URL, or null when it is absent or does not parse. */
+/**
+ * Values already reported, so a bad one read on every render of every blog
+ * image produces one line rather than thousands.
+ */
+const reportedMalformed = new Set<string>();
+
+/**
+ * The configured URL, or null when it is absent or does not parse.
+ *
+ * Absent and malformed reach the same fallback but are not the same thing:
+ * absent is normal in a test or a build before the env is populated, while
+ * malformed is a mistake, and it is the expensive kind. It widens the CSP and
+ * remotePatterns back to every Supabase tenant, which is the state this module
+ * exists to end, and it does so while everything still works. So it says so.
+ */
 function parseConfigured(raw: string | undefined): URL | null {
   if (!raw) return null;
   try {
     return new URL(raw);
   } catch {
+    if (!reportedMalformed.has(raw)) {
+      reportedMalformed.add(raw);
+      console.warn(
+        `NEXT_PUBLIC_SUPABASE_URL is set to ${raw}, which is not a URL. ` +
+          `Falling back to the ${WILDCARD_HOSTNAME} wildcard, so the CSP and ` +
+          `next/image now trust every Supabase project rather than this one, ` +
+          `and blog images will not render. Fix the value.`,
+      );
+    }
     return null;
   }
 }
