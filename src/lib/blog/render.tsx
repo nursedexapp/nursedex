@@ -6,6 +6,7 @@ import { collectFootnotes } from "./footnotes";
 import { imageAlignClass } from "./image-align";
 import { parseEmbed } from "./embed";
 import { CodeBlock } from "@/components/blog/CodeBlock";
+import { trustedSupabaseHosts } from "@/lib/supabase/trusted-hosts";
 
 // Reserved key in the shared `seen` map used to number footnotes in
 // document order. It cannot collide with a heading slug.
@@ -44,18 +45,16 @@ export function safeHref(href: unknown): string | null {
   }
 }
 
-/** Hosts that blog images may be served from (the Supabase storage host). */
+/**
+ * Hosts that blog images may be served from (the Supabase storage host).
+ *
+ * Shared with the CSP and next/image's remotePatterns so the three cannot
+ * disagree (#740). This one fails CLOSED when nothing is configured: an
+ * unconfigured app renders no authored images rather than widening the
+ * allowlist. See the module for why the other two fail open.
+ */
 export function allowedImageHosts(): string[] {
-  const hosts: string[] = [];
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (supabaseUrl) {
-    try {
-      hosts.push(new URL(supabaseUrl).host);
-    } catch {
-      // ignore a malformed env value
-    }
-  }
-  return hosts;
+  return trustedSupabaseHosts();
 }
 
 /** True when an image src is an absolute URL on an allowlisted host. */

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { supabaseCspSources } from "@/lib/supabase/trusted-hosts";
 import { constantTimeEqual } from "@/lib/security/constant-time";
 
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
@@ -20,34 +21,21 @@ const SENTRY_INGEST_HOST = "https://o4511116810584064.ingest.us.sentry.io";
 // route, which filters noise and records real gaps in Sentry.
 const CSP_REPORT_PATH = "/api/csp-report";
 
-// The Supabase origin this deployment actually talks to, taken from the URL it
-// is configured with rather than hardcoded.
+// The Supabase origin this deployment actually talks to, derived from the URL
+// it is configured with rather than hardcoded.
 //
-// It used to be the literal `https://*.supabase.co`, which allowed the browser
-// to reach ANY Supabase project on the internet, and only Supabase projects. So
-// it was both too loose for production (every other tenant's project was an
-// allowed destination) and too tight for anywhere else: a local or CI stack runs
-// on http://127.0.0.1:54321, so the browser's PUT of a nurse's photo straight to
-// storage was blocked by CSP, and the nurse onboarding journey could not be
-// exercised outside production at all (#485).
+// It used to be the literal `https://*.supabase.co`, which let the browser
+// reach ANY Supabase project on the internet, and only Supabase projects. So it
+// was both too loose for production (every other tenant's project was an
+// allowed destination) and too tight for anywhere else: a local or CI stack
+// runs on http://127.0.0.1:54321, so the browser's PUT of a nurse's photo
+// straight to storage was blocked by CSP, and the nurse onboarding journey
+// could not be exercised outside production at all (#485).
 //
-// Deriving it does both jobs: production narrows to its one project, and a local
-// stack is allowed to be local. The old wildcard stays as the fallback, so a
-// missing env var can never produce a CSP that blocks Supabase entirely.
-const SUPABASE_ORIGIN = (() => {
-  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!raw) return null;
-  try {
-    return new URL(raw).origin;
-  } catch {
-    return null;
-  }
-})();
-
-const SUPABASE_HTTP = SUPABASE_ORIGIN ?? "https://*.supabase.co";
-const SUPABASE_WS = SUPABASE_ORIGIN
-  ? SUPABASE_ORIGIN.replace(/^http/, "ws")
-  : "wss://*.supabase.co";
+// The derivation, and the deliberate fail-open to the old wildcard when nothing
+// is configured, now live in one module shared with next.config.ts and the blog
+// renderer (#740).
+const { http: SUPABASE_HTTP, ws: SUPABASE_WS } = supabaseCspSources();
 
 function buildCsp(nonce: string): string {
   return [
