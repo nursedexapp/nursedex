@@ -1,3 +1,4 @@
+import { encodePhotoToken } from "./photo-token";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PHOTO_UPLOAD } from "@/lib/constants";
@@ -36,6 +37,26 @@ export async function getSignedUploadUrl(
   }
 
   return { path, signedUrl: data.signedUrl };
+}
+
+/**
+ * The stable, cacheable URL a nurse photo is displayed through (#871).
+ *
+ * Never embed a signed URL in rendered markup: Supabase mints a fresh token on
+ * every call, so the URL differs on every render, and Vercel's image optimizer
+ * keys its cache on the source URL. In production that meant a cache MISS on
+ * every photo request forever, re-fetching and re-encoding each photo on every
+ * visit, and defeating the visitor's own browser cache too.
+ *
+ * The token is an encrypted form of the storage path, so `/api/nurse-photo`
+ * can sign it with no lookup of its own. That matters: a page of fifteen
+ * nurses produces fifteen concurrent optimizer requests, and an earlier
+ * version that hit the database on each one lost six of the fifteen photos
+ * under that fan-out. See photo-token.ts for why it is encrypted rather than
+ * signed.
+ */
+export function nursePhotoUrl(path: string): string {
+  return `/api/nurse-photo/${encodePhotoToken(path)}`;
 }
 
 /**
