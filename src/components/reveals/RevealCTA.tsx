@@ -19,6 +19,7 @@ import { ProvisioningNotice } from "./ProvisioningNotice";
 import { posthog } from "@/lib/posthog";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { revealNurse } from "@/lib/reveals/actions";
+import type { RevealedContact } from "./ContactDetailsCard";
 import {
   createFamilyAccessCheckout,
   redirectToCheckout,
@@ -37,9 +38,20 @@ interface RevealCTAProps {
   //   "no_sub"    , show "Reveal contact" button → opens paywall modal
   //   "subscribed", show "Reveal contact" button → fires action immediately
   mode: "anon" | "no_sub" | "subscribed";
+  // Called with the contact the action hands back, so the page can show it
+  // straight away instead of waiting on router.refresh() to bring a server
+  // render that has the reveal in it (#831). That render can lose the race
+  // with the write it is reading, and when it does the family is left looking
+  // at the button after paying for the reveal.
+  onRevealed?: (contact: RevealedContact) => void;
 }
 
-export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
+export function RevealCTA({
+  nurseUserId,
+  returnTo,
+  mode,
+  onRevealed,
+}: RevealCTAProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [captchaOpen, setCaptchaOpen] = useState(false);
@@ -113,6 +125,11 @@ export function RevealCTA({ nurseUserId, returnTo, mode }: RevealCTAProps) {
           nurse_user_id: nurseUserId,
         });
       }
+      // Hand the contact over first. The refresh still runs, because the rest
+      // of the page changes with the reveal (identity, the review and hire
+      // controls it unlocks), but the contact's appearance no longer waits on
+      // it: a refresh that loses the race is now slower, not invisible (#831).
+      if (result.contact) onRevealed?.(result.contact);
       router.refresh();
     }
   };

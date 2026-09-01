@@ -8,7 +8,6 @@ import {
   SKILL_LABELS,
   AVAILABILITY_COMMITMENT_LABELS,
   TIME_SLOT_LABELS,
-  COMMUNICATION_PREFERENCE_LABELS,
 } from "@/types/enums";
 import type {
   Credential,
@@ -16,7 +15,6 @@ import type {
   Skill,
   AvailabilityCommitment,
   TimeSlot,
-  CommunicationPreference,
 } from "@/types/enums";
 import {
   MapPin,
@@ -26,14 +24,12 @@ import {
   ExternalLink,
   ImageIcon,
   Lock,
-  Mail,
-  Phone,
-  MessageSquare,
   Star,
 } from "lucide-react";
 import Link from "next/link";
 import type { PublicNurseProfile } from "@/lib/profile/queries";
-import { RevealCTA } from "@/components/reveals/RevealCTA";
+import { ContactReveal } from "@/components/reveals/ContactReveal";
+import { ContactDetailsCard } from "@/components/reveals/ContactDetailsCard";
 import { ReviewStateAction } from "@/components/reviews/ReviewStateAction";
 import { ReviewList } from "@/components/reviews/ReviewList";
 import { HireButton } from "@/components/hires/HireButton";
@@ -473,55 +469,17 @@ function ContactSection({
   viewMode: "free" | "subscribed";
   revealMode: "anon" | "no_sub" | "subscribed" | null;
 }) {
-  const prefLabel = nurse.communication_preference
-    ? COMMUNICATION_PREFERENCE_LABELS[
-        nurse.communication_preference as CommunicationPreference
-      ]
-    : null;
-
-  // Revealed: server-render the contact info directly.
+  // Revealed: server-render the contact info directly. The same card the
+  // browser renders the instant a reveal succeeds (#831), from one definition.
   if (viewMode === "subscribed") {
     return (
-      <Card className="border-sage/20">
-        <CardContent className="pt-4">
-          <h2 className="mb-3 text-base font-semibold">Contact Information</h2>
-          <div className="space-y-3 text-base">
-            {nurse.contact_email && (
-              <a
-                href={`mailto:${nurse.contact_email}?subject=NurseDex%20Inquiry`}
-                className="text-teal flex items-center gap-2 hover:underline"
-              >
-                <Mail className="size-4" />
-                {nurse.contact_email}
-              </a>
-            )}
-            {nurse.contact_phone && (
-              <>
-                <a
-                  href={`tel:${nurse.contact_phone}`}
-                  className="text-teal flex items-center gap-2 hover:underline"
-                >
-                  <Phone className="size-4" />
-                  Call {nurse.contact_phone}
-                </a>
-                <a
-                  href={`sms:${nurse.contact_phone}`}
-                  className="text-teal flex items-center gap-2 hover:underline"
-                >
-                  <MessageSquare className="size-4" />
-                  Text {nurse.contact_phone}
-                </a>
-              </>
-            )}
-            {prefLabel && (
-              <div className="text-muted-foreground flex items-center gap-2">
-                <MessageSquare className="size-4" />
-                Prefers contact by {prefLabel.toLowerCase()}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <ContactDetailsCard
+        contact={{
+          email: nurse.contact_email,
+          phone: nurse.contact_phone,
+          communication_preference: nurse.communication_preference,
+        }}
+      />
     );
   }
 
@@ -530,27 +488,12 @@ function ContactSection({
   if (revealMode === null) return null;
 
   return (
-    <Card className="border-teal/20 bg-teal/5">
-      <CardContent className="py-6 text-center">
-        <Lock className="text-teal/60 mx-auto mb-3 size-8" />
-        <h2 className="font-heading text-lg font-semibold">
-          Contact {nurse.first_name}
-        </h2>
-        {prefLabel && (
-          <p className="text-muted-foreground mt-1 text-xs">
-            {nurse.first_name} prefers to be contacted by{" "}
-            {prefLabel.toLowerCase()}
-          </p>
-        )}
-        <div className="mt-4 flex justify-center">
-          <RevealCTA
-            nurseUserId={nurse.user_id}
-            nurseFirstName={nurse.first_name}
-            returnTo={`/nurses/${nurse.slug}`}
-            mode={revealMode}
-          />
-        </div>
-      </CardContent>
-    </Card>
+    <ContactReveal
+      nurseUserId={nurse.user_id}
+      nurseFirstName={nurse.first_name}
+      returnTo={`/nurses/${nurse.slug}`}
+      mode={revealMode}
+      communicationPreference={nurse.communication_preference}
+    />
   );
 }
