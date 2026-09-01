@@ -30,10 +30,6 @@ const privacy = flatten(
   readFileSync(join(root, "src/app/(public)/privacy/page.tsx"), "utf8"),
 );
 const posthogConfig = readFileSync(join(root, "src/lib/posthog.ts"), "utf8");
-const systemsGuide = readFileSync(
-  join(root, "Documents/NurseDex_Systems_Guide.md"),
-  "utf8",
-);
 
 describe("the privacy policy describes what the code actually does", () => {
   it("only promises a Do Not Track opt-out while the code honours it", () => {
@@ -66,16 +62,10 @@ describe("the privacy policy describes what the code actually does", () => {
   });
 });
 
-describe("the Systems Guide does not tell us analytics is anonymous", () => {
-  it("no longer claims PostHog stores no personal information", () => {
-    // This is why the gap survived: the internal doc asserted the opposite of the
-    // code, so nobody thought to check.
-    expect(systemsGuide).not.toMatch(
-      /only tracks anonymous usage data|does not store personal information/i,
-    );
-  });
-
-  it("says plainly that PostHog holds the user's email", () => {
-    expect(systemsGuide).toMatch(/email address/i);
-  });
-});
+/*
+ * Not guarded here: the Systems Guide. It lives in Documents/, which is
+ * gitignored, so it exists only on one machine and no CI run can read it. The
+ * July version of this file asserted on it and failed every CI run for that
+ * reason. Its PostHog section was corrected by hand alongside this change;
+ * tracking it in git is a separate decision (#497, L31).
+ */
