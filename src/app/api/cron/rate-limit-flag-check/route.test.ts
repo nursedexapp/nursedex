@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQueryBuilder } from "../../../../../test/supabase-mock";
 import { RATE_LIMITS } from "@/lib/constants";
+import { FLAGGED_RECENT_DAYS, flaggedSinceDate } from "@/lib/rate-limit/flagged";
 import {
   cronRequest,
   describeCronAuthGuard,
@@ -84,9 +85,38 @@ describe("rate-limit-flag-check threshold (issue #576)", () => {
     // Compared against the constant, so bumping CONSECUTIVE_CAPTCHA_DAYS_FLAG
     // without updating the query fails here instead of silently flagging the
     // wrong accounts.
-    expect(h.calls.gte).toEqual([
-      ["consecutive_captcha_days", RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG],
+    expect(h.calls.gte).toContainEqual([
+      "consecutive_captcha_days",
+      RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG,
     ]);
+  });
+});
+
+/**
+ * #425: the rows recording a flag stay in the table forever, so a query with
+ * no window counted every family ever flagged and mailed admins that count
+ * daily. The number never returned to zero, so it never meant anything.
+ */
+describe("rate-limit-flag-check recency", () => {
+  it("only counts flags from inside the recent window", async () => {
+    await GET(req());
+
+    const dateFilter = h.calls.gte.find((call) => call[0] === "date");
+    expect(dateFilter, "the query applies no date window").toBeDefined();
+    expect(dateFilter![1]).toBe(flaggedSinceDate(new Date()));
+  });
+
+  // The digest and the admin screen it links to have to answer the same
+  // question, or the email says four and the page shows one (L16).
+  it("uses the same window as the admin flagged tab", async () => {
+    await GET(req());
+
+    const dateFilter = h.calls.gte.find((call) => call[0] === "date");
+    const start = new Date(`${dateFilter![1] as string}T00:00:00Z`);
+    const daysBack = Math.round(
+      (Date.now() - start.getTime()) / (24 * 60 * 60 * 1000),
+    );
+    expect(daysBack).toBe(FLAGGED_RECENT_DAYS - 1);
   });
 });
 

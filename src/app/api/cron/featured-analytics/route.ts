@@ -18,7 +18,7 @@ interface WeekSums {
 }
 
 /**
- * Monday 14:00 UTC. Sums each Featured nurse's nurse_analytics rows
+ * Monday 14:30 UTC. Sums each Featured nurse's nurse_analytics rows
  * for the last 7 days vs the previous 7 days, then emails them the
  * snapshot. Skips nurses with zero activity in both windows so we
  * don't ship a "0 vs 0" email. Dedup keyed by ISO week so retries

@@ -5,14 +5,16 @@ import { shouldSendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendRateLimitFlaggedAdminEmail } from "@/lib/email/send";
 import { RATE_LIMITS } from "@/lib/constants";
+import { flaggedSinceDate } from "@/lib/rate-limit/flagged";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 /**
- * Daily 05:00 UTC. Counts distinct families with
- * consecutive_captcha_days >= 3 in their most recent rate_limit_reveals
- * row. If anything to flag, emails every admin/super_admin a single
+ * Daily 05:15 UTC. Counts distinct families with
+ * consecutive_captcha_days >= 3 on a day inside the recent window
+ * (see lib/rate-limit/flagged), so the digest reflects who is doing
+ * this now and clears when nobody is. If anything to flag, emails every admin/super_admin a single
  * digest pointing at /admin/accounts?tab=flagged. Daily-bucket dedup so
  * admins get exactly one digest per day even on cron retries.
  */
@@ -21,11 +23,15 @@ const handleRateLimitFlagCheck = withCronAlerting(
   async (_request: NextRequest) => {
     const supabase = createServiceRoleClient();
 
-    // Latest row per family at or over the captcha-day flag threshold.
+    // Families at or over the captcha-day flag threshold on a RECENT day.
+    // The rows stay in the table forever, so without the window this counted
+    // every family ever flagged and mailed that count daily, whether or not
+    // anybody was still doing it (#425).
     const { data: rows } = await supabase
       .from("rate_limit_reveals")
       .select("family_user_id, consecutive_captcha_days, date")
       .gte("consecutive_captcha_days", RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG)
+      .gte("date", flaggedSinceDate(new Date()))
       .order("date", { ascending: false });
 
     type Row = {

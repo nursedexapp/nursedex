@@ -12,7 +12,7 @@ export const maxDuration = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Daily 14:00 UTC. Active subscriptions whose current_period_end is
+ * Daily 14:20 UTC. Active subscriptions whose current_period_end is
  * 3 calendar days from now get a heads-up email. Subs with
  * cancel_at_period_end already true are skipped (they got a
  * cancellation email and don't need a renewal reminder).

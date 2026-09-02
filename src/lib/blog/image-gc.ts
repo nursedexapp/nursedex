@@ -41,7 +41,9 @@ export async function collectReferencedPaths(): Promise<Set<string>> {
       }[],
       total: count,
     };
-  });
+  },
+  1000,
+  "the sweep permanently deletes every image missing from this set, and storage deletion has no undo");
 
   for (const row of rows) {
     for (const p of collectImagePaths(row)) referenced.add(p);

@@ -22,6 +22,13 @@ export async function readAllRows<T>(
     to: number,
   ) => Promise<{ rows: T[]; total: number | null }>,
   pageSize = 1000,
+  /**
+   * What the caller does with these rows, named so a refusal says what is at
+   * stake. The blog GC deletes whatever is missing; the sitemap deindexes
+   * whoever is missing. Same refusal, different consequence, and a message
+   * that claimed the wrong one would send the reader to the wrong place (L11).
+   */
+  purpose = "the caller treats anything missing from this set as absent",
 ): Promise<T[]> {
   const out: T[] = [];
   let from = 0;
@@ -37,8 +44,7 @@ export async function readAllRows<T>(
     if (total === null || total === undefined) {
       throw new Error(
         "Cannot verify the read is complete: the source reported no total row " +
-          "count. Refusing to return a set that might be partial, because the " +
-          "caller deletes whatever is missing from it.",
+          `count. Refusing to return a set that might be partial, because ${purpose}.`,
       );
     }
     expected = total;
@@ -72,8 +78,7 @@ export async function readAllRows<T>(
   if (expected !== null && out.length !== expected) {
     throw new Error(
       `Incomplete read: read ${out.length} of ${expected} rows. Refusing to ` +
-        "continue, because the caller treats anything missing from this set as " +
-        "unreferenced and deletes it.",
+        `continue, because ${purpose}.`,
     );
   }
 

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { RATE_LIMITS } from "@/lib/constants";
+import { flaggedSinceDate } from "@/lib/rate-limit/flagged";
 
 vi.mock("server-only", () => ({}));
 
@@ -47,12 +48,25 @@ describe("getRateLimitFlagged threshold (issue #576)", () => {
     // Compared against the constant, so raising CONSECUTIVE_CAPTCHA_DAYS_FLAG
     // without updating this query fails here instead of silently showing the
     // wrong accounts on the admin flagged tab.
-    expect(h.gteCalls).toEqual([
-      {
-        column: "consecutive_captcha_days",
-        value: RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG,
-      },
-    ]);
+    expect(h.gteCalls).toContainEqual({
+      column: "consecutive_captcha_days",
+      value: RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG,
+    });
+  });
+
+  /**
+   * #425: the flag rows never expire, so without a window this tab listed
+   * every family ever flagged and the daily digest counted them. The tab and
+   * the digest have to answer the same question, or the email says four and
+   * the page shows one (L16).
+   */
+  it("lists only families flagged inside the recent window", async () => {
+    await getRateLimitFlagged();
+
+    expect(h.gteCalls).toContainEqual({
+      column: "date",
+      value: flaggedSinceDate(new Date()),
+    });
   });
 });
 
