@@ -19,6 +19,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StarRatingInput } from "./StarRatingInput";
 import { REVIEW_TEXT_MAX, REVIEW_TEXT_MIN } from "@/lib/schemas/review";
 import { submitFamilyReview, updateFamilyReview } from "@/lib/reviews/actions";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 type TriggerVariant = "default" | "outline" | "ghost" | "secondary" | "link";
 
@@ -104,6 +106,10 @@ export function ReviewFormDialog({
         return;
       }
 
+      captureClientEvent(ANALYTICS_EVENTS.REVIEW_SUBMITTED, {
+        source: "in_app",
+        is_edit: isEdit,
+      });
       toast.success(
         isEdit
           ? "Review updated. Pending approval."

@@ -9,6 +9,8 @@ import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
 import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { toggleAvailability } from "@/lib/profile/actions";
 import { UserCheck, UserX, Loader2 } from "lucide-react";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface QuickActionsProps {
   isAvailable: boolean;
@@ -63,6 +65,9 @@ export function QuickActions({
       toast.error(result.error);
     } else {
       setIsAvailable(newValue);
+      captureClientEvent(ANALYTICS_EVENTS.AVAILABILITY_TOGGLED, {
+        is_available: newValue,
+      });
       toast.success(result.success);
     }
   };

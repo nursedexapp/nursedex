@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendAccountExistsNoticeEmail } from "@/lib/email/send";
+import { captureServerEventAfterResponse } from "@/lib/analytics/server";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { PASSWORD, PASSWORD_RECOVERY } from "@/lib/constants";
 
 export type AuthResult = {
@@ -167,6 +169,15 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
       .select("role")
       .eq("id", user.id)
       .single();
+
+    // After the response, so a slow or failing analytics call cannot delay a
+    // login or break it. Captured here rather than on the client because every
+    // success path below redirects, and code after a redirect never runs.
+    captureServerEventAfterResponse({
+      distinctId: user.id,
+      event: ANALYTICS_EVENTS.LOGIN,
+      properties: { role: profile?.role ?? null, method: "password" },
+    });
 
     if (!profile?.role) {
       redirect("/role-select");
@@ -433,6 +444,15 @@ export async function selectRole(formData: FormData): Promise<void> {
       user_id: user.id,
     });
   }
+
+  // Which of the two roles people pick is the single most useful fact the
+  // funnel was missing: it says whether a visit was a nurse joining or a
+  // family looking to hire, which nothing else in the product records.
+  captureServerEventAfterResponse({
+    distinctId: user.id,
+    event: ANALYTICS_EVENTS.ROLE_SELECTED,
+    properties: { role },
+  });
 
   // Role just changed (null -> nurse/family), which flips layout gating and
   // the sidebar. Bust the client Router Cache so freshly-gated routes aren't

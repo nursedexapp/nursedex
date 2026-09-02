@@ -29,6 +29,8 @@ import { NurseJsonLd } from "@/components/profile/NurseJsonLd";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 import type { Credential } from "@/types/enums";
 import type { Review, Hire } from "@/types/database";
+import { CaptureOnMount } from "@/components/analytics/CaptureOnMount";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface NurseProfilePageProps {
   params: Promise<{ slug: string }>;
@@ -210,6 +212,23 @@ export default async function NurseProfilePage({
 
   return (
     <div className="flex flex-1 flex-col">
+      {/*
+        Separate from trackProfileView above, and deliberately so: that
+        increments a per-nurse daily counter the nurse sees on their own
+        dashboard, this attributes the view to a visitor so it can sit in a
+        funnel. Same word, two different questions (#867). No name or slug is
+        sent, since $current_url already carries the slug on every pageview.
+      */}
+      <CaptureOnMount
+        event={ANALYTICS_EVENTS.PROFILE_VIEWED}
+        dedupeKey={nurse.user_id}
+        properties={{
+          nurse_user_id: nurse.user_id,
+          credential: nurse.credential,
+          can_see_identity: canSeeIdentity,
+          view_mode: viewMode,
+        }}
+      />
       <NurseJsonLd
         firstName={nurse.first_name}
         lastName=""

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { captureServerEventAfterResponse } from "@/lib/analytics/server";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { PASSWORD_RECOVERY } from "@/lib/constants";
 import { isSafeRedirectPath } from "@/lib/auth/safe-redirect";
 
@@ -52,14 +54,30 @@ export async function GET(request: NextRequest) {
     // .is filter makes this a no-op if it was already recorded, e.g.
     // when the user re-clicks the email link.
     if (user && (tokenType === "signup" || code)) {
-      await supabase
+      const { data: firstConfirmation } = await supabase
         .from("users")
         .update({
           tos_accepted_at: new Date().toISOString(),
           tos_version: "1.0",
         })
         .eq("id", user.id)
-        .is("tos_accepted_at", null);
+        .is("tos_accepted_at", null)
+        .select("id");
+
+      // That .is filter means the update touches a row exactly once, on the
+      // first confirmation, which makes it the only trustworthy signal that a
+      // signup COMPLETED. Re-clicking the email link, or signing in again with
+      // Google, updates nothing and is therefore a login rather than a signup.
+      // Assume it runs twice: the database decides which event this is, not
+      // the shape of the request.
+      const completedSignup = (firstConfirmation?.length ?? 0) > 0;
+      captureServerEventAfterResponse({
+        distinctId: user.id,
+        event: completedSignup
+          ? ANALYTICS_EVENTS.SIGNUP_COMPLETED
+          : ANALYTICS_EVENTS.LOGIN,
+        properties: { method: code ? "oauth_or_link" : "email_confirmation" },
+      });
     }
 
     if (explicitNext) {

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { recordFamilyHire } from "@/lib/hires/actions";
 import type { Hire } from "@/types/database";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface HireButtonProps {
   nurseUserId: string;
@@ -93,6 +95,7 @@ export function HireButton({
         }
         return;
       }
+      captureClientEvent(ANALYTICS_EVENTS.HIRE_CLAIMED, { claimed_by: "family" });
       toast.success(`Recorded hire of ${nurseFirstName}`);
       setOpen(false);
       router.refresh();

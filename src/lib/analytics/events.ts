@@ -35,7 +35,12 @@ export const ANALYTICS_EVENTS = {
 
   // Reviews
   REVIEW_SUBMITTED: "review_submitted",
-  EXTERNAL_REVIEW_LINK_CREATED: "external_review_link_created",
+  // Renamed from external_review_link_created when it was first wired:
+  // the link is not created on demand, it is derived from the nurse slug
+  // and always exists, so "created" named a moment that never happens.
+  // Sharing it is the real act, and it had never fired, so no history
+  // was lost in the rename.
+  EXTERNAL_REVIEW_LINK_SHARED: "external_review_link_shared",
   REVIEW_DISPUTED: "review_disputed",
 
   // Hires
@@ -47,5 +52,8 @@ export const ANALYTICS_EVENTS = {
 
   // General
   CONTACT_FORM_SUBMITTED: "contact_form_submitted",
-  PAGE_VIEWED: "page_viewed",
+  // page_viewed was deliberately DELETED rather than wired (#864).
+  // PostHogProvider already fires PostHog's own $pageview on every route
+  // change, so a second name here would be a rival count of the same thing,
+  // and two numbers for one fact is worse than one.
 } as const;

@@ -15,6 +15,10 @@ const h = vi.hoisted(() => ({
     verifyOtpError: null as { message: string } | null,
     user: null as { id: string } | null,
     role: null as string | null,
+    // Rows the tos_accepted_at update actually touched. Non-empty means this
+    // is the first confirmation, which is what tells signup_completed apart
+    // from a repeat login (#864).
+    firstConfirmation: [] as { id: string }[],
   },
 }));
 
@@ -26,7 +30,11 @@ vi.mock("@/lib/supabase/server", () => ({
       getUser: async () => ({ data: { user: h.scenario.user } }),
     },
     from: () => ({
-      update: () => ({ eq: () => ({ is: async () => ({}) }) }),
+      update: () => ({
+        eq: () => ({
+          is: () => ({ select: async () => ({ data: h.scenario.firstConfirmation }) }),
+        }),
+      }),
       select: () => ({
         eq: () => ({
           maybeSingle: async () => ({

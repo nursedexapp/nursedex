@@ -13,6 +13,8 @@ import {
 import { submitContact } from "@/lib/contact/actions";
 import { PendingButton } from "@/components/ui/pending-button";
 import { useSubmissionId } from "@/components/ui/use-submission-id";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 export function ContactForm() {
   const [name, setName] = useState("");
@@ -71,6 +73,7 @@ export function ContactForm() {
       // Landed. Roll the id over so a genuine second message is not mistaken for
       // a duplicate of this one and silently dropped.
       renewSubmissionId();
+      captureClientEvent(ANALYTICS_EVENTS.CONTACT_FORM_SUBMITTED, { subject });
       setSubmitted(true);
     });
   };

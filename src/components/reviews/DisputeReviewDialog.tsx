@@ -20,6 +20,8 @@ import {
 } from "@/lib/schemas/review";
 import { disputeReview } from "@/lib/reviews/nurse-actions";
 import { PendingButton } from "@/components/ui/pending-button";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface DisputeReviewDialogProps {
   reviewId: string;
@@ -63,6 +65,7 @@ export function DisputeReviewDialog({ reviewId }: DisputeReviewDialogProps) {
         return;
       }
 
+      captureClientEvent(ANALYTICS_EVENTS.REVIEW_DISPUTED);
       toast.success("Dispute submitted. We'll be in touch.");
       setOpen(false);
       setReason("");

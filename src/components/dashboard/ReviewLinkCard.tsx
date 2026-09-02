@@ -9,6 +9,8 @@ import { Copy, Check } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface ReviewLinkCardProps {
   slug: string;
@@ -26,6 +28,7 @@ export function ReviewLinkCard({ slug }: ReviewLinkCardProps) {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      captureClientEvent(ANALYTICS_EVENTS.EXTERNAL_REVIEW_LINK_SHARED);
       toast.success("Link copied");
       setTimeout(() => setCopied(false), 2000);
     } catch {
