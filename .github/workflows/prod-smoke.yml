@@ -105,3 +105,34 @@ jobs:
           # Passing the path cannot hit that at all, whatever the file starts with.
           supabase db query --linked --output-format json --file scripts/legacy-host.sql \
             | tsx scripts/check-legacy-host.ts
+
+      # A THIRD independent question of production (#746): how much of the
+      # plan's included usage is left.
+      #
+      # The organization runs Pro with the spend cap ON, which trades cost
+      # certainty for availability: going past the included usage does not
+      # raise a bill, it restricts the project, and the database can go read
+      # only. That reaches people as saves failing everywhere while naming
+      # nothing about the cause.
+      #
+      # It rides in this job rather than a workflow of its own because it needs
+      # the same link and the same credentials, and a separate job would bill
+      # another runner minute a day to ask one query. `if: always()` for the
+      # same reason as the step above: a different question needs its own
+      # failure boundary, or the first failure hides it.
+      #
+      # Supabase's public API has no usage endpoint, so this measures the two
+      # dimensions the database can answer for. Egress and monthly active users
+      # cannot be read this way and the checker names them in every report.
+      - name: Check how much of the plan's included usage is left
+        if: always()
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$PROJECT_REF"
+          supabase db query --linked --output-format json --file scripts/supabase-usage.sql \
+            | tsx scripts/check-supabase-usage.ts

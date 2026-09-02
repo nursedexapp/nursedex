@@ -53,4 +53,25 @@ describe("prod-smoke workflow", () => {
   it("fails the job when any command in the pipeline fails", () => {
     expect(EXECUTABLE).toMatch(/set -euo pipefail/);
   });
+
+  /**
+   * A third independent question of production (#746): how much of the plan's
+   * included usage is left. It rides here because it needs the same link and
+   * the same credentials, and a job of its own would bill another runner
+   * minute a day to ask one query.
+   */
+  it("asks how much of the plan's included usage is left", () => {
+    expect(EXECUTABLE).toMatch(/scripts\/supabase-usage\.sql/);
+    expect(EXECUTABLE).toMatch(/scripts\/check-supabase-usage\.ts/);
+  });
+
+  /**
+   * Each of the three steps asks a different question, so each needs its own
+   * failure boundary. Without one, the first failure hides the others on
+   * exactly the run where every answer matters most.
+   */
+  it("runs every question even when an earlier one failed", () => {
+    const always = EXECUTABLE.match(/if:\s*always\(\)/g) ?? [];
+    expect(always.length).toBeGreaterThanOrEqual(2);
+  });
 });
