@@ -1,6 +1,7 @@
 import "server-only";
 import { after } from "next/server";
 import { PostHog } from "posthog-node";
+import { hasOptedOutOfAnalytics } from "./opt-out";
 
 let cached: PostHog | null = null;
 
@@ -26,6 +27,14 @@ export async function captureServerEvent(args: {
 }): Promise<void> {
   const client = getClient();
   if (!client) return;
+
+  // #715. The client-side opt-out cannot reach here: these calls fire from
+  // Stripe webhooks and from auth paths, where the person's browser is not
+  // involved at all. Without this check, opting out would quietly mean
+  // "opted out of most tracking". The lookup fails closed, so a database it
+  // cannot read stops the event rather than sending it anyway.
+  if (await hasOptedOutOfAnalytics(args.distinctId)) return;
+
   try {
     await client.captureImmediate({
       distinctId: args.distinctId,

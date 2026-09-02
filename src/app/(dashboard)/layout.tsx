@@ -66,7 +66,13 @@ export default async function DashboardLayout({
 
   return (
     <div className="bg-warm-white flex min-h-screen flex-col">
-      {user && <PostHogIdentify userId={user.id} email={user.email} />}
+      {user && (
+        <PostHogIdentify
+          userId={user.id}
+          email={user.email}
+          analyticsOptOut={user.analytics_opt_out}
+        />
+      )}
       {pastDueBanner}
       <div className="flex flex-1">
         <DashboardSidebar role={role} />

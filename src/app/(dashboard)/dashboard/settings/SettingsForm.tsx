@@ -16,6 +16,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { applyAnalyticsPreference } from "@/lib/analytics/preference";
 import { softDeleteAccount } from "@/lib/profile/actions";
 import { PASSWORD } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,8 @@ interface FamilyContact {
 interface SettingsFormProps {
   marketingOptOut: boolean;
   onUpdateMarketing: (optOut: boolean) => Promise<{ error?: string }>;
+  analyticsOptOut: boolean;
+  onUpdateAnalytics: (optOut: boolean) => Promise<{ error?: string }>;
   onChangePassword: (
     formData: FormData,
   ) => Promise<{ error?: string; success?: string }>;
@@ -45,12 +48,18 @@ interface SettingsFormProps {
 export function SettingsForm({
   marketingOptOut: initialOptOut,
   onUpdateMarketing,
+  analyticsOptOut: initialAnalyticsOptOut,
+  onUpdateAnalytics,
   onChangePassword,
   familyContact,
   onSaveContact,
 }: SettingsFormProps) {
   const [marketingOptOut, setMarketingOptOut] = useState(initialOptOut);
   const [savingMarketing, setSavingMarketing] = useState(false);
+  const [analyticsOptOut, setAnalyticsOptOut] = useState(
+    initialAnalyticsOptOut,
+  );
+  const [savingAnalytics, setSavingAnalytics] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [commPref, setCommPref] = useState<CommunicationPreference | null>(
@@ -80,6 +89,29 @@ export function SettingsForm({
       toast.success("Notification preferences updated");
     }
     setSavingMarketing(false);
+  };
+
+  const handleAnalyticsToggle = async (checked: boolean) => {
+    setSavingAnalytics(true);
+    const optOut = !checked; // checked = happy to be measured
+    const result = await onUpdateAnalytics(optOut);
+    if (result.error) {
+      // Nothing else changes. Saying "you are no longer tracked" while the row
+      // still says otherwise is the worst outcome available here: the next
+      // device would track them and the screen would have promised it would
+      // not.
+      toast.error(result.error);
+    } else {
+      setAnalyticsOptOut(optOut);
+      // The row records the choice for the NEXT device. This is what stops
+      // THIS browser, events and session recording alike, and without it the
+      // toggle would look right and do nothing where the person is sitting.
+      applyAnalyticsPreference(optOut);
+      toast.success(
+        optOut ? "Analytics turned off" : "Analytics turned back on",
+      );
+    }
+    setSavingAnalytics(false);
   };
 
   const handleDeleteAccount = async () => {
@@ -275,6 +307,33 @@ export function SettingsForm({
               <p className="text-sm font-medium">Marketing emails</p>
               <p className="text-muted-foreground text-xs">
                 Tips, feature updates, and promotional offers from NurseDex
+              </p>
+            </div>
+          </label>
+        </CardContent>
+      </Card>
+
+      {/* Privacy */}
+      <Card className="border-sage/20">
+        <CardHeader>
+          <CardTitle className="text-base">Privacy</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <label className="flex items-center gap-3">
+            <Checkbox
+              checked={!analyticsOptOut}
+              onCheckedChange={(checked) =>
+                handleAnalyticsToggle(checked as boolean)
+              }
+              disabled={savingAnalytics}
+              aria-label="Usage analytics"
+            />
+            <div>
+              <p className="text-sm font-medium">Usage analytics</p>
+              <p className="text-muted-foreground text-xs">
+                Lets us measure how the site is used, and record a masked replay
+                of your visit so we can see where things break. Turning this off
+                stops both, on every device you sign in on.
               </p>
             </div>
           </label>

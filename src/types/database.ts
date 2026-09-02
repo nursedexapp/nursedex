@@ -29,6 +29,7 @@ export interface User {
   tos_accepted_at: string | null;
   tos_version: string | null;
   marketing_opt_out: boolean;
+  analytics_opt_out: boolean;
   is_deleted: boolean;
   is_suspended: boolean;
   created_at: string;

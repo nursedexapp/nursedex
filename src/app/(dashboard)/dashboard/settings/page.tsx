@@ -25,6 +25,39 @@ async function updateMarketing(optOut: boolean) {
   return {};
 }
 
+/**
+ * Record whether this person wants to be measured (#715).
+ *
+ * Written through the RLS-scoped client, so the database itself enforces that
+ * somebody can only change their own preference: users_update_own is scoped to
+ * `id = auth.uid()`. The client-side half of the control lives in
+ * SettingsForm, which applies the choice to PostHog straight away; this is the
+ * record that carries it to the person's next device, and the one
+ * captureServerEvent reads before sending anything from a webhook.
+ */
+async function updateAnalytics(optOut: boolean) {
+  "use server";
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { error } = await supabase
+    .from("users")
+    .update({ analytics_opt_out: optOut })
+    .eq("id", user.id);
+
+  if (error) {
+    // Reported, not swallowed. The caller turns this into a toast and leaves
+    // the box where it was, because a control that says it saved when it did
+    // not is worse here than one that admits it failed.
+    console.error("[settings] could not save analytics preference", error);
+    return { error: "Could not update preferences" };
+  }
+  return {};
+}
+
 async function changePassword(formData: FormData) {
   "use server";
   return resetPassword(formData);
@@ -84,6 +117,8 @@ export default async function SettingsPage() {
         <SettingsForm
           marketingOptOut={user.marketing_opt_out}
           onUpdateMarketing={updateMarketing}
+          analyticsOptOut={user.analytics_opt_out}
+          onUpdateAnalytics={updateAnalytics}
           onChangePassword={changePassword}
           familyContact={familyContact}
           onSaveContact={isFamily ? saveContact : undefined}

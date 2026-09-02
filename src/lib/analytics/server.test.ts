@@ -17,28 +17,35 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const h = vi.hoisted(() => ({
   afterImpl: null as ((fn: () => unknown) => void) | null,
   captured: [] as { distinctId: string; event: string }[],
+  optedOut: new Set<string>(),
 }));
 
 vi.mock("next/server", () => ({
   after: (fn: () => unknown) => h.afterImpl?.(fn),
 }));
 
+vi.mock("./opt-out", () => ({
+  hasOptedOutOfAnalytics: async (userId: string) => h.optedOut.has(userId),
+}));
+
 vi.mock("posthog-node", () => ({
   PostHog: class {
-    async captureImmediate(args: { distinctId: string; event: string; properties?: Record<string, unknown> }) {
+    async captureImmediate(args: {
+      distinctId: string;
+      event: string;
+      properties?: Record<string, unknown>;
+    }) {
       h.captured.push(args);
     }
   },
 }));
 
-import {
-  captureServerEventAfterResponse,
-  captureServerEvent,
-} from "./server";
+import { captureServerEventAfterResponse, captureServerEvent } from "./server";
 
 beforeEach(() => {
   h.captured.length = 0;
   h.afterImpl = null;
+  h.optedOut.clear();
   process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test";
   process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
 });
@@ -108,6 +115,46 @@ describe("captureServerEvent", () => {
     await expect(
       captureServerEvent({ distinctId: "user-1", event: "login" }),
     ).resolves.toBeUndefined();
+    expect(h.captured).toEqual([]);
+  });
+});
+
+/**
+ * #715. The client-side opt-out cannot reach these calls at all: they fire
+ * from Stripe webhooks and from auth paths, where the person's browser is not
+ * involved. So the refusal has to happen here too, or opting out would quietly
+ * mean "opted out of most tracking".
+ */
+describe("captureServerEvent honours an analytics opt-out", () => {
+  it("sends for somebody who has not opted out", async () => {
+    // Asserted first and deliberately: a helper that sent NOTHING would
+    // satisfy every refusal test below on its own.
+    await captureServerEvent({ distinctId: "user-1", event: "login" });
+    expect(h.captured).toEqual([
+      { distinctId: "user-1", event: "login", properties: undefined },
+    ]);
+  });
+
+  it("sends nothing for somebody who has opted out", async () => {
+    h.optedOut.add("user-1");
+    await captureServerEvent({ distinctId: "user-1", event: "login" });
+    expect(h.captured).toEqual([]);
+  });
+
+  it("refuses only the person who opted out", async () => {
+    h.optedOut.add("user-1");
+    await captureServerEvent({ distinctId: "user-1", event: "login" });
+    await captureServerEvent({ distinctId: "user-2", event: "login" });
+    expect(h.captured.map((c) => c.distinctId)).toEqual(["user-2"]);
+  });
+
+  it("refuses through the after-response path as well", async () => {
+    // Two entry points, and the scheduled one is the one used by the auth
+    // paths, so a check on only the direct call would leave logins tracked.
+    h.optedOut.add("user-1");
+    h.afterImpl = (fn) => void fn();
+    captureServerEventAfterResponse({ distinctId: "user-1", event: "login" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(h.captured).toEqual([]);
   });
 });

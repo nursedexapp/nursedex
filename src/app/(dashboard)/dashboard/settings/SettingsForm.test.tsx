@@ -23,6 +23,12 @@ vi.mock("@/lib/profile/actions", () => ({
   softDeleteAccount: () => softDeleteAccount(),
 }));
 
+const applyAnalyticsPreference = vi.fn();
+vi.mock("@/lib/analytics/preference", () => ({
+  applyAnalyticsPreference: (optedOut: boolean) =>
+    applyAnalyticsPreference(optedOut),
+}));
+
 import { SettingsForm } from "./SettingsForm";
 import { STALL_MS } from "@/components/ui/pending-button";
 
@@ -44,6 +50,7 @@ beforeEach(() => {
   toastError.mockReset();
   toastSuccess.mockReset();
   softDeleteAccount.mockReset();
+  applyAnalyticsPreference.mockReset();
 });
 
 // A hung action has to be released before the next test starts. React entangles
@@ -81,11 +88,14 @@ function setup(
   const onUpdateMarketing = vi.fn().mockResolvedValue({});
   const onChangePassword = vi.fn().mockResolvedValue({ success: "Updated" });
   const onSaveContact = vi.fn().mockResolvedValue({ success: true });
+  const onUpdateAnalytics = vi.fn().mockResolvedValue({});
 
   const { container } = render(
     <SettingsForm
       marketingOptOut={false}
       onUpdateMarketing={onUpdateMarketing}
+      analyticsOptOut={false}
+      onUpdateAnalytics={onUpdateAnalytics}
       onChangePassword={onChangePassword}
       familyContact={{
         zip_code: "11779",
@@ -108,6 +118,7 @@ function setup(
   return {
     onChangePassword,
     onSaveContact,
+    onUpdateAnalytics,
     saveContact: () => submit(forms[0]),
     changePassword: () => submit(forms[1]),
   };
@@ -223,5 +234,66 @@ describe("deleting an account never hands back a live button", () => {
     });
 
     expect(softDeleteAccount).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * #715. The analytics opt-out.
+ *
+ * The thing worth pinning is that the toggle does TWO things, and the second
+ * one is the one that actually protects the person: writing the row records
+ * the choice for the next device, and applying it to PostHog is what stops
+ * this browser sending events and recording the session. A version that only
+ * wrote the row would look identical on screen and do nothing at all here.
+ */
+describe("the analytics opt-out", () => {
+  const analyticsCheckbox = () =>
+    screen.getByRole("checkbox", { name: /usage analytics/i });
+
+  it("shows the box ticked for somebody who has not opted out", () => {
+    setup({ analyticsOptOut: false });
+    expect(analyticsCheckbox()).toBeChecked();
+  });
+
+  it("shows the box unticked for somebody who has opted out", () => {
+    setup({ analyticsOptOut: true });
+    expect(analyticsCheckbox()).not.toBeChecked();
+  });
+
+  it("records the choice and stops this browser tracking", async () => {
+    const { onUpdateAnalytics } = setup({ analyticsOptOut: false });
+    await act(async () => {
+      fireEvent.click(analyticsCheckbox());
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(onUpdateAnalytics).toHaveBeenCalledWith(true);
+    expect(applyAnalyticsPreference).toHaveBeenCalledWith(true);
+  });
+
+  it("resumes tracking when somebody opts back in", async () => {
+    const { onUpdateAnalytics } = setup({ analyticsOptOut: true });
+    await act(async () => {
+      fireEvent.click(analyticsCheckbox());
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(onUpdateAnalytics).toHaveBeenCalledWith(false);
+    expect(applyAnalyticsPreference).toHaveBeenCalledWith(false);
+  });
+
+  it("does not claim the choice was saved when the write failed", async () => {
+    // The failure that matters: telling somebody they are no longer tracked
+    // while the row still says they are. The next device would track them, and
+    // the screen would have promised otherwise.
+    const onUpdateAnalytics = vi
+      .fn()
+      .mockResolvedValue({ error: "Could not update preferences" });
+    setup({ analyticsOptOut: false, onUpdateAnalytics });
+    await act(async () => {
+      fireEvent.click(analyticsCheckbox());
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(toastError).toHaveBeenCalled();
+    expect(applyAnalyticsPreference).not.toHaveBeenCalled();
+    expect(analyticsCheckbox()).toBeChecked();
   });
 });
