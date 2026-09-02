@@ -4,10 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, cleanup, render, screen, fireEvent } from "@testing-library/react";
 
 const captured: { event: string; properties?: Record<string, unknown> }[] = [];
+/** Whether the fake PostHog manages to send. False stands for "not loaded yet". */
+let captureSucceeds = true;
 
 vi.mock("@/lib/analytics/capture", () => ({
   captureClientEvent: (event: string, properties?: Record<string, unknown>) => {
+    if (!captureSucceeds) return false;
     captured.push({ event, properties });
+    return true;
   },
 }));
 
@@ -50,6 +54,7 @@ function fireAll(isIntersecting: boolean) {
 }
 
 beforeEach(() => {
+  captureSucceeds = true;
   captured.length = 0;
   observed = [];
   vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
@@ -115,6 +120,27 @@ describe("TrackedCta", () => {
       cta: "browse_nurses",
       placement: "hero",
     });
+  });
+
+  it("records the sighting on a later pass when the first send could not go", () => {
+    /**
+     * The defect this replaced was measured on the live homepage: a visit
+     * recorded its $pageview and no homepage_cta_seen at all. PostHog is
+     * initialized inside a Suspense boundary, so a capture can run before it
+     * has loaded. Marking the sighting as fired regardless meant the event was
+     * dropped AND the observer disconnected, so it could never be recorded.
+     */
+    captureSucceeds = false;
+    renderCta();
+    act(() => fireAll(true));
+    expect(captured).toEqual([]);
+
+    // PostHog finishes loading, and the next time the button is on screen the
+    // sighting is still there to be recorded.
+    captureSucceeds = true;
+    act(() => fireAll(true));
+
+    expect(captured.map((c) => c.event)).toEqual(["homepage_cta_seen"]);
   });
 
   it("records a click from someone who never triggered the seen event", () => {
