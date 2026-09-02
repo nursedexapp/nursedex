@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createQueryBuilder } from "../../../../../test/supabase-mock";
 import { RATE_LIMITS } from "@/lib/constants";
 import { FLAGGED_RECENT_DAYS, flaggedSinceDate } from "@/lib/rate-limit/flagged";
@@ -98,25 +98,51 @@ describe("rate-limit-flag-check threshold (issue #576)", () => {
  * daily. The number never returned to zero, so it never meant anything.
  */
 describe("rate-limit-flag-check recency", () => {
+  // The clock is SET rather than read. Both sides of the comparison would
+  // otherwise be derived from the live clock a few microseconds apart, which
+  // agrees on every day except the one where UTC midnight lands between them
+  // (L134, L290).
+  const AT = new Date("2026-09-10T05:00:00Z");
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(AT);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("only counts flags from inside the recent window", async () => {
     await GET(req());
 
     const dateFilter = h.calls.gte.find((call) => call[0] === "date");
     expect(dateFilter, "the query applies no date window").toBeDefined();
-    expect(dateFilter![1]).toBe(flaggedSinceDate(new Date()));
+    // The literal, not a recomputation of the helper's own arithmetic beside
+    // it: a second derivation agrees with the first however wrong both are.
+    expect(dateFilter![1]).toBe("2026-09-04");
   });
 
-  // The digest and the admin screen it links to have to answer the same
-  // question, or the email says four and the page shows one (L16).
-  it("uses the same window as the admin flagged tab", async () => {
+  /**
+   * The digest and the admin screen it links to have to answer the same
+   * question, or the email says four and the page shows one (L16). Both are
+   * asserted against the SHARED helper rather than each recomputing the date,
+   * which is the only thing that makes them one window: a second derivation
+   * beside the first is a second definition, and it drifts.
+   *
+   * The window's own arithmetic is pinned against a fixed clock in
+   * src/lib/rate-limit/flagged.test.ts. It is deliberately NOT re-derived from
+   * the wall clock here: an earlier version of this test measured elapsed
+   * milliseconds against a whole number of days, which is 6.6 days by lunchtime
+   * and rounds to 7, so it passed only when CI happened to run before noon UTC
+   * (L130, L224).
+   */
+  it("asks for the window the shared helper defines, not one of its own", async () => {
     await GET(req());
 
     const dateFilter = h.calls.gte.find((call) => call[0] === "date");
-    const start = new Date(`${dateFilter![1] as string}T00:00:00Z`);
-    const daysBack = Math.round(
-      (Date.now() - start.getTime()) / (24 * 60 * 60 * 1000),
-    );
-    expect(daysBack).toBe(FLAGGED_RECENT_DAYS - 1);
+    expect(dateFilter![1]).toBe(flaggedSinceDate(AT));
+    expect(FLAGGED_RECENT_DAYS).toBe(7);
   });
 });
 

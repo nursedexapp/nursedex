@@ -1,7 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { RATE_LIMITS } from "@/lib/constants";
-import { flaggedSinceDate } from "@/lib/rate-limit/flagged";
 
 vi.mock("server-only", () => ({}));
 
@@ -61,12 +60,19 @@ describe("getRateLimitFlagged threshold (issue #576)", () => {
    * the page shows one (L16).
    */
   it("lists only families flagged inside the recent window", async () => {
-    await getRateLimitFlagged();
+    // The clock is SET, so both sides cannot be read from the live one a few
+    // microseconds apart and disagree on the day UTC midnight lands between
+    // them (L134, L290). The literal is the expectation; the helper's own
+    // arithmetic is pinned in src/lib/rate-limit/flagged.test.ts.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-10T05:00:00Z"));
+    try {
+      await getRateLimitFlagged();
+    } finally {
+      vi.useRealTimers();
+    }
 
-    expect(h.gteCalls).toContainEqual({
-      column: "date",
-      value: flaggedSinceDate(new Date()),
-    });
+    expect(h.gteCalls).toContainEqual({ column: "date", value: "2026-09-04" });
   });
 });
 
