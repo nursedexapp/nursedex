@@ -53,11 +53,19 @@ export function TrackedCta({
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting || seenFired.current) continue;
+        // Only mark it seen, and only stop watching, if the event actually
+        // went. Setting the flag first meant a capture that arrived before
+        // PostHog had loaded was dropped AND the observer disconnected, so the
+        // sighting could never be recorded at all.
+        if (
+          !captureClientEvent(
+            ANALYTICS_EVENTS.HOMEPAGE_CTA_SEEN,
+            latestProperties.current,
+          )
+        ) {
+          continue;
+        }
         seenFired.current = true;
-        captureClientEvent(
-          ANALYTICS_EVENTS.HOMEPAGE_CTA_SEEN,
-          latestProperties.current,
-        );
         observer.disconnect();
       }
     });
