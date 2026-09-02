@@ -50,6 +50,12 @@ export const ANALYTICS_EVENTS = {
   // Blog
   BLOG_POST_VIEWED: "blog_post_viewed",
 
+  // Homepage. Seen as well as clicked, because a visitor who never reached the
+  // button and one who reached it and ignored it are indistinguishable
+  // otherwise, and they point at different fixes (#869).
+  HOMEPAGE_CTA_SEEN: "homepage_cta_seen",
+  HOMEPAGE_CTA_CLICKED: "homepage_cta_clicked",
+
   // General
   CONTACT_FORM_SUBMITTED: "contact_form_submitted",
   // page_viewed was deliberately DELETED rather than wired (#864).
