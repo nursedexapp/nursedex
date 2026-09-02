@@ -379,7 +379,8 @@ export function formatWatchdogReport(result: WatchdogResult): string {
   }
 
   const lines = [
-    `${result.overdue.length} of ${result.checked} scheduled ${plural} have stopped running.`,
+    `${result.overdue.length} of ${result.checked} scheduled ${plural} have not ` +
+      "completed successfully within their own interval.",
     "",
   ];
 
@@ -396,11 +397,13 @@ export function formatWatchdogReport(result: WatchdogResult): string {
 
   lines.push(
     "",
-    "A scheduled job that stops firing produces no error and no log, so this " +
-      "is the only signal. GitHub disables a scheduled workflow after 60 days " +
-      "without repository activity, and a Vercel cron can stop being dispatched " +
-      "just as quietly. Check the Actions tab, or Vercel's cron log, and re-run " +
-      "the job by hand to confirm it still works.",
+    "What is measured is the last SUCCESSFUL run, so each of these is either " +
+      "not being dispatched at all or failing every time. The second case is " +
+      "already alerting on its own; the first produces no error and no log, " +
+      "which is why this exists. GitHub disables a scheduled workflow after 60 " +
+      "days without repository activity, and a Vercel cron can stop being " +
+      "dispatched just as quietly. Check the Actions tab, or Vercel's cron log, " +
+      "and re-run the job by hand to confirm it still works.",
   );
 
   if (budgetLines.length > 0) lines.push("", ...budgetLines);
@@ -492,7 +495,7 @@ export async function runScheduledJobCheck({
   log(report);
 
   if (result.overdue.length > 0) {
-    await alert("Scheduled jobs have stopped running", report);
+    await alert("Scheduled jobs are not completing", report);
     return 1;
   }
 

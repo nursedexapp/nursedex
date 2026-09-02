@@ -241,6 +241,33 @@ describe("formatWatchdogReport", () => {
     expect(report).toMatch(/disabl/i);
   });
 
+  /**
+   * L11: a message may claim only what its check actually measured. What is
+   * measured is the last SUCCESSFUL run, so a job that fires every day and
+   * fails every day reads the same as one nothing is dispatching. Those are
+   * different problems with different remedies, and the failing one is already
+   * alerting on its own, so the wording must not assert the job is absent.
+   */
+  it("says what it measured, not that the job has stopped firing", () => {
+    const result = evaluateScheduledJobs({
+      jobs: [
+        {
+          name: "CI Health",
+          source: "ci-health.yml",
+          crons: ["0 9 * * 1"],
+          lastSuccessAt: new Date(NOW - 30 * DAY).toISOString(),
+        },
+      ],
+      now: NOW,
+    });
+
+    const report = formatWatchdogReport(result);
+    expect(report).toMatch(/not completed successfully|no successful/i);
+    // It may be failing rather than absent, and the reader has to be told to
+    // look at both.
+    expect(report).toMatch(/failing/i);
+  });
+
   // The healthy report has to say how many jobs it checked. "All healthy" over
   // an empty list reads exactly the same as "all healthy" over a full one.
   it("says how many jobs it checked when everything is healthy", () => {
@@ -352,7 +379,7 @@ describe("runScheduledJobCheck", () => {
 
     expect(code).toBe(1);
     expect(announce.calls).toHaveLength(1);
-    expect(announce.calls[0].title).toMatch(/stopped running/i);
+    expect(announce.calls[0].title).toMatch(/not completing/i);
     expect(announce.calls[0].report).toContain("Migration Drift");
   });
 
@@ -380,7 +407,7 @@ describe("runScheduledJobCheck", () => {
     expect(code).toBe(1);
     expect(announce.calls).toHaveLength(1);
     expect(announce.calls[0].title).toMatch(/time budget/i);
-    expect(announce.calls[0].title).not.toMatch(/stopped running/i);
+    expect(announce.calls[0].title).not.toMatch(/not completing/i);
   });
 
   /**
@@ -403,7 +430,7 @@ describe("runScheduledJobCheck", () => {
     expect(code).toBe(1);
     expect(announce.calls).toHaveLength(1);
     expect(announce.calls[0].title).toMatch(/could not run/i);
-    expect(announce.calls[0].title).not.toMatch(/stopped running/i);
+    expect(announce.calls[0].title).not.toMatch(/not completing/i);
     expect(announce.calls[0].report).toContain("403");
   });
 
