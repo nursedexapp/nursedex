@@ -148,13 +148,33 @@ describe("captureServerEvent honours an analytics opt-out", () => {
     expect(h.captured.map((c) => c.distinctId)).toEqual(["user-2"]);
   });
 
+  it("captures through the after-response path when nobody opted out", async () => {
+    // The positive control for the test below. "Nothing was captured" is
+    // satisfied by a fixture where nothing COULD be captured, so the same
+    // fixture has to be shown sending something first.
+    let scheduled: unknown;
+    h.afterImpl = (fn) => {
+      scheduled = fn();
+    };
+    captureServerEventAfterResponse({ distinctId: "user-2", event: "login" });
+    await scheduled;
+    expect(h.captured.map((c) => c.distinctId)).toEqual(["user-2"]);
+  });
+
   it("refuses through the after-response path as well", async () => {
     // Two entry points, and the scheduled one is the one used by the auth
     // paths, so a check on only the direct call would leave logins tracked.
+    //
+    // The scheduled work is AWAITED rather than slept past. A fixed delay here
+    // would be a bet on how many microtask ticks the capture happens to need,
+    // which is a bet that changes every time a line is added to it.
     h.optedOut.add("user-1");
-    h.afterImpl = (fn) => void fn();
+    let scheduled: unknown;
+    h.afterImpl = (fn) => {
+      scheduled = fn();
+    };
     captureServerEventAfterResponse({ distinctId: "user-1", event: "login" });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await scheduled;
     expect(h.captured).toEqual([]);
   });
 });
