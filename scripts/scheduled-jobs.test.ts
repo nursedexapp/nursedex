@@ -186,6 +186,21 @@ describe("evaluateScheduledJobs", () => {
   });
 
   /**
+   * L50: a timestamp that does not parse yields NaN, and NaN compares false
+   * against every threshold, so the job would read as healthy on the strength
+   * of a value nobody could read. An unreadable answer is a failure of the
+   * watchdog, not an all clear about the job.
+   */
+  it("refuses a last-run timestamp it cannot read, rather than passing the job", () => {
+    expect(() =>
+      evaluateScheduledJobs({
+        jobs: [job({ lastSuccessAt: "not a date" })],
+        now: NOW,
+      }),
+    ).toThrow(/could not be read/i);
+  });
+
+  /**
    * L98: a watcher that reports success when it found NOTHING to watch is
    * indistinguishable from one that saw everything pass. If the workflow
    * directory moves, or the API returns nothing, this must fail rather than

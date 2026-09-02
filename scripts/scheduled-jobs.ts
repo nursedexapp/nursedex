@@ -281,7 +281,19 @@ export function evaluateScheduledJobs({
       continue;
     }
 
-    const ageMs = now - new Date(since).getTime();
+    // A timestamp that does not parse is NaN, and NaN compares false against
+    // every threshold, so an unreadable value would quietly land on the healthy
+    // side (L50). It is the watchdog that is broken there, not the job.
+    const sinceMs = new Date(since).getTime();
+    if (!Number.isFinite(sinceMs)) {
+      throw new Error(
+        `The last run time for ${job.name} could not be read: "${since}". ` +
+          "Nothing can be judged from it, so this fails rather than reporting " +
+          "the job as healthy.",
+      );
+    }
+
+    const ageMs = now - sinceMs;
     if (ageMs > limit) {
       overdue.push({
         name: job.name,
