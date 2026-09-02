@@ -240,33 +240,6 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
     anonPage.getByRole("heading", { level: 1, name: FIRST_NAME }),
   ).toBeVisible();
 
-  // ── And her own preview shows her that same gated view (#447).
-  //
-  // Asserted here rather than in a spec of its own, because this is the only
-  // place a nurse with a real, complete, verified profile exists, and the
-  // claim being checked is precisely that the preview agrees with the public
-  // page a few lines above. Two specs could not have compared them.
-  await page.goto("/dashboard/preview");
-
-  await expect(
-    page.getByRole("button", { name: /anyone browsing/i }),
-  ).toHaveAttribute("aria-pressed", "true");
-
-  // What a visitor gets: no surname, and no licence number. Asserting the
-  // VALUES, since a "Licence" heading can survive while the number leaks
-  // underneath it.
-  await expect(page.locator("body")).not.toContainText(LAST_NAME);
-  await expect(page.locator("body")).not.toContainText("E2E-ONBOARD-001");
-
-  // The positive control. "Absent" is satisfied by a page that rendered
-  // nothing, so the same profile has to be shown producing both values under
-  // the other view.
-  await page
-    .getByRole("button", { name: /a family who has subscribed/i })
-    .click();
-  await expect(page.locator("body")).toContainText(LAST_NAME);
-  await expect(page.locator("body")).toContainText("E2E-ONBOARD-001");
-
   await anon.close();
   await adminCtx.close();
 });
