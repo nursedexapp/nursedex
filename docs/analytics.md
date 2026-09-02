@@ -134,3 +134,49 @@ Two things are deliberately NOT recorded, because PostHog already records them a
 measurement would be a rival number for the same fact: **page views** (PostHog's own
 `$pageview` fires on every route change) and **scroll depth**
 (`$prev_pageview_max_scroll_percentage` is on every page leave).
+
+---
+
+## The bio link test, running from September 2026
+
+**What is being tested.** The Instagram bio link (and post links where a link can be put directly)
+moves from the homepage to the nurse directory. Paid social visitors currently reach the directory
+about 1% of the time, because they have to click through the homepage to get there. Landing them on
+it makes that 100% by construction, so the test answers the question underneath: once they are
+looking at a list of real nurses, do they engage, or is this audience simply not interested?
+
+**Read it here:** "Bio link test: does landing on the directory make people look at a nurse" on the
+Acquisition and activation dashboard.
+
+**The baseline, measured 2 September 2026 before the change.** Every social visit lands on `/`.
+The share that go on to open an actual nurse profile:
+
+| Week | Visits | Opened a nurse profile |
+|---|---|---|
+| 8 Jun | 149 | 12.1% |
+| 22 Jun | 160 | 8.1% |
+| 20 Jul | 195 | 3.1% |
+| 3 Aug | 327 | 0.0% |
+| 17 Aug | 320 | 0.0% |
+| 24 Aug | 332 | 0.3% |
+
+And across all 2,369 paid visits since June: **four profile views and zero reveal attempts.**
+
+**The stopping rule, agreed before the numbers arrive so it cannot be argued with afterwards.**
+
+Wait for at least **200 visits landing on `/nurses`** before reading anything. At the current spend
+that is roughly a week, and below it the percentage is noise rather than a measurement.
+
+Then, continue the ad spend only if BOTH hold:
+
+1. At least **5%** of those visits open a nurse profile. That is roughly thirty times the current
+   rate and still below what the unpaid traffic managed, so it is a low bar deliberately.
+2. At least **one reveal attempt**. Zero across 2,369 visits is the actual problem, and a landing
+   page change that produces no attempt at all has answered the question.
+
+If either fails, the audience is wrong rather than the landing page, and the money is better kept.
+Stopping is the expected outcome of a fair test, not a failure of it.
+
+**Why the tagging matters here.** The new links must carry their own `utm_campaign` so the traffic
+after the change is separable from the traffic before it. Without that, both sit in the same bucket
+and the test cannot be read at all.
