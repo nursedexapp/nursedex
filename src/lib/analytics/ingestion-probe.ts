@@ -130,3 +130,50 @@ export function interpretQueryResult(payload: unknown): ProbeAnswer {
   }
   return first[0] > 0 ? { state: "found" } : { state: "not_yet" };
 }
+
+export type PollOutcome =
+  | { state: "found"; waitedMs: number; attempts: number }
+  | { state: "query_rejected"; status: number }
+  | { state: "unreadable"; because: string }
+  | { state: "timed_out"; waitedMs: number; attempts: number };
+
+/**
+ * Waits for the probe to appear, or reports precisely why it did not.
+ *
+ * The clock, the sleep and the query all arrive as arguments. That is not
+ * ceremony: without them this loop could only ever be exercised by waiting on a
+ * live service for real, so its deadline and its three failure branches would
+ * ship unverified, and a loop that never terminates or misreads an answer is
+ * exactly the kind of defect a live check cannot surface (it just looks slow).
+ *
+ * Every outcome is distinct. Folding "I could not read the answer" into "not
+ * there yet" would let a broken query API spend the whole deadline and then be
+ * reported as broken ingestion.
+ */
+export async function pollForProbe(deps: {
+  runQuery: () => Promise<{ ok: boolean; status: number; body: unknown }>;
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+  deadlineMs: number;
+  pollEveryMs: number;
+}): Promise<PollOutcome> {
+  const started = deps.now();
+  let attempts = 0;
+
+  while (deps.now() - started < deps.deadlineMs) {
+    attempts += 1;
+    const res = await deps.runQuery();
+    if (!res.ok) return { state: "query_rejected", status: res.status };
+
+    const answer = interpretQueryResult(res.body);
+    if (answer.state === "found") {
+      return { state: "found", waitedMs: deps.now() - started, attempts };
+    }
+    if (answer.state === "unreadable") {
+      return { state: "unreadable", because: answer.because };
+    }
+    await deps.sleep(deps.pollEveryMs);
+  }
+
+  return { state: "timed_out", waitedMs: deps.now() - started, attempts };
+}

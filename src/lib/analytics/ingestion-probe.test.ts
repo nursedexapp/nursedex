@@ -9,6 +9,7 @@ import {
   queryUrl,
   queryBody,
   interpretQueryResult,
+  pollForProbe,
 } from "./ingestion-probe";
 
 /**
@@ -126,4 +127,76 @@ describe("interpretQueryResult", () => {
       });
     },
   );
+});
+
+describe("pollForProbe", () => {
+  /**
+   * A fake clock and a fake sleep, so these run instantly and assert the
+   * SCHEDULE rather than surviving it. Sleeping for real here would make the
+   * deadline case a three minute test, which is how a loop like this ends up
+   * with no coverage at all.
+   */
+  function harness(answers: { ok: boolean; status: number; body: unknown }[]) {
+    let clock = 0;
+    const slept: number[] = [];
+    let served = 0;
+    return {
+      slept,
+      deps: {
+        runQuery: async () => answers[Math.min(served++, answers.length - 1)],
+        now: () => clock,
+        sleep: async (ms: number) => {
+          slept.push(ms);
+          clock += ms;
+        },
+        deadlineMs: 30_000,
+        pollEveryMs: 3_000,
+      },
+    };
+  }
+
+  const notYet = { ok: true, status: 200, body: { results: [[0]] } };
+  const found = { ok: true, status: 200, body: { results: [[1]] } };
+
+  it("stops the moment the event lands, rather than serving out the deadline", async () => {
+    const h = harness([notYet, notYet, found]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome).toEqual({ state: "found", waitedMs: 6_000, attempts: 3 });
+    // Two waits, not ten: it did not keep polling after it had its answer.
+    expect(h.slept).toEqual([3_000, 3_000]);
+  });
+
+  it("times out rather than hanging when the event never arrives", async () => {
+    const h = harness([notYet]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome.state).toBe("timed_out");
+    // A wait with no deadline cannot fail, it can only hang, and a hang is
+    // indistinguishable from slowness.
+    expect((outcome as { waitedMs: number }).waitedMs).toBeGreaterThanOrEqual(
+      30_000,
+    );
+  });
+
+  it("blames the query, not ingestion, when the query is rejected", async () => {
+    const h = harness([{ ok: false, status: 401, body: null }]);
+    const outcome = await pollForProbe(h.deps);
+
+    // Immediately, without spending the deadline first: a bad key is not slow
+    // ingestion and must not be reported as it.
+    expect(outcome).toEqual({ state: "query_rejected", status: 401 });
+    expect(h.slept).toEqual([]);
+  });
+
+  it("stops on an answer it cannot read, instead of retrying it to death", async () => {
+    const h = harness([{ ok: true, status: 200, body: { error: "boom" } }]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome).toEqual({
+      state: "unreadable",
+      because: "response had no results array",
+    });
+    expect(h.slept).toEqual([]);
+  });
 });

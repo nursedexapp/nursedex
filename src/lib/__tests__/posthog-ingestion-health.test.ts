@@ -8,7 +8,8 @@ import {
   captureBody,
   queryUrl,
   queryBody,
-  interpretQueryResult,
+  pollForProbe,
+  type PollOutcome,
   PROBE_EVENT,
 } from "@/lib/analytics/ingestion-probe";
 
@@ -83,60 +84,64 @@ describe("PostHog ingestion", () => {
         "is failing, so nothing the app sends is being recorded.",
     ).toBe(true);
 
-    const started = Date.now();
-    let attempts = 0;
-    let lastAnswer = "never queried";
+    // The loop itself lives in ingestion-probe.ts behind an injected clock and
+    // sleep, so its deadline and its three failure branches are tested there
+    // instantly rather than only ever exercised against a live service.
+    const outcome = await pollForProbe({
+      runQuery: async () => {
+        const res = await fetch(queryUrl(config), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.personalApiKey}`,
+          },
+          body: JSON.stringify(queryBody(probeId)),
+        });
+        return {
+          ok: res.ok,
+          status: res.status,
+          body: res.ok ? await res.json() : null,
+        };
+      },
+      now: () => Date.now(),
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      deadlineMs: DEADLINE_MS,
+      pollEveryMs: POLL_EVERY_MS,
+    });
 
-    while (Date.now() - started < DEADLINE_MS) {
-      attempts += 1;
-      const res = await fetch(queryUrl(config), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.personalApiKey}`,
-        },
-        body: JSON.stringify(queryBody(probeId)),
-      });
-
-      if (!res.ok) {
-        // A rejected query is its own fault, not slow ingestion, so say so now
-        // rather than spending the whole deadline and blaming the pipeline.
-        expect(
-          res.ok,
-          `PostHog rejected the read back with HTTP ${res.status}. The personal ` +
-            "API key is probably wrong or lacks query access, so this check " +
-            "cannot tell whether ingestion works.",
-        ).toBe(true);
-        return;
-      }
-
-      const answer = interpretQueryResult(await res.json());
-      if (answer.state === "found") {
-        expect(answer.state).toBe("found");
-        return;
-      }
-      if (answer.state === "unreadable") {
-        expect(
-          answer.state,
-          `PostHog answered in a shape this check does not understand ` +
-            `(${answer.because}). That is not the same as the event being ` +
-            "absent, and it needs looking at rather than retrying.",
-        ).toBe("found");
-        return;
-      }
-
-      lastAnswer = "not yet recorded";
-      await new Promise((resolve) => setTimeout(resolve, POLL_EVERY_MS));
-    }
-
-    const waited = Math.round((Date.now() - started) / 1000);
-    expect(
-      lastAnswer,
-      `A ${PROBE_EVENT} event was accepted by PostHog but never appeared in ` +
-        `queries after ${waited}s and ${attempts} attempts. Capture is ` +
-        "answering while ingestion is not recording, which is the failure this " +
-        "check exists to catch: recorded events would quietly fall to zero and " +
-        "look like a drop in traffic.",
-    ).toBe("found");
+    expect(outcome.state, explain(outcome)).toBe("found");
   }, DEADLINE_MS + 30_000);
 });
+
+/**
+ * One sentence per cause. These are four different problems with four different
+ * remedies, and a single "ingestion check failed" would send whoever reads it
+ * looking in the wrong place.
+ */
+function explain(outcome: PollOutcome): string {
+  switch (outcome.state) {
+    case "found":
+      return "";
+    case "query_rejected":
+      return (
+        `PostHog rejected the read back with HTTP ${outcome.status}. The personal ` +
+        "API key is probably wrong or lacks query access, so this check cannot " +
+        "tell whether ingestion works either way."
+      );
+    case "unreadable":
+      return (
+        `PostHog answered in a shape this check does not understand ` +
+        `(${outcome.because}). That is not the same as the event being absent, ` +
+        "and it needs looking at rather than retrying."
+      );
+    case "timed_out":
+      return (
+        `A ${PROBE_EVENT} event was accepted by PostHog but never appeared in ` +
+        `queries after ${Math.round(outcome.waitedMs / 1000)}s and ` +
+        `${outcome.attempts} attempts. Capture is answering while ingestion is ` +
+        "not recording, which is the failure this check exists to catch: " +
+        "recorded events would quietly fall to zero and look like a drop in " +
+        "traffic."
+      );
+  }
+}
