@@ -4,7 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { getSignedPhotoUrl } from "@/lib/profile/photos";
 import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
-import { NurseProfileFull } from "@/components/profile/NurseProfileFull";
+import { getNurseBySlugUnfiltered } from "@/lib/profile/queries";
+import { buildPreviewViews } from "@/lib/profile/preview";
+import { PreviewViews } from "./PreviewViews";
 
 export default async function PreviewPage() {
   const user = await requireRole(UserRole.NURSE);
@@ -28,13 +30,25 @@ export default async function PreviewPage() {
     redirect(`/dashboard/onboarding?step=${onboardingStatus.nextStep}`);
   }
 
-  // Get photo URL for first photo
+  // The same record the public page reads, through the same query, rather than
+  // a hand-assembled object (#447). The unfiltered variant exists for exactly
+  // this caller: a nurse looking at her own profile before it is verified.
+  // Requesting it is gated by requireRole plus the user_id match above.
+  const nurse = await getNurseBySlugUnfiltered(profile.slug);
+  if (!nurse) {
+    redirect("/dashboard");
+  }
+
+  const { visitor, subscribed, hasLicenseNumber } = buildPreviewViews(
+    nurse,
+    user,
+  );
+
   const photoUrl =
     profile.photos.length > 0
       ? await getSignedPhotoUrl(profile.photos[0])
       : null;
 
-  // Get license verification URL
   const { data: licenseUrl } = await supabase
     .from("license_verification_urls")
     .select("url")
@@ -47,38 +61,17 @@ export default async function PreviewPage() {
       <div className="mb-6">
         <h1 className="font-heading text-2xl font-semibold">Profile Preview</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          See how your profile looks to families.
+          Your profile exactly as families see it. Most people arrive without a
+          subscription, so that is the view shown first.
         </p>
       </div>
       <div className="max-w-5xl">
-        <NurseProfileFull
-          nurse={{
-            first_name: user.first_name || "",
-            last_name: user.last_name || "",
-            credential: profile.credential,
-            license_number: profile.license_number,
-            bio: profile.bio,
-            care_types: profile.care_types,
-            primary_care_type: profile.primary_care_type,
-            skills: profile.skills,
-            gender: profile.gender,
-            years_experience: profile.years_experience,
-            languages: profile.languages,
-            availability_commitment: profile.availability_commitment,
-            time_slots: profile.time_slots,
-            rate_min: profile.rate_min,
-            rate_max: profile.rate_max,
-            has_transportation: profile.has_transportation,
-            care_philosophy: profile.care_philosophy,
-            additional_certs: profile.additional_certs,
-            avg_rating: profile.avg_rating,
-            review_count: profile.review_count,
-            is_available: profile.is_available,
-            tier: profile.tier,
-          }}
+        <PreviewViews
+          visitor={visitor}
+          subscribed={subscribed}
           photoUrl={photoUrl}
-          licenseVerifyUrl={licenseUrl?.url}
-          isPreview
+          licenseVerifyUrl={licenseUrl?.url ?? null}
+          hasLicenseNumber={hasLicenseNumber}
         />
       </div>
     </div>
