@@ -16,6 +16,9 @@ import type { NextRequest } from "next/server";
 const h = vi.hoisted(() => ({
   rows: [] as unknown[],
   error: null as { message: string } | null,
+  inserted: [] as string[],
+  insertError: null as { message: string } | null,
+  upsertOptions: null as unknown,
   createServiceRoleClient: vi.fn(),
 }));
 
@@ -23,6 +26,13 @@ vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({
     from: () => ({
       select: () => Promise.resolve({ data: h.rows, error: h.error }),
+      // Upsert rather than insert: two watchdog reads can overlap, and the
+      // second must not fail on a row the first just created.
+      upsert: (payload: Array<{ job_name: string }>, options: unknown) => {
+        h.upsertOptions = options;
+        h.inserted.push(...payload.map((row) => row.job_name));
+        return Promise.resolve({ error: h.insertError });
+      },
     }),
   }),
 }));
@@ -46,6 +56,8 @@ beforeEach(() => {
     },
   ];
   h.error = null;
+  h.inserted = [];
+  h.insertError = null;
   process.env.HEARTBEAT_READ_SECRET = "test-heartbeat-secret";
 });
 
@@ -75,9 +87,13 @@ describe("GET /api/internal/job-heartbeats", () => {
     const res = await GET(request("Bearer test-heartbeat-secret"));
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { jobs: Array<{ job_name: string }> };
-    expect(body.jobs).toHaveLength(1);
-    expect(body.jobs[0].job_name).toBe("access-expiry");
+    const body = (await res.json()) as {
+      jobs: Array<{ job_name: string; last_success_at: string | null }>;
+    };
+    // Found by name rather than by position: the answer also carries a row for
+    // every other scheduled cron, registered on the way past.
+    const row = body.jobs.find((j) => j.job_name === "access-expiry");
+    expect(row?.last_success_at).toBe("2026-09-01T05:00:12Z");
   });
 
   /**
@@ -98,16 +114,100 @@ describe("GET /api/internal/job-heartbeats", () => {
   });
 
   /**
-   * An empty table is a real state: it is what the deploy before the first cron
-   * run looks like. It has to be distinguishable from the failure above.
+   * A table with nothing in it is a real state: it is what the deploy before
+   * the first cron run looks like. It has to stay distinguishable from the
+   * failure above, so it answers 200 with a row per scheduled job and no
+   * successes on any of them, never an error.
    */
-  it("returns an empty list, and a 200, when nothing has run yet", async () => {
+  it("answers 200 with jobs that have never succeeded when nothing has run yet", async () => {
     h.rows = [];
 
     const res = await GET(request("Bearer test-heartbeat-secret"));
 
     expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      jobs: Array<{ last_success_at: string | null }>;
+    };
+    expect(body.jobs.length).toBeGreaterThan(0);
+    expect(body.jobs.every((j) => j.last_success_at === null)).toBe(true);
+  });
+
+  /**
+   * The grace period a job gets before it is called overdue is measured from
+   * when it was FIRST SEEN, and that lives on its row. A cron with no row at
+   * all therefore gets no grace: the watchdog reports it as never having
+   * completed the moment it is added, and keeps saying so until its first run,
+   * which for the monthly invoice job is up to a month of daily false alerts.
+   *
+   * So the first read after a cron is added records that it exists. The names
+   * come from vercel.json on the server, never from the caller, so this cannot
+   * be used to create rows for anything that is not actually scheduled.
+   */
+  it("records a scheduled cron that has no row yet", async () => {
+    h.rows = [];
+
+    const res = await GET(request("Bearer test-heartbeat-secret"));
+
+    expect(res.status).toBe(200);
+    expect(h.inserted.length).toBeGreaterThan(0);
+    expect(h.inserted).toContain("access-expiry");
+  });
+
+  // Two runs can overlap, so the write has to tolerate a row that appeared
+  // between the read and the write rather than failing on it.
+  it("tolerates the row already existing when it writes", async () => {
+    h.rows = [];
+
+    await GET(request("Bearer test-heartbeat-secret"));
+
+    expect(h.upsertOptions).toMatchObject({
+      onConflict: "job_name",
+      ignoreDuplicates: true,
+    });
+  });
+
+  it("records nothing when every scheduled cron already has a row", async () => {
+    const { crons } = (await import("../../../../../vercel.json")) as unknown as {
+      crons: Array<{ path: string }>;
+    };
+    h.rows = crons.map((c) => ({
+      job_name: c.path.split("/").filter(Boolean).pop(),
+      first_seen_at: "2026-08-01T00:00:00Z",
+      last_success_at: null,
+      last_duration_ms: null,
+      last_result: null,
+    }));
+
+    await GET(request("Bearer test-heartbeat-secret"));
+
+    expect(h.inserted).toEqual([]);
+  });
+
+  it("returns the new rows in the same answer, not on the next call", async () => {
+    h.rows = [];
+
+    const res = await GET(request("Bearer test-heartbeat-secret"));
+    const body = (await res.json()) as { jobs: Array<{ job_name: string }> };
+
+    // A caller that had to ask twice would judge the first answer against an
+    // empty table, which is the state this exists to stop it seeing.
+    expect(body.jobs.length).toBe(h.inserted.length);
+  });
+
+  /**
+   * The read is what the caller asked for. If the bookkeeping write fails, the
+   * rows that DO exist still have to come back: refusing them would turn a
+   * failure to register a new job into a total blackout of every job that is
+   * running fine.
+   */
+  it("still answers with the rows it has when the registration write fails", async () => {
+    h.rows = [{ job_name: "access-expiry", last_success_at: "2026-09-01T05:00:00Z" }];
+    h.insertError = { message: "permission denied" };
+
+    const res = await GET(request("Bearer test-heartbeat-secret"));
+
+    expect(res.status).toBe(200);
     const body = (await res.json()) as { jobs: unknown[] };
-    expect(body.jobs).toEqual([]);
+    expect(body.jobs.length).toBeGreaterThan(0);
   });
 });
