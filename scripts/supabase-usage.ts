@@ -86,19 +86,21 @@ function toBytes(value: unknown, field: string): number {
  * rather than report headroom on a production nobody actually looked at (L98).
  */
 export function parseUsageRows(raw: string): Usage {
-  const line = raw
-    .split("\n")
-    .map((l) => l.trim())
-    .find((l) => l.startsWith("[") || l.startsWith("{"));
+  // From the first bracket to the END of the payload, not the first LINE that
+  // opens one: the CLI pretty-prints its JSON across several lines, so reading
+  // one line gets "[" on its own and JSON.parse throws on it. Any log lines
+  // the CLI printed first are skipped by starting at the bracket.
+  const trimmed = raw.trim();
+  const start = trimmed.search(/[[{]/);
 
-  if (!line) {
+  if (!trimmed || start === -1) {
     throw new Error(
       "The Supabase usage query produced no JSON payload, so it did not run. " +
         "Nothing was measured.",
     );
   }
 
-  const parsed: unknown = JSON.parse(line);
+  const parsed: unknown = JSON.parse(trimmed.slice(start));
   const row = Array.isArray(parsed) ? parsed[0] : parsed;
   if (!row || typeof row !== "object") {
     throw new Error("The Supabase usage query returned no row.");

@@ -45,6 +45,34 @@ describe("parseUsageRows", () => {
   });
 
   /**
+   * The CLI pretty-prints its JSON across several lines. Reading only the first
+   * line that opens a bracket gets "[" on its own, and JSON.parse of that
+   * throws "Unexpected end of JSON input", which is what the first real run
+   * against production did. The other production checkers parse the whole
+   * payload for exactly this reason.
+   */
+  it("reads a payload the CLI printed across several lines", () => {
+    const raw = [
+      "[",
+      "  {",
+      '    "database_bytes": 123456,',
+      '    "storage_bytes": 7890',
+      "  }",
+      "]",
+    ].join("\n");
+
+    expect(parseUsageRows(raw)).toEqual({
+      databaseBytes: 123456,
+      storageBytes: 7890,
+    });
+  });
+
+  it("reads a multi-line payload that follows the CLI's own log lines", () => {
+    const raw = ["Finished supabase link.", "[", "  {", '    "database_bytes": 1,', '    "storage_bytes": 2', "  }", "]"].join("\n");
+    expect(parseUsageRows(raw).storageBytes).toBe(2);
+  });
+
+  /**
    * A query that never ran must fail the job, never report a healthy amount of
    * headroom on a production nobody actually looked at (L98).
    */
