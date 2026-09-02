@@ -1,0 +1,71 @@
+name: Job Watchdog
+
+# Everything in this repo that runs on a schedule alerts when it FAILS. Until
+# this job existed, nothing noticed when one stopped running at all, and from
+# outside those two are the same thing: silence (#837, #757, L13).
+#
+# GitHub disables a scheduled workflow after 60 days without repository
+# activity, and says so only in an email to the repository owner. A counter
+# that has quietly stopped counting is exactly the failure CI Health exists to
+# catch, turned on itself.
+#
+# It reads each workflow's own cron expression and judges that workflow against
+# it, so a weekly job is allowed a week and a daily one is not. Nothing here is
+# a hand-kept list: a scheduled workflow added later is watched without anybody
+# remembering to add it.
+#
+# THE GAP THIS CANNOT CLOSE, stated rather than left to be discovered: it
+# cannot report its own absence. If GitHub disables THIS schedule, nothing
+# says so, and the only remaining signals are GitHub's own email to the owner
+# and the fact that the daily "all healthy" line stops appearing in the run
+# log. Watching the watcher from inside the same account is not possible
+# without a second, independent system.
+
+on:
+  # Daily, and deliberately not weekly: the jobs it watches include daily ones,
+  # and a watcher slower than the thing it watches turns every real outage into
+  # a week of silence. 06:20 UTC keeps it away from the 13:00 cluster, so an
+  # overdue job is reported before the next day's runs muddy the picture.
+  schedule:
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+
+# Read-only, listed rather than granted wholesale: an over-broad permission is
+# invisible, because the code never attempts what it is not meant to do, while
+# a missing one fails loudly on the first run (L503).
+permissions:
+  contents: read # checkout
+  actions: read # listing each workflow's runs
+
+concurrency:
+  group: job-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    name: Check every scheduled job still runs
+    runs-on: ubuntu-latest
+    # A handful of small API calls, one or two per scheduled workflow. Five
+    # minutes is far more than it needs and far less than the six hour default,
+    # which would let a hung request hold a runner and bill 360 minutes
+    # (#809, L110).
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install tsx
+        uses: ./.github/actions/setup-tsx
+
+      # SLACK_BOT_TOKEN is optional and follows Production Smoke: without it the
+      # failing job is the only signal, and the checker says so in the log
+      # rather than skipping in silence.
+      - name: Report any job that has stopped running
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: tsx scripts/check-scheduled-jobs.ts

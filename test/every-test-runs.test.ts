@@ -5,20 +5,20 @@ import { join } from "node:path";
 /**
  * Every test file has a command that runs it, and that command runs in CI.
  *
- * Three of them exist here and they do not overlap:
+ * Four commands exist here and they do not overlap:
  *
- *   npm test            vitest.config.ts, which EXCLUDES src/lib/__tests__
- *   npm run test:rls    a hand-listed subset of src/lib/__tests__
- *   npm run test:health the whole of src/lib/__tests__
+ *   npm test                    vitest.config.ts, which EXCLUDES src/lib/__tests__
+ *   npm run test:rls            a listed subset of src/lib/__tests__
+ *   npm run test:health:services the live third party checks
+ *   npm run test:health         the whole of src/lib/__tests__
  *
- * `npm test` runs in ci.yml and `npm run test:rls` in e2e.yml. `test:health`
- * runs in no workflow at all. So a guard dropped into src/lib/__tests__ and
- * not added to the test:rls list is executed by nothing, and its absence looks
- * exactly like a pass (#778).
+ * A file dropped into src/lib/__tests__ and named by no command is executed by
+ * nothing, and its absence looks exactly like a pass (#778).
  *
- * That list is a registry maintained by hand, which checks only what it lists.
- * This derives both sides from the files and from package.json, so a new file
- * there fails until it is wired into a command CI actually runs.
+ * Which commands COUNT is derived from the workflow files rather than listed
+ * here, so wiring a command into a workflow is what makes it count, and a
+ * command that exists in package.json but runs in no workflow protects nothing
+ * (#796, L96).
  */
 
 const HEALTH_DIR = join("src", "lib", "__tests__");
@@ -26,20 +26,51 @@ const HEALTH_DIR = join("src", "lib", "__tests__");
 /**
  * Files in that directory that deliberately run NOWHERE in CI, and why.
  *
- * Each reads .env.local and talks to a live third party service, so it is a
- * local diagnostic rather than a guard. Declaring them here is the point: a
- * new file in that directory now has to be either wired into test:rls or
- * declared local-only on purpose, instead of quietly executing nowhere.
+ * The four third party health checks used to live here. They came out as part
+ * of #796: a check that only runs when somebody happens to run it by hand is
+ * not a check on anything, and email that silently stops sending looks exactly
+ * like nobody signing up. They now run daily in health-checks.yml.
+ *
+ * Declaring the remainder here is the point: a new file in that directory has
+ * to be either wired into a command CI runs or declared local-only on purpose,
+ * instead of quietly executing nowhere.
  */
 const LOCAL_ONLY: Record<string, string> = {
   "src/lib/__tests__/distance-function.test.ts":
-    "calls the calculate_distance function on a live database",
-  "src/lib/__tests__/posthog-health.test.ts": "pings the live PostHog project",
-  "src/lib/__tests__/resend-health.test.ts": "pings the live Resend account",
-  "src/lib/__tests__/sentry-health.test.ts": "pings the live Sentry project",
-  "src/lib/__tests__/supabase-health.test.ts":
-    "pings the live Supabase project",
+    "calls the calculate_distance function on a live database, which CI has no route to",
 };
+
+/**
+ * The npm scripts the workflows actually invoke.
+ *
+ * Read out of the workflow files, because a script in package.json that no
+ * workflow runs executes nowhere, and a guard that trusted package.json alone
+ * would call such a file covered (L96, L3).
+ */
+function scriptsRunInCi(): string[] {
+  const dir = ".github/workflows";
+  const names = new Set<string>();
+
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".yml"))) {
+    const contents = readFileSync(join(dir, file), "utf8");
+    for (const line of contents.split("\n")) {
+      if (line.trim().startsWith("#")) continue;
+      for (const match of line.matchAll(/npm run ([\w:-]+)/g)) {
+        names.add(match[1]);
+      }
+      if (/npm test\b/.test(line)) names.add("test");
+    }
+  }
+
+  return [...names];
+}
+
+/** The command strings behind the scripts CI runs. */
+function ciCommands(scripts: Record<string, string>): string[] {
+  return scriptsRunInCi()
+    .map((name) => scripts[name])
+    .filter((command): command is string => Boolean(command));
+}
 
 function testFilesUnder(dir: string): string[] {
   const out: string[] = [];
@@ -61,14 +92,22 @@ const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
 describe("the health tests", () => {
   const files = testFilesUnder(HEALTH_DIR);
   const rlsScript = packageJson.scripts["test:rls"];
+  const commands = ciCommands(packageJson.scripts);
 
   it("exist, so this guard is not checking an empty list", () => {
     expect(files.length).toBeGreaterThan(5);
     expect(rlsScript).toBeTruthy();
   });
 
+  it("finds the commands CI runs, so it is not checking against an empty list", () => {
+    // Without this, a workflow rename would leave every health file matched
+    // against nothing, and the failure would read as "wire this up" on files
+    // that are already wired (L98).
+    expect(commands.length).toBeGreaterThan(1);
+  });
+
   it.each(files)(
-    "%s has a command that runs it, or a stated reason",
+    "%s has a command that runs it in CI, or a stated reason",
     (file) => {
       // The command uses forward slashes whatever platform assembled the path.
       const asScript = file.split(/[\\/]/).join("/");
@@ -77,10 +116,10 @@ describe("the health tests", () => {
         return;
       }
       expect(
-        rlsScript.includes(asScript),
-        `${asScript} lives in ${HEALTH_DIR}, which "npm test" excludes, and is ` +
-          `not in the test:rls command that CI runs. It would execute nowhere. ` +
-          `Add it to that command, or to LOCAL_ONLY with a reason.`,
+        commands.some((command) => command.includes(asScript)),
+        `${asScript} lives in ${HEALTH_DIR}, which "npm test" excludes, and no ` +
+          `npm script that a workflow runs names it. It would execute nowhere. ` +
+          `Add it to one of those commands, or to LOCAL_ONLY with a reason.`,
       ).toBe(true);
     },
   );

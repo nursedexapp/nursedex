@@ -100,3 +100,78 @@ export function formatDriftReport(report: DriftReport): string {
 
   return lines.join("\n");
 }
+
+/** The alert call, narrowed to what this check needs (see scripts/slack-alert.ts). */
+type AnnounceFn = (args: {
+  title: string;
+  report: string;
+  token: string | undefined;
+}) => Promise<void>;
+
+export interface DriftCheckOptions {
+  /** Raw stdout from `supabase migration list --linked --output-format json`. */
+  raw: string;
+  announceImpl: AnnounceFn;
+  token: string | undefined;
+  log: (message: string) => void;
+}
+
+/**
+ * The whole decision the CI entry point makes, in one testable place (#816).
+ *
+ * Returns the process exit code rather than calling process.exit, so every
+ * outcome can be exercised: in sync, drifted, and the payload that could not
+ * be read at all. The last of those gets its own wording, because "the check
+ * could not run" and "production is missing a migration" send whoever reads
+ * the alert to two different places (L11).
+ *
+ * A failing alert never changes the verdict. The job that found the drift has
+ * to survive long enough to print it and exit non zero, so an alerter that
+ * throws is logged and stepped over rather than allowed to take the run down.
+ */
+export async function runDriftCheck({
+  raw,
+  announceImpl,
+  token,
+  log,
+}: DriftCheckOptions): Promise<number> {
+  let report: DriftReport;
+  try {
+    report = detectDrift(parseMigrationList(raw));
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    log(`Migration drift check could not run: ${message}`);
+    await announceImpl({
+      title: "Migration drift check could not run",
+      report:
+        `${message}\n\n` +
+        "Nothing was compared, so this is not an all clear: production may or " +
+        "may not be in step with git.",
+      token,
+    }).catch((alertErr: unknown) => {
+      log(
+        `Could not post the Slack alert: ${
+          alertErr instanceof Error ? alertErr.message : String(alertErr)
+        }`,
+      );
+    });
+    return 1;
+  }
+
+  const text = formatDriftReport(report);
+  log(text);
+  if (!report.hasDrift) return 0;
+
+  await announceImpl({
+    title: "Migration drift detected",
+    report: text,
+    token,
+  }).catch((alertErr: unknown) => {
+    log(
+      `Could not post the Slack alert: ${
+        alertErr instanceof Error ? alertErr.message : String(alertErr)
+      }`,
+    );
+  });
+  return 1;
+}

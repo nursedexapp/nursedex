@@ -16,7 +16,7 @@ import {
   legacyHealthUrl,
   type HostCheck,
 } from "./legacy-host";
-import { announce } from "./prod-smoke-notify";
+import { announce } from "./slack-alert";
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -83,7 +83,11 @@ async function main(): Promise<void> {
   console.log(report);
 
   if (!result.ok) {
-    await announce({ report, token: process.env.SLACK_BOT_TOKEN });
+    await announce({
+      title: "Legacy Supabase host check failed",
+      report,
+      token: process.env.SLACK_BOT_TOKEN,
+    });
     process.exit(1);
   }
 }

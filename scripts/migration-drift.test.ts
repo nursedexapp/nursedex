@@ -4,6 +4,7 @@ import {
   parseMigrationList,
   detectDrift,
   formatDriftReport,
+  runDriftCheck,
 } from "./migration-drift";
 
 // The Supabase CLI prints progress lines before the JSON payload.
@@ -130,5 +131,104 @@ describe("formatDriftReport", () => {
       hasDrift: false,
     });
     expect(msg).toMatch(/in sync/i);
+  });
+});
+
+/**
+ * The alert path (#816).
+ *
+ * Until this existed, a drift failure was a red job in the Actions tab and
+ * nothing else. That is the same shape as the gap the check was written to
+ * close: migration 043 sat merged and unapplied in production for weeks
+ * because nothing said so (#518). A signal only visible to somebody who goes
+ * looking is not a signal (L13).
+ */
+describe("runDriftCheck", () => {
+  const IN_SYNC = payload([{ local: "001", remote: "001", time: "001" }]);
+  const DRIFTED = payload([{ local: "043", remote: null, time: "043" }]);
+
+  function spyAnnounce() {
+    const calls: Array<{ title: string; report: string }> = [];
+    return {
+      calls,
+      impl: async (args: { title: string; report: string }) => {
+        calls.push(args);
+      },
+    };
+  }
+
+  it("stays quiet and exits zero when production is in sync", async () => {
+    const announce = spyAnnounce();
+    const log: string[] = [];
+
+    const code = await runDriftCheck({
+      raw: IN_SYNC,
+      announceImpl: announce.impl,
+      token: "xoxb-test",
+      log: (m) => log.push(m),
+    });
+
+    expect(code).toBe(0);
+    expect(announce.calls).toHaveLength(0);
+    expect(log.join("\n")).toMatch(/in sync/i);
+  });
+
+  it("posts the drift report and exits non zero when a migration is unapplied", async () => {
+    const announce = spyAnnounce();
+
+    const code = await runDriftCheck({
+      raw: DRIFTED,
+      announceImpl: announce.impl,
+      token: "xoxb-test",
+      log: () => {},
+    });
+
+    expect(code).toBe(1);
+    expect(announce.calls).toHaveLength(1);
+    expect(announce.calls[0].title).toMatch(/drift/i);
+    expect(announce.calls[0].report).toContain("043");
+  });
+
+  /**
+   * A check that could not run and a check that found drift are different
+   * failures, and the remedy for each is different: one is a broken job, the
+   * other is an unapplied migration. Sharing one message would send whoever
+   * reads it to look for a migration that is fine (L11).
+   */
+  it("alerts with its own wording when the payload is unreadable", async () => {
+    const announce = spyAnnounce();
+
+    const code = await runDriftCheck({
+      raw: "Connecting to remote database...\nfailed to connect",
+      announceImpl: announce.impl,
+      token: "xoxb-test",
+      log: () => {},
+    });
+
+    expect(code).toBe(1);
+    expect(announce.calls).toHaveLength(1);
+    expect(announce.calls[0].title).toMatch(/could not run/i);
+    expect(announce.calls[0].title).not.toMatch(/drift detected/i);
+    expect(announce.calls[0].report).toMatch(/no JSON payload/i);
+  });
+
+  /**
+   * The drift is the thing that matters. An alerter that throws would take the
+   * job down before it printed the finding it was reporting on.
+   */
+  it("still exits non zero when the alert itself fails", async () => {
+    const log: string[] = [];
+
+    const code = await runDriftCheck({
+      raw: DRIFTED,
+      announceImpl: async () => {
+        throw new Error("slack unreachable");
+      },
+      token: "xoxb-test",
+      log: (m) => log.push(m),
+    });
+
+    expect(code).toBe(1);
+    expect(log.join("\n")).toContain("slack unreachable");
   });
 });

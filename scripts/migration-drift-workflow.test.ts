@@ -51,6 +51,13 @@ describe("migration-drift workflow", () => {
     expect(WORKFLOW).toMatch(/set -euo pipefail/);
   });
 
+  // #816: the check whose whole reason for existing is that nobody noticed had
+  // no way of telling anybody. Without the token in the step's environment the
+  // checker holds an alert path it can never use.
+  it("passes the Slack token to the checker, so a drift failure can be announced", () => {
+    expect(WORKFLOW).toMatch(/SLACK_BOT_TOKEN:\s*\$\{\{\s*secrets\./);
+  });
+
   it("reads its production credentials from secrets, never from literals", () => {
     expect(WORKFLOW).toMatch(/SUPABASE_ACCESS_TOKEN:\s*\$\{\{\s*secrets\./);
     expect(WORKFLOW).toMatch(/SUPABASE_DB_PASSWORD:\s*\$\{\{\s*secrets\./);

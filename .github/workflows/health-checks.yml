@@ -1,0 +1,79 @@
+name: Third Party Health
+
+# Four checks existed for the services whose failure is hardest to notice from
+# outside, and nothing ran them (#796). `npm test` excludes the directory they
+# live in, `test:rls` names other files, and `test:health` appeared in no
+# workflow, so they only ever ran when somebody happened to run them by hand.
+#
+# Email that silently stops sending looks exactly like nobody signing up.
+#
+# They are NOT in the pull request pipeline on purpose: they talk to live
+# services, so per-PR runs would be noise and would spend real quota against
+# every push. Daily is enough to catch a service that has gone quiet, and it
+# reports through the same Slack path as the other scheduled checks.
+
+on:
+  # An hour before the daily Supabase checks, so a bad morning does not arrive
+  # as four alerts in the same minute.
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read # checkout
+
+concurrency:
+  group: health-checks
+  cancel-in-progress: false
+
+jobs:
+  services:
+    name: Check the third party services answer
+    runs-on: ubuntu-latest
+    # The four checks are one HTTP round trip each. Most of this job is the
+    # install. Ten minutes is far more than it needs and far less than the six
+    # hour default, which would let a hung request hold a runner and bill 360
+    # minutes (#809, L110).
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Unlike the other scheduled jobs, this one runs vitest against the real
+      # client libraries, so it needs the dependency tree rather than tsx alone.
+      - name: Install dependencies
+        run: npm ci
+
+      # A missing secret makes the check fail, which fails the job. That is the
+      # intended behaviour: a health check that skips itself when its
+      # credentials are absent reports a pass, and a pass is what this exists to
+      # make meaningful.
+      #
+      # The log is kept so the alert step can carry the reason, rather than
+      # sending a message that only says something failed.
+      - name: Run the live service checks
+        id: checks
+        env:
+          NEXT_PUBLIC_POSTHOG_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_KEY }}
+          NEXT_PUBLIC_POSTHOG_HOST: ${{ secrets.NEXT_PUBLIC_POSTHOG_HOST }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          set -o pipefail
+          npm run test:health:services 2>&1 | tee health-checks.log
+
+      # Nobody is watching a scheduled run, so the red job is not the signal.
+      # Without a token this says so in its own log rather than skipping in
+      # silence, which is the behaviour Production Smoke already has.
+      - name: Say which service went quiet
+        if: failure() && steps.checks.outcome == 'failure'
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: npx tsx scripts/announce-ci-failure.ts "Third party health checks failed" health-checks.log

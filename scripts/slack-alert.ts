@@ -1,5 +1,9 @@
 /**
- * The alert path for the production permission check (#521).
+ * The shared Slack alert path for the scheduled checks (#521, #816).
+ *
+ * Every caller supplies its own title, because these all land in one channel
+ * and an alert that does not name the check it came from is one the reader has
+ * to identify before they can act on it.
  *
  * Deliberately does not reuse slackPost from src/lib/slack/client: that module
  * imports "server-only" and so only resolves inside the Next bundle. The guard
@@ -19,6 +23,8 @@ import { ALERTS_CHANNEL_ID } from "../src/lib/slack/constants";
 const SLACK_POST_MESSAGE = "https://slack.com/api/chat.postMessage";
 
 export interface AnnounceOptions {
+  /** Names the check that failed, e.g. "Migration drift detected". */
+  title: string;
   report: string;
   token: string | undefined;
   fetchImpl?: typeof fetch;
@@ -26,6 +32,7 @@ export interface AnnounceOptions {
 }
 
 export async function announce({
+  title,
   report,
   token,
   fetchImpl = fetch,
@@ -47,7 +54,7 @@ export async function announce({
       },
       body: JSON.stringify({
         channel: ALERTS_CHANNEL_ID,
-        text: `Production permission check failed\n\n${report}`,
+        text: `${title}\n\n${report}`,
       }),
     });
 

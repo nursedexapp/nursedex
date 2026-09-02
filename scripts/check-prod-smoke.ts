@@ -4,14 +4,14 @@
  * Reads the JSON from `supabase db query --linked` on stdin and exits non-zero
  * when production no longer allows what the app needs, or allows something it
  * should not. The reasoning lives in scripts/prod-smoke.ts; the alert path, and
- * every way it can fail, in scripts/prod-smoke-notify.ts.
+ * every way it can fail, in scripts/slack-alert.ts.
  *
  * Usage:
  *   supabase db query --linked --output-format json "$(cat scripts/prod-smoke.sql)" \
  *     | npx tsx scripts/check-prod-smoke.ts
  */
 import { parseGrantRows, checkGrants, formatSmokeReport } from "./prod-smoke";
-import { announce } from "./prod-smoke-notify";
+import { announce } from "./slack-alert";
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -30,7 +30,11 @@ async function main(): Promise<void> {
   console.log(report);
 
   if (!result.ok) {
-    await announce({ report, token: process.env.SLACK_BOT_TOKEN });
+    await announce({
+      title: "Production permission check failed",
+      report,
+      token: process.env.SLACK_BOT_TOKEN,
+    });
     process.exit(1);
   }
 }
