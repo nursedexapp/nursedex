@@ -11,7 +11,7 @@ export const maxDuration = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Daily 13:00 UTC (9am ET).
+ * Daily 13:20 UTC (9am ET).
  *
  * For each family who revealed a nurse ~30 days ago and hasn't
  * recorded a hire (any status, including rejected) for that nurse,
@@ -88,21 +88,41 @@ const handleHireFollowup = withCronAlerting(
     let sent = 0;
     let skipped = 0;
 
+    // Every candidate family's hires in ONE query, rather than one per family
+    // inside the loop (#441). The round trips came out of the same 60 second
+    // budget the email sends share, and the count grew with the number of
+    // families rather than staying flat. The reveal window bounds both lists,
+    // so this stays well inside the row cap on a single response.
+    const familyIds = [...byFamily.keys()];
+    const nurseIds = [
+      ...new Set([...byFamily.values()].flatMap((info) => [...info.nurseIds])),
+    ];
+
+    const { data: hires } = familyIds.length
+      ? await supabase
+          .from("hires")
+          .select("family_user_id, nurse_user_id")
+          .in("family_user_id", familyIds)
+          .in("nurse_user_id", nurseIds)
+      : { data: [] };
+
+    // Keyed by family, because one query covers all of them: matching on the
+    // nurse alone would let one family's hire silence another's followup.
+    const recordedByFamily = new Map<string, Set<string>>();
+    for (const hire of (hires ?? []) as Array<{
+      family_user_id: string;
+      nurse_user_id: string;
+    }>) {
+      const existing = recordedByFamily.get(hire.family_user_id);
+      if (existing) existing.add(hire.nurse_user_id);
+      else recordedByFamily.set(hire.family_user_id, new Set([hire.nurse_user_id]));
+    }
+
     for (const [familyUserId, info] of byFamily.entries()) {
       // Skip if the family has already recorded a hire (any status) with
       // any of the candidate nurses; the followup nudge is only useful
       // for families who haven't yet acted.
-      const { data: hires } = await supabase
-        .from("hires")
-        .select("nurse_user_id")
-        .eq("family_user_id", familyUserId)
-        .in("nurse_user_id", [...info.nurseIds]);
-
-      const recorded = new Set(
-        ((hires ?? []) as Array<{ nurse_user_id: string }>).map(
-          (h) => h.nurse_user_id,
-        ),
-      );
+      const recorded = recordedByFamily.get(familyUserId) ?? new Set<string>();
       const allRecorded = [...info.nurseIds].every((n) => recorded.has(n));
       if (allRecorded) {
         skipped++;

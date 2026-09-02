@@ -1,7 +1,18 @@
 import type { MetadataRoute } from "next";
+import * as Sentry from "@sentry/nextjs";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { getIndexableTaxonomy } from "@/lib/blog/queries";
+import { readAllRows } from "@/lib/blog/read-all-rows";
+
+/**
+ * A sitemap file may hold 50,000 URLs. Past that it is invalid and the
+ * overflow is ignored, so the moment to split into a sitemap index is before
+ * that arrives, not after. Reported at 90% because the remedy is a code change
+ * (generateSitemaps), which needs notice (#442).
+ */
+const SITEMAP_URL_LIMIT = 50_000;
+const SITEMAP_URL_WARNING = SITEMAP_URL_LIMIT * 0.9;
 
 // Refresh at most hourly so scheduled publishes and taxonomy changes reach
 // the sitemap without a deploy. Post mutations also revalidate it explicitly
@@ -46,25 +57,50 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: p.priority,
   }));
 
+  type Row = {
+    slug: string;
+    updated_at: string;
+    users: { is_deleted: boolean; is_suspended: boolean } | null;
+  };
+
   let nurseEntries: MetadataRoute.Sitemap = [];
+  // Read from the query's own count on the first page, so the file limit is
+  // judged even on a run whose read then fails: the size of the marketplace is
+  // knowable there, and it is the thing being judged.
+  let reportedNurseTotal: number | null = null;
+
   try {
     const supabase = createServiceRoleClient();
-    const nurseQuery = supabase.from("nurse_profiles").select(
-      `
+
+    // Paged and completeness-checked (#442). This was a single unbounded
+    // select, which PostgREST caps: past that cap it returned a healthy
+    // looking PREFIX with no error, and every nurse after it silently stopped
+    // being told to search engines. Nothing would have failed, the file would
+    // just have been smaller and wrong.
+    const rows = await readAllRows<Row>(
+      async (from, to) => {
+        const nurseQuery = supabase
+          .from("nurse_profiles")
+          .select(
+            `
         slug,
         updated_at,
         users!inner ( is_deleted, is_suspended )
       `,
+            { count: "exact" },
+          )
+          .range(from, to);
+
+        const { data, error, count } = await applyVisibleNurseFilter(nurseQuery);
+        if (error) throw new Error(error.message);
+        if (reportedNurseTotal === null) reportedNurseTotal = count;
+        return { rows: (data ?? []) as unknown as Row[], total: count };
+      },
+      1000,
+      "a short read would quietly drop every nurse after the cap out of the sitemap, and out of search",
     );
-    const { data } = await applyVisibleNurseFilter(nurseQuery);
 
-    type Row = {
-      slug: string;
-      updated_at: string;
-      users: { is_deleted: boolean; is_suspended: boolean } | null;
-    };
-
-    nurseEntries = ((data ?? []) as unknown as Row[])
+    nurseEntries = rows
       .filter((r) => r.users && !r.users.is_deleted && !r.users.is_suspended)
       .map((r) => ({
         url: `${BASE_URL}/nurses/${r.slug}`,
@@ -73,9 +109,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }));
   } catch (err) {
-    // Sitemap requests should never break; if Supabase is unreachable,
-    // ship just the static entries.
+    // Sitemap requests should never break, so the static entries still ship.
+    // The profiles are left out ENTIRELY rather than published as a prefix: a
+    // partial list looks like a complete one to a search engine, and would
+    // deindex whoever fell off the end (L10).
     console.error("[sitemap] failed to fetch nurse profiles:", err);
+    Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
+      tags: { action: "sitemap" },
+    });
+  }
+
+  if (reportedNurseTotal !== null && reportedNurseTotal >= SITEMAP_URL_WARNING) {
+    // One file cannot hold them all for much longer, and the failure past the
+    // limit is silent: the file is simply invalid and the overflow ignored.
+    // Said while there is still room to act.
+    Sentry.captureMessage(
+      `The sitemap is approaching the ${SITEMAP_URL_LIMIT} URL per file limit ` +
+        `(${reportedNurseTotal} nurse profiles). It needs splitting into a ` +
+        "sitemap index with generateSitemaps before it gets there.",
+      { level: "warning", tags: { action: "sitemap" } },
+    );
   }
 
   let blogEntries: MetadataRoute.Sitemap = [];

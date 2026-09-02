@@ -4,6 +4,7 @@ import { getPendingCommentCount } from "@/lib/comments/queries";
 import { compareVerificationQueueRows } from "./sla";
 import { SEED_EMAIL_PATTERN } from "./seed";
 import { RATE_LIMITS } from "@/lib/constants";
+import { flaggedSinceDate } from "@/lib/rate-limit/flagged";
 
 export interface AdminCounts {
   pendingVerifications: number;
@@ -390,7 +391,9 @@ export interface RateLimitFlaggedRow {
 /**
  * Family accounts at or over RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG
  * consecutive captcha-trigger days, the abuse signal from Phase 4. Latest
- * day per family.
+ * day per family, inside the same recent window the daily digest counts
+ * (#425), so the count in that email and the rows on this tab answer one
+ * question (L16).
  */
 export async function getRateLimitFlagged(): Promise<RateLimitFlaggedRow[]> {
   const supabase = await createClient();
@@ -405,6 +408,7 @@ export async function getRateLimitFlagged(): Promise<RateLimitFlaggedRow[]> {
     `,
     )
     .gte("consecutive_captcha_days", RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG)
+    .gte("date", flaggedSinceDate(new Date()))
     .order("date", { ascending: false });
 
   type Row = {

@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 /**
- * Daily 14:00 UTC (10am ET).
+ * Daily 14:10 UTC (10am ET).
  *
  * Counts pending verifications past 75% of their SLA (approaching or
  * overdue) and emails every admin/super_admin a single summary if

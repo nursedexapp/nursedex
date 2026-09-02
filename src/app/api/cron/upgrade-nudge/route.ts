@@ -16,7 +16,7 @@ export const maxDuration = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Wednesday 14:00 UTC. Free + verified nurses with at least
+ * Wednesday 14:40 UTC. Free + verified nurses with at least
  * UPSELL_SAVE_THRESHOLD family saves on file get a nudge,
  * rate-limited via last_upsell_shown_at to once per
  * UPSELL_COOLDOWN_DAYS days. Reuses the same gate fields the

@@ -12,7 +12,7 @@ export const maxDuration = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Daily 13:00 UTC (9am ET in summer, 8am ET in winter).
+ * Daily 13:10 UTC (9am ET in summer, 8am ET in winter).
  *
  * Finds verified nurses whose verified_at is between 14 and 28 days
  * ago and who haven't received a review invite email yet, then mails

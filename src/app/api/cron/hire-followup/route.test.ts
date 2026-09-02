@@ -18,18 +18,22 @@ const h = vi.hoisted(() => {
     },
     hires: { data: [] as unknown[], error: null as { message: string } | null },
   };
+  const counts = { hiresQueries: 0 };
   return {
     state,
+    counts,
     shouldSendOnce: vi.fn(async () => true),
     sendHireFollowupEmail: vi.fn(async () => {}),
     client: {
-      from: (table: string) =>
-        createQueryBuilder({
+      from: (table: string) => {
+        if (table === "hires") counts.hiresQueries++;
+        return createQueryBuilder({
           // Only the reveals query carries the date window; `filters` is
           // initialized below and this closure only runs inside a test.
           ...(table === "reveals" ? filters.handlers : {}),
           then: () => (table === "hires" ? h.state.hires : h.state.reveals),
-        }),
+        });
+      },
     },
   };
 });
@@ -70,6 +74,7 @@ beforeEach(() => {
   h.shouldSendOnce.mockResolvedValue(true);
   h.state.reveals = { data: [], error: null };
   h.state.hires = { data: [], error: null };
+  h.counts.hiresQueries = 0;
 });
 
 afterEach(() => {
@@ -108,11 +113,57 @@ describe("hire-followup cron", () => {
 
   it("skips a family that already recorded a hire for every revealed nurse", async () => {
     h.state.reveals = { data: [reveal()], error: null };
-    h.state.hires = { data: [{ nurse_user_id: "nurse-1" }], error: null };
+    h.state.hires = {
+      data: [{ family_user_id: "fam-1", nurse_user_id: "nurse-1" }],
+      error: null,
+    };
     const res = await GET(req());
     expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1 });
     expect(h.shouldSendOnce).not.toHaveBeenCalled();
     expect(h.sendHireFollowupEmail).not.toHaveBeenCalled();
+  });
+
+  /**
+   * #441: this used to run one hires query per family inside the loop. The
+   * work is bounded by a seven day reveal window today, so nothing is slow
+   * yet, but the cost grew with the number of families and every one of those
+   * round trips came out of the same 60 second budget the email sends share.
+   */
+  it("asks about hires once, however many families revealed", async () => {
+    h.state.reveals = {
+      data: [
+        reveal(),
+        reveal({ family_user_id: "fam-2", nurse_user_id: "nurse-2" }),
+        reveal({ family_user_id: "fam-3", nurse_user_id: "nurse-3" }),
+      ],
+      error: null,
+    };
+
+    await GET(req());
+
+    expect(h.counts.hiresQueries).toBe(1);
+  });
+
+  // One query covering every family means the rows have to be matched back to
+  // the family they belong to. Without that, a hire recorded by one family
+  // would silence the followup to a different one.
+  it("does not let one family's hire silence another family's followup", async () => {
+    h.state.reveals = {
+      data: [
+        reveal(),
+        reveal({ family_user_id: "fam-2", nurse_user_id: "nurse-2" }),
+      ],
+      error: null,
+    };
+    h.state.hires = {
+      data: [{ family_user_id: "fam-1", nurse_user_id: "nurse-1" }],
+      error: null,
+    };
+
+    const res = await GET(req());
+
+    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 1 });
+    expect(h.sendHireFollowupEmail).toHaveBeenCalledTimes(1);
   });
 
   it("does not count a deleted or suspended family", async () => {
