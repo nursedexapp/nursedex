@@ -58,6 +58,10 @@ export interface ScheduledJob {
    * adding a job does not fire an alert before its first scheduled run.
    */
   firstSeenAt?: string | null;
+  /** How long its last successful run took, when the job records that. */
+  lastDurationMs?: number | null;
+  /** The budget that run had, from the route's own maxDuration export. */
+  maxDurationMs?: number | null;
 }
 
 export interface OverdueJob {
@@ -68,10 +72,28 @@ export interface OverdueJob {
   neverRan: boolean;
 }
 
+export interface NearBudgetJob {
+  name: string;
+  source: string;
+  lastDurationMs: number;
+  maxDurationMs: number;
+}
+
 export interface WatchdogResult {
   checked: number;
   overdue: OverdueJob[];
+  nearBudget: NearBudgetJob[];
 }
+
+/**
+ * How much of its budget a run may use before it is worth saying so.
+ *
+ * These crons send emails one at a time inside a fixed maxDuration, and a run
+ * that reaches the ceiling sends a prefix of its batch and returns nothing to
+ * say it stopped early (#440). The run before that one is the only warning
+ * available.
+ */
+export const NEAR_BUDGET_FRACTION = 0.8;
 
 /**
  * The cron expressions in a workflow's `on.schedule` block.
@@ -261,8 +283,24 @@ export function evaluateScheduledJobs({
   }
 
   const overdue: OverdueJob[] = [];
+  const nearBudget: NearBudgetJob[] = [];
 
   for (const job of jobs) {
+    const lastDurationMs = job.lastDurationMs ?? null;
+    const maxDurationMs = job.maxDurationMs ?? null;
+    if (
+      lastDurationMs !== null &&
+      maxDurationMs !== null &&
+      lastDurationMs > maxDurationMs * NEAR_BUDGET_FRACTION
+    ) {
+      nearBudget.push({
+        name: job.name,
+        source: job.source,
+        lastDurationMs,
+        maxDurationMs,
+      });
+    }
+
     const intervalMs = expectedIntervalMs(job.crons);
     const limit = intervalMs * OVERDUE_FACTOR;
     const neverRan = !job.lastSuccessAt;
@@ -305,7 +343,7 @@ export function evaluateScheduledJobs({
     }
   }
 
-  return { checked: jobs.length, overdue };
+  return { checked: jobs.length, overdue, nearBudget };
 }
 
 function humanize(ms: number): string {
@@ -319,8 +357,25 @@ function humanize(ms: number): string {
 export function formatWatchdogReport(result: WatchdogResult): string {
   const plural = result.checked === 1 ? "job" : "jobs";
 
-  if (result.overdue.length === 0) {
+  const budgetLines = result.nearBudget.map(
+    (job) =>
+      `${job.name} (${job.source}) took ${Math.round(
+        job.lastDurationMs / 1000,
+      )}s of its ${Math.round(job.maxDurationMs / 1000)}s budget on its last ` +
+      "run. A run that reaches the ceiling stops partway through its batch and " +
+      "reports nothing about what it skipped.",
+  );
+
+  if (result.overdue.length === 0 && budgetLines.length === 0) {
     return `All ${result.checked} scheduled ${plural} have run within their own interval.`;
+  }
+
+  if (result.overdue.length === 0) {
+    return [
+      `All ${result.checked} scheduled ${plural} are running, but some are close to their time budget.`,
+      "",
+      ...budgetLines,
+    ].join("\n");
   }
 
   const lines = [
@@ -347,6 +402,8 @@ export function formatWatchdogReport(result: WatchdogResult): string {
       "just as quietly. Check the Actions tab, or Vercel's cron log, and re-run " +
       "the job by hand to confirm it still works.",
   );
+
+  if (budgetLines.length > 0) lines.push("", ...budgetLines);
 
   return lines.join("\n");
 }
@@ -433,8 +490,147 @@ export async function runScheduledJobCheck({
 
   const report = formatWatchdogReport(result);
   log(report);
-  if (result.overdue.length === 0) return 0;
 
-  await alert("Scheduled jobs have stopped running", report);
-  return 1;
+  if (result.overdue.length > 0) {
+    await alert("Scheduled jobs have stopped running", report);
+    return 1;
+  }
+
+  // A job that is still running but nearly out of time is a different finding
+  // with a different remedy, so it does not borrow the wording above (L11).
+  if (result.nearBudget.length > 0) {
+    await alert("A scheduled job is close to its time budget", report);
+    return 1;
+  }
+
+  return 0;
+}
+
+
+/**
+ * The Vercel crons, derived from vercel.json.
+ *
+ * The name is the last path segment, which is also the name withCronAlerting
+ * writes into job_heartbeats, so the two sides match without a mapping table
+ * maintained by hand.
+ *
+ * A file declaring no crons is a failed read rather than a repository with no
+ * scheduled work, and it must not quietly shrink the watched set to nothing
+ * (L98).
+ */
+export function collectVercelCronJobs(
+  vercelJson: string,
+): Array<{ name: string; source: string; crons: string[] }> {
+  const parsed = JSON.parse(vercelJson) as {
+    crons?: Array<{ path?: string; schedule?: string }>;
+  };
+  const crons = parsed.crons ?? [];
+
+  if (crons.length === 0) {
+    throw new Error(
+      "vercel.json declares no crons. The watched set cannot be empty, so this " +
+        "is a failed read rather than a repository with no scheduled work.",
+    );
+  }
+
+  return crons.map((cron) => {
+    const path = cron.path ?? "";
+    const name = path.split("/").filter(Boolean).pop() ?? path;
+    if (!name || !cron.schedule) {
+      throw new Error(
+        `A cron in vercel.json has no path or no schedule: ${JSON.stringify(cron)}`,
+      );
+    }
+    return { name, source: `vercel.json (${path})`, crons: [cron.schedule] };
+  });
+}
+
+export interface HeartbeatRow {
+  job_name: string;
+  first_seen_at?: string | null;
+  last_success_at?: string | null;
+  last_duration_ms?: number | null;
+}
+
+/**
+ * Joins the jobs that are SCHEDULED to the rows saying when they last ran.
+ *
+ * The scheduled side decides who is watched. A row whose job is no longer in
+ * vercel.json is a leftover, and reporting on it would name something that
+ * cannot run; a job with no row has simply never got through since the table
+ * existed, which is a state the evaluation already handles.
+ */
+export function attachHeartbeats(
+  jobs: Array<{ name: string; source: string; crons: string[] }>,
+  rows: HeartbeatRow[],
+  budgets: Record<string, number | null> = {},
+): ScheduledJob[] {
+  const byName = new Map(rows.map((row) => [row.job_name, row]));
+
+  return jobs.map((job) => {
+    const row = byName.get(job.name);
+    return {
+      ...job,
+      lastSuccessAt: row?.last_success_at ?? null,
+      firstSeenAt: row?.first_seen_at ?? null,
+      lastDurationMs: row?.last_duration_ms ?? null,
+      maxDurationMs: budgets[job.name] ?? null,
+    };
+  });
+}
+
+/** The budget a cron route declares for itself, in seconds. */
+export function parseMaxDurationSeconds(source: string): number | null {
+  const match = source.match(/export\s+const\s+maxDuration\s*=\s*(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
+export interface FetchHeartbeatOptions {
+  url: string;
+  secret: string | undefined;
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * Reads the cron heartbeats back out of the app.
+ *
+ * Everything here throws rather than degrading. A read that failed and a job
+ * that has stopped are different findings with different remedies, and the
+ * watchdog treats a job with no row as one that has never run, so an empty
+ * list from a broken read would accuse every cron at once and name the wrong
+ * problem entirely (L215, L11).
+ */
+export async function fetchHeartbeatRows({
+  url,
+  secret,
+  fetchImpl = fetch,
+}: FetchHeartbeatOptions): Promise<HeartbeatRow[]> {
+  // Refused here rather than by sending an unauthenticated request, whose 401
+  // would name the endpoint instead of the missing configuration.
+  if (!secret) {
+    throw new Error(
+      "HEARTBEAT_READ_SECRET is not set, so the cron heartbeats could not be read.",
+    );
+  }
+
+  const response = await fetchImpl(url, {
+    headers: { Authorization: `Bearer ${secret}` },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `The heartbeat endpoint answered ${response.status} ${response.statusText}` +
+        (body ? `: ${body.slice(0, 200)}` : ""),
+    );
+  }
+
+  const payload = (await response.json()) as { jobs?: HeartbeatRow[] };
+  if (!Array.isArray(payload.jobs)) {
+    throw new Error(
+      "The heartbeat endpoint returned no jobs array, so nothing could be read.",
+    );
+  }
+
+  return payload.jobs;
 }
