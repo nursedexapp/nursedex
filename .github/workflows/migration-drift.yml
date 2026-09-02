@@ -58,11 +58,16 @@ jobs:
       # Read-only: lists what production has applied. No schema is changed.
       # A missing secret makes the CLI fail, which fails the job, rather than
       # silently reporting "in sync".
+      #
+      # SLACK_BOT_TOKEN is optional and follows Production Smoke: without it the
+      # failing job is the only signal, and the checker says so in the log
+      # rather than skipping in silence (#816).
       - name: Compare local migrations against production
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         run: |
           set -euo pipefail
           supabase link --project-ref "$PROJECT_REF"

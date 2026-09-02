@@ -19,6 +19,7 @@ const ACTION = ".github/actions/setup-tsx/action.yml";
 const LEAN_WORKFLOWS = [
   ".github/workflows/migration-drift.yml",
   ".github/workflows/prod-smoke.yml",
+  ".github/workflows/job-watchdog.yml",
 ] as const;
 
 function read(path: string): string {

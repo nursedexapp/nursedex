@@ -1,15 +1,16 @@
 // @vitest-environment node
 //
-// The alert path, including every way it can fail.
+// The shared Slack alert path, including every way it can fail.
 //
 // This check exists to shout when production's permissions break. An alerter
 // that throws takes the whole job down before it can print WHY, and one that
 // fails quietly leaves a red job nobody hears about. Both are worse than
 // useless, so both are tested.
 import { describe, it, expect, vi } from "vitest";
-import { announce } from "./prod-smoke-notify";
+import { announce } from "./slack-alert";
 import { ALERTS_CHANNEL_ID } from "../src/lib/slack/constants";
 
+const TITLE = "Production permission check failed";
 const REPORT = "authenticated can no longer EXECUTE get_nurse_contact.";
 
 // Typed to fetch's own signature. A bare `vi.fn(async () => ...)` takes no
@@ -27,7 +28,7 @@ describe("announce", () => {
     const fetchImpl = okFetch();
     const log = vi.fn();
 
-    await announce({ report: REPORT, token: "xoxb-test", fetchImpl, log });
+    await announce({ title: TITLE, report: REPORT, token: "xoxb-test", fetchImpl, log });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     const [url, init] = fetchImpl.mock.calls[0];
@@ -48,7 +49,7 @@ describe("announce", () => {
     const fetchImpl = okFetch();
     const log = vi.fn();
 
-    await announce({ report: REPORT, token: undefined, fetchImpl, log });
+    await announce({ title: TITLE, report: REPORT, token: undefined, fetchImpl, log });
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
@@ -66,7 +67,7 @@ describe("announce", () => {
     const log = vi.fn();
 
     await expect(
-      announce({ report: REPORT, token: "xoxb-test", fetchImpl, log }),
+      announce({ title: TITLE, report: REPORT, token: "xoxb-test", fetchImpl, log }),
     ).resolves.toBeUndefined();
 
     expect(log).toHaveBeenCalledWith(
@@ -88,9 +89,31 @@ describe("announce", () => {
     const log = vi.fn();
 
     await expect(
-      announce({ report: REPORT, token: "xoxb-test", fetchImpl, log }),
+      announce({ title: TITLE, report: REPORT, token: "xoxb-test", fetchImpl, log }),
     ).resolves.toBeUndefined();
 
     expect(log).toHaveBeenCalledWith(expect.stringContaining("ENOTFOUND"));
+  });
+  // Three different checks now post into one channel. A message that names the
+  // check it came from is the difference between an alert somebody can act on
+  // and one they have to go and identify first. The title comes from the
+  // caller, so a hardcoded one would make every alert read as the same check.
+  it("names the check in the message, so two callers are distinguishable", async () => {
+    const fetchImpl = okFetch();
+    const log = vi.fn();
+
+    await announce({
+      title: "Migration drift detected",
+      report: "043 is in git and not applied to production.",
+      token: "xoxb-test",
+      fetchImpl,
+      log,
+    });
+
+    const body = JSON.parse(
+      fetchImpl.mock.calls[0][1]?.body as string,
+    ) as { text: string };
+    expect(body.text).toContain("Migration drift detected");
+    expect(body.text).not.toContain("Production permission check");
   });
 });

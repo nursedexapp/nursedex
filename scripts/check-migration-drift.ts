@@ -3,12 +3,14 @@
  *
  * Reads `supabase migration list --linked --output-format json` on stdin and
  * exits non-zero when production is out of step with the migrations in git,
- * failing the workflow loudly rather than passing quietly.
+ * failing the workflow loudly rather than passing quietly. The failure also
+ * posts to Slack (#816), so it is not a red job nobody was told about.
  *
  * Usage:
  *   supabase migration list --linked --output-format json | npx tsx scripts/check-migration-drift.ts
  */
-import { parseMigrationList, detectDrift, formatDriftReport } from "./migration-drift";
+import { runDriftCheck } from "./migration-drift";
+import { announce } from "./slack-alert";
 
 async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
@@ -19,12 +21,17 @@ async function readStdin(): Promise<string> {
 async function main(): Promise<void> {
   const raw = await readStdin();
 
-  // A parse failure means the CLI never reported state. Treat it as a failure,
-  // never as an all-clear.
-  const report = detectDrift(parseMigrationList(raw));
-  console.log(formatDriftReport(report));
+  // Every outcome, including a payload that could not be read at all, is
+  // decided in runDriftCheck so each one can be tested. A parse failure is a
+  // failure, never an all-clear.
+  const code = await runDriftCheck({
+    raw,
+    announceImpl: announce,
+    token: process.env.SLACK_BOT_TOKEN,
+    log: (message) => console.log(message),
+  });
 
-  if (report.hasDrift) process.exit(1);
+  if (code !== 0) process.exit(code);
 }
 
 main().catch((err: unknown) => {
