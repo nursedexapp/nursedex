@@ -21,6 +21,10 @@ import {
   OVERDUE_FACTOR,
   collectScheduledWorkflows,
   runScheduledJobCheck,
+  collectVercelCronJobs,
+  attachHeartbeats,
+  parseMaxDurationSeconds,
+  fetchHeartbeatRows,
 } from "./scheduled-jobs";
 
 const HOUR = 60 * 60 * 1000;
@@ -353,6 +357,33 @@ describe("runScheduledJobCheck", () => {
   });
 
   /**
+   * A job that is still running but nearly out of time is a different finding
+   * from one that has stopped, and it is worth failing on: at current volumes
+   * nothing is close, so this fires only when something genuinely is (L11).
+   */
+  it("alerts in its own words when a job is close to its time budget", async () => {
+    const announce = spyAnnounce();
+    const code = await runScheduledJobCheck({
+      loadJobs: async () => [
+        {
+          ...healthy[0],
+          lastDurationMs: 58_000,
+          maxDurationMs: 60_000,
+        },
+      ],
+      announceImpl: announce.impl,
+      token: "xoxb-test",
+      log: () => {},
+      now: NOW,
+    });
+
+    expect(code).toBe(1);
+    expect(announce.calls).toHaveLength(1);
+    expect(announce.calls[0].title).toMatch(/time budget/i);
+    expect(announce.calls[0].title).not.toMatch(/stopped running/i);
+  });
+
+  /**
    * The watchdog failing to READ the state and the state being bad are two
    * different failures with two different remedies, and the first one must
    * never be reported as an all clear (L98, L11).
@@ -389,5 +420,238 @@ describe("runScheduledJobCheck", () => {
     expect(code).toBe(1);
     expect(announce.calls[0].title).toMatch(/could not run/i);
     expect(announce.calls[0].report).toMatch(/nothing to watch/i);
+  });
+});
+
+describe("collectVercelCronJobs", () => {
+  const VERCEL_JSON = JSON.stringify({
+    crons: [
+      { path: "/api/cron/access-expiry", schedule: "0 5 * * *" },
+      { path: "/api/cron/sentry-alerts", schedule: "*/15 * * * *" },
+    ],
+  });
+
+  it("names each cron the way withCronAlerting names it", () => {
+    const jobs = collectVercelCronJobs(VERCEL_JSON);
+
+    expect(jobs.map((j) => j.name)).toEqual(["access-expiry", "sentry-alerts"]);
+    expect(jobs[0].crons).toEqual(["0 5 * * *"]);
+    expect(jobs[0].source).toContain("vercel.json");
+  });
+
+  /**
+   * The watched set is derived from vercel.json, so a cron added later is
+   * watched without anybody adding it to a list here (L41, L96). If the file
+   * ever stops declaring crons, that is a broken read, not a repository with
+   * no scheduled work.
+   */
+  it("refuses a vercel.json with no crons at all", () => {
+    expect(() => collectVercelCronJobs('{"crons":[]}')).toThrow(/no crons/i);
+  });
+});
+
+describe("attachHeartbeats", () => {
+  const jobs = [
+    { name: "access-expiry", source: "vercel.json", crons: ["0 5 * * *"] },
+    { name: "review-invite", source: "vercel.json", crons: ["0 13 * * *"] },
+  ];
+
+  it("gives each job the row that belongs to it", () => {
+    const attached = attachHeartbeats(jobs, [
+      {
+        job_name: "access-expiry",
+        first_seen_at: "2026-08-01T00:00:00Z",
+        last_success_at: "2026-09-01T05:00:00Z",
+        last_duration_ms: 1200,
+      },
+    ]);
+
+    expect(attached[0].lastSuccessAt).toBe("2026-09-01T05:00:00Z");
+    expect(attached[0].lastDurationMs).toBe(1200);
+  });
+
+  /**
+   * A cron with no row has never got through since the table existed. That is
+   * a real state (a newly added job, or one broken since it landed), and it is
+   * told apart from a job that ran long ago by first_seen_at being absent too,
+   * which leaves the grace period to be decided from when the watchdog first
+   * saw it.
+   */
+  it("leaves a job with no row marked as never having run", () => {
+    const attached = attachHeartbeats(jobs, []);
+    expect(attached[1].lastSuccessAt).toBeNull();
+  });
+
+  // A row for a cron that is no longer in vercel.json is a leftover, not a job.
+  // It must not appear in the watched set, or the watchdog reports on something
+  // that cannot run.
+  it("ignores a row whose job is no longer scheduled", () => {
+    const attached = attachHeartbeats(jobs, [
+      { job_name: "deleted-job", last_success_at: "2026-01-01T00:00:00Z" },
+    ]);
+    expect(attached).toHaveLength(2);
+    expect(attached.map((j) => j.name)).not.toContain("deleted-job");
+  });
+});
+
+describe("parseMaxDurationSeconds", () => {
+  it("reads the route's declared budget", () => {
+    expect(
+      parseMaxDurationSeconds('export const maxDuration = 60;\n'),
+    ).toBe(60);
+  });
+
+  it("returns null when a route declares none", () => {
+    expect(parseMaxDurationSeconds("export const runtime = 'nodejs';")).toBeNull();
+  });
+});
+
+describe("runs approaching their time budget", () => {
+  const NOW = new Date("2026-09-01T12:00:00Z").getTime();
+
+  function job(over: Record<string, unknown> = {}) {
+    return {
+      name: "renewal-reminder",
+      source: "vercel.json",
+      crons: ["0 14 * * *"],
+      lastSuccessAt: new Date(NOW - 60 * 60 * 1000).toISOString(),
+      maxDurationMs: 60_000,
+      ...over,
+    };
+  }
+
+  /**
+   * #440: these crons send emails one at a time inside a fixed budget. A run
+   * that hits the ceiling sends a prefix of its batch and returns nothing to
+   * say so, so the first sign would be a customer who never got an email. The
+   * run before that one is the warning, and this is what reads it.
+   */
+  it("reports a run that used most of its budget", () => {
+    const result = evaluateScheduledJobs({
+      jobs: [job({ lastDurationMs: 55_000 })],
+      now: NOW,
+    });
+
+    expect(result.nearBudget).toHaveLength(1);
+    expect(result.nearBudget[0].name).toBe("renewal-reminder");
+  });
+
+  it("says nothing about a run well inside its budget", () => {
+    const result = evaluateScheduledJobs({
+      jobs: [job({ lastDurationMs: 1_500 })],
+      now: NOW,
+    });
+
+    expect(result.nearBudget).toEqual([]);
+  });
+
+  // Without a declared budget there is nothing to be near, and inventing one
+  // would report against a number nobody set.
+  it("judges nothing when the route declares no budget", () => {
+    const result = evaluateScheduledJobs({
+      jobs: [job({ lastDurationMs: 55_000, maxDurationMs: null })],
+      now: NOW,
+    });
+
+    expect(result.nearBudget).toEqual([]);
+  });
+
+  it("names the job and both numbers in the report", () => {
+    const result = evaluateScheduledJobs({
+      jobs: [job({ lastDurationMs: 55_000 })],
+      now: NOW,
+    });
+
+    const report = formatWatchdogReport(result);
+    expect(report).toContain("renewal-reminder");
+    expect(report).toMatch(/55/);
+    expect(report).toMatch(/60/);
+  });
+});
+
+describe("fetchHeartbeatRows", () => {
+  const URL = "https://nursedex.com/api/internal/job-heartbeats";
+
+  function response(body: unknown, init: ResponseInit = {}): Response {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+      ...init,
+    });
+  }
+
+  it("sends the reader's own credential and returns the rows", async () => {
+    const calls: Array<[string, RequestInit | undefined]> = [];
+    const rows = await fetchHeartbeatRows({
+      url: URL,
+      secret: "hb-secret",
+      fetchImpl: async (input: RequestInfo | URL, init?: RequestInit) => {
+        calls.push([String(input), init]);
+        return response({ jobs: [{ job_name: "access-expiry" }] });
+      },
+    });
+
+    expect(calls[0][0]).toBe(URL);
+    expect(calls[0][1]?.headers).toMatchObject({
+      Authorization: "Bearer hb-secret",
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  /**
+   * Without the secret the request would go out unauthenticated, come back 401,
+   * and the failure would name the endpoint rather than the missing
+   * configuration that actually caused it (L11).
+   */
+  it("refuses before sending anything when it has no credential", async () => {
+    await expect(
+      fetchHeartbeatRows({
+        url: URL,
+        secret: undefined,
+        fetchImpl: async () => {
+          throw new Error("should never be called");
+        },
+      }),
+    ).rejects.toThrow(/HEARTBEAT_READ_SECRET/);
+  });
+
+  /**
+   * A refused or broken read must never come back as an empty list. The
+   * watchdog reads a job with no row as one that has never run, so an empty
+   * list here would accuse every cron at once and send the reader to the wrong
+   * place entirely (L215, L11).
+   */
+  it("throws on a refused read rather than returning nothing", async () => {
+    await expect(
+      fetchHeartbeatRows({
+        url: URL,
+        secret: "wrong",
+        fetchImpl: async () =>
+          response({ error: "Unauthorized" }, { status: 401 }),
+      }),
+    ).rejects.toThrow(/401/);
+  });
+
+  it("throws when the payload holds no jobs array", async () => {
+    await expect(
+      fetchHeartbeatRows({
+        url: URL,
+        secret: "hb-secret",
+        fetchImpl: async () => response({ unexpected: true }),
+      }),
+    ).rejects.toThrow(/jobs/i);
+  });
+
+  // An empty table is a real state, not a failure: it is what a deployment
+  // before the first cron run looks like, and the evaluation handles it by
+  // treating each job as never having run.
+  it("accepts an empty list, which is what a fresh deployment looks like", async () => {
+    await expect(
+      fetchHeartbeatRows({
+        url: URL,
+        secret: "hb-secret",
+        fetchImpl: async () => response({ jobs: [] }),
+      }),
+    ).resolves.toEqual([]);
   });
 });

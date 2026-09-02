@@ -50,6 +50,15 @@ describe("job watchdog workflow", () => {
     expect(WORKFLOW).toMatch(/actions:\s*read/);
   });
 
+  /**
+   * The Vercel crons are half of what this watches, and they are read over
+   * HTTP because the watchdog deliberately does not run on Vercel's scheduler.
+   * Without this credential that half silently drops out.
+   */
+  it("carries the credential for reading the cron heartbeats", () => {
+    expect(WORKFLOW).toMatch(/HEARTBEAT_READ_SECRET:\s*\$\{\{\s*secrets\./);
+  });
+
   it("passes the Slack token, so an overdue job reaches somebody", () => {
     expect(WORKFLOW).toMatch(/SLACK_BOT_TOKEN:\s*\$\{\{\s*secrets\./);
   });

@@ -4,6 +4,13 @@ name: Job Watchdog
 # this job existed, nothing noticed when one stopped running at all, and from
 # outside those two are the same thing: silence (#837, #757, L13).
 #
+# Two sets of jobs, one question. GitHub's scheduled workflows are judged on
+# when each last completed successfully on its own schedule. Vercel's thirteen
+# crons are judged on the heartbeat each one writes when it gets through, read
+# back over HTTP. The Vercel half lives here, and not in a fourteenth cron,
+# because a check that runs on the same scheduler as the jobs it watches dies
+# with them.
+#
 # GitHub disables a scheduled workflow after 60 days without repository
 # activity, and says so only in an email to the repository owner. A counter
 # that has quietly stopped counting is exactly the failure CI Health exists to
@@ -68,4 +75,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          # Reads the cron heartbeats. Its own secret rather than CRON_SECRET,
+          # which could trigger every cron, or ADMIN_SECRET, which reaches every
+          # admin route: this reader needs to do nothing but read timestamps.
+          HEARTBEAT_READ_SECRET: ${{ secrets.HEARTBEAT_READ_SECRET }}
         run: tsx scripts/check-scheduled-jobs.ts
