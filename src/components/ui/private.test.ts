@@ -21,7 +21,14 @@ const root = process.cwd();
 const read = (p: string) => readFileSync(join(root, p), "utf8");
 
 describe("the revealed contact card is BLOCKED, not merely masked", () => {
-  const source = read("src/components/profile/NurseProfilePublic.tsx");
+  // This guard used to read NurseProfilePublic.tsx, which rendered the contact
+  // markup inline. #831 moved it into one ContactDetailsCard that BOTH callers
+  // render: the server-rendered profile, and the card the browser shows the
+  // instant a reveal succeeds. The guard failed on that move rather than
+  // passing against a file that no longer holds the thing it guards, which is
+  // the behaviour worth keeping. Blocking now lives with the markup, so the
+  // second caller cannot leak what the first one protects.
+  const source = read("src/components/reveals/ContactDetailsCard.tsx");
 
   it("blocks the element that holds the revealed phone number and email", () => {
     // Blocking, not masking, and the distinction is the whole point: the phone
@@ -38,8 +45,22 @@ describe("the revealed contact card is BLOCKED, not merely masked", () => {
   it("still renders the contact details it is protecting, so this is a real guard", () => {
     // If the contact block were ever removed, the test above would keep passing
     // against nothing. Anchor it to the data.
-    expect(source).toMatch(/nurse\.contact_phone/);
-    expect(source).toMatch(/nurse\.contact_email/);
+    expect(source).toMatch(/contact\.phone/);
+    expect(source).toMatch(/contact\.email/);
+  });
+
+  it("is the only place the revealed contact is rendered", () => {
+    // The guard above protects one file. It is only worth anything while that
+    // file is the single renderer: a call site that built its own mailto from
+    // the contact triple would be unprotected and this suite would not notice.
+    // #714 replaces this with a lint rule that sees every surface; until then,
+    // this at least fails when a second copy appears.
+    const profile = read("src/components/profile/NurseProfilePublic.tsx");
+    expect(
+      profile,
+      "NurseProfilePublic renders contact details itself instead of going through ContactDetailsCard",
+    ).not.toMatch(/href=\{`(?:mailto|tel|sms):/);
+    expect(profile).toContain("ContactDetailsCard");
   });
 });
 

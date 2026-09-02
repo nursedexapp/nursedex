@@ -104,7 +104,11 @@ describe("ContactDetailsCard", () => {
       />,
     );
 
-    for (const name of [/nurse@example.com/, /call 555-0100/i, /text 555-0100/i]) {
+    for (const name of [
+      /nurse@example.com/,
+      /call 555-0100/i,
+      /text 555-0100/i,
+    ]) {
       const link = screen.getByRole("link", { name });
       expect(
         link.closest(`.${BLOCK_PII}`),

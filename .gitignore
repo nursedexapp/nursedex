@@ -18,7 +18,25 @@ out/
 .mcp.json
 
 # Documents & Legal (not code)
-Documents/
+#
+# The markdown docs ARE committed. privacy-accuracy.test.ts reads the Systems
+# Guide to prove it no longer claims PostHog is anonymous, and a guard that
+# reads a file only present on one person's Mac passes there and fails in CI,
+# which is exactly how it sat broken for six weeks (#499). A doc the product
+# makes a legal claim about belongs in git with the code it describes.
+#
+# The binaries (the brand kit PDF, the PRD .docx) stay out: they diff badly
+# and nothing tests them.
+Documents/*
+!Documents/*.md
+
+# The PRD stays out, for now and for a stated reason rather than by oversight.
+# It was written in April with em dashes in it, and the pre-push style gate
+# refuses them. Bringing it in means editing the punctuation of a record
+# somebody wrote, which is a different act from moving that record into git.
+# #496 already needs it edited (it states a family price the product does not
+# charge); it can come in on that change, rewritten deliberately.
+Documents/NurseDex_PRD_v2.md
 Legal/
 
 # Claude
