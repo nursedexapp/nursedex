@@ -7,7 +7,7 @@
 // the credentials they need, and a failure reaches Slack rather than sitting
 // in an Actions tab nobody opens.
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { parseCronSchedules } from "./scheduled-jobs";
 
@@ -39,16 +39,29 @@ describe("third party health workflow", () => {
   });
 
   /**
-   * The command names four files. If one is renamed or a fifth service check is
-   * added and left out, the job still passes while checking less than it claims
-   * (L98). This asserts the count so that goes red instead.
+   * If a service check is renamed, or a new one is added and left out of the
+   * command, the job still passes while checking less than it claims (L98).
+   *
+   * This used to assert a hardcoded count of four, which is the same defect one
+   * level up: the number had to be remembered, and a check added without
+   * touching it would have been caught only by luck. The expected set is now
+   * DERIVED from the files on disk, so a new *-health.test.ts that nothing runs
+   * fails here by construction.
    */
   it("names every live service check that exists", () => {
+    const onDisk = readdirSync("src/lib/__tests__")
+      .filter((f) => f.endsWith("-health.test.ts"))
+      .map((f) => `src/lib/__tests__/${f}`)
+      .sort();
+    // A scan that found nothing would make the comparison below vacuous.
+    expect(onDisk.length).toBeGreaterThan(0);
+
     const named =
       packageJson.scripts["test:health:services"].match(
         /src\/lib\/__tests__\/[\w.-]+\.test\.ts/g,
       ) ?? [];
-    expect(named.length).toBe(4);
+
+    expect([...named].sort()).toEqual(onDisk);
     for (const file of named) {
       expect(() => readFileSync(file, "utf8")).not.toThrow();
     }
@@ -67,6 +80,10 @@ describe("third party health workflow", () => {
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     "RESEND_API_KEY",
     "SENTRY_DSN",
+    // The ingestion round trip reads the event back, which capture alone
+    // cannot do.
+    "POSTHOG_PERSONAL_API_KEY",
+    "POSTHOG_PROJECT_ID",
   ])("passes %s from secrets, never from a literal", (name) => {
     expect(EXECUTABLE).toMatch(
       new RegExp(`${name}:\\s*\\$\\{\\{\\s*secrets\\.${name}\\s*\\}\\}`),
