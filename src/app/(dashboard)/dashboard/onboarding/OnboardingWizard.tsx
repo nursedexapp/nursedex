@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type { NurseProfileDraft } from "@/types/database";
@@ -13,6 +13,8 @@ import {
   step5Schema,
 } from "@/lib/schemas/profile";
 import { saveOnboardingStep, completeOnboarding } from "@/lib/profile/actions";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { StepLayout } from "@/components/profile-form/StepLayout";
 import { BasicsFields } from "@/components/profile-form/BasicsFields";
 import { CredentialsFields } from "@/components/profile-form/CredentialsFields";
@@ -23,6 +25,19 @@ import type { NurseTier } from "@/types/enums";
 
 const STORAGE_KEY = "nursedex_onboarding_draft";
 const TOTAL_STEPS = 5;
+
+/**
+ * Stable analytics names for the steps, deliberately not the on-screen titles:
+ * a title is copy and will be reworded, and a renamed value silently splits one
+ * funnel step into two in PostHog with nothing reporting it.
+ */
+const STEP_NAMES: Record<number, string> = {
+  1: "basics",
+  2: "credentials",
+  3: "skills",
+  4: "bio_photos",
+  5: "contact",
+};
 
 interface OnboardingWizardProps {
   profile: NurseProfile;
@@ -115,6 +130,19 @@ export function OnboardingWizard({
     setLoaded(true);
   }, [profile, userName, userEmail]);
 
+  // Fired once when a nurse reaches step 1 with nothing completed yet. A reload
+  // before the first save can repeat it, so any funnel built on this counts
+  // PEOPLE rather than events. Firing on plain mount would have counted every
+  // step navigation as a fresh start, since each step is its own route push.
+  const startedFired = useRef(false);
+  useEffect(() => {
+    if (!loaded || startedFired.current) return;
+    if (currentStep !== 1) return;
+    if ((draft.completed_step ?? 0) > 0) return;
+    startedFired.current = true;
+    captureClientEvent(ANALYTICS_EVENTS.ONBOARDING_STARTED, { tier });
+  }, [loaded, currentStep, draft.completed_step, tier]);
+
   // Save draft to localStorage whenever it changes. Uses the functional
   // setState form so back-to-back updates compose correctly. The earlier
   // signature (saveDraft(nextDraft)) closed over `draft` at call time,
@@ -197,6 +225,12 @@ export function OnboardingWizard({
     }
 
     markStepComplete(step);
+    captureClientEvent(ANALYTICS_EVENTS.ONBOARDING_STEP_COMPLETED, {
+      step,
+      step_name: STEP_NAMES[step],
+      total_steps: TOTAL_STEPS,
+      tier,
+    });
     setIsSubmitting(false);
     goToStep(nextStep);
   };
@@ -305,6 +339,11 @@ export function OnboardingWizard({
     } catch {
       // ignore
     }
+
+    captureClientEvent(ANALYTICS_EVENTS.ONBOARDING_COMPLETED, {
+      total_steps: TOTAL_STEPS,
+      tier,
+    });
 
     setIsSubmitting(false);
     toast.success("Profile saved. Verification next.");

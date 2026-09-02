@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { claimHireByEmail } from "@/lib/hires/actions";
 import { PendingButton } from "@/components/ui/pending-button";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface NurseClaimHireCardProps {
   slug: string;
@@ -69,6 +71,10 @@ export function NurseClaimHireCard({ slug }: NurseClaimHireCardProps) {
         }
         return;
       }
+      captureClientEvent(ANALYTICS_EVENTS.HIRE_CLAIMED, {
+        claimed_by: "nurse",
+        resent: !!result.resent,
+      });
       toast.success(
         result.resent
           ? "Confirmation email re-sent to that family."

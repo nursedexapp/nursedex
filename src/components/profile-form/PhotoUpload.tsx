@@ -17,6 +17,8 @@ import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
 import type { NurseTier } from "@/types/enums";
 import { cn } from "@/lib/utils";
 import { Upload, X, ImageIcon, Loader2 } from "lucide-react";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface PhotoUploadProps {
   photos: string[];
@@ -147,6 +149,9 @@ export function PhotoUpload({
         }
 
         onChange([...photos, urlResult.path]);
+        captureClientEvent(ANALYTICS_EVENTS.PHOTO_UPLOADED, {
+          photo_count: photos.length + 1,
+        });
         toast.success("Photo uploaded");
         setCropState(null);
       } catch (err) {

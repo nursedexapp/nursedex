@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth/actions";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { setSurveyHandoffCookie } from "@/lib/family/actions";
 import { PendingButton } from "@/components/ui/pending-button";
 import { GoogleSignInButton } from "@/components/ui/google-sign-in-button";
@@ -86,6 +88,17 @@ export default function SignUpPage() {
     if (!validateFields(formData)) return;
 
     const email = formData.get("email") as string;
+
+    // Fired on the client, before the server call, so it lands on the visitor's
+    // anonymous person and joins the acquisition funnel. signup_completed
+    // fires server-side at email confirmation, and identify() at login stitches
+    // the two onto one person. Captured on attempt rather than success on
+    // purpose: the gap between started and completed is the number worth
+    // having, since it is where a failed or abandoned signup shows up.
+    captureClientEvent(ANALYTICS_EVENTS.SIGNUP_STARTED, {
+      from_survey: fromSurvey,
+    });
+
     const result = await signUp(formData);
 
     if (result.error) {

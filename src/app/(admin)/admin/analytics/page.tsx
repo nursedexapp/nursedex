@@ -38,6 +38,19 @@ export default async function AnalyticsPage() {
           {PRICING.NURSE_FEATURED_MONTHLY} Featured, $
           {PRICING.FAMILY_ACCESS_MONTHLY} Family Access).
         </p>
+        {/*
+          Which system produced these numbers, said on the surface rather than
+          left to be rediscovered (#867, #870). Every figure here is a real
+          account from the database, with seeded demo nurses and removed
+          accounts excluded. PostHog counts a different thing and will never
+          agree, and its visitor counts are not headcounts at all.
+        */}
+        <p className="text-soft-black-light mt-1 text-sm">
+          Every figure on this page comes from the database, so each one is a
+          real account. PostHog answers a different question (how people behave,
+          and how they arrived) and the two are not meant to reconcile. See the
+          Analytics Guide before comparing them.
+        </p>
       </header>
 
       <Section title="Signups">

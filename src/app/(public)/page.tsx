@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { TrackedCta } from "@/components/analytics/TrackedCta";
 
 export const metadata: Metadata = {
   title: "NurseDex | New York's trusted nurse directory",
@@ -65,18 +66,24 @@ function Hero() {
                 other New York families.
               </p>
               <div className="mt-auto flex flex-wrap gap-2">
-                <Link
+                <TrackedCta
                   href="/nurses"
+                  audience="families"
+                  cta="browse_nurses"
+                  placement="hero"
                   className="bg-teal hover:bg-teal-dark inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
                 >
                   Browse nurses
-                </Link>
-                <Link
+                </TrackedCta>
+                <TrackedCta
                   href="/survey"
+                  audience="families"
+                  cta="survey"
+                  placement="hero"
                   className="border-teal/30 text-teal-dark hover:bg-teal/10 inline-flex items-center rounded-lg border px-4 py-2 text-sm font-medium transition-colors"
                 >
                   Take the 60 second survey
-                </Link>
+                </TrackedCta>
               </div>
             </CardContent>
           </Card>
@@ -92,12 +99,15 @@ function Hero() {
                 by families looking for exactly what you offer.
               </p>
               <div className="mt-auto flex flex-wrap gap-2">
-                <Link
+                <TrackedCta
                   href="/signup"
+                  audience="nurses"
+                  cta="join_free"
+                  placement="hero"
                   className="bg-soft-black hover:bg-soft-black/90 inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
                 >
                   Join NurseDex free
-                </Link>
+                </TrackedCta>
               </div>
             </CardContent>
           </Card>
@@ -298,12 +308,15 @@ function FinalCTAs() {
                 directly to a nurse you&apos;ve found.
               </p>
               <div className="mt-auto flex flex-wrap gap-2">
-                <Link
+                <TrackedCta
                   href="/nurses"
+                  audience="families"
+                  cta="browse_nurses"
+                  placement="final"
                   className="bg-teal hover:bg-teal-dark inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
                 >
                   Browse nurses
-                </Link>
+                </TrackedCta>
               </div>
             </CardContent>
           </Card>
@@ -317,12 +330,15 @@ function FinalCTAs() {
                 come to you.
               </p>
               <div className="mt-auto flex flex-wrap gap-2">
-                <Link
+                <TrackedCta
                   href="/signup"
+                  audience="nurses"
+                  cta="join_free"
+                  placement="final"
                   className="bg-soft-black hover:bg-soft-black/90 inline-flex items-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
                 >
                   Join NurseDex
-                </Link>
+                </TrackedCta>
               </div>
             </CardContent>
           </Card>

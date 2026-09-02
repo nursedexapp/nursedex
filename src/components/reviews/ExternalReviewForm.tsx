@@ -10,6 +10,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StarRatingInput } from "./StarRatingInput";
 import { REVIEW_TEXT_MAX, REVIEW_TEXT_MIN } from "@/lib/schemas/review";
 import { submitExternalReview } from "@/lib/reviews/external-actions";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface ExternalReviewFormProps {
   linkToken: string;
@@ -70,6 +72,10 @@ export function ExternalReviewForm({
         }
         return;
       }
+      captureClientEvent(ANALYTICS_EVENTS.REVIEW_SUBMITTED, {
+        source: "external_link",
+        is_edit: false,
+      });
       setSubmittedEmail(email);
       setSubmitted(true);
     });

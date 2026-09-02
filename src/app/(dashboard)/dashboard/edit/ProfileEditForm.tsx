@@ -218,11 +218,17 @@ export function ProfileEditForm({
 
     if (saveResult.error) {
       toast.error(saveResult.error);
-    } else if (saveResult.upsellHint) {
-      showFeaturedUpsellToast();
-      router.refresh();
     } else {
-      toast.success("Profile updated");
+      // One capture for both success branches: the upsell hint changes what the
+      // nurse is shown, not whether the profile saved.
+      posthog.capture(ANALYTICS_EVENTS.PROFILE_UPDATED, {
+        upsell_shown: !!saveResult.upsellHint,
+      });
+      if (saveResult.upsellHint) {
+        showFeaturedUpsellToast();
+      } else {
+        toast.success("Profile updated");
+      }
       router.refresh();
     }
 

@@ -6,6 +6,8 @@ import { CircleCheck } from "lucide-react";
 import { PendingButton } from "@/components/ui/pending-button";
 import { useInFlight } from "@/components/ui/use-in-flight";
 import { confirmHireFromToken, rejectHireFromToken } from "@/lib/hires/actions";
+import { captureClientEvent } from "@/lib/analytics/capture";
+import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface HireDecisionButtonsProps {
   token: string;
@@ -58,6 +60,7 @@ export function HireDecisionButtons({ token }: HireDecisionButtonsProps) {
       }
       // Show the result in place. Don't refresh: confirming/rejecting clears
       // the single-use token, so a re-query would 404 as "Link not valid".
+      captureClientEvent(ANALYTICS_EVENTS.HIRE_CONFIRMED, { outcome });
       setDecided(outcome);
     });
   };
