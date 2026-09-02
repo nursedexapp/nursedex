@@ -17,6 +17,7 @@ import type {
   TimeSlot,
 } from "@/types/enums";
 import { Clock, Car, Languages, ExternalLink, ImageIcon } from "lucide-react";
+import { MASK_PII } from "@/components/ui/private";
 
 interface NurseProfileFullProps {
   nurse: {
@@ -286,7 +287,8 @@ export function NurseProfileFull({
                 <strong>State:</strong> New York
               </p>
               <p>
-                <strong>License Number:</strong> {nurse.license_number}
+                <strong>License Number:</strong>{" "}
+                <span className={MASK_PII}>{nurse.license_number}</span>
               </p>
               {licenseVerifyUrl && (
                 <a

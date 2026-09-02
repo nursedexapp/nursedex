@@ -11,6 +11,7 @@ import {
   resolveAccountsTab,
 } from "@/lib/admin/accounts-view";
 import { AccountRowActions } from "@/components/admin/AccountRowActions";
+import { MASK_PII } from "@/components/ui/private";
 
 export const metadata: Metadata = {
   title: "Accounts | NurseDex Admin",
@@ -44,7 +45,9 @@ export default async function AdminAccountsPage({
                     <p className="font-medium">
                       {row.first_name} {row.last_name}
                     </p>
-                    <p className="text-muted-foreground text-xs">{row.email}</p>
+                    <p className={`text-muted-foreground text-xs ${MASK_PII}`}>
+                      {row.email}
+                    </p>
                     <p className="text-muted-foreground text-xs">
                       Last flagged{" "}
                       {new Date(row.date).toLocaleDateString("en-US", {
@@ -119,7 +122,9 @@ export default async function AdminAccountsPage({
                   <p className="font-medium">
                     {u.first_name || "(no name)"} {u.last_name ?? ""}
                   </p>
-                  <p className="text-muted-foreground text-xs">{u.email}</p>
+                  <p className={`text-muted-foreground text-xs ${MASK_PII}`}>
+                    {u.email}
+                  </p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {u.role && (
                       <Badge variant="outline" className="text-[10px]">

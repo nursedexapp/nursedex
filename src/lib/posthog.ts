@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { MASK_PII, BLOCK_PII } from "@/components/ui/private";
 
 export function initPostHog() {
   if (typeof window === "undefined") return;
@@ -17,6 +18,31 @@ export function initPostHog() {
     person_profiles: "identified_only",
     capture_pageview: false, // we handle this manually in the app
     capture_pageleave: true,
+
+    // The privacy policy promises "you can opt out of analytics tracking by
+    // enabling Do Not Track in your browser". PostHog defaults respect_dnt to
+    // false and we never set it, so for as long as that sentence has been
+    // published the promise did nothing: a visitor who turned DNT on was tracked
+    // exactly the same as one who did not (#498). Honouring it is one line, and
+    // a policy that asserts a control the code does not implement is the kind of
+    // thing that gets a company in trouble.
+    respect_dnt: true,
+
+    // Session replay is enabled from the PostHog dashboard, which this code
+    // cannot read. These options are pinned here anyway, and that is the point:
+    // the defaults are not a promise. A posthog-js release that changed them, or
+    // someone editing the recording config in the dashboard, would silently start
+    // recording personal data again and turn the privacy policy back into a lie.
+    // Stated here, a change has to go through a diff and a test (#379, #499).
+    session_recording: {
+      // What people TYPE: license numbers, phone numbers, rates, passwords.
+      // rrweb already defaults this to true; we say so out loud.
+      maskAllInputs: true,
+      // What we RENDER, which rrweb does NOT mask by default and which is where
+      // the data was actually going. See src/components/ui/private.tsx.
+      maskTextClass: MASK_PII,
+      blockClass: BLOCK_PII,
+    },
   });
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { MASK_PII } from "@/components/ui/private";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -104,7 +105,11 @@ function SuspendDialog({ userId, email }: { userId: string; email: string }) {
       onOpenChange={setOpen}
       trigger="Suspend"
       triggerVariant="outline"
-      title={`Suspend ${email}`}
+      title={
+        <>
+          Suspend <span className={MASK_PII}>{email}</span>
+        </>
+      }
       description="They are locked out of their account immediately and emailed to say it was suspended. Their profile stops appearing in search. You can unsuspend them at any time."
       confirmLabel="Suspend account"
       workingLabel="Suspending..."
@@ -152,7 +157,7 @@ function RemoveDialog({ userId, email }: { userId: string; email: string }) {
       </DialogTrigger>
       <DialogContent>
         <DialogTitle className="font-heading text-lg font-semibold">
-          Remove {email}
+          Remove <span className={MASK_PII}>{email}</span>
         </DialogTitle>
         <DialogDescription className="text-soft-black-light text-sm">
           This soft-deletes the user, cancels any active Stripe subscriptions,

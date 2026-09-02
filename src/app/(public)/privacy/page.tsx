@@ -22,7 +22,7 @@ export default function PrivacyPolicyPage() {
           Privacy Policy
         </h1>
         <p className="font-body text-soft-black-light mt-2 text-sm">
-          Last updated: June 9, 2026
+          Last updated: July 13, 2026
         </p>
 
         <div className="font-body text-soft-black-light mt-10 space-y-8 leading-relaxed">
@@ -63,6 +63,22 @@ export default function PrivacyPolicyPage() {
               or region level), and interaction events such as button clicks. We
               do not collect precise geolocation.
             </p>
+            <p className="mt-3">
+              If you are signed in, this analytics data is linked to your
+              account and your email address, so we can understand how real
+              users move through the product rather than only counting anonymous
+              visits. If you are signed out, it is not linked to you.
+            </p>
+            <p className="mt-3">
+              We also record sessions: a replay of how a page looked and how you
+              moved through it, so we can see where the product is confusing or
+              broken. Recordings are masked. Anything you type into a form (your
+              password, your phone number, a nurse&apos;s license number) is
+              hidden from the recording, and so is personal information we
+              display back to you, including a nurse&apos;s contact details once
+              you have revealed them. We do not use recordings to read your
+              personal data.
+            </p>
           </section>
 
           <section>
@@ -101,8 +117,19 @@ export default function PrivacyPolicyPage() {
               function.
             </p>
             <p className="mt-3">
-              You can opt out of analytics tracking by enabling &quot;Do Not
-              Track&quot; in your browser.
+              Our analytics and session recording are provided by PostHog. You
+              can opt out of both by enabling &quot;Do Not Track&quot; in your
+              browser: we check for it, and when it is on we do not capture
+              events about you and we do not record your session. Not every
+              browser still offers the setting, so if you would rather opt out
+              and cannot, email{" "}
+              <a
+                href="mailto:support@nursedex.com"
+                className="text-teal hover:underline"
+              >
+                support@nursedex.com
+              </a>{" "}
+              and we will do it for you.
             </p>
           </section>
 
@@ -124,8 +151,8 @@ export default function PrivacyPolicyPage() {
             <p className="mt-3">
               We retain your account information for as long as your account is
               active. You can ask us to delete your account and associated
-              personal data at any time. Analytics data is retained in aggregate
-              form and is not linked to your identity after 90 days.
+              personal data at any time, and that includes the analytics profile
+              and any session recordings linked to you.
             </p>
           </section>
 

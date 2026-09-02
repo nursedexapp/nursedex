@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Mail, Phone, MessageSquare } from "lucide-react";
 import { COMMUNICATION_PREFERENCE_LABELS } from "@/types/enums";
 import type { CommunicationPreference } from "@/types/enums";
+import { BLOCK_PII } from "@/components/ui/private";
 
 /** The contact triple, exactly as revealNurse and getNurseContactInfo hand it over. */
 export interface RevealedContact {
@@ -30,7 +31,17 @@ export function ContactDetailsCard({ contact }: { contact: RevealedContact }) {
     <Card className="border-sage/20">
       <CardContent className="pt-4">
         <h2 className="mb-3 text-base font-semibold">Contact Information</h2>
-        <div className="space-y-3 text-base">
+        {/* BLOCK, not mask (#379). This is the nurse's real phone number and
+            email, the thing a family pays to unlock, and it does not only
+            appear as text: it is inside href="mailto:...", href="tel:..." and
+            href="sms:...". Session replay records attributes too, so masking
+            the visible text would leave every one of them in plain sight in
+            the link targets. Blocking drops the element from the recording.
+
+            It sits here, on the one card both callers render (#831), rather
+            than at either call site, so the server-rendered profile and the
+            just-revealed client card cannot disagree about it. */}
+        <div className={`space-y-3 text-base ${BLOCK_PII}`}>
           {contact.email && (
             <a
               href={`mailto:${contact.email}?subject=NurseDex%20Inquiry`}
