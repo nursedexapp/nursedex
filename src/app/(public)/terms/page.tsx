@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LEGAL_PAGES } from "@/lib/legal/last-updated";
 
 export const metadata: Metadata = {
   title: "Terms of Service | NurseDex",
@@ -21,7 +22,7 @@ export default function TermsOfServicePage() {
           Terms of Service
         </h1>
         <p className="font-body text-soft-black-light mt-2 text-sm">
-          Last updated: June 9, 2026
+          Last updated: {LEGAL_PAGES.terms.date}
         </p>
 
         <div className="font-body text-soft-black-light mt-10 space-y-8 leading-relaxed">
