@@ -63,7 +63,13 @@ export function SurveyResultCard({
         <ul className="text-soft-black space-y-2 py-1 text-sm">
           <li className="flex items-start gap-2">
             <Check className="text-teal mt-0.5 size-4 shrink-0" />
-            Full profiles, credentials, and photos
+            {/* Not "photos": the card beside this one is already showing
+                her photograph, and faces are public on purpose (#873).
+                Not the full name either, which needs a subscription rather
+                than an account (#381), so promising it here would be a
+                promise the product refuses to keep. These three are what
+                signing up genuinely adds. */}
+            Full profiles, with bios, rates, and availability
           </li>
           <li className="flex items-start gap-2">
             <Check className="text-teal mt-0.5 size-4 shrink-0" />
