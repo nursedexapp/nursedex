@@ -37,7 +37,13 @@ Documents/*
 # #496 already needs it edited (it states a family price the product does not
 # charge); it can come in on that change, rewritten deliberately.
 Documents/NurseDex_PRD_v2.md
-Legal/
+
+# Anchored with a leading slash on purpose. Unanchored, "Legal/" matches a
+# directory of that name at EVERY depth, and it silently swallowed
+# src/lib/legal/ (a gitignored source file is invisible: status stays clean,
+# the commit looks right, and CI fails on an import of something never pushed).
+# src/source-tracked.test.ts fails if anything under src/ is ignored again.
+/Legal/
 
 # Claude
 .claude/
