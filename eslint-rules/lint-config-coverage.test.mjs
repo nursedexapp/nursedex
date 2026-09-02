@@ -109,3 +109,64 @@ describe("eslint.config.mjs coverage of the secret-comparison guard", () => {
     expect(ids).not.toContain("local/no-direct-secret-comparison");
   });
 });
+
+// #714. Session replay records the DOM, and the surfaces rendering personal
+// data were masked one at a time. A hand-listed set of surfaces is a snapshot:
+// the next page to render an email is unguarded, and nobody watches session
+// recordings critically enough to notice. These run the REAL project config,
+// so the guard never being wired up (or being narrowed to a directory later)
+// fails here rather than the next time somebody renders an address.
+const UNMASKED_EMAIL = `
+export function Row({ row }: { row: { email: string } }) {
+  return <span>{row.email}</span>;
+}
+`;
+
+describe("eslint.config.mjs coverage of the PII masking guard", () => {
+  it("flags an unmasked email on a new admin page", async () => {
+    const ids = await ruleIdsFor(
+      UNMASKED_EMAIL,
+      path.join(repoRoot, "src/app/(admin)/admin/example/page.tsx"),
+    );
+    expect(ids).toContain("local/require-pii-mask");
+  });
+
+  it("flags an unmasked email in a new component", async () => {
+    const ids = await ruleIdsFor(
+      UNMASKED_EMAIL,
+      path.join(repoRoot, "src/components/example/Example.tsx"),
+    );
+    expect(ids).toContain("local/require-pii-mask");
+  });
+
+  it("flags a contact detail put into an href behind only a mask", async () => {
+    // The distinction the whole guard turns on: session replay records
+    // attributes, so a masked mailto still ships the address.
+    const ids = await ruleIdsFor(
+      `
+import { MASK_PII } from "@/components/ui/private";
+export function C({ c }: { c: { contact_email: string } }) {
+  return (
+    <div className={MASK_PII}>
+      <a href={\`mailto:\${c.contact_email}\`}>write</a>
+    </div>
+  );
+}
+`,
+      path.join(repoRoot, "src/components/example/Contact.tsx"),
+    );
+    expect(ids).toContain("local/require-pii-mask");
+  });
+
+  it("does not flag a validation message keyed by field name", async () => {
+    const ids = await ruleIdsFor(
+      `
+export function F({ errors }: { errors: { email?: string } }) {
+  return <p>{errors.email}</p>;
+}
+`,
+      path.join(repoRoot, "src/components/example/Form.tsx"),
+    );
+    expect(ids).not.toContain("local/require-pii-mask");
+  });
+});

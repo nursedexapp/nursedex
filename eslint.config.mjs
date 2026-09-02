@@ -9,6 +9,7 @@ import requirePendingButton from "./eslint-rules/require-pending-button.mjs";
 import noHandRolledPageGuard from "./eslint-rules/no-hand-rolled-page-guard.mjs";
 import noHandWrittenStallCopy from "./eslint-rules/no-hand-written-stall-copy.mjs";
 import requireStatusPrecondition from "./eslint-rules/require-status-precondition.mjs";
+import requirePiiMask from "./eslint-rules/require-pii-mask.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -32,6 +33,7 @@ export default [
           "no-hand-rolled-page-guard": noHandRolledPageGuard,
           "no-hand-written-stall-copy": noHandWrittenStallCopy,
           "require-status-precondition": requireStatusPrecondition,
+          "require-pii-mask": requirePiiMask,
         },
       },
     },
@@ -70,6 +72,15 @@ export default [
       // fails CI. The expected status belongs in the UPDATE's own WHERE clause,
       // via guardedStatusUpdate or an explicit .eq("status", ...).
       "local/require-status-precondition": "error",
+      // Session replay records the DOM, and rrweb masks only what people TYPE.
+      // Text we RENDER was reaching PostHog in readable form: revealed nurse
+      // contact details, admin lists of every user's email, license numbers on
+      // the verification queue (#379). That was fixed surface by surface, and a
+      // hand-listed set of surfaces is a snapshot: the next page to render an
+      // email would be unguarded and nobody watches recordings critically
+      // (#714). Rendering PII without MASK_PII, or into an attribute without
+      // BLOCK_PII, now fails CI.
+      "local/require-pii-mask": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
