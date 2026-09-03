@@ -64,3 +64,35 @@ export function applyUnlistedNurseFilter<T>(query: T): T {
     .eq("has_photo", false)
     .or(UNLISTED_EMPTY_BIO) as unknown as T;
 }
+
+/**
+ * Whether a nurse's own availability lets the directory return her.
+ *
+ * - `unavailable_visibility = 'hidden'` never appears in search.
+ * - `is_available = true` always appears.
+ * - `is_available = false` with 'badge' appears only when the family asked to
+ *   see nurses not accepting new clients, or when the search relaxed the
+ *   constraint itself to find partial matches.
+ *
+ * Shared rather than written inline, because the facet counts behind the
+ * filter panel have to be drawn from exactly the population the search can
+ * return (#766). Relaxing only ever ADDS nurses, so an option counted against
+ * the unrelaxed set is not a dead end in either state of that switch.
+ */
+export function applyAvailabilityFilter<T>(
+  query: T,
+  opts: { relaxed: boolean },
+): T {
+  type Chainable = {
+    eq(column: string, value: unknown): Chainable;
+    or(filter: string): Chainable;
+  };
+  const q = query as unknown as Chainable;
+  return (
+    opts.relaxed
+      ? q.or(
+          "is_available.eq.true,and(is_available.eq.false,unavailable_visibility.eq.badge)",
+        )
+      : q.eq("is_available", true)
+  ) as unknown as T;
+}

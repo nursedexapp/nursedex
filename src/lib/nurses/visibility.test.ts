@@ -4,6 +4,7 @@ import {
   applyVisibleNurseFilter,
   applyListedNurseFilter,
   applyUnlistedNurseFilter,
+  applyAvailabilityFilter,
 } from "./visibility";
 
 // applyVisibleNurseFilter is the single chokepoint that keeps non-public
@@ -137,5 +138,48 @@ describe("applyUnlistedNurseFilter", () => {
   it("returns the same query builder so callers can keep chaining", () => {
     const { q } = recordingFullQuery();
     expect(applyUnlistedNurseFilter(q)).toBe(q);
+  });
+});
+
+/**
+ * The availability rule was written inline in runQuery and nowhere else, so
+ * the facet counts behind the filter panel (#766) would have needed a second
+ * copy of it. Two copies of "who the directory can return" is how a filter
+ * comes to offer an option that returns nothing: the counting query and the
+ * searching query stop agreeing about who counts.
+ */
+describe("applyAvailabilityFilter", () => {
+  function recordingAvailabilityQuery() {
+    const calls: string[] = [];
+    const q = {
+      eq(column: string, value: unknown) {
+        calls.push(`eq:${column}=${String(value)}`);
+        return q;
+      },
+      or(filter: string) {
+        calls.push(`or:${filter}`);
+        return q;
+      },
+    };
+    return { q, calls };
+  }
+
+  it("returns only nurses accepting new clients by default", () => {
+    const { q, calls } = recordingAvailabilityQuery();
+    applyAvailabilityFilter(q, { relaxed: false });
+    expect(calls).toEqual(["eq:is_available=true"]);
+  });
+
+  it("adds the badged unavailable nurses when relaxed, and never the hidden ones", () => {
+    const { q, calls } = recordingAvailabilityQuery();
+    applyAvailabilityFilter(q, { relaxed: true });
+    expect(calls).toEqual([
+      "or:is_available.eq.true,and(is_available.eq.false,unavailable_visibility.eq.badge)",
+    ]);
+  });
+
+  it("returns the same query builder so callers can keep chaining", () => {
+    const { q } = recordingAvailabilityQuery();
+    expect(applyAvailabilityFilter(q, { relaxed: false })).toBe(q);
   });
 });

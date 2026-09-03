@@ -27,6 +27,11 @@ const SURFACES: Array<{ file: string; filter: FilterName; what: string }> = [
     what: "the directory, which puts nurses in front of a stranger",
   },
   {
+    file: "src/lib/nurses/facets.ts",
+    filter: "applyListedNurseFilter",
+    what: "the filter options offered on the directory, which must be counted over exactly the nurses the directory can return (#766)",
+  },
+  {
     file: "src/app/sitemap.ts",
     filter: "applyListedNurseFilter",
     what: "the sitemap, which offers profiles to search engines",
