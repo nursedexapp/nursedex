@@ -50,7 +50,7 @@ export const LEGAL_PAGES = {
     path: "src/app/(public)/privacy/page.tsx",
     date: "September 2, 2026",
     proseSha:
-      "f9e3d5e65465f55ce510fba22dd0db41fb26b2626d22229819a442550cc62c5b",
+      "e7f9b1eb237471931bdbf3ff55d11042b45c8702bdf5274c30e6396625225c73",
   },
   terms: {
     path: "src/app/(public)/terms/page.tsx",

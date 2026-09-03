@@ -79,7 +79,13 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       {/* The pricing page is the main public conversion surface; identify
           logged-in visitors here so subscription_started isn't anonymous
           for users who never visited the dashboard this session. */}
-      {user && <PostHogIdentify userId={user.id} email={user.email} />}
+      {user && (
+        <PostHogIdentify
+          userId={user.id}
+          email={user.email}
+          analyticsOptOut={user.analytics_opt_out}
+        />
+      )}
       <main className="flex-1">
         <section className="border-sage-light/40 border-b">
           <div className="max-w-site mx-auto px-6 py-12 sm:py-16">

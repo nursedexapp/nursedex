@@ -118,12 +118,25 @@ export default function PrivacyPolicyPage() {
               function.
             </p>
             <p className="mt-3">
-              Our analytics and session recording are provided by PostHog. You
-              can opt out of both by enabling &quot;Do Not Track&quot; in your
+              Our analytics and session recording are provided by PostHog. If
+              you have an account, you can turn both off yourself under Privacy
+              in your{" "}
+              <Link
+                href="/dashboard/settings"
+                className="text-teal hover:underline"
+              >
+                settings
+              </Link>
+              . The choice is stored against your account, so it applies on
+              every device you sign in on, and it stops events being captured
+              about you and stops your sessions being recorded.
+            </p>
+            <p className="mt-3">
+              You can also opt out by enabling &quot;Do Not Track&quot; in your
               browser: we check for it, and when it is on we do not capture
               events about you and we do not record your session. Not every
-              browser still offers the setting, so if you would rather opt out
-              and cannot, email{" "}
+              browser still offers the setting, so if you have no account and
+              would rather opt out, email{" "}
               <a
                 href="mailto:support@nursedex.com"
                 className="text-teal hover:underline"
@@ -165,7 +178,10 @@ export default function PrivacyPolicyPage() {
             <ul className="mt-3 list-disc space-y-2 pl-5">
               <li>See what personal data we hold about you.</li>
               <li>Have your data corrected or deleted.</li>
-              <li>Opt out of analytics tracking.</li>
+              <li>
+                Opt out of analytics tracking, which you can do yourself under
+                Privacy in your settings.
+              </li>
               <li>Delete your account at any time.</li>
             </ul>
             <p className="mt-3">
