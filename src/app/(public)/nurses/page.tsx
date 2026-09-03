@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { NurseCard } from "@/components/nurses/NurseCard";
 import { FilterChipRow } from "@/components/nurses/FilterChipRow";
+import { KeywordSearch } from "@/components/nurses/KeywordSearch";
 import { SearchAnalytics } from "@/components/nurses/SearchAnalytics";
 import { ResultsSummary } from "@/components/nurses/ResultsSummary";
 import { SortControl } from "@/components/nurses/SortControl";
@@ -150,6 +151,10 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
               <SortControl value={result.sort} hasZip={!!filters.zip} />
             )}
           </div>
+        </div>
+
+        <div className="mb-4 max-w-xl">
+          <KeywordSearch filters={filters} />
         </div>
 
         <div className="mb-6">

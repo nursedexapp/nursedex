@@ -4,6 +4,7 @@ import {
   applyListedNurseFilter,
   applyAvailabilityFilter,
 } from "./visibility";
+import { keywordPattern, matchesNurseName } from "./search-keyword";
 import { SEARCH } from "@/lib/constants";
 import {
   GENDER_FILTER_ANY,
@@ -263,6 +264,28 @@ async function runQuery(
     query = query.or(`rate_max.is.null,rate_max.gte.${filters.rate_min}`);
   }
 
+  // Free text (#729). The bio and the care philosophy can be matched in the
+  // query; a name cannot travel with them, because PostgREST refuses a filter
+  // on an embedded table inside a top-level `or` (measured 2026-09-03: 400,
+  // "failed to parse logic tree"). So the names are matched first and carried
+  // as ids, which is cheap: names are small, bios are not.
+  if (filters.q) {
+    const pattern = keywordPattern(filters.q);
+    // A keyword of nothing but wildcards is dropped rather than sent: "**"
+    // matches every nurse, which reads as the search being ignored.
+    if (pattern) {
+      const clauses = [
+        `bio.ilike."${pattern}"`,
+        `care_philosophy.ilike."${pattern}"`,
+      ];
+      const nameMatches = await nurseIdsMatchingName(filters.q, gate);
+      if (nameMatches.length > 0) {
+        clauses.push(`user_id.in.(${nameMatches.join(",")})`);
+      }
+      query = query.or(clauses.join(","));
+    }
+  }
+
   if (filters.skills.length > 0) {
     query = query.overlaps("skills", filters.skills);
   }
@@ -287,6 +310,51 @@ async function runQuery(
   if (error || !data) return [];
 
   return shapeNurseCards(data, gate);
+}
+
+/**
+ * The listed nurses whose name matches a keyword (#729).
+ *
+ * Reads every listed nurse's name, which is two short strings each, and
+ * matches in memory. The alternative is a second round trip per name field,
+ * because the name lives on the embedded users row and PostgREST cannot OR
+ * across that join.
+ *
+ * It THROWS on a failed read rather than answering "nobody by that name".
+ * Those two are indistinguishable to the family, and the wrong one of them
+ * tells her the nurse she was recommended is not on NurseDex (#780).
+ */
+async function nurseIdsMatchingName(
+  keyword: string,
+  gate: CardGate,
+): Promise<string[]> {
+  const supabase = createServiceRoleClient();
+
+  let query = supabase
+    .from("nurse_profiles")
+    .select("user_id,users!inner(first_name,last_name,is_deleted,is_suspended)");
+  query = applyListedNurseFilter(query);
+
+  const { data, error } = await query.limit(SQL_FETCH_CAP);
+
+  if (error || !data) {
+    throw new Error(
+      `Nurse name search failed: ${
+        error && typeof error === "object" && "message" in error
+          ? String((error as { message: unknown }).message)
+          : "no rows and no error"
+      }`,
+    );
+  }
+
+  return (data as unknown as NameRow[])
+    .filter((row) => row.users && matchesNurseName(row.users, keyword, gate))
+    .map((row) => row.user_id);
+}
+
+interface NameRow {
+  user_id: string;
+  users: { first_name: string | null; last_name: string | null } | null;
 }
 
 // ── Distance ──────────────────────────────────────────────────

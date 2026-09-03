@@ -86,3 +86,32 @@ describe("narrowestAppliedFilter", () => {
     expect(narrowestAppliedFilter(filters, directoryFacets())).toBeNull();
   });
 });
+
+describe("a keyword alongside filters", () => {
+  it("offers the keyword first, since a text match over sixty profiles is the likeliest thing nobody satisfied", () => {
+    const filters = parseSearchParams({
+      q: "ventilator",
+      credential: Credential.RN,
+    });
+
+    const suggestion = narrowestAppliedFilter(filters, directoryFacets());
+
+    expect(suggestion?.label).toBe('"ventilator"');
+    expect(suggestion?.patch).toEqual({ q: undefined, page: 1 });
+  });
+
+  it("says nothing for a keyword on its own, which the ordinary clear already covers", () => {
+    const filters = parseSearchParams({ q: "ventilator" });
+
+    expect(narrowestAppliedFilter(filters, directoryFacets())).toBeNull();
+  });
+
+  it("offers the keyword even beside a filter that carries no count", () => {
+    const filters = parseSearchParams({ q: "ventilator", zip: "11779" });
+
+    expect(narrowestAppliedFilter(filters, directoryFacets())?.patch).toEqual({
+      q: undefined,
+      page: 1,
+    });
+  });
+});

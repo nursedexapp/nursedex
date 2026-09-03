@@ -104,7 +104,23 @@ const pageNumber = z
   .default(1)
   .catch(1);
 
+/**
+ * What the family typed in the search box (#729).
+ *
+ * An empty or whitespace-only box is no keyword at all rather than a keyword
+ * that matches everything. The length cap lives with the pattern builder in
+ * search-keyword.ts, which is what actually has to survive being handed to
+ * the database.
+ */
+const keyword = z
+  .string()
+  .transform((v) => v.trim())
+  .transform((v) => (v.length === 0 ? undefined : v))
+  .optional()
+  .catch(undefined);
+
 export const searchParamsSchema = z.object({
+  q: keyword,
   credential: z.nativeEnum(Credential).optional().catch(undefined),
   care_type: z.nativeEnum(CareType).optional().catch(undefined),
   skills: commaArrayOfEnum(Skill),
@@ -164,6 +180,7 @@ export function toURLSearchParams(
   filters: Partial<SearchFilters>,
 ): URLSearchParams {
   const params = new URLSearchParams();
+  if (filters.q) params.set("q", filters.q);
   if (filters.credential) params.set("credential", filters.credential);
   if (filters.care_type) params.set("care_type", filters.care_type);
   if (filters.skills && filters.skills.length > 0) {
@@ -220,6 +237,7 @@ export function toURLSearchParams(
  */
 export function isEmptyFilterSet(filters: SearchFilters): boolean {
   return (
+    !filters.q &&
     !filters.credential &&
     !filters.care_type &&
     filters.skills.length === 0 &&
