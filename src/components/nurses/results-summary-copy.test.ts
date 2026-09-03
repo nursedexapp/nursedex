@@ -21,6 +21,7 @@ function card(id: string): NurseSearchCard {
     is_available: true,
     unavailable_visibility: null,
     profile_completeness: 0,
+    verified_at: null,
     zip_code: null,
     distance_miles: null,
     communication_preference: null,
@@ -41,9 +42,11 @@ function result(
   totalFull: number,
   partials = 0,
   orderedByDistance = false,
+  sortChoice: SearchResult["sort"] = "best",
 ): SearchResult {
   return {
     orderedByDistance,
+    sort: sortChoice,
     items: Array.from({ length: items }, (_, i) => card(`i${i}`)),
     partials: Array.from({ length: partials }, (_, i) => card(`p${i}`)),
     totalFull,
@@ -140,5 +143,27 @@ describe("the order caption", () => {
   it("claims nothing that only applies to some viewers", () => {
     expect(orderSentence(false)).not.toContain("contacted");
     expect(orderSentence(true)).not.toContain("contacted");
+  });
+});
+
+describe("the caption when the family chose a sort", () => {
+  // A caption that kept describing the default order while she is looking at
+  // her own chosen one would be describing an order that is not on screen.
+  it("names the sort she chose", () => {
+    expect(resultsSummary(result(15, 98, 0, true, "rating")).order).toMatch(
+      /highest rated first/i,
+    );
+  });
+
+  it("names closest when that is what she chose", () => {
+    expect(resultsSummary(result(15, 98, 0, true, "closest")).order).toMatch(
+      /closest first/i,
+    );
+  });
+
+  it("goes back to describing the ranking on best match", () => {
+    expect(resultsSummary(result(15, 98, 0, false, "best")).order).toMatch(
+      /^Featured nurses first/,
+    );
   });
 });

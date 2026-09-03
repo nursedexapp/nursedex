@@ -29,6 +29,7 @@ function nurse(overrides: Partial<NurseSearchCard> = {}): NurseSearchCard {
     is_available: true,
     unavailable_visibility: null,
     profile_completeness: 50,
+    verified_at: null,
     zip_code: "11779",
     distance_miles: null,
     communication_preference: null,

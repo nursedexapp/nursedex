@@ -26,6 +26,7 @@ function card(id: string): NurseSearchCard {
     is_available: true,
     unavailable_visibility: null,
     profile_completeness: 0,
+    verified_at: null,
     zip_code: null,
     distance_miles: null,
     communication_preference: null,
@@ -51,6 +52,7 @@ function result(items: number, totalFull: number, partials = 0): SearchResult {
     hitResultCap: false,
     unlocatableZip: null,
     orderedByDistance: false,
+    sort: "best" as const,
   };
 }
 

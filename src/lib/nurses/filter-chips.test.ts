@@ -29,8 +29,11 @@ describe("the chip vocabulary", () => {
     const owned = ALL_CHIP_IDS.flatMap((id) => Object.keys(clearChipPatch(id)));
     expect(new Set(owned).size).toBe(owned.length);
 
+    // page and sort are in the URL but are not filters: neither narrows the
+    // results, so neither belongs to a chip that clears it.
+    const notFilters = ["page", "sort"];
     const schemaKeys = Object.keys(searchParamsSchema.shape).filter(
-      (k) => k !== "page",
+      (k) => !notFilters.includes(k),
     );
     expect([...owned].sort()).toEqual(schemaKeys.sort());
   });
