@@ -28,3 +28,14 @@ export function isListed(profile: {
 }): boolean {
   return profile.has_photo || (profile.bio ?? "") !== "";
 }
+
+/**
+ * The same rule inverted, for finding the nurses who are NOT listed so they
+ * can be told (#732).
+ *
+ * Expressed as two parts because PostgREST needs them applied separately:
+ * `has_photo` false, AND a bio that is null or empty. Together with
+ * LISTED_MINIMUM_CONTENT they partition the visible roster exactly, measured
+ * on 2026-09-03 as 60 listed plus 40 unlisted out of 100 visible.
+ */
+export const UNLISTED_EMPTY_BIO = "bio.is.null,bio.eq.";

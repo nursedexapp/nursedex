@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   applyVisibleNurseFilter,
   applyListedNurseFilter,
+  applyUnlistedNurseFilter,
 } from "./visibility";
 
 // applyVisibleNurseFilter is the single chokepoint that keeps non-public
@@ -100,5 +101,41 @@ describe("applyListedNurseFilter", () => {
   it("returns the same query builder so callers can keep chaining", () => {
     const { q } = recordingFullQuery();
     expect(applyListedNurseFilter(q)).toBe(q);
+  });
+});
+
+describe("applyUnlistedNurseFilter", () => {
+  it("applies every condition applyVisibleNurseFilter applies", () => {
+    const visible = recordingFullQuery();
+    applyVisibleNurseFilter(visible.q);
+    const unlisted = recordingFullQuery();
+    applyUnlistedNurseFilter(unlisted.q);
+    for (const call of visible.eqCalls) {
+      expect(unlisted.eqCalls).toContainEqual(call);
+    }
+  });
+
+  it("additionally requires no photo and an empty bio", () => {
+    const { q, eqCalls, orCalls } = recordingFullQuery();
+    applyUnlistedNurseFilter(q);
+    expect(eqCalls).toContainEqual(["has_photo", false]);
+    expect(orCalls).toEqual(["bio.is.null,bio.eq."]);
+  });
+
+  it("selects nobody the listed filter also selects", () => {
+    // The two filters exist to divide the roster, so their extra conditions
+    // must contradict each other rather than merely differ.
+    const listed = recordingFullQuery();
+    applyListedNurseFilter(listed.q);
+    const unlisted = recordingFullQuery();
+    applyUnlistedNurseFilter(unlisted.q);
+    expect(listed.orCalls[0]).toBe("has_photo.eq.true,bio.neq.");
+    expect(unlisted.eqCalls).toContainEqual(["has_photo", false]);
+    expect(unlisted.orCalls[0]).toBe("bio.is.null,bio.eq.");
+  });
+
+  it("returns the same query builder so callers can keep chaining", () => {
+    const { q } = recordingFullQuery();
+    expect(applyUnlistedNurseFilter(q)).toBe(q);
   });
 });

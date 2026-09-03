@@ -58,6 +58,44 @@ interface SendCommentSubmittedArgs {
  * Notifies admins (support inbox) that a blog comment was submitted and is
  * awaiting moderation.
  */
+/**
+ * Tells a verified nurse whose profile is empty that families cannot see her
+ * (#732).
+ *
+ * Unlike its neighbours this one REPORTS whether the email went out, because
+ * the nudge cron claims a dedup row before sending and has to release it again
+ * when the send fails, or she is marked as told and never hears from us. A
+ * network failure is caught for the same reason: letting it escape would abort
+ * the run partway and silently leave the remaining nurses untold.
+ */
+export async function sendNotListedNudgeEmail(args: {
+  to: string;
+  firstName?: string;
+}): Promise<boolean> {
+  const baseUrl = await getBaseUrl();
+
+  try {
+    const res = await fetch(`${baseUrl}/api/email/not-listed-nudge`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify({ to: args.to, firstName: args.firstName }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error("[email] Not listed nudge failed:", res.status, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[email] Not listed nudge could not be sent:", err);
+    return false;
+  }
+}
+
 export async function sendCommentSubmittedEmail(
   args: SendCommentSubmittedArgs,
 ): Promise<void> {

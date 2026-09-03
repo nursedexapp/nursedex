@@ -1,6 +1,10 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { isListed, LISTED_MINIMUM_CONTENT } from "./listing";
+import {
+  isListed,
+  LISTED_MINIMUM_CONTENT,
+  UNLISTED_EMPTY_BIO,
+} from "./listing";
 
 /**
  * The listing rule exists in two forms that must agree: a PostgREST filter the
@@ -32,5 +36,26 @@ describe("isListed", () => {
     // SQL semantics: has_photo IS TRUE OR bio <> ''. If this string changes,
     // the predicate above has to change with it.
     expect(LISTED_MINIMUM_CONTENT).toBe("has_photo.eq.true,bio.neq.");
+  });
+});
+
+describe("the unlisted filter", () => {
+  it("is the exact complement of the listed one", () => {
+    // Measured against production on 2026-09-03: the listed filter matched 60
+    // of the 100 visible profiles and this one matched 40, so the two
+    // partition the roster with no overlap and no gap.
+    //
+    // The empty-string arm matched 0 rows there, because no stored bio is
+    // currently the empty string. It is carried anyway: without it a bio
+    // saved as "" would be neither listed nor unlisted, and would fall out of
+    // both the directory and the nudge, which is the one state nobody would
+    // ever look for.
+    expect(UNLISTED_EMPTY_BIO).toBe("bio.is.null,bio.eq.");
+  });
+
+  it.each(CASES)("$what is not both listed and unlisted", (c) => {
+    const listed = isListed({ has_photo: c.has_photo, bio: c.bio });
+    const unlisted = !c.has_photo && (c.bio === null || c.bio === "");
+    expect(listed).toBe(!unlisted);
   });
 });

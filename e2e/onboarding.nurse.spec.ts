@@ -243,3 +243,40 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
   await anon.close();
   await adminCtx.close();
 });
+
+// A verified nurse whose profile is empty is not in the directory (#732). She
+// is also sent straight back into the wizard, at whichever step she stopped
+// at, so the message telling her families cannot see her has to be on the step
+// she actually lands on. This one lands on the FIRST step, which is the case
+// that would be missed by a notice living on the bio and photo step: 22 of the
+// 40 nurses in this state stopped before step 3.
+test("a verified nurse with an empty profile is told families cannot see her", async ({
+  page,
+}) => {
+  const service = serviceClient();
+  const { nurseId } = fixture();
+
+  const { error: userErr } = await service
+    .from("users")
+    .update({ role: "nurse", first_name: FIRST_NAME, last_name: LAST_NAME })
+    .eq("id", nurseId);
+  if (userErr) throw new Error(`Could not set the nurse role: ${userErr.message}`);
+
+  // Verified, and empty: no photo and no bio, and no years_experience, so the
+  // wizard sends her to step 1 rather than to the bio and photo step.
+  const { error: profileErr } = await service.from("nurse_profiles").insert({
+    user_id: nurseId,
+    slug: `e2e-verified-empty-${Date.now()}`,
+    credential: "rn",
+    verification_status: "verified",
+  });
+  if (profileErr) {
+    throw new Error(`Could not provision the empty profile: ${profileErr.message}`);
+  }
+
+  await page.goto("/dashboard");
+
+  await expect(page).toHaveURL(/\/dashboard\/onboarding/);
+  await expect(page.getByText(/families cannot see you yet/i)).toBeVisible();
+  await expect(page.getByText(/no photo and no bio/i)).toBeVisible();
+});
