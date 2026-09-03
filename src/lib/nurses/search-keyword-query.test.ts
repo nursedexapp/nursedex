@@ -119,6 +119,30 @@ describe("a keyword search", () => {
     expect(keywordClause()).toContain('care_philosophy.ilike."*dementia*"');
   });
 
+  it("does not match the care philosophy for a viewer who is not shown it", async () => {
+    await searchNurses({
+      filters: parseSearchParams({ q: "dementia" }),
+      viewerIsSignedIn: false,
+    });
+
+    // The bio is safe to match for anyone: it is already the public meta
+    // description of the nurse's profile page. The care philosophy is not
+    // shown to a logged out visitor anywhere, so matching it would confirm
+    // its contents through the result count, one guess at a time (#935).
+    expect(keywordClause()).toContain('bio.ilike."*dementia*"');
+    expect(keywordClause()).not.toContain("care_philosophy");
+  });
+
+  it("still finds a nurse by name for a viewer who is not signed in", async () => {
+    // The gate is on the philosophy, not on searching at all.
+    await searchNurses({
+      filters: parseSearchParams({ q: "marisol" }),
+      viewerIsSignedIn: false,
+    });
+
+    expect(keywordClause()).toContain("user_id.in.(nurse-1)");
+  });
+
   it("carries the nurses whose name matched, which cannot travel in the same clause", async () => {
     await searchNurses({
       filters: parseSearchParams({ q: "marisol" }),
