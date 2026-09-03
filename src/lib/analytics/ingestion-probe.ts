@@ -87,9 +87,18 @@ export function queryUrl(config: ProbeConfig): string {
  * Asks only whether THIS probe landed. Bounded to a short window so the query
  * stays cheap and cannot be satisfied by a probe from an earlier run whose id
  * somehow repeated.
+ *
+ * `refresh` is what makes the polling real. PostHog caches an answer against
+ * the TEXT of the query, and every poll here sends the same text, so without
+ * this the first attempt's answer is returned to all the rest. That attempt
+ * runs a fraction of a second after the capture, when zero is the honest
+ * answer, and the check then spends its whole deadline re-reading it (measured
+ * 3 September 2026: 52 requests over 182s, all served a zero computed 179ms
+ * after the event was sent, while the event was in PostHog throughout).
  */
 export function queryBody(probeId: string) {
   return {
+    refresh: "force_blocking",
     query: {
       kind: "HogQLQuery",
       query:

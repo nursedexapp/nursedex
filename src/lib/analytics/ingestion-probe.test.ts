@@ -91,6 +91,23 @@ describe("the requests it sends", () => {
     );
   });
 
+  /**
+   * The defect this exists to stop coming back, measured on 3 September 2026.
+   *
+   * PostHog caches a query answer against the text of the query, and this poll
+   * sends the SAME text every few seconds. The first attempt runs a fraction of
+   * a second after the event is sent, when the honest answer is genuinely zero,
+   * and every later attempt was handed that cached zero back. The check waited
+   * three minutes, made 52 requests, and read its own first answer 52 times
+   * while the event sat in PostHog the whole while.
+   *
+   * A poll that cannot observe a change is not a poll, so the request has to
+   * say it wants the answer recomputed.
+   */
+  it("makes each poll recompute, so it cannot be handed its own first answer", () => {
+    expect(queryBody("probe-123").refresh).toBe("force_blocking");
+  });
+
   it("asks only about this probe, inside a bounded window", () => {
     const sql = queryBody("probe-123").query.query;
     expect(sql).toContain("probe-123");
