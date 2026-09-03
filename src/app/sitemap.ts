@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import * as Sentry from "@sentry/nextjs";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
+import { applyListedNurseFilter } from "@/lib/nurses/visibility";
 import { getIndexableTaxonomy } from "@/lib/blog/queries";
 import { readAllRows } from "@/lib/blog/read-all-rows";
 
@@ -91,7 +91,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           )
           .range(from, to);
 
-        const { data, error, count } = await applyVisibleNurseFilter(nurseQuery);
+        const { data, error, count } = await applyListedNurseFilter(nurseQuery);
         if (error) throw new Error(error.message);
         if (reportedNurseTotal === null) reportedNurseTotal = count;
         return { rows: (data ?? []) as unknown as Row[], total: count };

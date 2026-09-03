@@ -238,6 +238,30 @@ describe("step4Schema", () => {
     expect(result.success).toBe(true);
   });
 
+  // A bio of only whitespace passed min(1) and was stored. The directory
+  // lists a nurse whose bio is not the empty string (#732), while
+  // calculateCompleteness trims before crediting it, so such a nurse would
+  // have been listed with a blank card and no credit for it. Trimming makes
+  // the two rules agree on every value that can reach the database.
+  it("rejects a bio of only whitespace", () => {
+    const schema = step4Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      bio: "   ",
+      photos: ["photo-1.jpg"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("stores a bio with its surrounding whitespace removed", () => {
+    const schema = step4Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      bio: "  I love this work  ",
+      photos: ["photo-1.jpg"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.bio).toBe("I love this work");
+  });
+
   it("free tier limits to 1 photo", () => {
     const schema = step4Schema(NurseTier.FREE);
     const result = schema.safeParse({

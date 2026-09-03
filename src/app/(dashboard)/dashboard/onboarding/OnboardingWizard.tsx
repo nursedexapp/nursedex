@@ -20,6 +20,7 @@ import { BasicsFields } from "@/components/profile-form/BasicsFields";
 import { CredentialsFields } from "@/components/profile-form/CredentialsFields";
 import { SkillsFields } from "@/components/profile-form/SkillsFields";
 import { BioFields } from "@/components/profile-form/BioFields";
+import { NotListedNotice } from "@/components/onboarding/NotListedNotice";
 import { ContactFields } from "@/components/profile-form/ContactFields";
 import type { NurseTier } from "@/types/enums";
 
@@ -458,6 +459,11 @@ export function OnboardingWizard({
         onNext={handleStep4Next}
         isSubmitting={isSubmitting}
       >
+        <NotListedNotice
+          verificationStatus={profile.verification_status}
+          hasPhoto={profile.has_photo}
+          bio={profile.bio}
+        />
         <BioFields
           values={{
             bio: draft.bio || "",

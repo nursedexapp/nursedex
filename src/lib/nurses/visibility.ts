@@ -1,3 +1,5 @@
+import { LISTED_MINIMUM_CONTENT } from "./listing";
+
 /**
  * Single source of truth for the "publicly visible nurse" filter.
  *
@@ -21,4 +23,26 @@ export function applyVisibleNurseFilter<T>(query: T): T {
     .eq("is_hidden", false)
     .eq("users.is_deleted", false)
     .eq("users.is_suspended", false) as unknown as T;
+}
+
+
+/**
+ * Publicly visible AND worth showing: the filter for surfaces that DISCOVER a
+ * nurse for somebody (the directory, the sitemap).
+ *
+ * Deliberately separate from applyVisibleNurseFilter rather than folded into
+ * it. That filter is also how a family's SAVED nurses and the nurses she has
+ * PAID to reveal are read; a minimum-content condition there would remove a
+ * purchased result from the family who bought it. Direct profile links go
+ * through their own RPC and are unaffected, so a nurse stays reachable by
+ * anyone holding her link even while she is not listed.
+ *
+ * visibility.test.ts pins which surfaces use which, so a new caller has to
+ * choose deliberately.
+ */
+export function applyListedNurseFilter<T>(query: T): T {
+  type Chainable = { or(filter: string): Chainable };
+  return (
+    applyVisibleNurseFilter(query) as unknown as Chainable
+  ).or(LISTED_MINIMUM_CONTENT) as unknown as T;
 }

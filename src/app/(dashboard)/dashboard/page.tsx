@@ -2,6 +2,7 @@ import { requireAuth } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { calculateCompleteness } from "@/lib/profile/completeness";
+import { isListed } from "@/lib/nurses/listing";
 import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
 import { redirect } from "next/navigation";
 import { NurseDashboardHero } from "@/components/dashboard/NurseDashboardHero";
@@ -192,6 +193,7 @@ export default async function DashboardPage() {
           rejectedReason={profile.verification_rejected_reason}
           slug={profile.slug}
           score={score}
+          listed={isListed(profile)}
         />
 
         {/* Secondary lane: only renders meaningful content for verified

@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { applyVisibleNurseFilter } from "./visibility";
+import { applyListedNurseFilter } from "./visibility";
 import { SEARCH } from "@/lib/constants";
 import { GENDER_FILTER_ANY, type SearchFilters } from "./search-params";
 import { rankNurses as rankNursesPure } from "./search-ranking";
@@ -192,7 +192,7 @@ async function runQuery(
   const supabase = createServiceRoleClient();
 
   let query = supabase.from("nurse_profiles").select(NURSE_CARD_COLUMNS);
-  query = applyVisibleNurseFilter(query);
+  query = applyListedNurseFilter(query);
 
   if (opts.savedIds) {
     // A family with no saves matches nothing. PostgREST's .in() with an empty
