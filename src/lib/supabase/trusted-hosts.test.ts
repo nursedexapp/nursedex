@@ -8,8 +8,21 @@ import {
 } from "./trusted-hosts";
 
 // The three states NEXT_PUBLIC_SUPABASE_URL is ever in. Every function here
-// takes the raw value as an argument precisely so all three can be exercised
-// without mutating process.env or resetting the module registry.
+// takes the raw value as an argument so the configured states can be
+// exercised without resetting the module registry.
+//
+// The ABSENT state cannot be: the argument DEFAULTS to process.env, so
+// passing undefined reads whatever the machine happens to have set. These
+// tests therefore clear it themselves rather than inheriting it, or they pass
+// only on a machine with no Supabase URL exported and fail for anyone who has
+// sourced a normal .env before running them.
+beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 const PRODUCTION = "https://fisuhtkzhyttdmqoivlp.supabase.co";
 const LOCAL = "http://127.0.0.1:54321";
 
