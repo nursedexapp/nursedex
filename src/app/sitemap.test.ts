@@ -34,8 +34,10 @@ vi.mock("@/lib/supabase/service-role", () => ({
       builder.select = chain;
       builder.eq = chain;
       builder.not = chain;
-      // applyListedNurseFilter adds the minimum-content condition as .or().
+      // applyListedNurseFilter adds the minimum-content condition as .or()
+      // and the care type condition as .neq() (#940).
       builder.or = chain;
+      builder.neq = chain;
       // The real builder is chainable AND thenable: .range() narrows it and the
       // filters are applied afterwards, so range has to return the builder
       // rather than a promise, or applyVisibleNurseFilter has nothing to chain
@@ -48,7 +50,8 @@ vi.mock("@/lib/supabase/service-role", () => ({
       };
       builder.then = (resolve: (value: unknown) => unknown) => {
         const source = table === "nurse_profiles" ? h.nurses : h.blogPosts;
-        const total = table === "nurse_profiles" ? h.nurseTotal : h.blogPosts.length;
+        const total =
+          table === "nurse_profiles" ? h.nurseTotal : h.blogPosts.length;
         const rows = range ? source.slice(range[0], range[1] + 1) : source;
         return resolve({ data: rows, count: total, error: null });
       };
@@ -101,7 +104,9 @@ describe("sitemap", () => {
 
     const entries = await sitemap();
 
-    expect(entries.filter((e) => e.url.includes("/nurses/"))).toHaveLength(1250);
+    expect(entries.filter((e) => e.url.includes("/nurses/"))).toHaveLength(
+      1250,
+    );
     expect(h.ranges.length).toBeGreaterThan(1);
   });
 

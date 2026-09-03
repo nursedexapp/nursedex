@@ -391,6 +391,7 @@ export function OnboardingWizard({
         verificationStatus={profile.verification_status}
         hasPhoto={profile.has_photo}
         bio={profile.bio}
+        careTypes={profile.care_types}
       />
     </>
   );

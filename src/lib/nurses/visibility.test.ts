@@ -68,10 +68,15 @@ describe("applyVisibleNurseFilter", () => {
 // nurse in front of somebody who did not ask for her by name.
 function recordingFullQuery() {
   const eqCalls: Array<[string, unknown]> = [];
+  const neqCalls: Array<[string, unknown]> = [];
   const orCalls: string[] = [];
   const q = {
     eq(column: string, value: unknown) {
       eqCalls.push([column, value]);
+      return q;
+    },
+    neq(column: string, value: unknown) {
+      neqCalls.push([column, value]);
       return q;
     },
     or(filter: string) {
@@ -79,7 +84,7 @@ function recordingFullQuery() {
       return q;
     },
   };
-  return { q, eqCalls, orCalls };
+  return { q, eqCalls, neqCalls, orCalls };
 }
 
 describe("applyListedNurseFilter", () => {
@@ -116,11 +121,12 @@ describe("applyUnlistedNurseFilter", () => {
     }
   });
 
-  it("additionally requires no photo and an empty bio", () => {
-    const { q, eqCalls, orCalls } = recordingFullQuery();
+  it("additionally requires no content or no care type", () => {
+    const { q, orCalls } = recordingFullQuery();
     applyUnlistedNurseFilter(q);
-    expect(eqCalls).toContainEqual(["has_photo", false]);
-    expect(orCalls).toEqual(["bio.is.null,bio.eq."]);
+    expect(orCalls).toEqual([
+      "and(has_photo.eq.false,or(bio.is.null,bio.eq.)),care_types.eq.{}",
+    ]);
   });
 
   it("selects nobody the listed filter also selects", () => {
@@ -131,8 +137,10 @@ describe("applyUnlistedNurseFilter", () => {
     const unlisted = recordingFullQuery();
     applyUnlistedNurseFilter(unlisted.q);
     expect(listed.orCalls[0]).toBe("has_photo.eq.true,bio.neq.");
-    expect(unlisted.eqCalls).toContainEqual(["has_photo", false]);
-    expect(unlisted.orCalls[0]).toBe("bio.is.null,bio.eq.");
+    expect(listed.neqCalls).toContainEqual(["care_types", "{}"]);
+    expect(unlisted.orCalls[0]).toBe(
+      "and(has_photo.eq.false,or(bio.is.null,bio.eq.)),care_types.eq.{}",
+    );
   });
 
   it("returns the same query builder so callers can keep chaining", () => {

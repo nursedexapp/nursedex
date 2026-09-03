@@ -5,6 +5,7 @@ import { withCronAlerting } from "@/lib/cron/alerting";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyUnlistedNurseFilter } from "@/lib/nurses/visibility";
+import { listingGaps } from "@/lib/nurses/listing";
 import { sendNotListedNudgeEmail } from "@/lib/email/send";
 
 export const runtime = "nodejs";
@@ -36,9 +37,14 @@ const handleNotListedNudge = withCronAlerting(
   async (_request: NextRequest) => {
     const supabase = createServiceRoleClient();
 
+    // The three columns the listing rule reads come back with the row, so the
+    // email can say what is actually missing rather than assuming (#940).
     const nurseQuery = supabase.from("nurse_profiles").select(
       `
       user_id,
+      has_photo,
+      bio,
+      care_types,
       users!inner ( email, first_name, is_deleted, is_suspended )
     `,
     );
@@ -53,6 +59,9 @@ const handleNotListedNudge = withCronAlerting(
 
     type Row = {
       user_id: string;
+      has_photo: boolean;
+      bio: string | null;
+      care_types: string[] | null;
       users: {
         email: string;
         first_name: string | null;
@@ -90,6 +99,7 @@ const handleNotListedNudge = withCronAlerting(
       const delivered = await sendNotListedNudgeEmail({
         to: row.users.email,
         firstName: row.users.first_name ?? undefined,
+        gaps: listingGaps(row),
       });
 
       if (delivered) {
