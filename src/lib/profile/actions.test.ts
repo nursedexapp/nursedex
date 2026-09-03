@@ -103,9 +103,11 @@ const editData = {
   license_number: "12345",
   care_types: ["elderly"],
   primary_care_type: null,
-  skills: [],
-  availability_commitment: [],
-  time_slots: [],
+  // Non-empty since #905: fullProfileSchema requires one of each, so an empty
+  // list here would bounce the save off validation before the code under test.
+  skills: ["medication_management"],
+  availability_commitment: ["part_time"],
+  time_slots: ["weekdays"],
   rate_min: null,
   rate_max: null,
   has_transportation: true,

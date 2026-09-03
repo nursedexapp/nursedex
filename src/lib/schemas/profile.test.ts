@@ -6,7 +6,12 @@ import {
   step4Schema,
   step5Schema,
 } from "@/lib/schemas/profile";
-import { NurseTier } from "@/types/enums";
+import {
+  NurseTier,
+  Skill,
+  AvailabilityCommitment,
+  TimeSlot,
+} from "@/types/enums";
 
 describe("step1Schema", () => {
   it("accepts valid data", () => {
@@ -178,7 +183,11 @@ describe("step2Schema", () => {
 });
 
 describe("step3Schema", () => {
-  it("accepts explicitly empty optional fields", () => {
+  // The test that used to stand here asserted the opposite: that all three
+  // lists could be left empty. That was the behaviour reversed in #905, so it
+  // is deleted rather than adjusted. Leaving it would have made it the guard
+  // defending the lockout.
+  it("requires at least one skill, availability and time slot", () => {
     const result = step3Schema.safeParse({
       skills: [],
       availability_commitment: [],
@@ -190,19 +199,47 @@ describe("step3Schema", () => {
       care_philosophy: null,
       additional_certs: [],
     });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts one of each", () => {
+    const result = step3Schema.safeParse({
+      skills: [Skill.MEDICATION_MANAGEMENT],
+      availability_commitment: [AvailabilityCommitment.PART_TIME],
+      time_slots: [TimeSlot.WEEKDAYS],
+      rate_min: null,
+      rate_max: null,
+      has_transportation: false,
+      covid_vaccinated: null,
+      care_philosophy: null,
+      additional_certs: [],
+    });
     expect(result.success).toBe(true);
   });
 
+  // Both rate tests carry the required lists (#905). Without them the
+  // rejection test would pass on the missing lists rather than on the rate
+  // rule it names.
+  const step3Required = {
+    skills: [Skill.MEDICATION_MANAGEMENT],
+    availability_commitment: [AvailabilityCommitment.PART_TIME],
+    time_slots: [TimeSlot.WEEKDAYS],
+  };
+
   it("rejects rate_max less than rate_min", () => {
     const result = step3Schema.safeParse({
+      ...step3Required,
       rate_min: 50,
       rate_max: 30,
     });
     expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(JSON.stringify(result.error.issues)).toContain("rate");
   });
 
   it("accepts equal rate_min and rate_max", () => {
     const result = step3Schema.safeParse({
+      ...step3Required,
       rate_min: 40,
       rate_max: 40,
     });

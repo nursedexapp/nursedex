@@ -3,7 +3,10 @@ import { requireRole } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { getSignedPhotoUrls } from "@/lib/profile/photos";
-import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
+import {
+  getOnboardingStatus,
+  onboardingRedirectPath,
+} from "@/lib/profile/onboarding-status";
 import { ProfileEditForm } from "./ProfileEditForm";
 
 export default async function EditProfilePage() {
@@ -27,7 +30,7 @@ export default async function EditProfilePage() {
   // partially-onboarded nurses through to a half-rendered edit form.
   const onboardingStatus = getOnboardingStatus(profile, user);
   if (!onboardingStatus.complete) {
-    redirect(`/dashboard/onboarding?step=${onboardingStatus.nextStep}`);
+    redirect(onboardingRedirectPath(onboardingStatus));
   }
 
   const photoUrls =
