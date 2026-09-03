@@ -35,8 +35,12 @@ describe("calculateCompleteness", () => {
     const { score, missing } = calculateCompleteness(EMPTY_PROFILE);
     expect(score).toBe(10);
     expect(missing.length).toBe(10);
-    expect(missing).not.toContain("List any additional certifications");
-    expect(missing).not.toContain("Add additional languages you speak");
+    expect(labelsOf(missing)).not.toContain(
+      "List any additional certifications",
+    );
+    expect(labelsOf(missing)).not.toContain(
+      "Add additional languages you speak",
+    );
   });
 
   it("returns 100% for a fully complete profile", () => {
@@ -102,8 +106,41 @@ describe("calculateCompleteness", () => {
       photos: [],
       bio: null,
     });
-    expect(missing).toContain("Add a professional photo");
-    expect(missing).toContain("Write your bio");
+    expect(labelsOf(missing)).toContain("Add a professional photo");
+    expect(labelsOf(missing)).toContain("Write your bio");
     expect(missing.length).toBe(2);
+  });
+});
+
+// #730: the missing list reads as housekeeping unless it says what each item
+// is worth. Nurses were never told a fuller profile means a better position
+// in search, and once completeness genuinely decides the order (#724) that is
+// true and still unstated.
+function labelsOf(missing: { label: string }[]): string[] {
+  return missing.map((m) => m.label);
+}
+
+describe("what each missing item is worth", () => {
+  it("says how many points each one earns", () => {
+    const { missing } = calculateCompleteness({
+      ...FULL_PROFILE,
+      photos: [],
+      bio: null,
+    });
+    const photo = missing.find((m) => m.label.includes("photo"));
+    expect(photo?.points).toBe(15);
+  });
+
+  it("puts the biggest wins first, so the top of the list is worth reading", () => {
+    const { missing } = calculateCompleteness(EMPTY_PROFILE);
+    const points = missing.map((m) => m.points);
+    expect(points).toEqual([...points].sort((a, b) => b - a));
+  });
+
+  it("adds up to what is missing from the score", () => {
+    // Otherwise the list and the number beside it tell different stories.
+    const { score, missing } = calculateCompleteness(EMPTY_PROFILE);
+    const owed = missing.reduce((sum, m) => sum + m.points, 0);
+    expect(score + owed).toBe(100);
   });
 });

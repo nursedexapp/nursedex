@@ -3,9 +3,11 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
+import type { MissingItem } from "@/lib/profile/completeness";
+
 interface CompletenessCardProps {
   score: number;
-  missing: string[];
+  missing: MissingItem[];
 }
 
 export function CompletenessCard({ score, missing }: CompletenessCardProps) {
@@ -63,16 +65,19 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
           {missing.length > 0 ? (
             <div className="flex-1 space-y-1">
               <p className="text-muted-foreground text-xs font-medium">
-                Add these so families can find a fuller picture of you:
+                A fuller profile ranks higher when families search:
               </p>
               {missing.slice(0, 3).map((item) => (
                 <Link
-                  key={item}
+                  key={item.label}
                   href="/dashboard/edit"
                   className="text-teal flex items-center gap-1 text-sm hover:underline"
                 >
-                  <ChevronRight className="size-3.5" />
-                  {item}
+                  <ChevronRight className="size-3.5 shrink-0" />
+                  <span>{item.label}</span>
+                  <span className="text-muted-foreground text-xs">
+                    +{item.points}
+                  </span>
                 </Link>
               ))}
               {missing.length > 3 && (
@@ -87,6 +92,16 @@ export function CompletenessCard({ score, missing }: CompletenessCardProps) {
             </p>
           )}
         </div>
+
+        {missing.length > 0 && (
+          // Honest about the ceiling: a complete free profile still sits below
+          // a Featured one, and promising otherwise would be selling her
+          // something the ranking does not do.
+          <p className="text-muted-foreground mt-4 text-xs">
+            Featured nurses appear first whatever their profile. Among everyone
+            else, the fuller your profile, the higher you appear.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
