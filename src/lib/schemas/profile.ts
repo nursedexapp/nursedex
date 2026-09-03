@@ -149,6 +149,17 @@ export const BIO_PLACEHOLDER_ERROR =
  * completeness scoring trims first and gives no credit, so such a nurse would
  * be listed with a blank card.
  */
+/**
+ * Where her face is in her photo, as a percentage (#768).
+ *
+ * Defaulted rather than required, so a form that never showed the picker
+ * still saves. A value that IS present and outside the photo is refused
+ * rather than quietly replaced: the picker cannot produce one, so it means a
+ * bug or tampering, and silently storing the middle instead would move her
+ * photo without telling her.
+ */
+const focalCoordinate = z.number().int().min(0).max(100).default(50);
+
 function bioField(limits: { bioMaxLength: number }) {
   return z
     .string()
@@ -166,6 +177,8 @@ export function step4Schema(tier: NurseTier) {
 
   return z.object({
     bio: bioField(limits),
+    photo_focal_x: focalCoordinate,
+    photo_focal_y: focalCoordinate,
     photos: z
       .array(z.string())
       .min(1, "Please upload at least one photo")
@@ -263,6 +276,8 @@ export function fullProfileSchema(tier: NurseTier) {
       additional_certs: z.array(z.string().min(1)).default([]),
       // Step 4
       bio: bioField(limits),
+      photo_focal_x: focalCoordinate,
+      photo_focal_y: focalCoordinate,
       photos: z.array(z.string()).min(1).max(limits.maxPhotos),
       // Step 5
       contact_email: z.string().email().or(z.literal("")).nullable(),

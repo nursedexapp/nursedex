@@ -3,6 +3,7 @@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PhotoUpload } from "./PhotoUpload";
+import { PhotoFocalPicker } from "./PhotoFocalPicker";
 import type { NurseTier } from "@/types/enums";
 import { TIER_LIMITS } from "@/lib/constants";
 import {
@@ -15,6 +16,8 @@ interface BioFieldsProps {
   values: {
     bio: string;
     photos: string[];
+    photo_focal_x: number;
+    photo_focal_y: number;
   };
   photoUrls: (string | null)[];
   tier: NurseTier;
@@ -90,6 +93,21 @@ export function BioFields({
         />
         {errors.photos && (
           <p className="text-destructive text-xs">{errors.photos}</p>
+        )}
+        {/* Only once there is a photo to position, and only when its URL has
+            arrived: a picker over a blank box would be a control with nothing
+            to control. */}
+        {photoUrls[0] && (
+          <div className="pt-2">
+            <PhotoFocalPicker
+              src={photoUrls[0]}
+              focal={{ x: values.photo_focal_x, y: values.photo_focal_y }}
+              onChange={(focal) => {
+                onChange("photo_focal_x", focal.x);
+                onChange("photo_focal_y", focal.y);
+              }}
+            />
+          </div>
         )}
       </div>
     </>

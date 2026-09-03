@@ -26,6 +26,8 @@ function makeNurse(overrides: Partial<NurseSearchCard> = {}): NurseSearchCard {
     unavailable_visibility: null,
     profile_completeness: 100,
     verified_at: null,
+    photo_focal_x: 50,
+    photo_focal_y: 25,
     zip_code: null,
     distance_miles: null,
     communication_preference: null,
@@ -253,5 +255,31 @@ describe("NurseCard extra badge", () => {
       />,
     );
     expect(container.textContent).not.toContain("Access until");
+  });
+});
+
+describe("the card photo's framing", () => {
+  // The card crops her photo to a small circle, so where that circle is taken
+  // from decides whether her face is in it (#768).
+  it("frames the photo where the nurse says her face is", () => {
+    render(
+      <NurseCard
+        nurse={makeNurse({ photo_url: "/p.jpg", photo_focal_x: 20, photo_focal_y: 80 })}
+      />,
+    );
+    const img = document.querySelector("img");
+    expect(img).toHaveStyle({ objectPosition: "20% 80%" });
+  });
+
+  it("uses her own point rather than one fixed for everybody", () => {
+    const { container: a } = render(
+      <NurseCard nurse={makeNurse({ photo_url: "/p.jpg", photo_focal_x: 10, photo_focal_y: 10 })} />,
+    );
+    const { container: b } = render(
+      <NurseCard nurse={makeNurse({ photo_url: "/p.jpg", photo_focal_x: 90, photo_focal_y: 90 })} />,
+    );
+    const posOf = (c: HTMLElement) =>
+      (c.querySelector("img") as HTMLElement | null)?.style.objectPosition;
+    expect(posOf(a)).not.toBe(posOf(b));
   });
 });

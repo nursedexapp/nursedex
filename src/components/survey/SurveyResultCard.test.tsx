@@ -37,6 +37,8 @@ const nurse: NurseSearchCard = {
   unavailable_visibility: null,
   profile_completeness: 80,
   verified_at: null,
+  photo_focal_x: 50,
+  photo_focal_y: 25,
   zip_code: "11779",
   distance_miles: null,
   communication_preference: null,

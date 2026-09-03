@@ -27,6 +27,8 @@ function card(id: string): NurseSearchCard {
     unavailable_visibility: null,
     profile_completeness: 0,
     verified_at: null,
+    photo_focal_x: 50,
+    photo_focal_y: 25,
     zip_code: null,
     distance_miles: null,
     communication_preference: null,

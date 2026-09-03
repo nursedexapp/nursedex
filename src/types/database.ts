@@ -63,6 +63,9 @@ export interface NurseProfile {
   verification_status: VerificationStatus;
   verification_rejected_reason: string | null;
   verified_at: string | null;
+  // Where her face is in her photo, 0-100 each (#768, migration 069).
+  photo_focal_x: number;
+  photo_focal_y: number;
   is_available: boolean;
   unavailable_visibility: "hidden" | "badge" | null;
   profile_completeness: number;
@@ -103,6 +106,8 @@ export interface NurseProfileDraft {
   // Step 4: Bio & Photos
   bio?: string;
   photos?: string[]; // storage paths, not URLs
+  photo_focal_x?: number;
+  photo_focal_y?: number;
   // Step 5: Contact
   contact_email?: string;
   contact_phone?: string;
