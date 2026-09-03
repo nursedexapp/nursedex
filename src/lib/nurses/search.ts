@@ -274,10 +274,18 @@ async function runQuery(
     // A keyword of nothing but wildcards is dropped rather than sent: "**"
     // matches every nurse, which reads as the search being ignored.
     if (pattern) {
-      const clauses = [
-        `bio.ilike."${pattern}"`,
-        `care_philosophy.ilike."${pattern}"`,
-      ];
+      // Bio is matched for everyone: it is already this nurse's public meta
+      // description, so a match confirms nothing a search engine has not
+      // indexed. The care philosophy is shown only to a signed in viewer
+      // (NurseProfilePublic renders the anon branch instead), so matching it
+      // for a logged out visitor would hand back its contents through the
+      // result count, one guess at a time, without ever displaying them
+      // (#935). Same rule as the last name above: a viewer may only search
+      // what she is allowed to read.
+      const clauses = [`bio.ilike."${pattern}"`];
+      if (gate.canSeeDetails) {
+        clauses.push(`care_philosophy.ilike."${pattern}"`);
+      }
       const nameMatches = await nurseIdsMatchingName(filters.q, gate);
       if (nameMatches.length > 0) {
         clauses.push(`user_id.in.(${nameMatches.join(",")})`);
