@@ -22,6 +22,7 @@ import {
   type CompletenessInput,
 } from "./completeness";
 import { claimSlug, saveSlugRedirect } from "./slug";
+import { resubmissionPatch } from "./resubmission";
 import {
   getSignedUploadUrl as _getSignedUploadUrl,
   validateUploadedPhoto,
@@ -316,7 +317,15 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
     async (candidate) => {
       const { error: updateError } = await supabase
         .from("nurse_profiles")
-        .update({ slug: candidate, profile_completeness: score })
+        .update({
+          slug: candidate,
+          profile_completeness: score,
+          // She finished the wizard. If she was rejected, this is her
+          // resubmission: the edit form is unreachable to her (it requires a
+          // complete profile), so without this she would fix exactly what she
+          // was asked to fix and never re-enter the queue (#912).
+          ...resubmissionPatch(profile.verification_status),
+        })
         .eq("user_id", user.id);
       return updateError;
     },
@@ -416,13 +425,11 @@ export async function updateNurseProfile(
 
   const photos = (data.photos as string[]) || [];
 
-  // A rejected profile re-enters the review queue on save. The rejection
-  // reason is kept so the admin queue can badge it as a resubmission;
-  // approval clears it.
-  const resubmission =
-    currentProfile.verification_status === "rejected"
-      ? { verification_status: "pending" as const }
-      : {};
+  // A rejected profile re-enters the review queue on save. The rule is shared
+  // with the wizard's own completion path, which is where a nurse whose
+  // profile is unfinished fixes it, since this form is unreachable until
+  // onboarding is complete.
+  const resubmission = resubmissionPatch(currentProfile.verification_status);
 
   // Build the profile update; the slug is set per-path below.
   const profileUpdate = {

@@ -15,17 +15,29 @@ import {
   sendVerificationApprovedEmail,
   sendVerificationRejectedEmail,
 } from "@/lib/email/send";
+import {
+  getOnboardingStatus,
+  ONBOARDING_STEP_LABELS,
+} from "@/lib/profile/onboarding-status";
+import type { NurseProfile, User } from "@/types/database";
 
 export type VerifyActionError =
   | "invalid"
   | "not_found"
   | "wrong_state"
+  | "incomplete"
   | "unknown";
 
 export interface VerifyActionResult {
   success: boolean;
   error?: VerifyActionError;
   fieldErrors?: Record<string, string>;
+  /**
+   * Which step of her profile is still empty, when the refusal is
+   * "incomplete". The queue says it, because the generic "please try again"
+   * names an action that cannot fix this one: only the nurse can (#912).
+   */
+  missingStep?: string;
 }
 
 export async function approveVerification(
@@ -40,10 +52,18 @@ export async function approveVerification(
   const admin = await requireAdmin();
   const supabase = await createClient();
 
+  // Every field the onboarding floor reads comes back with the row (#912).
+  // Verification is the product's promise that somebody checked her, and it
+  // could be granted to a profile with nothing in it: 29 of the 32 verified
+  // HHAs have no licence number, which is the one field onboarding requires
+  // of an HHA and the one the check is supposed to rest on.
   const { data: profile } = await supabase
     .from("nurse_profiles")
     .select(
-      "user_id, slug, verification_status, users!inner(first_name, email)",
+      `user_id, slug, verification_status, years_experience, languages,
+       credential, license_number, care_types, skills,
+       availability_commitment, time_slots, bio, photos, travel_radius_miles,
+       users!inner(first_name, last_name, email, zip_code)`,
     )
     .eq("user_id", input.user_id)
     .maybeSingle();
@@ -52,11 +72,33 @@ export async function approveVerification(
     user_id: string;
     slug: string;
     verification_status: "pending" | "verified" | "rejected";
-    users: { first_name: string | null; email: string } | null;
+    users: {
+      first_name: string | null;
+      last_name: string | null;
+      email: string;
+      zip_code: string | null;
+    } | null;
   };
   const row = profile as unknown as ProfileRow | null;
 
   if (!row || !row.users) return { success: false, error: "not_found" };
+
+  // The floor is the wizard's own definition of a finished profile, read
+  // through the same helper the dashboard gates on, so there is one
+  // definition rather than a second one written here. Checked before the
+  // status guard: a nurse below the floor must not be approved from any
+  // status, and nothing at all is written or emailed.
+  const onboarding = getOnboardingStatus(
+    row as unknown as NurseProfile,
+    row.users as unknown as User,
+  );
+  if (!onboarding.complete) {
+    return {
+      success: false,
+      error: "incomplete",
+      missingStep: ONBOARDING_STEP_LABELS[onboarding.nextStep],
+    };
+  }
 
   // The status guard lives in the UPDATE, not in a JavaScript check above it
   // (#652). Reading the status and then updating by user_id alone let two admins

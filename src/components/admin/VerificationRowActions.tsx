@@ -67,7 +67,15 @@ function ApproveDialog({
     startTransition(async () => {
       const result = await approveVerification({ user_id: userId });
       if (!result.success) {
-        toast.error("Could not approve. Please try again.");
+        // An unfinished profile is not something the admin can retry past:
+        // only the nurse can fill the step in (#912). So it gets its own
+        // sentence rather than the generic one, which would send them round
+        // the same button again.
+        toast.error(
+          result.error === "incomplete"
+            ? `${nurseFirstName} has not finished the ${result.missingStep ?? "profile"} step, so she cannot be verified yet.`
+            : "Could not approve. Please try again.",
+        );
         return;
       }
       toast.success(`Approved ${nurseFirstName}`);
