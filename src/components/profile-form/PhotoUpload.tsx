@@ -25,6 +25,14 @@ interface PhotoUploadProps {
   photoUrls: (string | null)[];
   tier: NurseTier;
   onChange: (photos: string[]) => void;
+  /**
+   * Reports the URL a freshly uploaded photo can be shown at, which this
+   * component already keeps for its own preview. The parent needs it too: the
+   * server-rendered URL list only covers photos that existed at page load, so
+   * without this a control that renders a photo cannot show one the nurse has
+   * just added until the page is reloaded (#768).
+   */
+  onPhotoResolved?: (path: string, url: string) => void;
 }
 
 export function PhotoUpload({
@@ -32,6 +40,7 @@ export function PhotoUpload({
   photoUrls,
   tier,
   onChange,
+  onPhotoResolved,
 }: PhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [removingIndex, setRemovingIndex] = useState<number | null>(null);
@@ -146,6 +155,7 @@ export function PhotoUpload({
             ...prev,
             [urlResult.path]: validation.signedUrl!,
           }));
+          onPhotoResolved?.(urlResult.path, validation.signedUrl);
         }
 
         onChange([...photos, urlResult.path]);
@@ -165,7 +175,7 @@ export function PhotoUpload({
         if (upload.isLatest(attempt)) setUploading(false);
       }
     },
-    [cropState, photos, onChange, upload],
+    [cropState, photos, onChange, onPhotoResolved, upload],
   );
 
   const handleRemove = useCallback(
