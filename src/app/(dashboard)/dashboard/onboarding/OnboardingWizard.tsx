@@ -294,6 +294,11 @@ export function OnboardingWizard({
       {
         bio: draft.bio || "",
         photos: draft.photos || [],
+        // Without these the picker above changes the draft and the save
+        // throws the choice away, so the control looks like it works and
+        // nothing reaches her profile (#768).
+        photo_focal_x: draft.photo_focal_x ?? DEFAULT_FOCAL.x,
+        photo_focal_y: draft.photo_focal_y ?? DEFAULT_FOCAL.y,
       },
       5,
     );
