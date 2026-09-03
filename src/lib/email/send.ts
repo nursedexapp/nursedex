@@ -329,6 +329,38 @@ export async function sendVerificationApprovedEmail(
   }
 }
 
+/**
+ * Asks a nurse who was verified with no licence number on file to supply it
+ * (#912). Reports whether it went out, because the backfill that sends it
+ * writes a dedup row and has to release that row when the send fails, or she
+ * is marked as told and never hears from us.
+ */
+export async function sendLicenceNumberNeededEmail(args: {
+  to: string;
+  firstName?: string;
+}): Promise<boolean> {
+  const baseUrl = await getBaseUrl();
+  try {
+    const res = await fetch(`${baseUrl}/api/email/licence-number-needed`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify({ to: args.to, firstName: args.firstName }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error("[email] Licence number needed failed:", res.status, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[email] Licence number needed could not be sent:", err);
+    return false;
+  }
+}
+
 interface SendVerificationRejectedArgs {
   to: string;
   firstName?: string;

@@ -30,7 +30,11 @@ const h = vi.hoisted(() => {
   return { state, calls };
 });
 
+// These tests are about the onboarding floor, not about who may call. The
+// non-admin path is driven for real in src/lib/admin/authz-boundary.test.ts,
+// which calls approveVerification as a family and as a nurse.
 vi.mock("@/lib/auth/helpers", () => ({
+  // eslint-disable-next-line local/no-mocked-auth-guard -- covered in authz-boundary.test.ts
   requireAdmin: async () => ({ id: "admin-1" }),
 }));
 
