@@ -22,6 +22,7 @@ import { CredentialsFields } from "@/components/profile-form/CredentialsFields";
 import { SkillsFields } from "@/components/profile-form/SkillsFields";
 import { BioFields } from "@/components/profile-form/BioFields";
 import { NotListedNotice } from "@/components/onboarding/NotListedNotice";
+import { SentBackNotice } from "@/components/onboarding/SentBackNotice";
 import { ContactFields } from "@/components/profile-form/ContactFields";
 import type { NurseTier } from "@/types/enums";
 
@@ -379,12 +380,19 @@ export function OnboardingWizard({
   // the 40 in that state stopped before step 3, so a notice on one step alone
   // would miss most of the people it is for (#732). It renders nothing unless
   // she is verified and genuinely unlisted.
+  //
+  // The sent-back notice sits above it and answers a different question: not
+  // "why can families not see me" but "why am I looking at this at all". A
+  // nurse redirected off /dashboard has both, and they do not overlap.
   const notListedBanner = (
-    <NotListedNotice
-      verificationStatus={profile.verification_status}
-      hasPhoto={profile.has_photo}
-      bio={profile.bio}
-    />
+    <>
+      <SentBackNotice sentBack={searchParams.get("unfinished") === "1"} />
+      <NotListedNotice
+        verificationStatus={profile.verification_status}
+        hasPhoto={profile.has_photo}
+        bio={profile.bio}
+      />
+    </>
   );
 
   if (currentStep === 1) {

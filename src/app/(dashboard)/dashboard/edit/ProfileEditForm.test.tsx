@@ -85,9 +85,12 @@ const profile = {
   license_number: "NY123456",
   care_types: [CareType.ELDERLY],
   primary_care_type: null,
-  skills: [],
-  availability_commitment: [],
-  time_slots: [],
+  // Non-empty since #905: the edit form saves through fullProfileSchema, which
+  // now requires one of each. Emptying these here would fail the save before it
+  // reached the server action, which is not what these tests are about.
+  skills: ["medication_management"],
+  availability_commitment: ["part_time"],
+  time_slots: ["weekdays"],
   rate_min: null,
   rate_max: null,
   has_transportation: true,

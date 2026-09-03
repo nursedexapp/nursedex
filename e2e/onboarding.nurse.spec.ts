@@ -121,8 +121,27 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
     .check();
   await continueTo(page, "Skills and details");
 
-  // ── Step 3: skills and details (everything here is optional, so this is the
-  //    step where a nurse in a hurry clicks straight through)
+  // ── Step 3: skills, availability and time slots.
+  //
+  // Required since #905. Clicking straight through used to be allowed, and
+  // the profile it produced was one getOnboardingStatus called unfinished, so
+  // /dashboard, /dashboard/edit and /dashboard/preview all bounced her back
+  // here for good. 24 verified nurses were in that state when it was measured.
+  // The refusal is asserted first, because the whole fix is that this step can
+  // no longer be skipped.
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(
+    page.getByText("Pick at least one skill so families can find you"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Skills and details" }),
+  ).toBeVisible();
+
+  await page
+    .getByRole("checkbox", { name: "Medication Management", exact: true })
+    .check();
+  await page.getByRole("checkbox", { name: "Part-Time", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Weekdays", exact: true }).check();
   await continueTo(page, "Bio and photos");
 
   // ── Step 4: bio and a real photo, cropped and uploaded to storage
@@ -177,7 +196,8 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
   // page.mouse.click does not scroll to anything. The position is relative to
   // the element, low and to the left, nowhere near the upper-third default.
   const box = await framing.boundingBox();
-  if (!box) throw new Error("The framing control rendered with no box to click.");
+  if (!box)
+    throw new Error("The framing control rendered with no box to click.");
   await framing.click({
     position: { x: box.width * 0.25, y: box.height * 0.8 },
   });
@@ -229,6 +249,22 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
   expect([profile!.photo_focal_x, profile!.photo_focal_y]).not.toEqual([
     50, 25,
   ]);
+
+  // ── Her own preview opens (#905).
+  //
+  // The gate that keeps an unfinished profile out of the dashboard guards the
+  // preview too, and until now it disagreed with the wizard about what
+  // finished meant: the wizard waved this step 3 through empty and the gate
+  // then refused every one of those pages. The disagreement lived between a
+  // page and a schema, so nothing below the browser exercised both ends of it.
+  await page.goto("/dashboard/preview");
+  await expect(
+    page.getByRole("heading", { name: "Profile Preview" }),
+  ).toBeVisible({ timeout: 20_000 });
+  // Asserted explicitly rather than left to the heading: the failure this
+  // guards against is a redirect back into the wizard, and a heading check
+  // alone would report that as "the page did not render".
+  await expect(page).toHaveURL(/\/dashboard\/preview$/);
 
   // ── THE GATE. A finished profile is not a public one. Until an admin says so,
   //    a family looking her up finds nothing there.
@@ -315,7 +351,8 @@ test("a verified nurse with an empty profile is told families cannot see her", a
     .from("users")
     .update({ role: "nurse", first_name: FIRST_NAME, last_name: LAST_NAME })
     .eq("id", nurseId);
-  if (userErr) throw new Error(`Could not set the nurse role: ${userErr.message}`);
+  if (userErr)
+    throw new Error(`Could not set the nurse role: ${userErr.message}`);
 
   // Verified, and empty: no photo and no bio, and no years_experience, so the
   // wizard sends her to step 1 rather than to the bio and photo step.
@@ -326,7 +363,9 @@ test("a verified nurse with an empty profile is told families cannot see her", a
     verification_status: "verified",
   });
   if (profileErr) {
-    throw new Error(`Could not provision the empty profile: ${profileErr.message}`);
+    throw new Error(
+      `Could not provision the empty profile: ${profileErr.message}`,
+    );
   }
 
   await page.goto("/dashboard");

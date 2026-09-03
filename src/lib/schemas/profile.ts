@@ -87,13 +87,31 @@ export type Step2Data = z.infer<ReturnType<typeof step2Schema>>;
 
 // ── Step 3: Skills & Details ────────────────────────────────
 
+/**
+ * The three step 3 lists a profile cannot be finished without (#905).
+ *
+ * Declared once and spread into both step3Schema (the wizard) and
+ * fullProfileSchema (the edit form), because these are the fields
+ * getOnboardingStatus gates the dashboard, the edit page and the preview on.
+ * A second, looser copy is what created the lockout in the first place: the
+ * wizard waved a nurse past all three empty and the gate then refused to let
+ * her out of the wizard. onboarding-status.test.ts pins the two ends together.
+ */
+const STEP_3_REQUIRED = {
+  skills: z
+    .array(z.nativeEnum(Skill))
+    .min(1, "Pick at least one skill so families can find you"),
+  availability_commitment: z
+    .array(z.nativeEnum(AvailabilityCommitment))
+    .min(1, "Pick at least one availability so families know when you work"),
+  time_slots: z
+    .array(z.nativeEnum(TimeSlot))
+    .min(1, "Pick at least one time slot so families know when you work"),
+};
+
 export const step3Schema = z
   .object({
-    skills: z.array(z.nativeEnum(Skill)).default([]),
-    availability_commitment: z
-      .array(z.nativeEnum(AvailabilityCommitment))
-      .default([]),
-    time_slots: z.array(z.nativeEnum(TimeSlot)).default([]),
+    ...STEP_3_REQUIRED,
     rate_min: z.number().min(0, "Rate cannot be negative").nullable(),
     rate_max: z.number().min(0, "Rate cannot be negative").nullable(),
     has_transportation: z.boolean().default(false),
@@ -262,12 +280,10 @@ export function fullProfileSchema(tier: NurseTier) {
         .min(1)
         .max(limits.maxCareTypes === Infinity ? 100 : limits.maxCareTypes),
       primary_care_type: z.nativeEnum(CareType).nullable(),
-      // Step 3
-      skills: z.array(z.nativeEnum(Skill)).default([]),
-      availability_commitment: z
-        .array(z.nativeEnum(AvailabilityCommitment))
-        .default([]),
-      time_slots: z.array(z.nativeEnum(TimeSlot)).default([]),
+      // Step 3. The same objects the wizard validates with, not a second
+      // copy: the edit form saves through this schema, so a looser rule here
+      // would let a nurse empty these fields and lock herself back out.
+      ...STEP_3_REQUIRED,
       rate_min: z.number().min(0).nullable(),
       rate_max: z.number().min(0).nullable(),
       has_transportation: z.boolean(),

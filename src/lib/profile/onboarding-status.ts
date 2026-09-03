@@ -1,5 +1,17 @@
 import type { NurseProfile, User } from "@/types/database";
 
+/**
+ * The pages that refuse to render until onboarding is finished, and send the
+ * nurse into the wizard instead (#905). Listed here so the redirect they all
+ * perform has one definition, and so a fourth page cannot quietly build its
+ * own path: onboarding-status.test.ts reads these files.
+ */
+export const ONBOARDING_GATED_PAGES = [
+  "src/app/(dashboard)/dashboard/page.tsx",
+  "src/app/(dashboard)/dashboard/edit/page.tsx",
+  "src/app/(dashboard)/dashboard/preview/page.tsx",
+] as const;
+
 export type OnboardingStatus =
   | { complete: true }
   | { complete: false; nextStep: 1 | 2 | 3 | 4 | 5 };
@@ -62,4 +74,18 @@ export function getOnboardingStatus(
   }
 
   return { complete: true };
+}
+
+/**
+ * Where to send a nurse whose profile is not finished.
+ *
+ * The `unfinished` marker is what lets the wizard say why she is looking at a
+ * form rather than at the dashboard she asked for. Without it the redirect is
+ * silent, which for the 24 nurses in this state (measured 2026-09-03) is the
+ * entire product: every route they try turns into step 3 with no explanation.
+ */
+export function onboardingRedirectPath(
+  status: Extract<OnboardingStatus, { complete: false }>,
+): string {
+  return `/dashboard/onboarding?step=${status.nextStep}&unfinished=1`;
 }

@@ -91,7 +91,8 @@ export function SkillsFields({ values, onChange, errors }: SkillsFieldsProps) {
       <div className="space-y-2">
         <Label>Skills and experience</Label>
         <p className="text-muted-foreground text-xs">
-          Select all that apply. These help families find the right match.
+          Pick at least one. Families use these to find the right match, so the
+          more that genuinely apply the better.
         </p>
         <CheckboxGroup
           options={skillOptions}

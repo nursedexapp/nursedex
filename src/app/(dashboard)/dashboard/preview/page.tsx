@@ -3,7 +3,10 @@ import { requireRole } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { getSignedPhotoUrl } from "@/lib/profile/photos";
-import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
+import {
+  getOnboardingStatus,
+  onboardingRedirectPath,
+} from "@/lib/profile/onboarding-status";
 import { getNurseBySlugUnfiltered } from "@/lib/profile/queries";
 import { buildPreviewViews } from "@/lib/profile/preview";
 import { PreviewViews } from "./PreviewViews";
@@ -27,7 +30,7 @@ export default async function PreviewPage() {
   // the right step instead of rendering a half-empty preview.
   const onboardingStatus = getOnboardingStatus(profile, user);
   if (!onboardingStatus.complete) {
-    redirect(`/dashboard/onboarding?step=${onboardingStatus.nextStep}`);
+    redirect(onboardingRedirectPath(onboardingStatus));
   }
 
   // The same record the public page reads, through the same query, rather than

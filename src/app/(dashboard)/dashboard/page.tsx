@@ -3,7 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 import { calculateCompleteness } from "@/lib/profile/completeness";
 import { isListed } from "@/lib/nurses/listing";
-import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
+import {
+  getOnboardingStatus,
+  onboardingRedirectPath,
+} from "@/lib/profile/onboarding-status";
 import { redirect } from "next/navigation";
 import { NurseDashboardHero } from "@/components/dashboard/NurseDashboardHero";
 import { FamilyDashboardHero } from "@/components/dashboard/FamilyDashboardHero";
@@ -168,7 +171,7 @@ export default async function DashboardPage() {
   // step's fields to the DB, so we can derive resume state from there.
   const onboardingStatus = getOnboardingStatus(profile, user);
   if (!onboardingStatus.complete) {
-    redirect(`/dashboard/onboarding?step=${onboardingStatus.nextStep}`);
+    redirect(onboardingRedirectPath(onboardingStatus));
   }
 
   const { score, missing } = calculateCompleteness(profile);
