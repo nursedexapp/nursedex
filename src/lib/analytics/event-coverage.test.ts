@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { sourceFilesUnder, normalise } from "../../../test/source-files";
 import { ANALYTICS_EVENTS } from "./events";
 
 /**
@@ -89,21 +89,5 @@ describe("analytics event catalog", () => {
   });
 });
 
-function normalise(path: string): string {
-  return path.split(sep).join("/");
-}
 
-const sep = join("a", "b").slice(1, -1);
 
-function sourceFilesUnder(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      out.push(...sourceFilesUnder(full));
-    } else {
-      out.push(full);
-    }
-  }
-  return out;
-}

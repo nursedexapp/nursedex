@@ -8,7 +8,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { Clock, Sparkles, Eye, AlertTriangle, X } from "lucide-react";
+import { Clock, Sparkles, Eye, EyeOff, AlertTriangle, X } from "lucide-react";
 
 const CELEBRATION_KEY = "nursedex.celebrated.verified";
 
@@ -18,6 +18,11 @@ interface NurseDashboardHeroProps {
   slug: string;
   // Profile completeness, 0..100. Only relevant for verified state.
   score: number;
+  // Whether the directory actually lists her, from isListed (#732). No
+  // default: a verified nurse who is not listed must never be told her
+  // profile is live, so a call site that forgets this is a type error rather
+  // than a false promise.
+  listed: boolean;
 }
 
 export function NurseDashboardHero({
@@ -25,11 +30,12 @@ export function NurseDashboardHero({
   rejectedReason,
   slug,
   score,
+  listed,
 }: NurseDashboardHeroProps) {
   if (status === "pending") return <PendingHero slug={slug} />;
   if (status === "rejected")
     return <RejectedHero rejectedReason={rejectedReason} />;
-  return <VerifiedHero slug={slug} score={score} />;
+  return <VerifiedHero slug={slug} score={score} listed={listed} />;
 }
 
 function PendingHero({ slug }: { slug: string }) {
@@ -85,11 +91,24 @@ function RejectedHero({ rejectedReason }: { rejectedReason?: string | null }) {
   );
 }
 
-function VerifiedHero({ slug, score }: { slug: string; score: number }) {
+function VerifiedHero({
+  slug,
+  score,
+  listed,
+}: {
+  slug: string;
+  score: number;
+  listed: boolean;
+}) {
   // Track first-time-verified celebration. Server-rendered first paint
   // assumes already-celebrated; the actual decision happens after mount
   // so a returning user never sees the celebration flash in.
   const [celebrated, setCelebrated] = useState<boolean | null>(null);
+
+  // Checked before the celebration and before the completeness heroes: all
+  // three of those say her profile is live, and for an unlisted nurse that is
+  // simply untrue.
+  const notListed = !listed;
 
   useEffect(() => {
     setCelebrated(window.localStorage.getItem(CELEBRATION_KEY) === "1");
@@ -98,6 +117,10 @@ function VerifiedHero({ slug, score }: { slug: string; score: number }) {
   function dismissCelebration() {
     window.localStorage.setItem(CELEBRATION_KEY, "1");
     setCelebrated(true);
+  }
+
+  if (notListed) {
+    return <NotListedHero />;
   }
 
   if (celebrated === false) {
@@ -109,6 +132,31 @@ function VerifiedHero({ slug, score }: { slug: string; score: number }) {
   }
 
   return <LiveHero slug={slug} />;
+}
+
+function NotListedHero() {
+  return (
+    <HeroFrame tone="warning">
+      <HeroIcon tone="warning" Icon={EyeOff} />
+      <div className="flex-1">
+        <HeroHeading>
+          You&apos;re verified, but not showing in search yet
+        </HeroHeading>
+        <HeroBody>
+          Families only see profiles with a photo or a bio on them. Add either
+          one and you will appear in the directory straight away.
+        </HeroBody>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/edit"
+            className={`${buttonVariants({ size: "sm" })} bg-teal hover:bg-teal-dark text-warm-white`}
+          >
+            Edit profile
+          </Link>
+        </div>
+      </div>
+    </HeroFrame>
+  );
 }
 
 function CelebrationHero({

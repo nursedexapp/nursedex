@@ -139,18 +139,33 @@ export function isBioFromPlaceholder(bio: string): boolean {
 export const BIO_PLACEHOLDER_ERROR =
   "This looks like our example bio. Please write something in your own words so families get to know the real you.";
 
+/**
+ * The bio field, defined once.
+ *
+ * It was defined twice, in step4Schema and in the full profile schema, which
+ * is how a rule comes to hold on one save path and not the other. Trimming
+ * matters here beyond tidiness: a bio of only whitespace passed min(1) and
+ * reached the database, where the directory counts it as a bio (#732) while
+ * completeness scoring trims first and gives no credit, so such a nurse would
+ * be listed with a blank card.
+ */
+function bioField(limits: { bioMaxLength: number }) {
+  return z
+    .string()
+    .trim()
+    .min(1, "A bio is required")
+    .max(
+      limits.bioMaxLength,
+      `Bio must be under ${limits.bioMaxLength} characters`,
+    )
+    .refine((bio) => !isBioFromPlaceholder(bio), BIO_PLACEHOLDER_ERROR);
+}
+
 export function step4Schema(tier: NurseTier) {
   const limits = TIER_LIMITS[tier];
 
   return z.object({
-    bio: z
-      .string()
-      .min(1, "A bio is required")
-      .max(
-        limits.bioMaxLength,
-        `Bio must be under ${limits.bioMaxLength} characters`,
-      )
-      .refine((bio) => !isBioFromPlaceholder(bio), BIO_PLACEHOLDER_ERROR),
+    bio: bioField(limits),
     photos: z
       .array(z.string())
       .min(1, "Please upload at least one photo")
@@ -247,11 +262,7 @@ export function fullProfileSchema(tier: NurseTier) {
       care_philosophy: z.string().max(500).nullable(),
       additional_certs: z.array(z.string().min(1)).default([]),
       // Step 4
-      bio: z
-        .string()
-        .min(1)
-        .max(limits.bioMaxLength)
-        .refine((bio) => !isBioFromPlaceholder(bio), BIO_PLACEHOLDER_ERROR),
+      bio: bioField(limits),
       photos: z.array(z.string()).min(1).max(limits.maxPhotos),
       // Step 5
       contact_email: z.string().email().or(z.literal("")).nullable(),

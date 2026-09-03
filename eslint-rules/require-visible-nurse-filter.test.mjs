@@ -39,7 +39,7 @@ function expectClean(code) {
 const IMPORTS = `
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
-import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
+import { applyVisibleNurseFilter, applyListedNurseFilter } from "@/lib/nurses/visibility";
 `;
 
 describe("require-visible-nurse-filter", () => {
@@ -61,6 +61,22 @@ describe("require-visible-nurse-filter", () => {
         const supabase = createServiceRoleClient();
         const query = supabase.from("nurse_profiles").select("slug");
         const { data } = await query;
+        return data;
+      }
+    `);
+  });
+
+  // applyListedNurseFilter IS applyVisibleNurseFilter plus a minimum-content
+  // condition (#732), so a read routed through it satisfies this rule. Without
+  // this the directory and the sitemap, the two surfaces the rule exists to
+  // protect, are the ones it refuses.
+  it("accepts a query wrapped in applyListedNurseFilter", () => {
+    expectClean(`${IMPORTS}
+      async function load() {
+        const supabase = createServiceRoleClient();
+        const { data } = await applyListedNurseFilter(
+          supabase.from("nurse_profiles").select("slug"),
+        );
         return data;
       }
     `);

@@ -34,6 +34,8 @@ vi.mock("@/lib/supabase/service-role", () => ({
       builder.select = chain;
       builder.eq = chain;
       builder.not = chain;
+      // applyListedNurseFilter adds the minimum-content condition as .or().
+      builder.or = chain;
       // The real builder is chainable AND thenable: .range() narrows it and the
       // filters are applied afterwards, so range has to return the builder
       // rather than a promise, or applyVisibleNurseFilter has nothing to chain

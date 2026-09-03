@@ -32,7 +32,10 @@
  */
 
 const TABLE = "nurse_profiles";
-const FILTER = "applyVisibleNurseFilter";
+// Either filter satisfies the rule: applyListedNurseFilter applies all four
+// conditions and then adds the minimum-content one (#732), so a read routed
+// through it is strictly narrower than one routed through the base filter.
+const FILTERS = new Set(["applyVisibleNurseFilter", "applyListedNurseFilter"]);
 const SERVICE_ROLE_FACTORY = "createServiceRoleClient";
 
 /** Methods that make a chain a write, not a public read. */
@@ -126,12 +129,12 @@ function chainMethods(outermost) {
   return names;
 }
 
-/** `applyVisibleNurseFilter(...)`. */
+/** `applyVisibleNurseFilter(...)` or `applyListedNurseFilter(...)`. */
 function isFilterCall(node) {
   return (
     node?.type === "CallExpression" &&
     node.callee?.type === "Identifier" &&
-    node.callee.name === FILTER
+    FILTERS.has(node.callee.name)
   );
 }
 

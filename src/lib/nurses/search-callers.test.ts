@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { sourceFilesUnder, normalise } from "../../../test/source-files";
 
 /**
  * Every searchNurses call site, with the value it passes for viewerIsSignedIn.
@@ -46,30 +46,14 @@ describe("searchNurses call sites", () => {
   // A hand-written list goes stale the moment a fourth call site is added, and
   // then reports green while blind to it. Find them instead of listing them.
   it("knows about every call site there is", () => {
-    const found = sourceFilesUnder("src/app").filter((f) =>
-      readFileSync(f, "utf8").includes("searchNurses("),
-    );
+    const found = sourceFilesUnder("src/app")
+      .filter((f) => /\.tsx?$/.test(f))
+      .filter((f) => readFileSync(f, "utf8").includes("searchNurses("));
     expect(found.map(normalise).sort()).toEqual(
       CALL_SITES.map((c) => c.file).sort(),
     );
   });
 });
 
-function normalise(path: string): string {
-  return path.split(sep).join("/");
-}
 
-const sep = join("a", "b").slice(1, -1);
 
-function sourceFilesUnder(dir: string): string[] {
-  const out: string[] = [];
-  for (const entry of readdirSync(dir)) {
-    const full = join(dir, entry);
-    if (statSync(full).isDirectory()) {
-      out.push(...sourceFilesUnder(full));
-    } else if (full.endsWith(".tsx") || full.endsWith(".ts")) {
-      out.push(full);
-    }
-  }
-  return out;
-}
