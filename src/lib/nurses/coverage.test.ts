@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { applyVisibleNurseFilter } from "./visibility";
-import { LISTED_MINIMUM_CONTENT, UNLISTED_EMPTY_BIO } from "./listing";
+import {
+  LISTED_MINIMUM_CONTENT,
+  LISTED_CARE_TYPES_PRESENT,
+  UNLISTED_FILTER,
+} from "./listing";
 
 // The listing gap this measures (100 verified, 60 listed, 59 searchable on
 // 2026-09-03) has only ever been read by running a query by hand on one day.
@@ -10,11 +14,15 @@ import { LISTED_MINIMUM_CONTENT, UNLISTED_EMPTY_BIO } from "./listing";
 // it is drawn from the SAME predicates the directory itself filters on, and a
 // failed read is reported as a failure rather than as a zero.
 
-type Recorded = { eq: Array<[string, unknown]>; or: string[] };
+type Recorded = {
+  eq: Array<[string, unknown]>;
+  neq: Array<[string, unknown]>;
+  or: string[];
+};
 type Kind = "verified" | "listed" | "searchable" | "unlisted";
 
 const h = vi.hoisted(() => {
-  const builders: Array<{ eq: Array<[string, unknown]>; or: string[] }> = [];
+  const builders: Recorded[] = [];
   // Keyed by the shape of the query, so the fake answers the way the real
   // API does: whichever query asks for the unlisted set gets the unlisted
   // count. A mapping bug in the module then shows up as a swapped number.
@@ -23,10 +31,7 @@ const h = vi.hoisted(() => {
   let nullCountOn: Kind | null = null;
 
   function kindOf(rec: Recorded): Kind {
-    const hasPhotoFalse = rec.eq.some(
-      ([column, value]) => column === "has_photo" && value === false,
-    );
-    if (hasPhotoFalse) return "unlisted";
+    if (rec.or.includes(UNLISTED_FILTER)) return "unlisted";
     const available = rec.eq.some(
       ([column, value]) => column === "is_available" && value === true,
     );
@@ -36,12 +41,16 @@ const h = vi.hoisted(() => {
   }
 
   function from() {
-    const rec: Recorded = { eq: [], or: [] };
+    const rec: Recorded = { eq: [], neq: [], or: [] };
     builders.push(rec);
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.eq = (column: string, value: unknown) => {
       rec.eq.push([column, value]);
+      return b;
+    };
+    b.neq = (column: string, value: unknown) => {
+      rec.neq.push([column, value]);
       return b;
     };
     b.or = (filter: string) => {
@@ -148,11 +157,20 @@ describe("getDirectoryCoverage", () => {
     const unlisted = h.builders.find((rec) => h.kindOf(rec) === "unlisted");
     const searchable = h.builders.find((rec) => h.kindOf(rec) === "searchable");
     expect(listed?.or).toContain(LISTED_MINIMUM_CONTENT);
-    expect(unlisted?.or).toContain(UNLISTED_EMPTY_BIO);
+    expect(unlisted?.or).toContain(UNLISTED_FILTER);
     // Searchable is the listed set the default search can actually return:
     // listed, and available.
     expect(searchable?.or).toContain(LISTED_MINIMUM_CONTENT);
     expect(searchable?.eq).toContainEqual(["is_available", true]);
+    // Both halves of the listed rule, not just the content one (#940): a
+    // count that dropped the care type condition would report more nurses as
+    // listed than the directory shows.
+    for (const rec of [listed, searchable]) {
+      expect(rec?.neq).toContainEqual([
+        LISTED_CARE_TYPES_PRESENT.column,
+        LISTED_CARE_TYPES_PRESENT.notEqualTo,
+      ]);
+    }
   });
 
   it("reports a failed read as a failure, not as a zero", async () => {

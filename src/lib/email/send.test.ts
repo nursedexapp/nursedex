@@ -14,7 +14,11 @@ vi.mock("@/lib/email/resend", () => ({ resend: {} }));
 vi.mock("next/headers", () => ({
   headers: async () => ({
     get: (k: string) =>
-      k === "host" ? "nursedex.test" : k === "x-forwarded-proto" ? "https" : null,
+      k === "host"
+        ? "nursedex.test"
+        : k === "x-forwarded-proto"
+          ? "https"
+          : null,
   }),
 }));
 
@@ -34,10 +38,16 @@ afterEach(() => {
 
 describe("sendNotListedNudgeEmail", () => {
   it("says it went out when the request succeeds", async () => {
-    global.fetch = vi.fn(async () => new Response("{}", { status: 200 })) as never;
+    global.fetch = vi.fn(
+      async () => new Response("{}", { status: 200 }),
+    ) as never;
 
     await expect(
-      sendNotListedNudgeEmail({ to: "nurse@example.com", firstName: "Nia" }),
+      sendNotListedNudgeEmail({
+        to: "nurse@example.com",
+        firstName: "Nia",
+        gaps: ["content"],
+      }),
     ).resolves.toBe(true);
   });
 
@@ -47,7 +57,7 @@ describe("sendNotListedNudgeEmail", () => {
     ) as never;
 
     await expect(
-      sendNotListedNudgeEmail({ to: "nurse@example.com" }),
+      sendNotListedNudgeEmail({ to: "nurse@example.com", gaps: ["content"] }),
     ).resolves.toBe(false);
   });
 
@@ -60,7 +70,7 @@ describe("sendNotListedNudgeEmail", () => {
     }) as never;
 
     await expect(
-      sendNotListedNudgeEmail({ to: "nurse@example.com" }),
+      sendNotListedNudgeEmail({ to: "nurse@example.com", gaps: ["content"] }),
     ).resolves.toBe(false);
   });
 });

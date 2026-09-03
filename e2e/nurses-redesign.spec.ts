@@ -41,24 +41,46 @@ const FIXTURE_NURSES = [
     // Every field this card can be missing, missing at once. The absent states
     // are designed, so they have to be seen rather than assumed.
     //
-    // She carries a bio and nothing else. A nurse with neither a photo nor a
-    // bio is not listed at all (#732), so the barest card a family can
-    // actually meet is this one: no photo, no zip, no care type, no
-    // experience, no rate, no availability.
+    // She carries a bio and a care type, and nothing else. Those two are what
+    // the directory now requires: a nurse with neither a photo nor a bio is
+    // not listed (#732), and nor is one who has not said what care she
+    // provides (#940). So the barest card a family can actually meet is this
+    // one: no photo, no zip, no experience, no rate, no availability.
     email: "e2e-redesign-bare@nursedex.test",
     first_name: "Bev",
     last_name: "Quill",
     zip_code: null,
     profile: {
       credential: "hha",
-      primary_care_type: null,
-      care_types: [],
+      primary_care_type: "elderly",
+      care_types: ["elderly"],
       years_experience: null,
       bio: "Still writing this.",
       rate_min: null,
       rate_max: null,
       availability_commitment: [],
       profile_completeness: 10,
+    },
+  },
+  {
+    // Verified and available, with a real bio, and no care type (#940). The
+    // trap the not listed nudge would otherwise walk nurses into: she has
+    // done what the email asks for, so a content-only rule would put her in
+    // the directory where the filter families narrow by cannot reach her.
+    email: "e2e-redesign-nocaretype@nursedex.test",
+    first_name: "Cara",
+    last_name: "Mott",
+    zip_code: null,
+    profile: {
+      credential: "hha",
+      primary_care_type: null,
+      care_types: [],
+      years_experience: null,
+      bio: "I have looked after families in Brooklyn for nine years.",
+      rate_min: null,
+      rate_max: null,
+      availability_commitment: [],
+      profile_completeness: 20,
     },
   },
   {
@@ -301,10 +323,24 @@ test.describe("the absent states", () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/nurses");
 
-    // Bev is the control: she is just as bare, but she has a bio, so the
-    // absence below is about the rule rather than about an empty page.
+    // Bev is the control: she is just as bare, but she has a bio and a care
+    // type, so the absences below are about the rule rather than about an
+    // empty page.
     await expect(page.locator("article", { hasText: "Bev Q." })).toBeVisible();
     await expect(page.locator("article", { hasText: "Nula V." })).toHaveCount(
+      0,
+    );
+  });
+
+  // #940, and the reason it is here rather than only in a unit test: Cara has
+  // a real bio, so a rule that only asked for content would list her, and she
+  // would then match no care type filter at all.
+  test("a profile with no care type is not listed either", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/nurses");
+
+    await expect(page.locator("article", { hasText: "Bev Q." })).toBeVisible();
+    await expect(page.locator("article", { hasText: "Cara M." })).toHaveCount(
       0,
     );
   });

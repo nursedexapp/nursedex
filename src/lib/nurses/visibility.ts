@@ -1,4 +1,8 @@
-import { LISTED_MINIMUM_CONTENT, UNLISTED_EMPTY_BIO } from "./listing";
+import {
+  LISTED_MINIMUM_CONTENT,
+  LISTED_CARE_TYPES_PRESENT,
+  UNLISTED_FILTER,
+} from "./listing";
 
 /**
  * Single source of truth for the "publicly visible nurse" filter.
@@ -25,7 +29,6 @@ export function applyVisibleNurseFilter<T>(query: T): T {
     .eq("users.is_suspended", false) as unknown as T;
 }
 
-
 /**
  * Publicly visible AND worth showing: the filter for surfaces that DISCOVER a
  * nurse for somebody (the directory, the sitemap).
@@ -41,10 +44,16 @@ export function applyVisibleNurseFilter<T>(query: T): T {
  * choose deliberately.
  */
 export function applyListedNurseFilter<T>(query: T): T {
-  type Chainable = { or(filter: string): Chainable };
-  return (
-    applyVisibleNurseFilter(query) as unknown as Chainable
-  ).or(LISTED_MINIMUM_CONTENT) as unknown as T;
+  type Chainable = {
+    or(filter: string): Chainable;
+    neq(column: string, value: unknown): Chainable;
+  };
+  return (applyVisibleNurseFilter(query) as unknown as Chainable)
+    .or(LISTED_MINIMUM_CONTENT)
+    .neq(
+      LISTED_CARE_TYPES_PRESENT.column,
+      LISTED_CARE_TYPES_PRESENT.notEqualTo,
+    ) as unknown as T;
 }
 
 /**
@@ -60,9 +69,9 @@ export function applyUnlistedNurseFilter<T>(query: T): T {
     eq(column: string, value: unknown): Chainable;
     or(filter: string): Chainable;
   };
-  return (applyVisibleNurseFilter(query) as unknown as Chainable)
-    .eq("has_photo", false)
-    .or(UNLISTED_EMPTY_BIO) as unknown as T;
+  return (applyVisibleNurseFilter(query) as unknown as Chainable).or(
+    UNLISTED_FILTER,
+  ) as unknown as T;
 }
 
 /**
@@ -88,11 +97,9 @@ export function applyAvailabilityFilter<T>(
     or(filter: string): Chainable;
   };
   const q = query as unknown as Chainable;
-  return (
-    opts.relaxed
-      ? q.or(
-          "is_available.eq.true,and(is_available.eq.false,unavailable_visibility.eq.badge)",
-        )
-      : q.eq("is_available", true)
-  ) as unknown as T;
+  return (opts.relaxed
+    ? q.or(
+        "is_available.eq.true,and(is_available.eq.false,unavailable_visibility.eq.badge)",
+      )
+    : q.eq("is_available", true)) as unknown as T;
 }

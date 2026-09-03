@@ -5,6 +5,7 @@ import { withCronAlerting } from "@/lib/cron/alerting";
 import { shouldSendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyUnlistedNurseFilter } from "@/lib/nurses/visibility";
+import { listingGaps } from "@/lib/nurses/listing";
 import { sendNotListedNudgeEmail } from "@/lib/email/send";
 
 export const runtime = "nodejs";
@@ -16,10 +17,11 @@ const DEDUP_KEY = "v1";
 /**
  * Tells a verified nurse whose profile is empty that families cannot see her.
  *
- * She is verified but not in the directory, because there is no photo and no
- * bio on her profile (#732). The in-product version of this message sits on
- * the bio and photo step of the sign-up wizard, which only reaches her if she
- * comes back on her own. 27 of the 40 in this state signed up before July.
+ * She is verified but not in the directory, because her profile is missing
+ * content (a photo or a bio) or a care type (#732, #940). The email names
+ * whichever it is. The in-product version of this message sits on every step
+ * of the sign-up wizard, which only reaches her if she comes back on her own.
+ * 27 of the 40 in this state signed up before July.
  *
  * Safe to run daily: the email_log dedup keeps a nurse from getting it more
  * than once, and she stops matching the query the moment she adds either
@@ -36,9 +38,14 @@ const handleNotListedNudge = withCronAlerting(
   async (_request: NextRequest) => {
     const supabase = createServiceRoleClient();
 
+    // The three columns the listing rule reads come back with the row, so the
+    // email can say what is actually missing rather than assuming (#940).
     const nurseQuery = supabase.from("nurse_profiles").select(
       `
       user_id,
+      has_photo,
+      bio,
+      care_types,
       users!inner ( email, first_name, is_deleted, is_suspended )
     `,
     );
@@ -53,6 +60,9 @@ const handleNotListedNudge = withCronAlerting(
 
     type Row = {
       user_id: string;
+      has_photo: boolean;
+      bio: string | null;
+      care_types: string[] | null;
       users: {
         email: string;
         first_name: string | null;
@@ -90,6 +100,7 @@ const handleNotListedNudge = withCronAlerting(
       const delivered = await sendNotListedNudgeEmail({
         to: row.users.email,
         firstName: row.users.first_name ?? undefined,
+        gaps: listingGaps(row),
       });
 
       if (delivered) {

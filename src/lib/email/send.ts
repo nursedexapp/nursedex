@@ -6,6 +6,7 @@
  */
 
 import { headers } from "next/headers";
+import type { ListingGap } from "@/lib/nurses/listing";
 
 // The request host, used as the target for the internal /api/email/* POST so
 // it reaches the same running deployment (including previews).
@@ -71,6 +72,7 @@ interface SendCommentSubmittedArgs {
 export async function sendNotListedNudgeEmail(args: {
   to: string;
   firstName?: string;
+  gaps: ListingGap[];
 }): Promise<boolean> {
   const baseUrl = await getBaseUrl();
 
@@ -81,7 +83,11 @@ export async function sendNotListedNudgeEmail(args: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.CRON_SECRET}`,
       },
-      body: JSON.stringify({ to: args.to, firstName: args.firstName }),
+      body: JSON.stringify({
+        to: args.to,
+        firstName: args.firstName,
+        gaps: args.gaps,
+      }),
     });
 
     if (!res.ok) {

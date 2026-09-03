@@ -70,8 +70,22 @@ process.env.CRON_SECRET = TEST_CRON_SECRET;
 
 import { GET } from "./route";
 
-const nurse = (id = "nurse-1") => ({
+// The profile fields the listing rule reads come with the row, because the
+// email says what is actually missing (#940). Defaults to the commonest case
+// in production: no photo, no bio and no care type, which is all 22 of the
+// nurses who stopped before the credentials step.
+const nurse = (
+  id = "nurse-1",
+  profile: {
+    has_photo?: boolean;
+    bio?: string | null;
+    care_types?: string[] | null;
+  } = {},
+) => ({
   user_id: id,
+  has_photo: profile.has_photo ?? false,
+  bio: profile.bio ?? null,
+  care_types: profile.care_types ?? [],
   users: {
     email: `${id}@example.com`,
     first_name: "Nia",
@@ -206,5 +220,50 @@ describe("the not-listed nudge, switched on", () => {
 
     expect(res.status).toBe(500);
     expect(h.sendNotListedNudgeEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("what the nudge tells each nurse", () => {
+  beforeEach(() => {
+    process.env.NOT_LISTED_NUDGE_SEND = "true";
+  });
+
+  it("asks a nurse with nothing filled in for both", async () => {
+    h.state.nurses = { data: [nurse("a")], error: null };
+
+    await GET(req());
+
+    expect(h.sendNotListedNudgeEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ gaps: ["content", "care_type"] }),
+    );
+  });
+
+  it("asks a nurse who already has a photo only for the care type", async () => {
+    // The case this exists for. She has done what an earlier version of this
+    // email asked for, so telling her there is no photo on her profile would
+    // be a false statement about her own profile.
+    h.state.nurses = {
+      data: [nurse("a", { has_photo: true, care_types: [] })],
+      error: null,
+    };
+
+    await GET(req());
+
+    expect(h.sendNotListedNudgeEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ gaps: ["care_type"] }),
+    );
+  });
+
+  it("asks a nurse who has a care type only for the photo or bio", async () => {
+    h.state.nurses = {
+      data: [nurse("a", { care_types: ["elderly"] })],
+      error: null,
+    };
+
+    await GET(req());
+
+    expect(h.sendNotListedNudgeEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ gaps: ["content"] }),
+    );
   });
 });
