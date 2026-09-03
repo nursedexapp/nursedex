@@ -37,16 +37,25 @@ dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
  */
 
 /**
- * Measured, not guessed. A probe sent by hand on 2 September 2026 was ABSENT
- * from queries a few seconds after capture returned 200, and present about 90
- * seconds later. So PostHog's ingestion lag here is under two minutes but well
- * over a few seconds, and a deadline near the observed lag would fail on a
- * healthy pipeline. Three minutes leaves real headroom and still sits far
- * inside the workflow's ten minute timeout.
+ * Measured, and the first measurement was wrong in a way worth recording.
  *
- * Re-measure this before shortening it. The check finishes as soon as the event
- * lands, so a generous deadline costs nothing on a good day and is only ever
- * paid on a genuinely broken one.
+ * A probe sent by hand on 2 September 2026 read as absent seconds after capture
+ * and present about 90 seconds later, and that 90 seconds was written here as
+ * the ingestion lag. It was not. Those reads went through PostHog's query
+ * cache, so what they timed was the cached answer expiring, not the event
+ * arriving. Anything measured through a repeated identical query measures the
+ * cache (see queryBody's `refresh`).
+ *
+ * Re-measured on 3 September 2026 with the cache bypassed, one probe was absent
+ * at 31s and present at 35s. That is one sample from one machine, not a
+ * distribution, so it is a floor to stay well clear of rather than a number to
+ * calibrate against.
+ *
+ * Three minutes is therefore generous by roughly five times, deliberately, and
+ * still sits far inside the workflow's ten minute timeout. The check finishes
+ * as soon as the event lands, so the headroom costs nothing on a good day and
+ * is only ever paid on a genuinely broken one. Re-measure before shortening it,
+ * with the cache bypassed.
  */
 const DEADLINE_MS = 180_000;
 const POLL_EVERY_MS = 3_000;
