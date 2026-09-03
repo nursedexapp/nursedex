@@ -50,6 +50,7 @@ function result(items: number, totalFull: number, partials = 0): SearchResult {
     totalPages: 1,
     hitResultCap: false,
     unlocatableZip: null,
+    orderedByDistance: false,
   };
 }
 

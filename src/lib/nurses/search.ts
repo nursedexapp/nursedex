@@ -3,7 +3,11 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyListedNurseFilter } from "./visibility";
 import { SEARCH } from "@/lib/constants";
 import { GENDER_FILTER_ANY, type SearchFilters } from "./search-params";
-import { rankNurses as rankNursesPure } from "./search-ranking";
+import {
+  rankNurses as rankNursesPure,
+  DEFAULT_FEATURED_RANGE_MILES,
+  type DistanceContext,
+} from "./search-ranking";
 import {
   NURSE_CARD_COLUMNS,
   applyTowns,
@@ -38,6 +42,11 @@ export interface SearchResult {
   // ignored rather than silently emptying the results (#769). The page has to
   // say so: "we could not locate 06830" is honest, returning zero is not.
   unlocatableZip: string | null;
+  // Whether the results are in nearest-first order, which they are exactly
+  // when a zip was given and we could place it. The sentence telling a family
+  // how the list is ordered reads this, so it cannot claim an order that was
+  // not used.
+  orderedByDistance: boolean;
 }
 
 export interface SearchOptions {
@@ -107,7 +116,12 @@ export async function searchNurses(
     filters,
     originResolved,
   );
-  let fullRanked = rankCards(fullAfterDistance, viewerCommPref ?? null);
+  const ordering = distanceContext(originZip, originResolved, filters);
+  let fullRanked = rankCards(
+    fullAfterDistance,
+    viewerCommPref ?? null,
+    ordering,
+  );
 
   // Mark nurses the family already revealed and sink them below the rest,
   // keeping the existing rank order (Featured first, etc.) within each group.
@@ -160,6 +174,7 @@ export async function searchNurses(
     totalPages,
     hitResultCap: fullRaw.length >= SQL_FETCH_CAP,
     unlocatableZip: originZip && !originResolved ? originZip : null,
+    orderedByDistance: ordering.originResolved,
   };
 }
 
@@ -364,8 +379,27 @@ function haversineMiles(
 function rankCards(
   nurses: InternalNurseCard[],
   viewerCommPref: string | null,
+  distance?: DistanceContext,
 ): InternalNurseCard[] {
-  return rankNursesPure(nurses, viewerCommPref);
+  return rankNursesPure(nurses, viewerCommPref, distance);
+}
+
+/**
+ * The ordering context for one search.
+ *
+ * `originResolved` on its own is not it: enrichWithLocation reports true when
+ * there was nothing to locate, which is the commonest case of all. Distance
+ * only orders when a zip was actually given AND placed.
+ */
+function distanceContext(
+  originZip: string | null,
+  originResolved: boolean,
+  filters: SearchFilters,
+): DistanceContext {
+  return {
+    originResolved: !!originZip && originResolved,
+    featuredRangeMiles: filters.distance ?? DEFAULT_FEATURED_RANGE_MILES,
+  };
 }
 
 // ── Partial matches ───────────────────────────────────────────
@@ -394,10 +428,12 @@ async function getPartialMatches(
     const raw = await runQuery(filters, gate, {
       skipLocation: true,
     });
-    const { cards: enriched } = await enrichWithLocation(raw, originZip);
+    const { cards: enriched, originResolved: partialResolved } =
+      await enrichWithLocation(raw, originZip);
     const ranked = rankCards(
       enriched.filter((n) => !excluded.has(n.user_id)),
       viewerCommPref,
+      distanceContext(originZip, partialResolved, filters),
     );
     stage1 = ranked.slice(0, limit);
     if (stage1.length >= limit) return stage1;
@@ -429,10 +465,12 @@ async function runRelaxedAvailability(
     skipLocation: true,
     skipAvailability: true,
   });
-  const { cards: enriched } = await enrichWithLocation(raw, originZip);
+  const { cards: enriched, originResolved: partialResolved } =
+    await enrichWithLocation(raw, originZip);
   const ranked = rankCards(
     enriched.filter((n) => !excluded.has(n.user_id)),
     viewerCommPref,
+    distanceContext(originZip, partialResolved, filters),
   );
   return ranked.slice(0, limit);
 }

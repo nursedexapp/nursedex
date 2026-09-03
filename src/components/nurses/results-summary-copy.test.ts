@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ORDER_SENTENCE, resultsSummary } from "./results-summary-copy";
+import { orderSentence, resultsSummary } from "./results-summary-copy";
 import type { SearchResult } from "@/lib/nurses/search";
 import type { NurseSearchCard } from "@/lib/nurses/card";
 
@@ -36,8 +36,14 @@ function card(id: string): NurseSearchCard {
   };
 }
 
-function result(items: number, totalFull: number, partials = 0): SearchResult {
+function result(
+  items: number,
+  totalFull: number,
+  partials = 0,
+  orderedByDistance = false,
+): SearchResult {
   return {
+    orderedByDistance,
     items: Array.from({ length: items }, (_, i) => card(`i${i}`)),
     partials: Array.from({ length: partials }, (_, i) => card(`p${i}`)),
     totalFull,
@@ -114,26 +120,25 @@ describe("the partials line", () => {
 });
 
 describe("the order caption", () => {
-  // The mockup's caption was "Most complete profiles first". Completeness is
-  // the LAST criterion, consulted only on an exact tie of everything above it.
-  it("does not claim completeness drives the order", () => {
-    expect(ORDER_SENTENCE.toLowerCase()).not.toContain("complete");
+  // The mockup's caption was "Most complete profiles first", which was a claim
+  // about an order the code did not use. Completeness genuinely is the second
+  // criterion now, so the caption may name it, but it still must not be
+  // described as what comes first.
+  it("names what actually comes first with no zip", () => {
+    expect(orderSentence(false)).toMatch(/^Featured nurses first/);
   });
 
-  it("names what actually comes first", () => {
-    expect(ORDER_SENTENCE).toMatch(/^Featured nurses first/);
+  it("names what actually comes first once a zip is placed", () => {
+    expect(orderSentence(true)).toMatch(/^The closest nurses first/);
+  });
+
+  it("never says completeness comes first", () => {
+    expect(orderSentence(false)).not.toMatch(/^Most complete/i);
+    expect(orderSentence(true)).not.toMatch(/^Most complete/i);
   });
 
   it("claims nothing that only applies to some viewers", () => {
-    expect(ORDER_SENTENCE).not.toContain("contacted");
-  });
-
-  it("is left off when there is nothing to order", () => {
-    expect(resultsSummary(result(1, 1)).order).toBeNull();
-    expect(resultsSummary(result(0, 0)).order).toBeNull();
-  });
-
-  it("is shown once there is more than one nurse", () => {
-    expect(resultsSummary(result(2, 2)).order).toBe(ORDER_SENTENCE);
+    expect(orderSentence(false)).not.toContain("contacted");
+    expect(orderSentence(true)).not.toContain("contacted");
   });
 });

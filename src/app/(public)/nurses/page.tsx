@@ -160,6 +160,7 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
                         key={nurse.user_id}
                         nurse={nurse}
                         showLastName={hasSub}
+                        distanceMeasured={result.orderedByDistance}
                         saveState={
                           showSaves
                             ? {
@@ -191,6 +192,7 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
                           nurse={nurse}
                           dimmed
                           showLastName={hasSub}
+                          distanceMeasured={result.orderedByDistance}
                           saveState={
                             showSaves
                               ? {

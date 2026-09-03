@@ -1,19 +1,28 @@
-import { RANKING_CRITERIA } from "@/lib/nurses/search-ranking";
+import {
+  RANKING_CRITERIA,
+  DISTANCE_RANKING_CRITERIA,
+} from "@/lib/nurses/search-ranking";
 import type { SearchResult } from "@/lib/nurses/search";
 
 /**
  * How the order is described to a family, built from the ranking module's own
  * criteria rather than restated beside them.
  *
- * Only the first two, and only the unconditional ones: the third criterion
- * applies only to a viewer who has told us how they prefer to be contacted, so
- * a sentence shown to everyone may not claim it. The mockup's "Most complete
- * profiles first" is the opposite of true, since completeness is last.
+ * Only the first two, and only the unconditional ones: one criterion applies
+ * only to a viewer who has told us how they prefer to be contacted, so a
+ * sentence shown to everyone may not claim it.
+ *
+ * Which order is described depends on whether the family gave a zip we could
+ * place. Saying "closest first" to somebody who gave no zip would be a claim
+ * about an order that was never used (#723).
  */
-export const ORDER_SENTENCE = (() => {
-  const [first, second] = RANKING_CRITERIA.filter((c) => !c.conditional);
+export function orderSentence(orderedByDistance: boolean): string {
+  const criteria = orderedByDistance
+    ? DISTANCE_RANKING_CRITERIA
+    : RANKING_CRITERIA;
+  const [first, second] = criteria.filter((c) => !c.conditional);
   return `${sentenceCase(first.phrase)} first, then ${second.phrase}.`;
-})();
+}
 
 function sentenceCase(phrase: string): string {
   return phrase.charAt(0).toUpperCase() + phrase.slice(1);
@@ -52,7 +61,7 @@ export function resultsSummary(result: SearchResult): ResultsSummaryCopy {
     headline,
     // The real order, not the mockup's caption. Only worth saying when there
     // is more than one nurse to order.
-    order: total > 1 ? ORDER_SENTENCE : null,
+    order: total > 1 ? orderSentence(result.orderedByDistance) : null,
     partials:
       partialCount > 0
         ? `Plus ${partialCount} ${nurses(partialCount)} who match some of your filters, below.`

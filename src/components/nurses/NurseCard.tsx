@@ -24,6 +24,13 @@ interface NurseCardProps {
   saveState?: { isSaved: boolean; inSavedOnlyView?: boolean };
   // Dim the card slightly to visually distinguish partial matches.
   dimmed?: boolean;
+  // Whether this search measured distances at all, which it does exactly when
+  // the family gave a zip we could place. It changes what a card with no
+  // distance says: nothing when nothing was measured, and that her location
+  // is not on file when everyone else got measured and she could not be
+  // (#723). False is the quiet default, so a call site that forgets it makes
+  // no claim rather than a wrong one.
+  distanceMeasured?: boolean;
   // Anon survey-results mode: hide last name, suppress save button, no profile link.
   anonymousMode?: boolean;
   // Reveal the nurse's last name. Only true for viewers entitled to see it
@@ -53,6 +60,7 @@ export function NurseCard({
   nurse,
   saveState,
   dimmed,
+  distanceMeasured = false,
   anonymousMode,
   interactive,
   showLastName,
@@ -64,7 +72,7 @@ export function NurseCard({
   const credential = credentialLine(nurse);
   const careType = careTypeLabel(nurse);
   const town = townLabel(nurse);
-  const distance = distanceLabel(nurse);
+  const distance = distanceLabel(nurse, { measured: distanceMeasured });
   const showUnavailable = !nurse.is_available;
 
   // Signed out cards arrive with these blanked in the data, so the footer is

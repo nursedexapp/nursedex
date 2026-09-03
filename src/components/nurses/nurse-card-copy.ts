@@ -75,15 +75,26 @@ export function careTypeLabel(nurse: NurseSearchCard): string | null {
 }
 
 /**
- * How far away, in words, or null when there is no distance to state.
+ * How far away, in words, or null when there is nothing to state.
  *
  * distance_miles is rounded, so 0 means "under half a mile", not "exactly
  * here". Printing "0 miles away" states something that is not true and reads
  * as a bug to anyone who sees it.
+ *
+ * `measured` says whether a distance was expected at all. Without it a card
+ * with no distance means two different things and reads the same either way:
+ * the family gave no zip, or this nurse cannot be placed. The second is real,
+ * and silent: three nurses on the roster live outside New York, and the zip
+ * lookup only holds New York, so they can never be measured. Under
+ * nearest-first they sort last for a reason the card should say out loud
+ * rather than leave as a blank space (#723).
  */
-export function distanceLabel(nurse: NurseSearchCard): string | null {
+export function distanceLabel(
+  nurse: NurseSearchCard,
+  { measured }: { measured: boolean } = { measured: false },
+): string | null {
   const miles = nurse.distance_miles;
-  if (miles === null) return null;
+  if (miles === null) return measured ? "Location not on file" : null;
   if (miles === 0) return "Less than a mile away";
   return `${miles} ${miles === 1 ? "mile" : "miles"} away`;
 }
