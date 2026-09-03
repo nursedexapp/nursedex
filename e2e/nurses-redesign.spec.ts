@@ -312,7 +312,9 @@ test.describe("the absent states", () => {
   test("but she is still reachable by her own link", async ({ page }) => {
     const response = await page.goto("/nurses/e2e-redesign-unlisted");
     expect(response?.status()).toBe(200);
-    await expect(page.getByText(/Nula/)).toBeVisible();
+    // Her name appears in several places on her own page, so assert the one
+    // that means the page rendered as hers rather than any mention of it.
+    await expect(page.getByRole("heading", { name: /Nula/ })).toBeVisible();
   });
 
   // The positive control for the absence above, in the same run: the nurse who
