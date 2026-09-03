@@ -172,10 +172,15 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
     (el) => getComputedStyle(el).objectPosition,
   );
 
+  // Clicked through the locator rather than at raw viewport coordinates: this
+  // control sits below a bio box and a photo, so it is usually off screen, and
+  // page.mouse.click does not scroll to anything. The position is relative to
+  // the element, low and to the left, nowhere near the upper-third default.
   const box = await framing.boundingBox();
   if (!box) throw new Error("The framing control rendered with no box to click.");
-  // Low and to the left, nowhere near the upper-third default.
-  await page.mouse.click(box.x + box.width * 0.25, box.y + box.height * 0.8);
+  await framing.click({
+    position: { x: box.width * 0.25, y: box.height * 0.8 },
+  });
 
   await expect
     .poll(async () =>
