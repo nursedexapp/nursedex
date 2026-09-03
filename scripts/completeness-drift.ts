@@ -69,6 +69,23 @@ export function summarise(drift: DriftRow[]): string {
   return lines.join("\n");
 }
 
+/**
+ * How many rows the server says there are, from a PostgREST content-range
+ * header, or null when it does not say or says something we cannot read.
+ *
+ * Returned as null rather than a number, and mapped to a refusal by the
+ * caller, because a value parsed straight into a comparison lands on the
+ * permissive side when the parse fails: NaN compares unequal to everything,
+ * and "*" or a missing header would otherwise become 0 and make an empty read
+ * look complete.
+ */
+export function parseReportedTotal(contentRange: string | null): number | null {
+  const total = contentRange?.split("/")[1];
+  if (!total || total === "*") return null;
+  const parsed = Number(total);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 async function main(): Promise<void> {
   const apply = process.argv.includes("--apply");
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -83,17 +100,44 @@ async function main(): Promise<void> {
   // Paged rather than one unbounded read: PostgREST caps a select at a page
   // and returns a healthy looking prefix, so an unbounded read would repair
   // the first page and silently leave the rest.
+  //
+  // A short page ends the loop, which is also what a truncated read looks
+  // like, so the total is checked against the count the server reports. A
+  // repair that quietly covered half the roster would report success and
+  // leave the other half wrong, which is the failure this whole script exists
+  // to find.
   const rows: ScoredRow[] = [];
   const pageSize = 500;
+  let reportedTotal: number | null = null;
   for (let from = 0; ; from += pageSize) {
     const res = await fetch(
       `${url}/rest/v1/nurse_profiles?select=user_id,profile_completeness,${encodeURIComponent(COMPLETENESS_COLUMNS)}`,
-      { headers: { ...headers, Range: `${from}-${from + pageSize - 1}` } },
+      {
+        headers: {
+          ...headers,
+          Range: `${from}-${from + pageSize - 1}`,
+          Prefer: "count=exact",
+        },
+      },
     );
     if (!res.ok) throw new Error(`Read failed: ${res.status} ${await res.text()}`);
+    if (reportedTotal === null) {
+      reportedTotal = parseReportedTotal(res.headers.get("content-range"));
+    }
     const page = (await res.json()) as ScoredRow[];
     rows.push(...page);
     if (page.length < pageSize) break;
+  }
+
+  if (reportedTotal === null) {
+    throw new Error(
+      "The server did not report how many profiles there are, so a short read could not be told from a complete one.",
+    );
+  }
+  if (rows.length !== reportedTotal) {
+    throw new Error(
+      `Read ${rows.length} profiles but the server reports ${reportedTotal}. Refusing to repair a partial roster.`,
+    );
   }
 
   const drift = rowsNeedingRepair(rows);

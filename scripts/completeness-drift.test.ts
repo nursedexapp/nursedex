@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { rowsNeedingRepair, summarise } from "./completeness-drift";
+import {
+  rowsNeedingRepair,
+  summarise,
+  parseReportedTotal,
+} from "./completeness-drift";
 import type { Skill, AvailabilityCommitment, TimeSlot } from "@/types/enums";
 
 /**
@@ -71,5 +75,28 @@ describe("summarise", () => {
 
   it("says plainly when there is no drift", () => {
     expect(summarise([])).toMatch(/no drift/i);
+  });
+});
+
+describe("parseReportedTotal", () => {
+  // The count is what tells a short read from a complete one, so an
+  // unreadable count must not become a number. Every one of these would
+  // otherwise land on the permissive side: NaN compares unequal to any row
+  // count and would pass, and a missing header becoming 0 would make an empty
+  // read look complete.
+  it("reads the total out of a content-range header", () => {
+    expect(parseReportedTotal("0-133/134")).toBe(134);
+  });
+
+  it("refuses a header that does not state a total", () => {
+    expect(parseReportedTotal("0-133/*")).toBeNull();
+  });
+
+  it("refuses a missing header", () => {
+    expect(parseReportedTotal(null)).toBeNull();
+  });
+
+  it("refuses a total that is not a number", () => {
+    expect(parseReportedTotal("0-133/lots")).toBeNull();
   });
 });
