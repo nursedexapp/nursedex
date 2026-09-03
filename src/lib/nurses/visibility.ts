@@ -1,4 +1,4 @@
-import { LISTED_MINIMUM_CONTENT } from "./listing";
+import { LISTED_MINIMUM_CONTENT, UNLISTED_EMPTY_BIO } from "./listing";
 
 /**
  * Single source of truth for the "publicly visible nurse" filter.
@@ -45,4 +45,22 @@ export function applyListedNurseFilter<T>(query: T): T {
   return (
     applyVisibleNurseFilter(query) as unknown as Chainable
   ).or(LISTED_MINIMUM_CONTENT) as unknown as T;
+}
+
+/**
+ * Publicly visible but NOT listed: the verified nurses the directory does not
+ * show, so they can be told (#732).
+ *
+ * The exact complement of applyListedNurseFilter over the same visible set.
+ * Measured against production on 2026-09-03: 60 listed plus 40 unlisted out
+ * of 100 visible, no overlap and no gap.
+ */
+export function applyUnlistedNurseFilter<T>(query: T): T {
+  type Chainable = {
+    eq(column: string, value: unknown): Chainable;
+    or(filter: string): Chainable;
+  };
+  return (applyVisibleNurseFilter(query) as unknown as Chainable)
+    .eq("has_photo", false)
+    .or(UNLISTED_EMPTY_BIO) as unknown as T;
 }

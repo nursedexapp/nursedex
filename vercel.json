@@ -49,6 +49,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/not-listed-nudge",
+      "schedule": "50 14 * * *"
+    },
+    {
       "path": "/api/cron/sentry-alerts",
       "schedule": "*/15 * * * *"
     }

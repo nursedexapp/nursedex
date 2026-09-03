@@ -15,7 +15,10 @@ import { sourceFilesUnder, normalise } from "../../../test/source-files";
  * somebody "consolidates" the two filters into one. Hence this list, and
  * hence the completeness check below it.
  */
-type FilterName = "applyListedNurseFilter" | "applyVisibleNurseFilter";
+type FilterName =
+  | "applyListedNurseFilter"
+  | "applyVisibleNurseFilter"
+  | "applyUnlistedNurseFilter";
 
 const SURFACES: Array<{ file: string; filter: FilterName; what: string }> = [
   {
@@ -27,6 +30,11 @@ const SURFACES: Array<{ file: string; filter: FilterName; what: string }> = [
     file: "src/app/sitemap.ts",
     filter: "applyListedNurseFilter",
     what: "the sitemap, which offers profiles to search engines",
+  },
+  {
+    file: "src/app/api/cron/not-listed-nudge/route.ts",
+    filter: "applyUnlistedNurseFilter",
+    what: "telling the nurses the directory does not show that it does not",
   },
   {
     file: "src/lib/nurses/saves.ts",
@@ -60,8 +68,11 @@ const SURFACES: Array<{ file: string; filter: FilterName; what: string }> = [
   },
 ];
 
+// What each surface must NOT also call. The listed and unlisted filters are
+// complements over the same set, so a surface calling both selects nobody.
 const OTHER: Record<FilterName, FilterName> = {
-  applyListedNurseFilter: "applyVisibleNurseFilter",
+  applyListedNurseFilter: "applyUnlistedNurseFilter",
+  applyUnlistedNurseFilter: "applyListedNurseFilter",
   applyVisibleNurseFilter: "applyListedNurseFilter",
 } as const;
 
@@ -85,7 +96,8 @@ describe("nurse visibility filter call sites", () => {
         const source = readFileSync(f, "utf8");
         return (
           source.includes("applyVisibleNurseFilter(") ||
-          source.includes("applyListedNurseFilter(")
+          source.includes("applyListedNurseFilter(") ||
+          source.includes("applyUnlistedNurseFilter(")
         );
       })
       .map(normalise)

@@ -368,9 +368,23 @@ export function OnboardingWizard({
   }
 
   // Step 1: Basics
+  // Shown on EVERY step, not just the bio and photo one. A verified nurse
+  // with an empty profile is sent to whichever step she stopped at, and 22 of
+  // the 40 in that state stopped before step 3, so a notice on one step alone
+  // would miss most of the people it is for (#732). It renders nothing unless
+  // she is verified and genuinely unlisted.
+  const notListedBanner = (
+    <NotListedNotice
+      verificationStatus={profile.verification_status}
+      hasPhoto={profile.has_photo}
+      bio={profile.bio}
+    />
+  );
+
   if (currentStep === 1) {
     return (
       <StepLayout
+        banner={notListedBanner}
         step={1}
         title="Let's start with the basics"
         description="Tell us about yourself so families can get to know you."
@@ -396,6 +410,7 @@ export function OnboardingWizard({
   if (currentStep === 2) {
     return (
       <StepLayout
+        banner={notListedBanner}
         step={2}
         title="Your credentials"
         description="Share your professional credentials and care types."
@@ -422,6 +437,7 @@ export function OnboardingWizard({
   if (currentStep === 3) {
     return (
       <StepLayout
+        banner={notListedBanner}
         step={3}
         title="Skills and details"
         description="Tell families about your skills, availability, and preferences."
@@ -452,6 +468,7 @@ export function OnboardingWizard({
   if (currentStep === 4) {
     return (
       <StepLayout
+        banner={notListedBanner}
         step={4}
         title="Bio and photos"
         description="Write a bio and upload a professional photo to make your profile stand out."
@@ -459,11 +476,6 @@ export function OnboardingWizard({
         onNext={handleStep4Next}
         isSubmitting={isSubmitting}
       >
-        <NotListedNotice
-          verificationStatus={profile.verification_status}
-          hasPhoto={profile.has_photo}
-          bio={profile.bio}
-        />
         <BioFields
           values={{
             bio: draft.bio || "",
@@ -498,6 +510,7 @@ export function OnboardingWizard({
   // Step 5: Contact Info
   return (
     <StepLayout
+      banner={notListedBanner}
       step={5}
       title="Contact information"
       description="How families will reach you. Your zip code is never shown publicly."

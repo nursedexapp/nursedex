@@ -39,7 +39,7 @@ function expectClean(code) {
 const IMPORTS = `
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
-import { applyVisibleNurseFilter, applyListedNurseFilter } from "@/lib/nurses/visibility";
+import { applyVisibleNurseFilter, applyListedNurseFilter, applyUnlistedNurseFilter } from "@/lib/nurses/visibility";
 `;
 
 describe("require-visible-nurse-filter", () => {
@@ -70,6 +70,22 @@ describe("require-visible-nurse-filter", () => {
   // condition (#732), so a read routed through it satisfies this rule. Without
   // this the directory and the sitemap, the two surfaces the rule exists to
   // protect, are the ones it refuses.
+  // applyUnlistedNurseFilter is the complement of the listed one over the same
+  // visible set, so it applies all four conditions too. Without this the nudge
+  // cron, whose whole job is reading that set, is the one read the rule
+  // refuses.
+  it("accepts a query wrapped in applyUnlistedNurseFilter", () => {
+    expectClean(`${IMPORTS}
+      async function load() {
+        const supabase = createServiceRoleClient();
+        const { data } = await applyUnlistedNurseFilter(
+          supabase.from("nurse_profiles").select("user_id"),
+        );
+        return data;
+      }
+    `);
+  });
+
   it("accepts a query wrapped in applyListedNurseFilter", () => {
     expectClean(`${IMPORTS}
       async function load() {

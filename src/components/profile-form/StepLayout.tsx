@@ -22,6 +22,13 @@ interface StepLayoutProps {
   nextLabel?: string;
   nextDisabled?: boolean;
   isSubmitting?: boolean;
+  /**
+   * Shown above the step's own fields, on every step. Used to tell a verified
+   * nurse that families cannot see her yet (#732): she is sent to whichever
+   * step she stopped at, so a message on one step alone reaches only the
+   * nurses who happened to stop there.
+   */
+  banner?: React.ReactNode;
 }
 
 export function StepLayout({
@@ -34,6 +41,7 @@ export function StepLayout({
   nextLabel = "Continue",
   nextDisabled = false,
   isSubmitting = false,
+  banner,
 }: StepLayoutProps) {
   return (
     <div className="mx-auto w-full max-w-2xl">
@@ -117,6 +125,8 @@ export function StepLayout({
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">{description}</p>
       </div>
+
+      {banner}
 
       {/* Step content */}
       <div className="space-y-6">{children}</div>
