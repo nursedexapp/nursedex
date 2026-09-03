@@ -73,6 +73,29 @@ const SURFACES: Array<{ file: string; filter: FilterName; what: string }> = [
   },
 ];
 
+/**
+ * The surfaces that read EVERY filter, on purpose.
+ *
+ * The "uses only that one" rule below exists because the listed and unlisted
+ * filters are complements, so applying both to ONE query selects nobody. A
+ * surface that MEASURES the partition rather than selecting from it applies
+ * each to its own separate query, which the rule cannot tell apart by reading
+ * the file.
+ *
+ * The behaviour is guarded where it can actually be seen: coverage.test.ts
+ * asserts four separate count queries, each carrying its own predicate, so a
+ * pair landing on one query fails there rather than here.
+ *
+ * Entry here requires calling all three, so this cannot become the place a
+ * surface reading two of them goes to escape the rule.
+ */
+const MEASUREMENT_SURFACES: Array<{ file: string; what: string }> = [
+  {
+    file: "src/lib/nurses/coverage.ts",
+    what: "the admin directory coverage panel, which counts verified, listed and unlisted so the gap between them is visible (#939)",
+  },
+];
+
 // What each surface must NOT also call. The listed and unlisted filters are
 // complements over the same set, so a surface calling both selects nobody.
 const OTHER: Record<FilterName, FilterName> = {
@@ -92,6 +115,20 @@ describe("nurse visibility filter call sites", () => {
     expect(source).not.toContain(`${OTHER[filter]}(`);
   });
 
+  it.each(MEASUREMENT_SURFACES)(
+    "$file reads every filter because it measures $what",
+    ({ file }) => {
+      const source = readFileSync(file, "utf8");
+      for (const filter of [
+        "applyVisibleNurseFilter",
+        "applyListedNurseFilter",
+        "applyUnlistedNurseFilter",
+      ]) {
+        expect(source).toContain(`${filter}(`);
+      }
+    },
+  );
+
   // A hand-written list is exempt from its own rule the moment a ninth
   // surface is added, and then reports green while blind to it.
   it("knows about every surface that reads either filter", () => {
@@ -107,6 +144,10 @@ describe("nurse visibility filter call sites", () => {
       })
       .map(normalise)
       .filter((f) => f !== "src/lib/nurses/visibility.ts");
-    expect(found.sort()).toEqual(SURFACES.map((s) => s.file).sort());
+    const known = [
+      ...SURFACES.map((s) => s.file),
+      ...MEASUREMENT_SURFACES.map((s) => s.file),
+    ];
+    expect(found.sort()).toEqual(known.sort());
   });
 });

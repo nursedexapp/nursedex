@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ShieldCheck, MessageSquare, Flag, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAdminCounts } from "@/lib/admin/queries";
+import { getDirectoryCoverage } from "@/lib/nurses/coverage";
+import { DirectoryCoverage } from "./DirectoryCoverage";
 
 export const metadata: Metadata = {
   title: "Admin | NurseDex",
@@ -10,7 +12,10 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminDashboardPage() {
-  const counts = await getAdminCounts();
+  const [counts, coverage] = await Promise.all([
+    getAdminCounts(),
+    getDirectoryCoverage(),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-5xl p-6 sm:p-8">
@@ -49,6 +54,8 @@ export default async function AdminDashboardPage() {
           count={counts.removalRequests}
         />
       </div>
+
+      <DirectoryCoverage coverage={coverage} />
     </div>
   );
 }
