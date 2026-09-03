@@ -137,6 +137,22 @@ describe("approving a verification", () => {
       screen.getByRole("button", { name: /approve verification/i }),
     ).toBeEnabled();
   });
+
+  it("says which step is missing when the profile is unfinished", async () => {
+    // "Please try again" would name an action that cannot fix this: trying
+    // again refuses again, because only the nurse can finish her profile
+    // (#912). So this failure gets its own sentence.
+    vi.mocked(approveVerification).mockResolvedValue({
+      success: false,
+      error: "incomplete",
+      missingStep: "Credentials",
+    });
+    await clickApprove();
+
+    const said = vi.mocked(toast.error).mock.calls.at(-1)?.[0];
+    expect(said).toContain("Credentials");
+    expect(said).not.toContain("try again");
+  });
 });
 
 describe("rejecting a verification", () => {

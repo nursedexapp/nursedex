@@ -12,6 +12,19 @@ export const ONBOARDING_GATED_PAGES = [
   "src/app/(dashboard)/dashboard/preview/page.tsx",
 ] as const;
 
+/**
+ * What each step is called when a person has to be told which one is missing
+ * (the admin verification queue, #912). The wizard's own STEP_NAMES are
+ * analytics slugs, so they are not reused here.
+ */
+export const ONBOARDING_STEP_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
+  1: "Basics",
+  2: "Credentials",
+  3: "Skills and details",
+  4: "Bio and photos",
+  5: "Contact",
+};
+
 export type OnboardingStatus =
   | { complete: true }
   | { complete: false; nextStep: 1 | 2 | 3 | 4 | 5 };

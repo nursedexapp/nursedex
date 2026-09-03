@@ -17,11 +17,30 @@ const h = vi.hoisted(() => {
     // Rows the pre-flight SELECT still returns (kept: it is what produces
     // not_found and gives us the email address). The race is decided by whether
     // the guarded UPDATE matches, which is what `updateMatches` controls.
+    // A profile that MEETS the onboarding floor, because approveVerification
+    // refuses below it (#912) and would then never reach the race these tests
+    // are about. Its shape is the floor's, not this test's subject.
     profile: {
       user_id: "nurse-1",
       slug: "jane-rn",
       verification_status: "pending",
-      users: { first_name: "Jane", email: "jane@example.com" },
+      years_experience: 8,
+      languages: ["English"],
+      credential: "rn",
+      license_number: "RN-1",
+      care_types: ["elderly"],
+      skills: ["medication_management"],
+      availability_commitment: ["part_time"],
+      time_slots: ["weekdays"],
+      bio: "Eight years on a ward.",
+      photos: ["photo-1.jpg"],
+      travel_radius_miles: 10,
+      users: {
+        first_name: "Jane",
+        last_name: "Doe",
+        email: "jane@example.com",
+        zip_code: "11201",
+      },
     } as Record<string, unknown> | null,
     review: {
       id: "rev-1",
