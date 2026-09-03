@@ -70,7 +70,11 @@ vi.mock("./slug", () => ({
   claimSlug: vi.fn(),
   saveSlugRedirect: vi.fn(),
 }));
-vi.mock("./completeness", () => ({
+vi.mock("./completeness", async (importOriginal) => ({
+  // Only the scoring is stubbed. The column list stays real, so a field added
+  // to the score without being added to that list still breaks here rather
+  // than being silently absent from what these callers read.
+  ...(await importOriginal<typeof import("./completeness")>()),
   calculateCompleteness: () => ({ score: 50 }),
 }));
 vi.mock("./upsell", () => ({
@@ -78,7 +82,12 @@ vi.mock("./upsell", () => ({
   markUpsellShown: vi.fn(),
 }));
 
-import { updateNurseProfile, saveOnboardingStep, softDeleteAccount } from "./actions";
+import {
+  updateNurseProfile,
+  saveOnboardingStep,
+  softDeleteAccount,
+  deletePhoto,
+} from "./actions";
 
 // A complete, schema-valid payload (matches what the edit form sends after
 // fullProfileSchema validation). Names and credential match the existing slug
@@ -208,5 +217,73 @@ describe("softDeleteAccount", () => {
       expect.anything(),
       "nurse-1",
     );
+  });
+});
+
+describe("deletePhoto", () => {
+  // A photo is worth 15 points, the largest single weight in the score, and
+  // search ranks on the STORED score while the nurse's own dashboard computes
+  // it live. Without recomputing here, a nurse who removes her last photo
+  // keeps credit for it in search until the next time she saves the main
+  // form, which may be never, and the two screens disagree about her (#727).
+  beforeEach(() => {
+    h.state.singles = [];
+    h.calls.profileUpdates.length = 0;
+  });
+
+  it("writes a freshly computed score alongside the photo change", async () => {
+    h.state.singles = [
+      {
+        photos: ["a.jpg", "b.jpg"],
+        bio: "A bio",
+        skills: [],
+        care_philosophy: null,
+        availability_commitment: [],
+        time_slots: [],
+        rate_min: null,
+        rate_max: null,
+        has_transportation: false,
+        covid_vaccinated: null,
+        travel_radius_miles: null,
+      },
+    ];
+
+    await deletePhoto("a.jpg");
+
+    expect(h.calls.profileUpdates).toHaveLength(1);
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      photos: ["b.jpg"],
+      has_photo: true,
+      profile_completeness: 50,
+    });
+  });
+
+  it("records that the last photo is gone in the same write", async () => {
+    h.state.singles = [
+      {
+        photos: ["only.jpg"],
+        bio: null,
+        skills: [],
+        care_philosophy: null,
+        availability_commitment: [],
+        time_slots: [],
+        rate_min: null,
+        rate_max: null,
+        has_transportation: false,
+        covid_vaccinated: null,
+        travel_radius_miles: null,
+      },
+    ];
+
+    await deletePhoto("only.jpg");
+
+    // One write, not two: a second round trip would leave a window where the
+    // photo is gone and the score still counts it.
+    expect(h.calls.profileUpdates).toHaveLength(1);
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      photos: [],
+      has_photo: false,
+      profile_completeness: 50,
+    });
   });
 });
