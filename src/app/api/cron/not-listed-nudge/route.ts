@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
 import { shouldSendOnce } from "@/lib/cron/email-log";
@@ -112,8 +113,23 @@ const handleNotListedNudge = withCronAlerting(
     }
 
     if (failed > 0) {
-      console.error(
-        `[cron not-listed-nudge] ${failed} of ${rows.length} nudges did not go out; their claims were released for the next run.`,
+      // A console line is not monitoring. withCronAlerting reports a throw or
+      // a non-2xx and nothing else, so a 200 carrying a failure count would
+      // reach nobody, every day, for as long as it lasted.
+      Sentry.captureMessage(
+        `[not-listed-nudge] ${failed} of ${failed + sent} nudges did not go out; their claims were released for the next run.`,
+        "warning",
+      );
+    }
+
+    // Every attempt failing is an outage rather than a bad address: answer
+    // non-2xx so the cron alerting fires and no heartbeat is written for a run
+    // that told nobody. A run that mostly worked keeps its 200, because
+    // discarding the heartbeat would report the whole job as dead.
+    if (sent === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every nudge failed to send", sent, skipped, failed },
+        { status: 500 },
       );
     }
 

@@ -29,6 +29,7 @@ const h = vi.hoisted(() => {
     shouldSendOnce: vi.fn(async () => true),
     sendNotListedNudgeEmail: vi.fn(async () => true),
     releaseClaim: vi.fn(async (_dedupKey: unknown) => {}),
+    captureMessage: vi.fn(),
     client: {
       from: (table: string) =>
         table === "email_log"
@@ -53,6 +54,7 @@ const h = vi.hoisted(() => {
 vi.mock("@/lib/cron/alerting", () => ({
   withCronAlerting: (_n: string, handler: unknown) => handler,
 }));
+vi.mock("@sentry/nextjs", () => ({ captureMessage: h.captureMessage }));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client,
 }));
@@ -163,6 +165,35 @@ describe("the not-listed nudge, switched on", () => {
 
     expect(h.releaseClaim).toHaveBeenCalledWith("v1");
     expect(body).toMatchObject({ sent: 0, failed: 1 });
+  });
+
+  it("calls a run where every send failed a failed run", async () => {
+    // withCronAlerting only alerts on a throw or a non-2xx. A 200 carrying a
+    // failure count reaches nobody, so a provider refusing every send would
+    // log quietly every day and never be noticed.
+    h.state.nurses = { data: [nurse("a"), nurse("b")], error: null };
+    h.sendNotListedNudgeEmail.mockResolvedValue(false);
+
+    const res = await GET(req());
+
+    expect(res.status).toBe(500);
+  });
+
+  it("still counts a run that mostly worked as done", async () => {
+    // One failure among several is not an outage, and answering 500 would
+    // discard the heartbeat for a run that did most of its work.
+    h.state.nurses = { data: [nurse("a"), nurse("b")], error: null };
+    h.sendNotListedNudgeEmail
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    const res = await GET(req());
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({ sent: 1, failed: 1 });
+    // It still has to reach monitoring rather than only the log.
+    expect(h.captureMessage).toHaveBeenCalled();
   });
 
   it("refuses rather than emailing when it cannot read the roster", async () => {
