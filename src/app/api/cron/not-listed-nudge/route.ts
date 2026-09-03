@@ -17,10 +17,11 @@ const DEDUP_KEY = "v1";
 /**
  * Tells a verified nurse whose profile is empty that families cannot see her.
  *
- * She is verified but not in the directory, because there is no photo and no
- * bio on her profile (#732). The in-product version of this message sits on
- * the bio and photo step of the sign-up wizard, which only reaches her if she
- * comes back on her own. 27 of the 40 in this state signed up before July.
+ * She is verified but not in the directory, because her profile is missing
+ * content (a photo or a bio) or a care type (#732, #940). The email names
+ * whichever it is. The in-product version of this message sits on every step
+ * of the sign-up wizard, which only reaches her if she comes back on her own.
+ * 27 of the 40 in this state signed up before July.
  *
  * Safe to run daily: the email_log dedup keeps a nurse from getting it more
  * than once, and she stops matching the query the moment she adds either
