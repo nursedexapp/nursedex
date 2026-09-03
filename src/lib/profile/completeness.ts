@@ -7,25 +7,43 @@ interface CompletenessResult {
 }
 
 /**
+ * Every profile field the score is computed from, named once.
+ *
+ * The type below is derived from this list, so a field added to the scoring
+ * without being added here is a compile error rather than a column some
+ * caller forgets to read. That mattered: search ranks on the STORED score, so
+ * a caller that recomputes from a partial row would quietly write a lower
+ * score than the nurse has earned (#727).
+ */
+export const COMPLETENESS_FIELDS = [
+  "photos",
+  "bio",
+  "skills",
+  "care_philosophy",
+  "availability_commitment",
+  "time_slots",
+  "rate_min",
+  "rate_max",
+  "has_transportation",
+  "covid_vaccinated",
+  "travel_radius_miles",
+] as const;
+
+/** The same list as a PostgREST select, for callers that read a row to score it. */
+export const COMPLETENESS_COLUMNS = COMPLETENESS_FIELDS.join(", ");
+
+export type CompletenessInput = Pick<
+  NurseProfile,
+  (typeof COMPLETENESS_FIELDS)[number]
+>;
+
+/**
  * Calculate profile completeness from 0-100 based on optional fields.
  * Required fields (name, credential, license, care types, contact) are
  * not counted here since the onboarding wizard enforces them.
  */
 export function calculateCompleteness(
-  profile: Pick<
-    NurseProfile,
-    | "photos"
-    | "bio"
-    | "skills"
-    | "care_philosophy"
-    | "availability_commitment"
-    | "time_slots"
-    | "rate_min"
-    | "rate_max"
-    | "has_transportation"
-    | "covid_vaccinated"
-    | "travel_radius_miles"
-  >,
+  profile: CompletenessInput,
 ): CompletenessResult {
   // additional_certs and languages_extra credit automatically: every nurse provides
   // their credential and at least one language during onboarding, so flagging them

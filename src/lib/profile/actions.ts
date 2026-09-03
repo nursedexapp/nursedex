@@ -16,7 +16,11 @@ import {
   fullProfileSchema,
 } from "@/lib/schemas/profile";
 import type { ZodError } from "zod";
-import { calculateCompleteness } from "./completeness";
+import {
+  calculateCompleteness,
+  COMPLETENESS_COLUMNS,
+  type CompletenessInput,
+} from "./completeness";
 import { claimSlug, saveSlugRedirect } from "./slug";
 import {
   getSignedUploadUrl as _getSignedUploadUrl,
@@ -497,6 +501,11 @@ export async function updateNurseProfile(
   // Recalculate completeness + read the upsell-gate fields in one round trip
   const { data: updatedProfile } = await supabase
     .from("nurse_profiles")
+    // Written out rather than composed from COMPLETENESS_COLUMNS: the Supabase
+    // client parses this string at the TYPE level to give the row its shape,
+    // and a template literal defeats that, costing the type safety on every
+    // field below. completeness-columns.test.ts holds it to the same list
+    // instead.
     .select(
       "photos, bio, skills, care_philosophy, availability_commitment, time_slots, rate_min, rate_max, has_transportation, covid_vaccinated, additional_certs, travel_radius_miles, languages, tier, verification_status, save_count_for_upsell, last_upsell_shown_at",
     )
@@ -598,20 +607,33 @@ export async function deletePhoto(path: string): Promise<ProfileActionResult> {
   // Remove from storage
   await removePhoto(path);
 
-  // Remove from profile's photos array
+  // Remove from profile's photos array.
+  //
+  // The whole scored row is read, not just the photos, so the completeness
+  // score can be rewritten in the SAME update. A photo is the largest single
+  // weight in that score, search ranks on the stored value, and the nurse's
+  // own dashboard computes it live, so leaving it behind here means she keeps
+  // credit in search for a photo she no longer has and the two screens
+  // disagree about her (#727). One write rather than two, because a second
+  // round trip leaves a window where the photo is gone and the score counts it.
   const { data: profile } = await supabase
     .from("nurse_profiles")
-    .select("photos")
+    .select(COMPLETENESS_COLUMNS)
     .eq("user_id", user.id)
-    .single();
+    .single<CompletenessInput>();
 
   if (profile) {
     const updatedPhotos = profile.photos.filter((p: string) => p !== path);
+    const { score } = calculateCompleteness({
+      ...profile,
+      photos: updatedPhotos,
+    });
     await supabase
       .from("nurse_profiles")
       .update({
         photos: updatedPhotos,
         has_photo: updatedPhotos.length > 0,
+        profile_completeness: score,
       })
       .eq("user_id", user.id);
   }

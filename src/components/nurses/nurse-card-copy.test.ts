@@ -223,3 +223,28 @@ describe("distanceLabel", () => {
     );
   });
 });
+
+describe("distanceLabel when a zip was given", () => {
+  // A card with no distance means two different things, and they must not
+  // read the same. Either the family gave no zip, so nothing was measured and
+  // the card should say nothing, or she genuinely cannot be placed, which is
+  // the case for the three nurses on the roster whose zip is outside New York
+  // and so is not in the lookup table at all (#723).
+  it("says the location is not on file when she cannot be placed", () => {
+    expect(
+      distanceLabel(nurse({ distance_miles: null }), { measured: true }),
+    ).toMatch(/not on file/i);
+  });
+
+  it("says nothing when no zip was given to measure from", () => {
+    expect(
+      distanceLabel(nurse({ distance_miles: null }), { measured: false }),
+    ).toBeNull();
+  });
+
+  it("still states a real distance", () => {
+    expect(
+      distanceLabel(nurse({ distance_miles: 4 }), { measured: true }),
+    ).toBe("4 miles away");
+  });
+});
