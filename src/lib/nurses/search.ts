@@ -1,6 +1,9 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { applyListedNurseFilter } from "./visibility";
+import {
+  applyListedNurseFilter,
+  applyAvailabilityFilter,
+} from "./visibility";
 import { SEARCH } from "@/lib/constants";
 import {
   GENDER_FILTER_ANY,
@@ -229,18 +232,12 @@ async function runQuery(
     query = query.in("user_id", [...opts.savedIds]);
   }
 
-  // Availability visibility:
-  // - unavailable_visibility='hidden' → NEVER in search.
-  // - is_available=true → always included.
-  // - is_available=false + 'badge' → only when show_unavailable=true
-  //   (or when availability relaxation is in effect).
-  if (opts.skipAvailability || filters.show_unavailable) {
-    query = query.or(
-      "is_available.eq.true,and(is_available.eq.false,unavailable_visibility.eq.badge)",
-    );
-  } else {
-    query = query.eq("is_available", true);
-  }
+  // Availability visibility, shared with the facet counts behind the filter
+  // panel so the two cannot disagree about who the directory can return
+  // (#766). The rule itself is documented on applyAvailabilityFilter.
+  query = applyAvailabilityFilter(query, {
+    relaxed: !!opts.skipAvailability || filters.show_unavailable,
+  });
 
   // Scalar filters
   if (filters.credential) {

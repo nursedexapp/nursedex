@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useId, useTransition } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,20 +8,9 @@ import { cn } from "@/lib/utils";
 import { DebouncedFilterInput, parseFilterInt } from "./DebouncedFilterInput";
 import { useApplyFilters } from "./useApplyFilters";
 import { nativeSelectCls } from "./native-select";
-import {
-  CREDENTIAL_LABELS,
-  CARE_TYPE_LABELS,
-  SKILL_LABELS,
-  GENDER_LABELS,
-  AVAILABILITY_COMMITMENT_LABELS,
-  TIME_SLOT_LABELS,
-  Credential,
-  CareType,
-  Skill,
-  Gender,
-  AvailabilityCommitment,
-  TimeSlot,
-} from "@/types/enums";
+import { Credential, CareType, Gender } from "@/types/enums";
+import type { DirectoryFacets, FacetOption } from "@/lib/nurses/facets";
+import { facetOptionLabel } from "@/lib/nurses/facet-labels";
 import {
   GENDER_FILTER_ANY,
   type SearchFilters,
@@ -29,30 +18,34 @@ import {
 } from "@/lib/nurses/search-params";
 
 const DISTANCE_OPTIONS = [5, 10, 25, 50, 100] as const;
-const FILTER_LANGUAGES = [
-  "English",
-  "Spanish",
-  "Italian",
-  "Mandarin",
-  "Russian",
-  "Haitian Creole",
-  "Polish",
-  "Portuguese",
-];
+
+// The ceiling the box accepts when we could not count the directory. Every
+// listed nurse has a years_experience, so with facets the real maximum is
+// used instead and asking for more than the most experienced nurse is not
+// offered at all.
+const EXPERIENCE_FALLBACK_MAX = 70;
 
 interface FilterPanelProps {
   initialFilters: SearchFilters;
+  /**
+   * What the directory can actually be filtered by, counted from the nurses
+   * in it (#766). `null` means the count could not be read: the panel says so
+   * rather than rendering every section empty, which would read as a
+   * directory holding nobody (#780).
+   */
+  facets: DirectoryFacets | null;
   // Called after each URL change. Used by the mobile sheet to auto-close.
   onAfterChange?: () => void;
 }
 
-
 export function FilterPanel({
   initialFilters,
+  facets,
   onAfterChange,
 }: FilterPanelProps) {
   const [isPending, startTransition] = useTransition();
   const { apply: applyToUrl, clearAll: clearAllInUrl } = useApplyFilters();
+  const idPrefix = useId();
 
   // Merges over the URL as it stands at the moment of the click, not over
   // initialFilters, which is a prop from the last completed server render.
@@ -77,6 +70,12 @@ export function FilterPanel({
       ? current.filter((v) => v !== value)
       : [...current, value];
 
+  // A specific gender excludes prefer_not_to_say, so it is not offered as a
+  // choice even when nurses have selected it (the existing product decision;
+  // "Any" still includes them).
+  const genderOptions =
+    facets?.gender.filter((o) => o.value !== Gender.PREFER_NOT_TO_SAY) ?? [];
+
   return (
     <div className={cn("space-y-6 text-sm", isPending && "opacity-70")}>
       <div className="flex items-center justify-between">
@@ -92,115 +91,111 @@ export function FilterPanel({
         </button>
       </div>
 
+      {facets === null && (
+        <p className="text-soft-black-light text-sm">
+          We could not load the filter options just now. You can still search
+          by location, rate and experience, or try again in a moment.
+        </p>
+      )}
+
       {/* Credential */}
-      <FilterSection label="Credential">
-        <select
-          className={nativeSelectCls}
-          value={initialFilters.credential ?? ""}
-          onChange={(e) =>
-            apply({
-              credential: e.target.value
-                ? (e.target.value as Credential)
-                : undefined,
-            })
-          }
-        >
-          <option value="">Any credential</option>
-          {Object.values(Credential).map((c) => (
-            <option key={c} value={c}>
-              {CREDENTIAL_LABELS[c]}
-            </option>
-          ))}
-        </select>
-      </FilterSection>
-
-      {/* Care type */}
-      <FilterSection label="Care type">
-        <select
-          className={nativeSelectCls}
-          value={initialFilters.care_type ?? ""}
-          onChange={(e) =>
-            apply({
-              care_type: e.target.value
-                ? (e.target.value as CareType)
-                : undefined,
-            })
-          }
-        >
-          <option value="">Any care type</option>
-          {Object.values(CareType).map((c) => (
-            <option key={c} value={c}>
-              {CARE_TYPE_LABELS[c]}
-            </option>
-          ))}
-        </select>
-      </FilterSection>
-
-      {/* Skills */}
-      <FilterSection label="Skills">
-        <div className="grid gap-1.5">
-          {Object.values(Skill).map((s) => {
-            const checked = initialFilters.skills.includes(s);
-            return (
-              <label
-                key={s}
-                className="text-soft-black-light flex cursor-pointer items-center gap-2 text-sm"
-              >
-                <Checkbox
-                  checked={checked}
-                  onCheckedChange={() =>
-                    apply({ skills: toggleArray(initialFilters.skills, s) })
-                  }
-                />
-                {SKILL_LABELS[s]}
-              </label>
-            );
-          })}
-        </div>
-      </FilterSection>
-
-      {/* Languages */}
-      <FilterSection label="Languages">
-        <div className="grid gap-1.5">
-          {FILTER_LANGUAGES.map((lang) => {
-            const checked = initialFilters.languages.includes(lang);
-            return (
-              <label
-                key={lang}
-                className="text-soft-black-light flex cursor-pointer items-center gap-2 text-sm"
-              >
-                <Checkbox
-                  checked={checked}
-                  onCheckedChange={() =>
-                    apply({
-                      languages: toggleArray(initialFilters.languages, lang),
-                    })
-                  }
-                />
-                {lang}
-              </label>
-            );
-          })}
-        </div>
-      </FilterSection>
-
-      {/* Gender */}
-      <FilterSection label="Gender">
-        <select
-          className={nativeSelectCls}
-          value={initialFilters.gender}
-          onChange={(e) => apply({ gender: e.target.value as GenderFilter })}
-        >
-          <option value={GENDER_FILTER_ANY}>Any</option>
-          {Object.values(Gender)
-            .filter((g) => g !== Gender.PREFER_NOT_TO_SAY)
-            .map((g) => (
-              <option key={g} value={g}>
-                {GENDER_LABELS[g]}
+      {facets && facets.credential.length > 0 && (
+        <FilterSection label="Credential">
+          <select
+            className={nativeSelectCls}
+            value={initialFilters.credential ?? ""}
+            onChange={(e) =>
+              apply({
+                credential: e.target.value
+                  ? (e.target.value as Credential)
+                  : undefined,
+              })
+            }
+          >
+            <option value="">Any credential</option>
+            {facets.credential.map((o) => (
+              <option key={o.value} value={o.value}>
+                {facetOptionLabel("credential", o)}
               </option>
             ))}
-        </select>
-      </FilterSection>
+          </select>
+        </FilterSection>
+      )}
+
+      {/* Care type */}
+      {facets && facets.care_types.length > 0 && (
+        <FilterSection label="Care type">
+          <select
+            className={nativeSelectCls}
+            value={initialFilters.care_type ?? ""}
+            onChange={(e) =>
+              apply({
+                care_type: e.target.value
+                  ? (e.target.value as CareType)
+                  : undefined,
+              })
+            }
+          >
+            <option value="">Any care type</option>
+            {facets.care_types.map((o) => (
+              <option key={o.value} value={o.value}>
+                {facetOptionLabel("care_types", o)}
+              </option>
+            ))}
+          </select>
+        </FilterSection>
+      )}
+
+      {/* Skills */}
+      {facets && facets.skills.length > 0 && (
+        <CheckboxFacet
+          idPrefix={idPrefix}
+          facet="skills"
+          label="Skills"
+          options={facets.skills}
+          selected={initialFilters.skills}
+          onToggle={(value) =>
+            apply({
+              skills: toggleArray(
+                initialFilters.skills,
+                value as SearchFilters["skills"][number],
+              ),
+            })
+          }
+        />
+      )}
+
+      {/* Languages */}
+      {facets && facets.languages.length > 0 && (
+        <CheckboxFacet
+          idPrefix={idPrefix}
+          facet="languages"
+          label="Languages"
+          options={facets.languages}
+          selected={initialFilters.languages}
+          onToggle={(value) =>
+            apply({ languages: toggleArray(initialFilters.languages, value) })
+          }
+        />
+      )}
+
+      {/* Gender */}
+      {genderOptions.length > 0 && (
+        <FilterSection label="Gender">
+          <select
+            className={nativeSelectCls}
+            value={initialFilters.gender}
+            onChange={(e) => apply({ gender: e.target.value as GenderFilter })}
+          >
+            <option value={GENDER_FILTER_ANY}>Any</option>
+            {genderOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {facetOptionLabel("gender", o)}
+              </option>
+            ))}
+          </select>
+        </FilterSection>
+      )}
 
       {/* Rate max */}
       <FilterSection label="Max hourly rate ($)">
@@ -217,6 +212,13 @@ export function FilterPanel({
           placeholder="e.g. 40"
           onCommit={(raw) => apply({ rate_max: parseFilterInt(raw) })}
         />
+        {facets?.rate && (
+          // A hint, deliberately not a bound. A nurse who states no minimum
+          // rate matches every budget, so a lower number is not a dead end.
+          <p className="text-soft-black-light text-xs">
+            Nurses here list ${facets.rate.min} to ${facets.rate.max} an hour.
+          </p>
+        )}
       </FilterSection>
 
       {/* Experience min */}
@@ -225,7 +227,7 @@ export function FilterPanel({
           type="number"
           inputMode="numeric"
           min={0}
-          max={70}
+          max={facets?.experience?.max ?? EXPERIENCE_FALLBACK_MAX}
           step={1}
           value={
             initialFilters.experience_min !== undefined
@@ -300,57 +302,42 @@ export function FilterPanel({
       </FilterSection>
 
       {/* Availability commitment */}
-      <FilterSection label="Availability">
-        <div className="grid gap-1.5">
-          {Object.values(AvailabilityCommitment).map((v) => {
-            const checked = initialFilters.availability_commitment.includes(v);
-            return (
-              <label
-                key={v}
-                className="text-soft-black-light flex cursor-pointer items-center gap-2 text-sm"
-              >
-                <Checkbox
-                  checked={checked}
-                  onCheckedChange={() =>
-                    apply({
-                      availability_commitment: toggleArray(
-                        initialFilters.availability_commitment,
-                        v,
-                      ),
-                    })
-                  }
-                />
-                {AVAILABILITY_COMMITMENT_LABELS[v]}
-              </label>
-            );
-          })}
-        </div>
-      </FilterSection>
+      {facets && facets.availability_commitment.length > 0 && (
+        <CheckboxFacet
+          idPrefix={idPrefix}
+          facet="availability_commitment"
+          label="Availability"
+          options={facets.availability_commitment}
+          selected={initialFilters.availability_commitment}
+          onToggle={(value) =>
+            apply({
+              availability_commitment: toggleArray(
+                initialFilters.availability_commitment,
+                value as SearchFilters["availability_commitment"][number],
+              ),
+            })
+          }
+        />
+      )}
 
       {/* Time slots */}
-      <FilterSection label="Time slots">
-        <div className="grid gap-1.5">
-          {Object.values(TimeSlot).map((v) => {
-            const checked = initialFilters.time_slots.includes(v);
-            return (
-              <label
-                key={v}
-                className="text-soft-black-light flex cursor-pointer items-center gap-2 text-sm"
-              >
-                <Checkbox
-                  checked={checked}
-                  onCheckedChange={() =>
-                    apply({
-                      time_slots: toggleArray(initialFilters.time_slots, v),
-                    })
-                  }
-                />
-                {TIME_SLOT_LABELS[v]}
-              </label>
-            );
-          })}
-        </div>
-      </FilterSection>
+      {facets && facets.time_slots.length > 0 && (
+        <CheckboxFacet
+          idPrefix={idPrefix}
+          facet="time_slots"
+          label="Time slots"
+          options={facets.time_slots}
+          selected={initialFilters.time_slots}
+          onToggle={(value) =>
+            apply({
+              time_slots: toggleArray(
+                initialFilters.time_slots,
+                value as SearchFilters["time_slots"][number],
+              ),
+            })
+          }
+        />
+      )}
 
       {/* Show unavailable */}
       <FilterSection label="Also show">
@@ -376,6 +363,54 @@ export function FilterPanel({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * One multi-select filter, rendered from the directory's own values.
+ *
+ * The label carries the count and is tied to the checkbox by id: a wrapping
+ * label does not name a Radix checkbox to assistive technology, because the
+ * control it renders is a button rather than a labelable input.
+ */
+function CheckboxFacet({
+  idPrefix,
+  facet,
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  idPrefix: string;
+  facet: string;
+  label: string;
+  options: FacetOption[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <FilterSection label={label}>
+      <div className="grid gap-1.5">
+        {options.map((o) => {
+          const id = `${idPrefix}-${facet}-${o.value}`;
+          return (
+            <div key={o.value} className="flex items-center gap-2">
+              <Checkbox
+                id={id}
+                checked={selected.includes(o.value)}
+                onCheckedChange={() => onToggle(o.value)}
+              />
+              <label
+                htmlFor={id}
+                className="text-soft-black-light cursor-pointer text-sm"
+              >
+                {facetOptionLabel(facet, o)}
+              </label>
+            </div>
+          );
+        })}
+      </div>
+    </FilterSection>
   );
 }
 

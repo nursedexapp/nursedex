@@ -11,9 +11,12 @@ import {
 } from "@/components/ui/sheet";
 import { FilterPanel } from "./FilterPanel";
 import type { SearchFilters } from "@/lib/nurses/search-params";
+import type { DirectoryFacets } from "@/lib/nurses/facets";
 
 interface FilterSheetProps {
   initialFilters: SearchFilters;
+  /** The directory's own filter options, passed straight to the panel (#766). */
+  facets: DirectoryFacets | null;
   /**
    * What opens the sheet. The chip row passes its own "More filters" pill so
    * the row reads as one control surface; without it the sheet renders the
@@ -22,7 +25,11 @@ interface FilterSheetProps {
   trigger?: React.ReactNode;
 }
 
-export function FilterSheet({ initialFilters, trigger }: FilterSheetProps) {
+export function FilterSheet({
+  initialFilters,
+  facets,
+  trigger,
+}: FilterSheetProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -49,6 +56,7 @@ export function FilterSheet({ initialFilters, trigger }: FilterSheetProps) {
               closes it too: the results behind have changed just as much. */}
           <FilterPanel
             initialFilters={initialFilters}
+            facets={facets}
             onAfterChange={() => setOpen(false)}
           />
         </div>

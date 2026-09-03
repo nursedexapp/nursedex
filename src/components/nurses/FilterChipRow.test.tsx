@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { FilterChipRow } from "./FilterChipRow";
 import { parseSearchParams } from "@/lib/nurses/search-params";
+import type { DirectoryFacets } from "@/lib/nurses/facets";
+import { directoryFacets } from "../../../test/facets-fixture";
 
 const replace = vi.fn((url: string) => {
   window.history.replaceState({}, "", url);
@@ -13,12 +15,22 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
 }));
 
-function show(search = "", savedCount: number | null = null) {
+function show(
+  search = "",
+  savedCount: number | null = null,
+  facets: DirectoryFacets | null = directoryFacets(),
+) {
   window.history.replaceState({}, "", `/nurses${search}`);
   const filters = parseSearchParams(
     new URLSearchParams(search.replace(/^\?/, "")),
   );
-  return render(<FilterChipRow filters={filters} savedCount={savedCount} />);
+  return render(
+    <FilterChipRow
+      filters={filters}
+      savedCount={savedCount}
+      facets={facets}
+    />,
+  );
 }
 
 const lastUrl = () => replace.mock.calls.at(-1)?.[0] ?? "";
@@ -221,6 +233,7 @@ describe("the clear controls", () => {
           new URLSearchParams("credential=rn&zip=11779"),
         )}
         savedCount={null}
+        facets={directoryFacets()}
       />,
     );
     expect(container.textContent).not.toContain("\u00d7");
@@ -238,5 +251,48 @@ describe("the clear controls", () => {
     expect(
       screen.getByRole("button", { name: /Clear Location/ }),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * #766. The chips carried their own copy of the language list and read every
+ * other option straight off a TypeScript enum, so the row offered filters
+ * with nobody behind them and hid languages nurses had entered.
+ */
+describe("chip options come from the directory", () => {
+  const open = (name: string) =>
+    fireEvent.click(screen.getByRole("button", { name }));
+
+  it("offers only the languages nurses actually speak", () => {
+    show();
+    open("Languages");
+
+    expect(screen.queryByRole("checkbox", { name: /Russian/ })).toBeNull();
+    expect(
+      screen.getByRole("checkbox", { name: /French \(3\)/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not offer a credential nobody holds", () => {
+    show();
+    open("Credential");
+
+    expect(screen.getByRole("radio", { name: /Registered Nurse \(34\)/ })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /Nurse Practitioner/ })).toBeNull();
+  });
+
+  it("does not offer a chip whose filter has nobody behind any option", () => {
+    show("", null, directoryFacets({ skills: [] }));
+
+    expect(screen.queryByRole("button", { name: "Skills" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Languages" })).toBeInTheDocument();
+  });
+
+  it("says the options could not be loaded rather than dropping the row in silence", () => {
+    show("", null, null);
+
+    expect(screen.getByText(/could not load/i)).toBeInTheDocument();
+    // The filters that need no counting still work.
+    expect(screen.getByRole("button", { name: "Rate" })).toBeInTheDocument();
   });
 });

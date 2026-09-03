@@ -14,6 +14,7 @@ vi.mock("./useApplyFilters", () => ({
 
 import { FilterSheet } from "./FilterSheet";
 import { parseSearchParams } from "@/lib/nurses/search-params";
+import { directoryFacets } from "../../../test/facets-fixture";
 
 /**
  * On a phone the filters live in a sheet that covers the results. Applying a
@@ -24,7 +25,12 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 async function openSheet() {
-  render(<FilterSheet initialFilters={parseSearchParams({})} />);
+  render(
+    <FilterSheet
+      initialFilters={parseSearchParams({})}
+      facets={directoryFacets()}
+    />,
+  );
   fireEvent.click(screen.getByLabelText(/open more filters/i));
   return screen.findByRole("dialog");
 }

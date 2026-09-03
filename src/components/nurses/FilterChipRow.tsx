@@ -3,16 +3,9 @@
 import { Heart, SlidersHorizontal, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import {
-  CREDENTIAL_LABELS,
-  CARE_TYPE_LABELS,
-  SKILL_LABELS,
-  GENDER_LABELS,
-  Credential,
-  CareType,
-  Skill,
-  Gender,
-} from "@/types/enums";
+import { Credential, CareType, Skill, Gender } from "@/types/enums";
+import type { DirectoryFacets } from "@/lib/nurses/facets";
+import { facetOptionLabel } from "@/lib/nurses/facet-labels";
 import {
   GENDER_FILTER_ANY,
   type GenderFilter,
@@ -33,17 +26,6 @@ import { FilterSheet } from "./FilterSheet";
 import { DebouncedFilterInput, parseFilterInt } from "./DebouncedFilterInput";
 import { useApplyFilters } from "./useApplyFilters";
 
-const FILTER_LANGUAGES = [
-  "English",
-  "Spanish",
-  "Italian",
-  "Mandarin",
-  "Russian",
-  "Haitian Creole",
-  "Polish",
-  "Portuguese",
-];
-
 interface FilterChipRowProps {
   filters: SearchFilters;
   /**
@@ -52,6 +34,16 @@ interface FilterChipRowProps {
    * rather than offering a control that would do nothing (#776).
    */
   savedCount: number | null;
+  /**
+   * What the directory can actually be filtered by, counted from the nurses
+   * in it (#766). A chip is offered only where at least one nurse is behind
+   * an option, or where the family already has that filter applied, so a
+   * constraint on the results is never invisible.
+   *
+   * `null` means the count could not be read: the row says so rather than
+   * quietly dropping five of its seven chips.
+   */
+  facets: DirectoryFacets | null;
 }
 
 /**
@@ -64,7 +56,11 @@ interface FilterChipRowProps {
  * survey with a zip and a distance set would otherwise see an empty looking
  * row above a thin grid, with no visible cause (#775).
  */
-export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
+export function FilterChipRow({
+  filters,
+  savedCount,
+  facets,
+}: FilterChipRowProps) {
   const { apply, clearAll } = useApplyFilters();
   const hidden = appliedSheetChips(filters);
   const moreCount = sheetAppliedCount(filters);
@@ -74,6 +70,16 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
     ROW_CHIP_IDS.some((id) => isChipApplied(id, filters));
 
   const clear = (id: ChipId) => () => apply(clearChipPatch(id));
+
+  // A chip whose options are all empty cannot narrow anything, so it is not
+  // offered. It stays if the family already applied it, because a filter
+  // constraining the results must always be visible and clearable (#775).
+  const offers = (id: RowChipId, options: unknown[]) =>
+    options.length > 0 || isChipApplied(id, filters);
+
+  const genderOptions = (facets?.gender ?? []).filter(
+    (o) => o.value !== Gender.PREFER_NOT_TO_SAY,
+  );
 
   const chip = (
     id: RowChipId,
@@ -120,13 +126,14 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
         </button>
       )}
 
-      {chip("credential", (close) => (
+      {offers("credential", facets?.credential ?? []) &&
+        chip("credential", (close) => (
         <ChoiceList
           name="Credential"
           value={filters.credential ?? ""}
-          options={Object.values(Credential).map((c) => ({
-            value: c,
-            label: CREDENTIAL_LABELS[c],
+          options={(facets?.credential ?? []).map((o) => ({
+            value: o.value,
+            label: facetOptionLabel("credential", o),
           }))}
           anyLabel="Any credential"
           onSelect={(value) => {
@@ -136,13 +143,14 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
         />
       ))}
 
-      {chip("care_type", (close) => (
+      {offers("care_type", facets?.care_types ?? []) &&
+        chip("care_type", (close) => (
         <ChoiceList
           name="Care type"
           value={filters.care_type ?? ""}
-          options={Object.values(CareType).map((c) => ({
-            value: c,
-            label: CARE_TYPE_LABELS[c],
+          options={(facets?.care_types ?? []).map((o) => ({
+            value: o.value,
+            label: facetOptionLabel("care_types", o),
           }))}
           anyLabel="Any care type"
           onSelect={(value) => {
@@ -152,34 +160,41 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
         />
       ))}
 
-      {chip("skills", () => (
+      {offers("skills", facets?.skills ?? []) &&
+        chip("skills", () => (
         <CheckList
           name="Skills"
           values={filters.skills}
-          options={Object.values(Skill).map((s) => ({
-            value: s,
-            label: SKILL_LABELS[s],
+          options={(facets?.skills ?? []).map((o) => ({
+            value: o.value,
+            label: facetOptionLabel("skills", o),
           }))}
           onToggle={(next) => apply({ skills: next as Skill[] })}
         />
       ))}
 
-      {chip("languages", () => (
-        <CheckList
-          name="Languages"
-          values={filters.languages}
-          options={FILTER_LANGUAGES.map((l) => ({ value: l, label: l }))}
-          onToggle={(next) => apply({ languages: next })}
-        />
-      ))}
+      {offers("languages", facets?.languages ?? []) &&
+        chip("languages", () => (
+          <CheckList
+            name="Languages"
+            values={filters.languages}
+            options={(facets?.languages ?? []).map((o) => ({
+              value: o.value,
+              label: facetOptionLabel("languages", o),
+            }))}
+            onToggle={(next) => apply({ languages: next })}
+          />
+        ))}
 
-      {chip("gender", (close) => (
+      {offers("gender", genderOptions) &&
+        chip("gender", (close) => (
         <ChoiceList
           name="Gender"
           value={filters.gender === GENDER_FILTER_ANY ? "" : filters.gender}
-          options={Object.values(Gender)
-            .filter((g) => g !== Gender.PREFER_NOT_TO_SAY)
-            .map((g) => ({ value: g, label: GENDER_LABELS[g] }))}
+          options={genderOptions.map((o) => ({
+            value: o.value,
+            label: facetOptionLabel("gender", o),
+          }))}
           anyLabel="Any"
           onSelect={(value) => {
             apply({ gender: (value || GENDER_FILTER_ANY) as GenderFilter });
@@ -221,7 +236,7 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
             type="number"
             inputMode="numeric"
             min={0}
-            max={70}
+            max={facets?.experience?.max ?? 70}
             step={1}
             className="mt-1"
             placeholder="e.g. 5"
@@ -256,6 +271,7 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
 
       <FilterSheet
         initialFilters={filters}
+        facets={facets}
         trigger={
           <span
             className={cn(
@@ -272,6 +288,12 @@ export function FilterChipRow({ filters, savedCount }: FilterChipRowProps) {
           </span>
         }
       />
+
+      {facets === null && (
+        <p className="text-soft-black-light text-sm">
+          We could not load the filter options just now.
+        </p>
+      )}
 
       {anyApplied && (
         <button

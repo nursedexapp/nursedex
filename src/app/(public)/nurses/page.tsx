@@ -11,6 +11,8 @@ import { SavedListUnavailableNotice } from "@/components/nurses/SavedListUnavail
 import { UnlocatableZipNotice } from "@/components/nurses/UnlocatableZipNotice";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { searchNurses } from "@/lib/nurses/search";
+import { getDirectoryFacets, type DirectoryFacets } from "@/lib/nurses/facets";
+import { narrowestAppliedFilter } from "@/lib/nurses/narrowest-filter";
 import { getAllSavedNurseIds, getSavedNurseIds } from "@/lib/nurses/saves";
 import { getRevealedNurseIds } from "@/lib/reveals/queries";
 import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
@@ -19,6 +21,7 @@ import {
   parseSearchParams,
   isEmptyFilterSet,
   toURLSearchParams,
+  type SearchFilters,
 } from "@/lib/nurses/search-params";
 
 export const metadata: Metadata = {
@@ -61,6 +64,18 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
   // check. A subscribed family sees every nurse's last name.
   // The saved set comes from the SESSION, never from the URL. The flag in the
   // URL only says whether to constrain (#776).
+  // The filter options, counted from the nurses the directory can actually
+  // return (#766). Its own failure boundary: a facet read that fails must not
+  // take the results down with it, so the panel says the options could not be
+  // loaded and the family can still search by location, rate and experience.
+  const facetsPromise = getDirectoryFacets().catch((error: unknown) => {
+    console.error(
+      "[nurses] directory facet read failed:",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  });
+
   const [viewerRevealedIds, hasSub, viewerSavedIds] = await Promise.all([
     showSaves && user
       ? getRevealedNurseIds(user.id)
@@ -70,6 +85,8 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
       ? getAllSavedNurseIds(user.id)
       : Promise.resolve(undefined),
   ]);
+
+  const facets = await facetsPromise;
 
   const result = await searchNurses({
     filters,
@@ -139,6 +156,7 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
           <FilterChipRow
             filters={filters}
             savedCount={viewerSavedIds ? viewerSavedIds.size : null}
+            facets={facets}
           />
         </div>
 
@@ -222,6 +240,8 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
             ) : (
               <EmptyState
                 hasFilters={!isEmptyFilterSet(filters)}
+                filters={filters}
+                facets={facets}
                 savedOnlyWithNoSaves={
                   filters.saved && viewerSavedIds?.size === 0
                 }
@@ -256,9 +276,13 @@ function AnonSignupBanner() {
 
 function EmptyState({
   hasFilters,
+  filters,
+  facets,
   savedOnlyWithNoSaves,
 }: {
   hasFilters: boolean;
+  filters: SearchFilters;
+  facets: DirectoryFacets | null;
   savedOnlyWithNoSaves?: boolean;
 }) {
   // A family with zero saves would otherwise be told "we're onboarding nurses
@@ -285,21 +309,50 @@ function EmptyState({
   }
 
   if (hasFilters) {
+    // No single filter is a dead end any more, but several together still
+    // can be. Name the narrowest thing she asked for, since that is the
+    // likeliest reason nobody matched, and offer to drop just that (#766).
+    const narrowest = narrowestAppliedFilter(filters, facets);
+    const withoutNarrowest = narrowest
+      ? (() => {
+          const query = toURLSearchParams({
+            ...filters,
+            ...narrowest.patch,
+          }).toString();
+          return query ? `/nurses?${query}` : "/nurses";
+        })()
+      : null;
+
     return (
       <div className="border-sage/20 rounded-2xl border bg-white p-10 text-center">
         <h2 className="font-heading text-soft-black text-lg font-medium">
           No nurses match your filters
         </h2>
         <p className="text-soft-black-light mt-2 text-sm">
-          Try loosening a filter or two. We&apos;ll add more nurses across Long
-          Island as they onboard.
+          {narrowest
+            ? `${narrowest.label} is the narrowest thing you asked for. Dropping it is the quickest way back to some results.`
+            : "Try loosening a filter or two. We'll add more nurses across New York as they onboard."}
         </p>
-        <Link
-          href="/nurses"
-          className="bg-teal hover:bg-teal-dark mt-4 inline-block rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
-        >
-          Clear filters
-        </Link>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          {withoutNarrowest && narrowest && (
+            <Link
+              href={withoutNarrowest}
+              className="bg-teal hover:bg-teal-dark inline-block rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
+            >
+              Search without {narrowest.label}
+            </Link>
+          )}
+          <Link
+            href="/nurses"
+            className={
+              withoutNarrowest
+                ? "text-soft-black-light hover:text-soft-black text-sm underline underline-offset-4"
+                : "bg-teal hover:bg-teal-dark inline-block rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
+            }
+          >
+            Clear filters
+          </Link>
+        </div>
       </div>
     );
   }

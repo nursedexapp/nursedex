@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,29 +24,32 @@ import {
 } from "@/lib/nurses/search-params";
 import { posthog } from "@/lib/posthog";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
+import type { DirectoryFacets } from "@/lib/nurses/facets";
 import { ChevronLeft } from "lucide-react";
 
 const TOTAL_STEPS = 4;
 const DEFAULT_DISTANCE_MILES = 25;
-const SURVEY_LANGUAGES = [
-  "English",
-  "Spanish",
-  "Italian",
-  "Mandarin",
-  "Russian",
-  "Haitian Creole",
-  "Polish",
-  "Portuguese",
-];
-
 interface SurveyWizardProps {
   initialFilters: SearchFilters;
   initialStep: number;
+  /**
+   * What the directory can actually be filtered by (#766). The survey's
+   * answers become a prefilled search, so an option nobody is behind takes a
+   * family who answered every question to an empty results page.
+   *
+   * Deliberately rendered WITHOUT the counts the directory's own filter panel
+   * shows: this is a conversation about what she needs, not a filter panel.
+   *
+   * `null` means they could not be counted. The survey cannot ask its
+   * questions without them, so it says so and offers the directory instead.
+   */
+  facets: DirectoryFacets | null;
 }
 
 export function SurveyWizard({
   initialFilters,
   initialStep,
+  facets,
 }: SurveyWizardProps) {
   const router = useRouter();
 
@@ -107,6 +111,26 @@ export function SurveyWizard({
   const toggleArray = <T extends string>(arr: T[], value: T): T[] =>
     arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
 
+  if (facets === null) {
+    return (
+      <div className="space-y-4">
+        <h1 className="font-heading text-soft-black text-2xl font-semibold sm:text-3xl">
+          We could not load the questions just now
+        </h1>
+        <p className="text-soft-black-light text-sm">
+          Rather than ask you what you need and then have nothing to match it
+          against, here is the whole directory.
+        </p>
+        <Link
+          href="/nurses"
+          className="text-teal text-sm font-medium underline underline-offset-4"
+        >
+          Browse all nurses
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <Header step={initialStep} />
@@ -114,7 +138,7 @@ export function SurveyWizard({
       {initialStep === 1 && (
         <Step heading="What kind of care are you looking for?">
           <div className="grid gap-2 sm:grid-cols-2">
-            {Object.values(CareType).map((c) => {
+            {(facets?.care_types ?? []).map(({ value: c }) => {
               const selected = careType === c;
               return (
                 <button
@@ -143,7 +167,7 @@ export function SurveyWizard({
           subheading="Optional. Pick any that apply, we'll prioritize nurses who have them."
         >
           <div className="grid gap-1.5 sm:grid-cols-2">
-            {Object.values(Skill).map((s) => {
+            {(facets?.skills ?? []).map(({ value: s }) => {
               const checked = skills.includes(s);
               return (
                 <label
@@ -180,7 +204,7 @@ export function SurveyWizard({
                 Commitment
               </h3>
               <div className="grid gap-1.5 sm:grid-cols-2">
-                {Object.values(AvailabilityCommitment).map((v) => {
+                {(facets?.availability_commitment ?? []).map(({ value: v }) => {
                   const checked = commitment.includes(v);
                   return (
                     <label
@@ -210,7 +234,7 @@ export function SurveyWizard({
                 Time slots
               </h3>
               <div className="grid gap-1.5 sm:grid-cols-3">
-                {Object.values(TimeSlot).map((v) => {
+                {(facets?.time_slots ?? []).map(({ value: v }) => {
                   const checked = timeSlots.includes(v);
                   return (
                     <label
@@ -270,7 +294,7 @@ export function SurveyWizard({
                 Preferred languages (optional)
               </h3>
               <div className="grid gap-1.5 sm:grid-cols-2">
-                {SURVEY_LANGUAGES.map((lang) => {
+                {(facets?.languages ?? []).map(({ value: lang }) => {
                   const checked = languages.includes(lang);
                   return (
                     <label
