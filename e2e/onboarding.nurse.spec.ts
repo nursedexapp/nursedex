@@ -372,5 +372,8 @@ test("a verified nurse with an empty profile is told families cannot see her", a
 
   await expect(page).toHaveURL(/\/dashboard\/onboarding/);
   await expect(page.getByText(/families cannot see you yet/i)).toBeVisible();
-  await expect(page.getByText(/no photo and no bio/i)).toBeVisible();
+  // Both reasons, because this profile has neither content nor a care type,
+  // and the notice names what is actually missing rather than assuming (#940).
+  await expect(page.getByText(/photo or a short bio/i)).toBeVisible();
+  await expect(page.getByText(/type of care you provide/i)).toBeVisible();
 });
