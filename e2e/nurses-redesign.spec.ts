@@ -40,9 +40,34 @@ const FIXTURE_NURSES = [
   {
     // Every field this card can be missing, missing at once. The absent states
     // are designed, so they have to be seen rather than assumed.
+    //
+    // She carries a bio and nothing else. A nurse with neither a photo nor a
+    // bio is not listed at all (#732), so the barest card a family can
+    // actually meet is this one: no photo, no zip, no care type, no
+    // experience, no rate, no availability.
     email: "e2e-redesign-bare@nursedex.test",
     first_name: "Bev",
     last_name: "Quill",
+    zip_code: null,
+    profile: {
+      credential: "hha",
+      primary_care_type: null,
+      care_types: [],
+      years_experience: null,
+      bio: "Still writing this.",
+      rate_min: null,
+      rate_max: null,
+      availability_commitment: [],
+      profile_completeness: 10,
+    },
+  },
+  {
+    // Verified, available, and completely empty: the 40 profiles that were
+    // being shown to families (#732). She must not reach the directory, and
+    // must still be reachable by her own link.
+    email: "e2e-redesign-unlisted@nursedex.test",
+    first_name: "Nula",
+    last_name: "Vane",
     zip_code: null,
     profile: {
       credential: "hha",
@@ -53,7 +78,7 @@ const FIXTURE_NURSES = [
       rate_min: null,
       rate_max: null,
       availability_commitment: [],
-      profile_completeness: 10,
+      profile_completeness: 0,
     },
   },
 ];
@@ -266,6 +291,28 @@ test.describe("the absent states", () => {
     await expect(bare.getByText("B", { exact: true })).toBeVisible();
     // No years on the credential line.
     await expect(bare).not.toContainText("years");
+  });
+
+  // #732, proved against a real database rather than in a unit test: an empty
+  // profile is not put in front of a family, and is not deleted either.
+  test("a profile with nothing on it at all is not listed", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/nurses");
+
+    // Bev is the control: she is just as bare, but she has a bio, so the
+    // absence below is about the rule rather than about an empty page.
+    await expect(page.locator("article", { hasText: "Bev Q." })).toBeVisible();
+    await expect(page.locator("article", { hasText: "Nula V." })).toHaveCount(
+      0,
+    );
+  });
+
+  test("but she is still reachable by her own link", async ({ page }) => {
+    const response = await page.goto("/nurses/e2e-redesign-unlisted");
+    expect(response?.status()).toBe(200);
+    await expect(page.getByText(/Nula/)).toBeVisible();
   });
 
   // The positive control for the absence above, in the same run: the nurse who
