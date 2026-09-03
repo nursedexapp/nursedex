@@ -24,6 +24,29 @@ export interface NarrowestFilter {
   patch: Partial<SearchFilters>;
 }
 
+/**
+ * How many separate things the family has asked for, counting the ones with
+ * no options behind them (a zip, a rate, a keyword). Used only to tell "one
+ * filter" from "several": dropping the only filter is the same as clearing
+ * everything, which the empty state already offers.
+ */
+function countApplied(filters: SearchFilters): number {
+  return [
+    filters.q,
+    filters.credential,
+    filters.care_type,
+    filters.gender !== "any" ? filters.gender : undefined,
+    filters.zip,
+    filters.rate_min,
+    filters.rate_max,
+    filters.experience_min,
+    ...filters.skills,
+    ...filters.languages,
+    ...filters.availability_commitment,
+    ...filters.time_slots,
+  ].filter((v) => v !== undefined && v !== null && v !== "").length;
+}
+
 /** An applied option that came from a counted facet. */
 interface Candidate {
   count: number;
@@ -41,6 +64,15 @@ export function narrowestAppliedFilter(
   facets: DirectoryFacets | null,
 ): NarrowestFilter | null {
   if (!facets) return null;
+
+  // A keyword outranks every counted filter when it is not the only thing
+  // applied. It carries no count, so this is a judgement rather than a
+  // measurement: a free text match across sixty bios is a far narrower thing
+  // to ask for than any single option in the panel, all of which are
+  // guaranteed to have somebody behind them (#729, #766).
+  if (filters.q && countApplied(filters) > 1) {
+    return { label: `"${filters.q}"`, patch: { q: undefined, page: 1 } };
+  }
 
   const candidates: Candidate[] = [];
 

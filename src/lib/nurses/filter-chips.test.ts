@@ -32,8 +32,14 @@ describe("the chip vocabulary", () => {
     // page and sort are in the URL but are not filters: neither narrows the
     // results, so neither belongs to a chip that clears it.
     const notFilters = ["page", "sort"];
+    // q narrows the results and is deliberately not a chip: it has its own
+    // box above the row, which shows what was typed and carries its own
+    // clear, at rest rather than behind a popover (#729). That control is
+    // what this rule is protecting, and KeywordSearch.test.tsx holds it to
+    // showing the keyword and clearing it.
+    const ownControl = ["q"];
     const schemaKeys = Object.keys(searchParamsSchema.shape).filter(
-      (k) => !notFilters.includes(k),
+      (k) => !notFilters.includes(k) && !ownControl.includes(k),
     );
     expect([...owned].sort()).toEqual(schemaKeys.sort());
   });
