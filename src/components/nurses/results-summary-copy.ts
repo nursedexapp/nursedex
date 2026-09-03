@@ -3,6 +3,11 @@ import {
   DISTANCE_RANKING_CRITERIA,
 } from "@/lib/nurses/search-ranking";
 import type { SearchResult } from "@/lib/nurses/search";
+import {
+  SORT_OPTIONS,
+  DEFAULT_SORT,
+  type SortOption,
+} from "@/lib/nurses/search-params";
 
 /**
  * How the order is described to a family, built from the ranking module's own
@@ -16,7 +21,17 @@ import type { SearchResult } from "@/lib/nurses/search";
  * place. Saying "closest first" to somebody who gave no zip would be a claim
  * about an order that was never used (#723).
  */
-export function orderSentence(orderedByDistance: boolean): string {
+export function orderSentence(
+  orderedByDistance: boolean,
+  sort: SortOption = DEFAULT_SORT,
+): string {
+  // A sort she chose herself is the order on screen, so the caption names it
+  // rather than describing the ranking she is no longer looking at.
+  if (sort !== DEFAULT_SORT) {
+    const chosen = SORT_OPTIONS.find((o) => o.value === sort);
+    if (chosen) return `${chosen.label} first.`;
+  }
+
   const criteria = orderedByDistance
     ? DISTANCE_RANKING_CRITERIA
     : RANKING_CRITERIA;
@@ -61,7 +76,10 @@ export function resultsSummary(result: SearchResult): ResultsSummaryCopy {
     headline,
     // The real order, not the mockup's caption. Only worth saying when there
     // is more than one nurse to order.
-    order: total > 1 ? orderSentence(result.orderedByDistance) : null,
+    order:
+      total > 1
+        ? orderSentence(result.orderedByDistance, result.sort)
+        : null,
     partials:
       partialCount > 0
         ? `Plus ${partialCount} ${nurses(partialCount)} who match some of your filters, below.`

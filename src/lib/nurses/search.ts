@@ -2,9 +2,15 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyListedNurseFilter } from "./visibility";
 import { SEARCH } from "@/lib/constants";
-import { GENDER_FILTER_ANY, type SearchFilters } from "./search-params";
 import {
-  rankNurses as rankNursesPure,
+  GENDER_FILTER_ANY,
+  DEFAULT_SORT,
+  effectiveSort,
+  type SearchFilters,
+  type SortOption,
+} from "./search-params";
+import {
+  orderNurses,
   DEFAULT_FEATURED_RANGE_MILES,
   type DistanceContext,
 } from "./search-ranking";
@@ -47,6 +53,9 @@ export interface SearchResult {
   // how the list is ordered reads this, so it cannot claim an order that was
   // not used.
   orderedByDistance: boolean;
+  // The sort actually applied, so the sentence describing the order can name
+  // the one the family chose rather than the default.
+  sort: SortOption;
 }
 
 export interface SearchOptions {
@@ -117,10 +126,13 @@ export async function searchNurses(
     originResolved,
   );
   const ordering = distanceContext(originZip, originResolved, filters);
+  // Closest is only honourable when there is a placed zip to measure from.
+  const sort = effectiveSort(filters.sort, ordering.originResolved);
   let fullRanked = rankCards(
     fullAfterDistance,
     viewerCommPref ?? null,
     ordering,
+    sort,
   );
 
   // Mark nurses the family already revealed and sink them below the rest,
@@ -175,6 +187,7 @@ export async function searchNurses(
     hitResultCap: fullRaw.length >= SQL_FETCH_CAP,
     unlocatableZip: originZip && !originResolved ? originZip : null,
     orderedByDistance: ordering.originResolved,
+    sort,
   };
 }
 
@@ -380,8 +393,9 @@ function rankCards(
   nurses: InternalNurseCard[],
   viewerCommPref: string | null,
   distance?: DistanceContext,
+  sort: SortOption = DEFAULT_SORT,
 ): InternalNurseCard[] {
-  return rankNursesPure(nurses, viewerCommPref, distance);
+  return orderNurses(nurses, viewerCommPref, { sort, distance });
 }
 
 /**
@@ -434,6 +448,7 @@ async function getPartialMatches(
       enriched.filter((n) => !excluded.has(n.user_id)),
       viewerCommPref,
       distanceContext(originZip, partialResolved, filters),
+      filters.sort,
     );
     stage1 = ranked.slice(0, limit);
     if (stage1.length >= limit) return stage1;
@@ -471,6 +486,7 @@ async function runRelaxedAvailability(
     enriched.filter((n) => !excluded.has(n.user_id)),
     viewerCommPref,
     distanceContext(originZip, partialResolved, filters),
+    filters.sort,
   );
   return ranked.slice(0, limit);
 }

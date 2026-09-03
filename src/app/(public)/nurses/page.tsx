@@ -4,6 +4,7 @@ import { NurseCard } from "@/components/nurses/NurseCard";
 import { FilterChipRow } from "@/components/nurses/FilterChipRow";
 import { SearchAnalytics } from "@/components/nurses/SearchAnalytics";
 import { ResultsSummary } from "@/components/nurses/ResultsSummary";
+import { SortControl } from "@/components/nurses/SortControl";
 import { SearchPagination } from "@/components/nurses/SearchPagination";
 import { SurveyAppliedBanner } from "@/components/nurses/SurveyAppliedBanner";
 import { SavedListUnavailableNotice } from "@/components/nurses/SavedListUnavailableNotice";
@@ -126,8 +127,11 @@ export default async function NursesPage({ searchParams }: NursesPageProps) {
           <h1 className="font-heading text-soft-black text-2xl font-semibold sm:text-3xl">
             Find a Nurse
           </h1>
-          <div className="mt-1">
+          <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
             <ResultsSummary result={result} />
+            {result.totalFull > 1 && (
+              <SortControl value={result.sort} hasZip={!!filters.zip} />
+            )}
           </div>
         </div>
 

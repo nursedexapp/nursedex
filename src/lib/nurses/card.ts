@@ -30,6 +30,8 @@ export interface NurseSearchCard {
   is_available: boolean;
   unavailable_visibility: string | null;
   profile_completeness: number;
+  // When she was verified, for the newest-first sort (#725).
+  verified_at: string | null;
   zip_code: string | null;
   distance_miles: number | null;
   communication_preference: string | null;
@@ -99,6 +101,7 @@ export const NURSE_CARD_ROW_KEYS = [
   "is_available",
   "unavailable_visibility",
   "profile_completeness",
+  "verified_at",
   "years_experience",
   "bio",
   "rate_min",
@@ -186,6 +189,7 @@ export function shapeNurseCard(
     is_available: r.is_available as boolean,
     unavailable_visibility: r.unavailable_visibility as string | null,
     profile_completeness: r.profile_completeness as number,
+    verified_at: (r.verified_at as string | null) ?? null,
     zip_code: u.zip_code as string | null,
     distance_miles: null,
     communication_preference: u.communication_preference as string | null,

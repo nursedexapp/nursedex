@@ -43,7 +43,14 @@ export function FilterSheet({ initialFilters, trigger }: FilterSheetProps) {
           <SheetTitle className="sr-only">Filters</SheetTitle>
         </SheetHeader>
         <div className="px-4 pt-2 pb-6">
-          <FilterPanel initialFilters={initialFilters} />
+          {/* The sheet covers the results on a phone, so leaving it open
+              after a filter is applied means the visitor has to dismiss it by
+              hand to see what her choice did (#779). Clearing everything
+              closes it too: the results behind have changed just as much. */}
+          <FilterPanel
+            initialFilters={initialFilters}
+            onAfterChange={() => setOpen(false)}
+          />
         </div>
       </SheetContent>
     </Sheet>

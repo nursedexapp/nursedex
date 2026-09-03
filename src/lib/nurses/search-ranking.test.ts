@@ -3,6 +3,7 @@ import {
   RANKING_CRITERIA,
   DISTANCE_RANKING_CRITERIA,
   rankNurses,
+  orderNurses,
   type RankableNurse,
 } from "./search-ranking";
 
@@ -242,5 +243,118 @@ describe("rankNurses when there is no zip to measure from", () => {
       null,
     );
     expect(ranked[0].user_id).toBe("featured-bare");
+  });
+});
+
+// ── An explicitly chosen sort (#725) ──────────────────────────
+//
+// Best match stays the default, so the paid Featured placement is what a
+// family sees unless she deliberately chooses otherwise. Once she does
+// choose, her choice wins outright: an order that quietly kept putting
+// Featured first would not be the order she asked for.
+function sortable(user_id: string, over: Partial<RankableNurse> = {}) {
+  return nurse({ user_id, ...over });
+}
+
+describe("orderNurses with a chosen sort", () => {
+  it("puts the closest first when she asks for closest", () => {
+    const ranked = orderNurses(
+      [
+        sortable("far", { distance_miles: 40 }),
+        sortable("near", { distance_miles: 2, profile_completeness: 0 }),
+      ],
+      null,
+      { sort: "closest", distance: nearestFirst },
+    );
+    expect(ranked[0].user_id).toBe("near");
+  });
+
+  it("does not let a paying nurse override the order she chose", () => {
+    const ranked = orderNurses(
+      [
+        sortable("featured-far", { tier: "featured", distance_miles: 20 }),
+        sortable("free-near", { distance_miles: 1 }),
+      ],
+      null,
+      { sort: "closest", distance: nearestFirst },
+    );
+    expect(ranked[0].user_id).toBe("free-near");
+  });
+
+  it("puts a nurse it cannot place last under closest", () => {
+    const ranked = orderNurses(
+      [sortable("unplaceable"), sortable("far", { distance_miles: 200 })],
+      null,
+      { sort: "closest", distance: nearestFirst },
+    );
+    expect(ranked.map((n) => n.user_id)).toEqual(["far", "unplaceable"]);
+  });
+
+  it("puts the highest rated first when she asks for rating", () => {
+    const ranked = orderNurses(
+      [
+        sortable("ok", { review_count: 9, avg_rating: 3.5 }),
+        sortable("great", { review_count: 2, avg_rating: 5 }),
+      ],
+      null,
+      { sort: "rating" },
+    );
+    expect(ranked[0].user_id).toBe("great");
+  });
+
+  it("puts an unrated nurse below a rated one", () => {
+    const ranked = orderNurses(
+      [sortable("unrated"), sortable("rated", { review_count: 1, avg_rating: 1 })],
+      null,
+      { sort: "rating" },
+    );
+    expect(ranked.map((n) => n.user_id)).toEqual(["rated", "unrated"]);
+  });
+
+  it("puts the fullest profile first when she asks for that", () => {
+    const ranked = orderNurses(
+      [
+        sortable("thin", { profile_completeness: 40, tier: "featured" }),
+        sortable("full", { profile_completeness: 95 }),
+      ],
+      null,
+      { sort: "complete" },
+    );
+    expect(ranked[0].user_id).toBe("full");
+  });
+
+  it("puts the most recently verified first when she asks for newest", () => {
+    const ranked = orderNurses(
+      [
+        sortable("older", { verified_at: "2026-01-01T00:00:00.000Z" }),
+        sortable("newer", { verified_at: "2026-08-01T00:00:00.000Z" }),
+      ],
+      null,
+      { sort: "newest" },
+    );
+    expect(ranked[0].user_id).toBe("newer");
+  });
+
+  it("falls back to the ranking for best match", () => {
+    const ranked = orderNurses(
+      [sortable("free", { profile_completeness: 100 }), sortable("paid", { tier: "featured" })],
+      null,
+      { sort: "best" },
+    );
+    expect(ranked[0].user_id).toBe("paid");
+  });
+
+  it("orders ties the same way every time", () => {
+    // Two nurses identical on the chosen sort. Without a deterministic
+    // tie-break the page can render them in one order and re-render in
+    // another (NURSEDEX-SITE-4).
+    const a = sortable("b-nurse", { profile_completeness: 50 });
+    const b = sortable("a-nurse", { profile_completeness: 50 });
+    expect(
+      orderNurses([a, b], null, { sort: "complete" }).map((n) => n.user_id),
+    ).toEqual(["a-nurse", "b-nurse"]);
+    expect(
+      orderNurses([b, a], null, { sort: "complete" }).map((n) => n.user_id),
+    ).toEqual(["a-nurse", "b-nurse"]);
   });
 });

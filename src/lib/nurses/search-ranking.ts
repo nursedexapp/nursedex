@@ -8,6 +8,8 @@ export interface RankableNurse {
   profile_completeness: number;
   /** Miles from the family's zip, or null when she cannot be placed. */
   distance_miles?: number | null;
+  /** When she was verified, for the newest-first sort. */
+  verified_at?: string | null;
 }
 
 /**
@@ -146,3 +148,57 @@ export function rankNurses<T extends RankableNurse>(
     return a.user_id < b.user_id ? -1 : a.user_id > b.user_id ? 1 : 0;
   });
 }
+
+// ── An explicitly chosen sort ─────────────────────────────────
+
+/**
+ * Order the results the way the family asked.
+ *
+ * Best match is the default and is the ranking above, so the paid Featured
+ * placement is what she sees unless she deliberately chooses otherwise. Once
+ * she does choose, her choice wins outright: quietly keeping Featured on top
+ * would not be the order she asked for, and she has no way to tell that from
+ * a broken control (#725).
+ *
+ * Every sort ends on the same deterministic tie-break as the ranking, because
+ * a page that renders one order and re-renders another produces a hydration
+ * mismatch (NURSEDEX-SITE-4).
+ */
+export function orderNurses<T extends RankableNurse>(
+  nurses: T[],
+  viewerCommPref: string | null,
+  opts: { sort: SortMode; distance?: DistanceContext },
+): T[] {
+  if (opts.sort === "best") {
+    return rankNurses(nurses, viewerCommPref, opts.distance);
+  }
+
+  const key = SORT_KEYS[opts.sort];
+  return [...nurses].sort((a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    if (ka !== kb) return kb - ka;
+    return a.user_id < b.user_id ? -1 : a.user_id > b.user_id ? 1 : 0;
+  });
+}
+
+export type SortMode = "best" | "closest" | "rating" | "complete" | "newest";
+
+/**
+ * Higher wins, for each sort. Anything unknown scores below everything known,
+ * so a nurse we cannot place, or who has never been rated, sorts last rather
+ * than first, which is what treating an absent value as zero would do for
+ * distance.
+ */
+const SORT_KEYS: Record<Exclude<SortMode, "best">, (n: RankableNurse) => number> =
+  {
+    closest: (n) =>
+      n.distance_miles === null || n.distance_miles === undefined
+        ? -Infinity
+        : -n.distance_miles,
+    rating: (n) =>
+      n.review_count > 0 && n.avg_rating !== null ? n.avg_rating : -Infinity,
+    complete: (n) => n.profile_completeness,
+    newest: (n) =>
+      n.verified_at ? new Date(n.verified_at).getTime() : -Infinity,
+  };

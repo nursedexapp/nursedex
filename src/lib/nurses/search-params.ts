@@ -14,6 +14,48 @@ import {
 export const GENDER_FILTER_ANY = "any" as const;
 export type GenderFilter = typeof GENDER_FILTER_ANY | Gender;
 
+// ── Sort ──────────────────────────────────────────────────────
+//
+// What a family can ask for, and what each one means. "best" is the ranking
+// the page produces on its own, and stays the default so the paid Featured
+// placement is what she sees unless she deliberately chooses otherwise (#725).
+//
+// "closest" is only offered once a zip is set, since without one there is
+// nothing to measure from.
+export const SORT_OPTIONS = [
+  { value: "best", label: "Best match", needsZip: false },
+  { value: "closest", label: "Closest", needsZip: true },
+  { value: "rating", label: "Highest rated", needsZip: false },
+  { value: "complete", label: "Most complete profile", needsZip: false },
+  { value: "newest", label: "Newest", needsZip: false },
+] as const;
+
+export type SortOption = (typeof SORT_OPTIONS)[number]["value"];
+
+export const DEFAULT_SORT: SortOption = "best";
+
+const sortValue = z
+  .enum(
+    SORT_OPTIONS.map((o) => o.value) as unknown as [SortOption, ...SortOption[]],
+  )
+  .default(DEFAULT_SORT)
+  .catch(DEFAULT_SORT);
+
+/**
+ * The sort that can actually be honoured.
+ *
+ * Closest needs somewhere to measure from. Asked for without a zip we could
+ * place, it falls back to best match, and the page then says "Featured nurses
+ * first" rather than claiming an order it is not in.
+ */
+export function effectiveSort(
+  sort: SortOption,
+  hasPlacedZip: boolean,
+): SortOption {
+  if (sort === "closest" && !hasPlacedZip) return DEFAULT_SORT;
+  return sort;
+}
+
 // ── Schema ────────────────────────────────────────────────────
 // Parses raw URL string values into typed filters.
 // Anything malformed is dropped (via .catch) so hand-edited URLs never crash the page.
@@ -89,6 +131,7 @@ export const searchParamsSchema = z.object({
   // non-family viewers.
   saved: boolFlag,
   page: pageNumber,
+  sort: sortValue,
 });
 
 export type SearchFilters = z.infer<typeof searchParamsSchema>;
@@ -138,6 +181,9 @@ export function toURLSearchParams(
     params.set("rate_max", String(filters.rate_max));
   if (filters.experience_min !== undefined) {
     params.set("experience_min", String(filters.experience_min));
+  }
+  if (filters.sort && filters.sort !== DEFAULT_SORT) {
+    params.set("sort", filters.sort);
   }
   if (filters.zip) params.set("zip", filters.zip);
   if (filters.distance !== undefined)

@@ -25,6 +25,7 @@ function makeNurse(overrides: Partial<NurseSearchCard> = {}): NurseSearchCard {
     is_available: true,
     unavailable_visibility: null,
     profile_completeness: 100,
+    verified_at: null,
     zip_code: null,
     distance_miles: null,
     communication_preference: null,

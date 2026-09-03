@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { DebouncedFilterInput, parseFilterInt } from "./DebouncedFilterInput";
 import { useApplyFilters } from "./useApplyFilters";
+import { nativeSelectCls } from "./native-select";
 import {
   CREDENTIAL_LABELS,
   CARE_TYPE_LABELS,
@@ -45,8 +46,6 @@ interface FilterPanelProps {
   onAfterChange?: () => void;
 }
 
-const nativeSelectCls =
-  "flex h-9 w-full cursor-pointer rounded-lg border border-input bg-white px-3 text-sm text-soft-black transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal disabled:cursor-not-allowed disabled:opacity-50";
 
 export function FilterPanel({
   initialFilters,

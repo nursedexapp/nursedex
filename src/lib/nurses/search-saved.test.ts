@@ -27,6 +27,7 @@ function profileRow(userId: string) {
     is_available: true,
     unavailable_visibility: null,
     profile_completeness: 50,
+    verified_at: null,
     years_experience: 4,
     verification_status: "verified",
     bio: null,

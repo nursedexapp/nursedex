@@ -4,6 +4,7 @@ import {
   parseSearchParams,
   toURLSearchParams,
   isEmptyFilterSet,
+  effectiveSort,
   GENDER_FILTER_ANY,
 } from "./search-params";
 import { Skill, Gender } from "@/types/enums";
@@ -20,6 +21,7 @@ function card(overrides: Partial<RankableNurse>): RankableNurse {
     review_count: 0,
     avg_rating: null,
     profile_completeness: 0,
+    verified_at: null,
     ...overrides,
   };
 }
@@ -68,10 +70,12 @@ describe("rankNurses", () => {
     const emailNurse = card({
       communication_preference: "email",
       profile_completeness: 10,
+      verified_at: null,
     });
     const phoneNurse = card({
       communication_preference: "phone",
       profile_completeness: 90,
+      verified_at: null,
     });
     const ranked = rankNurses([phoneNurse, emailNurse], "email");
     expect(ranked[0]).toBe(emailNurse);
@@ -81,10 +85,12 @@ describe("rankNurses", () => {
     const emailNurse = card({
       communication_preference: "email",
       profile_completeness: 10,
+      verified_at: null,
     });
     const phoneNurse = card({
       communication_preference: "phone",
       profile_completeness: 90,
+      verified_at: null,
     });
     const ranked = rankNurses([emailNurse, phoneNurse], null);
     expect(ranked[0]).toBe(phoneNurse);
@@ -239,5 +245,57 @@ describe("gender filter semantics", () => {
     // gender='prefer_not_to_say' are excluded from any specific selection.
     const f = parseSearchParams({ gender: "female" });
     expect(f.gender).toBe("female");
+  });
+});
+
+// ── The sort control (#725) ───────────────────────────────────
+//
+// The family had no say in the order at all, and no way to see what it was.
+// The sort lives in the URL like every other filter, so a sorted search can be
+// shared and reloaded and paging keeps it.
+describe("the sort parameter", () => {
+  it("defaults to best match, which is the ranking the page already uses", () => {
+    expect(parseSearchParams({}).sort).toBe("best");
+  });
+
+  it("reads a sort the family chose", () => {
+    expect(parseSearchParams({ sort: "closest" }).sort).toBe("closest");
+    expect(parseSearchParams({ sort: "complete" }).sort).toBe("complete");
+  });
+
+  it("falls back to best match on a sort nobody offers", () => {
+    // Hand-edited URLs reach this. An unknown sort must not empty the page or
+    // throw; it just means the default order.
+    expect(parseSearchParams({ sort: "cheapest" }).sort).toBe("best");
+  });
+
+  it("keeps the sort in the URL so a shared link opens the same way", () => {
+    const params = toURLSearchParams({ sort: "rating" });
+    expect(params.get("sort")).toBe("rating");
+  });
+
+  it("leaves the default out of the URL", () => {
+    // Otherwise every link carries a parameter that changes nothing, and the
+    // filter chips have to know to ignore it.
+    expect(toURLSearchParams({ sort: "best" }).get("sort")).toBeNull();
+  });
+});
+
+describe("effectiveSort", () => {
+  // Closest needs somewhere to measure from. Asked for without a placed zip
+  // it cannot be honoured, and pretending otherwise would leave the control
+  // showing an order the page is not in, with nothing saying so.
+  it("keeps closest when there is a zip to measure from", () => {
+    expect(effectiveSort("closest", true)).toBe("closest");
+  });
+
+  it("falls back to best match when there is not", () => {
+    expect(effectiveSort("closest", false)).toBe("best");
+  });
+
+  it("leaves every other sort alone", () => {
+    expect(effectiveSort("rating", false)).toBe("rating");
+    expect(effectiveSort("complete", false)).toBe("complete");
+    expect(effectiveSort("newest", false)).toBe("newest");
   });
 });
