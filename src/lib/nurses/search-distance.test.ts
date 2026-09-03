@@ -57,6 +57,8 @@ function profileRow(userId: string, zip: string | null) {
     unavailable_visibility: null,
     profile_completeness: 50,
     verified_at: null,
+    photo_focal_x: 50,
+    photo_focal_y: 25,
     years_experience: 4,
     verification_status: "verified",
     bio: "Ten years with medically complex children.",

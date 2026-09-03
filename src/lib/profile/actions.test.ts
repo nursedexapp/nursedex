@@ -287,3 +287,25 @@ describe("deletePhoto", () => {
     });
   });
 });
+
+describe("saving where her face is", () => {
+  // The card crops her photo to a circle, so the point she chose has to reach
+  // the database or the picker is a control that does nothing (#768).
+  beforeEach(() => {
+    h.state.singles = [];
+    h.calls.profileUpdates.length = 0;
+  });
+
+  it("persists the point with the bio and photos step", async () => {
+    await saveOnboardingStep(4, {
+      bio: "Seven years on overnight shifts.",
+      photos: ["a.jpg"],
+      photo_focal_x: 30,
+      photo_focal_y: 70,
+    });
+
+    expect(h.calls.profileUpdates).toContainEqual(
+      expect.objectContaining({ photo_focal_x: 30, photo_focal_y: 70 }),
+    );
+  });
+});

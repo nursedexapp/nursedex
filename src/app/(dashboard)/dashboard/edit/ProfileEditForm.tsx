@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_FOCAL } from "@/lib/profile/focal-point";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -100,6 +101,8 @@ export function ProfileEditForm({
     additional_certs: profile.additional_certs as string[],
     bio: profile.bio || "",
     photos: profile.photos as string[],
+    photo_focal_x: (profile.photo_focal_x as number) ?? DEFAULT_FOCAL.x,
+    photo_focal_y: (profile.photo_focal_y as number) ?? DEFAULT_FOCAL.y,
     contact_email: userEmail,
     contact_phone: userPhone,
     communication_preference: userCommPref,
@@ -297,6 +300,8 @@ export function ProfileEditForm({
             values={{
               bio: values.bio,
               photos: values.photos,
+              photo_focal_x: values.photo_focal_x ?? DEFAULT_FOCAL.x,
+              photo_focal_y: values.photo_focal_y ?? DEFAULT_FOCAL.y,
             }}
             photoUrls={photoUrls}
             tier={tier}

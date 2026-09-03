@@ -247,7 +247,13 @@ function Avatar({ nurse, name }: { nurse: NurseSearchCard; name: string }) {
           alt={name}
           fill
           sizes="64px"
-          className="object-cover object-[50%_25%]"
+          className="object-cover"
+          // Where she says her face is (#768). The defaults are the upper
+          // third the card used to hard-code, so a photo nobody has adjusted
+          // is framed exactly as before.
+          style={{
+            objectPosition: `${nurse.photo_focal_x}% ${nurse.photo_focal_y}%`,
+          }}
         />
       ) : (
         <span

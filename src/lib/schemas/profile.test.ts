@@ -379,3 +379,43 @@ describe("step5Schema", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("where her face is in the photo", () => {
+  // Two percentages, saved with the rest of step 4 (#768). A value outside
+  // the photo crops to nothing, and a form that never showed the picker must
+  // still save rather than being refused for a field she was never asked.
+  it("accepts a point on the photo", () => {
+    const schema = step4Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      bio: "My bio",
+      photos: ["photo-1.jpg"],
+      photo_focal_x: 30,
+      photo_focal_y: 70,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.photo_focal_x).toBe(30);
+      expect(result.data.photo_focal_y).toBe(70);
+    }
+  });
+
+  it("refuses a point outside the photo", () => {
+    const schema = step4Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      bio: "My bio",
+      photos: ["photo-1.jpg"],
+      photo_focal_x: 140,
+      photo_focal_y: 50,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("saves fine when the form never asked", () => {
+    const schema = step4Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      bio: "My bio",
+      photos: ["photo-1.jpg"],
+    });
+    expect(result.success).toBe(true);
+  });
+});

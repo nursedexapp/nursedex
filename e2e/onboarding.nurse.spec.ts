@@ -30,12 +30,14 @@ const fixture = () =>
 interface ProfileRow {
   slug: string;
   verification_status: string;
+  photo_focal_x: number;
+  photo_focal_y: number;
 }
 
 async function profileOf(nurseId: string): Promise<ProfileRow | null> {
   const { data } = await serviceClient()
     .from("nurse_profiles")
-    .select("slug, verification_status")
+    .select("slug, verification_status, photo_focal_x, photo_focal_y")
     .eq("user_id", nurseId)
     .maybeSingle();
   return data as ProfileRow | null;
@@ -151,6 +153,52 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
   await expect(page.getByText("Frame your photo")).toBeHidden({
     timeout: 30_000,
   });
+
+  // ── Where her face is (#768)
+  //
+  // The one part of this that unit tests cannot reach: the control works out
+  // a position from where a click lands inside a REAL laid out image, and a
+  // stubbed rectangle proves nothing about that. Asserted here, and again
+  // against the saved profile below, because the control changing on screen
+  // and the choice reaching her profile are two different things and the
+  // second one was broken while the first looked perfect.
+  const framing = page.getByRole("button", {
+    name: "Set where your face is in the photo",
+  });
+  await expect(framing).toBeVisible();
+
+  const preview = page.getByTestId("focal-preview");
+  const framedBefore = await preview.evaluate(
+    (el) => getComputedStyle(el).objectPosition,
+  );
+
+  // Clicked through the locator rather than at raw viewport coordinates: this
+  // control sits below a bio box and a photo, so it is usually off screen, and
+  // page.mouse.click does not scroll to anything. The position is relative to
+  // the element, low and to the left, nowhere near the upper-third default.
+  const box = await framing.boundingBox();
+  if (!box) throw new Error("The framing control rendered with no box to click.");
+  await framing.click({
+    position: { x: box.width * 0.25, y: box.height * 0.8 },
+  });
+
+  await expect
+    .poll(async () =>
+      preview.evaluate((el) => getComputedStyle(el).objectPosition),
+    )
+    .not.toBe(framedBefore);
+
+  // And by keyboard, which is the only way in for a nurse who cannot drag.
+  const framedAfterClick = await preview.evaluate(
+    (el) => getComputedStyle(el).objectPosition,
+  );
+  await framing.press("ArrowUp");
+  await expect
+    .poll(async () =>
+      preview.evaluate((el) => getComputedStyle(el).objectPosition),
+    )
+    .not.toBe(framedAfterClick);
+
   await continueTo(page, "Contact information");
 
   // ── Step 5: contact
@@ -174,6 +222,13 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
   expect(profile!.verification_status).toBe("pending");
   const slug = profile!.slug;
   expect(slug).toBeTruthy();
+
+  // The framing she chose reached her profile. This is the half that was
+  // broken while the control on screen worked perfectly: the step's save
+  // payload did not carry it, so the choice was thrown away on Continue.
+  expect([profile!.photo_focal_x, profile!.photo_focal_y]).not.toEqual([
+    50, 25,
+  ]);
 
   // ── THE GATE. A finished profile is not a public one. Until an admin says so,
   //    a family looking her up finds nothing there.

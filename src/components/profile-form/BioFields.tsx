@@ -2,7 +2,9 @@
 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useState } from "react";
 import { PhotoUpload } from "./PhotoUpload";
+import { PhotoFocalPicker } from "./PhotoFocalPicker";
 import type { NurseTier } from "@/types/enums";
 import { TIER_LIMITS } from "@/lib/constants";
 import {
@@ -15,6 +17,8 @@ interface BioFieldsProps {
   values: {
     bio: string;
     photos: string[];
+    photo_focal_x: number;
+    photo_focal_y: number;
   };
   photoUrls: (string | null)[];
   tier: NurseTier;
@@ -29,6 +33,15 @@ export function BioFields({
   onChange,
   errors,
 }: BioFieldsProps) {
+  // URLs for photos uploaded during THIS visit. photoUrls is server-rendered
+  // and only covers photos that existed at page load, so on the sign-up step
+  // it is empty for the photo she just added, and the framing control would
+  // not appear until the page was reloaded (#768).
+  const [uploadedUrls, setUploadedUrls] = useState<Record<string, string>>({});
+  const firstPhoto = values.photos[0];
+  const firstPhotoUrl =
+    photoUrls[0] ?? (firstPhoto ? uploadedUrls[firstPhoto] : undefined);
+
   const maxBio = TIER_LIMITS[tier].bioMaxLength;
   const bioLength = values.bio.length;
   const bioPercent = bioLength / maxBio;
@@ -87,9 +100,27 @@ export function BioFields({
           photoUrls={photoUrls}
           tier={tier}
           onChange={(photos) => onChange("photos", photos)}
+          onPhotoResolved={(path, url) =>
+            setUploadedUrls((prev) => ({ ...prev, [path]: url }))
+          }
         />
         {errors.photos && (
           <p className="text-destructive text-xs">{errors.photos}</p>
+        )}
+        {/* Only once there is a photo to position, and only when its URL has
+            arrived: a picker over a blank box would be a control with nothing
+            to control. */}
+        {firstPhotoUrl && (
+          <div className="pt-2">
+            <PhotoFocalPicker
+              src={firstPhotoUrl}
+              focal={{ x: values.photo_focal_x, y: values.photo_focal_y }}
+              onChange={(focal) => {
+                onChange("photo_focal_x", focal.x);
+                onChange("photo_focal_y", focal.y);
+              }}
+            />
+          </div>
         )}
       </div>
     </>

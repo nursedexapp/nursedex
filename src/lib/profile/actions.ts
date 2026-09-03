@@ -214,6 +214,8 @@ export async function saveOnboardingStep(
         bio: data.bio,
         photos,
         has_photo: photos.length > 0,
+        photo_focal_x: data.photo_focal_x,
+        photo_focal_y: data.photo_focal_y,
       })
       .eq("user_id", user.id);
 
@@ -436,6 +438,8 @@ export async function updateNurseProfile(
     bio: data.bio,
     photos,
     has_photo: photos.length > 0,
+    photo_focal_x: data.photo_focal_x,
+    photo_focal_y: data.photo_focal_y,
     rate_min: data.rate_min ?? null,
     rate_max: data.rate_max ?? null,
     has_transportation: data.has_transportation,

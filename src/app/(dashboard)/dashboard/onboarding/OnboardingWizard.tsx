@@ -1,5 +1,6 @@
 "use client";
 
+import { DEFAULT_FOCAL } from "@/lib/profile/focal-point";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -293,6 +294,11 @@ export function OnboardingWizard({
       {
         bio: draft.bio || "",
         photos: draft.photos || [],
+        // Without these the picker above changes the draft and the save
+        // throws the choice away, so the control looks like it works and
+        // nothing reaches her profile (#768).
+        photo_focal_x: draft.photo_focal_x ?? DEFAULT_FOCAL.x,
+        photo_focal_y: draft.photo_focal_y ?? DEFAULT_FOCAL.y,
       },
       5,
     );
@@ -480,6 +486,8 @@ export function OnboardingWizard({
           values={{
             bio: draft.bio || "",
             photos: draft.photos || [],
+            photo_focal_x: draft.photo_focal_x ?? DEFAULT_FOCAL.x,
+            photo_focal_y: draft.photo_focal_y ?? DEFAULT_FOCAL.y,
           }}
           photoUrls={photoUrls}
           tier={tier}
