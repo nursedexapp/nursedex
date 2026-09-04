@@ -17,6 +17,7 @@ import {
   sendNewsletterBatch,
 } from "@/lib/email/send";
 
+import { toTypedFailure, toTypedCount } from "@/lib/db/results";
 export interface NewsletterResult {
   success: boolean;
   error?: "invalid" | "unknown" | "rate_limited";
@@ -58,21 +59,34 @@ export async function subscribeNewsletter(
     clientIpFrom((await headers()).get("x-forwarded-for")),
   );
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count } = await supabase
-    .from("newsletter_subscribers")
-    .select("id", { count: "exact", head: true })
-    .eq("ip_hash", ipHash)
-    .gte("created_at", oneHourAgo);
-  if (count !== null && count >= RATE_LIMIT_PER_HOUR) {
+  // A failed count is NOT "nobody has subscribed from here recently" (#847).
+  // The `count !== null` test reads a missing count as under the limit, which
+  // opens the one gate stopping this endpoint being used to blast confirmation
+  // emails at many addresses. A gate that opens when it cannot be read is not
+  // a gate.
+  const recent = await toTypedCount(
+    supabase
+      .from("newsletter_subscribers")
+      .select("id", { count: "exact", head: true })
+      .eq("ip_hash", ipHash)
+      .gte("created_at", oneHourAgo),
+    "recent newsletter subscriptions from this network",
+  );
+  if (!recent.ok) return { success: false, error: "unknown" };
+  if (recent.count >= RATE_LIMIT_PER_HOUR) {
     return { success: false, error: "rate_limited" };
   }
 
-  const { data: existing } = await supabase
-    .from("newsletter_subscribers")
-    .select("id, confirmed_at, unsubscribed_at")
-    .eq("email", input.email)
-    .maybeSingle();
-  const ex = existing as {
+  const existingRead = await toTypedFailure(
+    supabase
+      .from("newsletter_subscribers")
+      .select("id, confirmed_at, unsubscribed_at")
+      .eq("email", input.email)
+      .maybeSingle(),
+    "an existing newsletter subscription for this address",
+  );
+  if (!existingRead.ok) return { success: false, error: "unknown" };
+  const ex = existingRead.data as {
     id: string;
     confirmed_at: string | null;
     unsubscribed_at: string | null;
@@ -134,7 +148,11 @@ export async function subscribeNewsletter(
   return { success: true };
 }
 
-export type ConfirmResult = "confirmed" | "already" | "invalid";
+// "unavailable" is distinct from "invalid" on purpose (#847): "invalid" is a
+// claim about the token in somebody's email, and a read that fell over cannot
+// make it. Telling a real subscriber their confirmation link is bad is the one
+// answer they cannot act on, because the link is all they have.
+export type ConfirmResult = "confirmed" | "already" | "invalid" | "unavailable";
 
 /**
  * Confirm a subscription from the emailed link. Idempotent: re-visiting the
@@ -144,14 +162,22 @@ export async function confirmNewsletter(token: string): Promise<ConfirmResult> {
   if (!token) return "invalid";
   const supabase = createServiceRoleClient();
 
-  const { data: sub } = await supabase
-    .from("newsletter_subscribers")
-    .select("id, email, confirmed_at")
-    .eq("confirmation_token", token)
-    .maybeSingle();
-  const row = sub as
-    | { id: string; email: string; confirmed_at: string | null }
-    | null;
+  const subRead = await toTypedFailure(
+    supabase
+      .from("newsletter_subscribers")
+      .select("id, email, confirmed_at")
+      .eq("confirmation_token", token)
+      .maybeSingle(),
+    "the newsletter subscriber behind this link",
+  );
+  // Not "invalid": that is a claim about the token in somebody's email.
+  if (!subRead.ok) return "unavailable";
+  const sub = subRead.data;
+  const row = sub as {
+    id: string;
+    email: string;
+    confirmed_at: string | null;
+  } | null;
   if (!row) return "invalid";
   if (row.confirmed_at) return "already";
 
@@ -218,12 +244,15 @@ export async function sendNewsletterIssue(
   return { success: true, sent };
 }
 
-export type UnsubscribeResult = "ok" | "invalid";
+// "unavailable" is distinct from "invalid" (#847): "invalid" is a claim about
+// the token in somebody's email footer, and telling them their unsubscribe
+// link is bad, when the read simply failed, leaves them with no way out.
+export type UnsubscribeResult = "ok" | "invalid" | "unavailable";
 
 /** Unsubscribe by token (from the email footer). Idempotent. */
 export interface UnsubscribeByEmailResult {
   success: boolean;
-  error?: "invalid";
+  error?: "invalid" | "unknown";
 }
 
 /**
@@ -238,11 +267,18 @@ export async function unsubscribeByEmail(
   if (!parsed.success) return { success: false, error: "invalid" };
 
   const supabase = createServiceRoleClient();
-  await supabase
-    .from("newsletter_subscribers")
-    .update({ unsubscribed_at: new Date().toISOString() })
-    .eq("email", parsed.data.email)
-    .is("unsubscribed_at", null);
+  // Checked: this reported success on a write that never landed, so somebody
+  // who asked to stop receiving the newsletter was told they had, and kept
+  // receiving it (#847).
+  const write = await toTypedFailure(
+    supabase
+      .from("newsletter_subscribers")
+      .update({ unsubscribed_at: new Date().toISOString() })
+      .eq("email", parsed.data.email)
+      .is("unsubscribed_at", null),
+    "the unsubscribe write for this address",
+  );
+  if (!write.ok) return { success: false, error: "unknown" };
 
   return { success: true };
 }
@@ -253,19 +289,30 @@ export async function unsubscribeNewsletter(
   if (!token) return "invalid";
   const supabase = createServiceRoleClient();
 
-  const { data: sub } = await supabase
-    .from("newsletter_subscribers")
-    .select("id, unsubscribed_at")
-    .eq("unsubscribe_token", token)
-    .maybeSingle();
+  const subRead = await toTypedFailure(
+    supabase
+      .from("newsletter_subscribers")
+      .select("id, unsubscribed_at")
+      .eq("unsubscribe_token", token)
+      .maybeSingle(),
+    "the newsletter subscriber behind this link",
+  );
+  // Not "invalid": that is a claim about the token in somebody's email.
+  if (!subRead.ok) return "unavailable";
+  const sub = subRead.data;
   const row = sub as { id: string; unsubscribed_at: string | null } | null;
   if (!row) return "invalid";
 
   if (!row.unsubscribed_at) {
-    await supabase
-      .from("newsletter_subscribers")
-      .update({ unsubscribed_at: new Date().toISOString() })
-      .eq("id", row.id);
+    const write = await toTypedFailure(
+      supabase
+        .from("newsletter_subscribers")
+        .update({ unsubscribed_at: new Date().toISOString() })
+        .eq("id", row.id),
+      "the unsubscribe write for this link",
+    );
+    // "ok" would tell somebody they are unsubscribed when they are not.
+    if (!write.ok) return "unavailable";
   }
   return "ok";
 }

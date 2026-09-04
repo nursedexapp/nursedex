@@ -5,11 +5,18 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requireSuperAdmin } from "@/lib/auth/helpers";
 
+import { toTypedFailure } from "@/lib/db/results";
 export type RoleActionError =
   | "invalid"
   | "not_found"
   | "self_action"
   | "wrong_state"
+  // The database could not be read, so nothing is known either way (#847).
+  // Distinct from not_found, which is a claim about the row.
+  | "lookup_failed"
+  // The action applied but was not recorded in the admin log (#982). Retrying
+  // cannot help, which is why it says something different.
+  | "audit_unwritten"
   | "unknown";
 
 export interface RoleActionResult {
@@ -39,11 +46,16 @@ export async function promoteToAdmin(raw: unknown): Promise<RoleActionResult> {
   await requireSuperAdmin();
   const supabase = await createClient();
 
-  const { data: target } = await supabase
-    .from("users")
-    .select("id, role, is_deleted, is_suspended")
-    .eq("email", parsed.data.email)
-    .maybeSingle();
+  const targetRead = await toTypedFailure(
+    supabase
+      .from("users")
+      .select("id, role, is_deleted, is_suspended")
+      .eq("email", parsed.data.email)
+      .maybeSingle(),
+    "users (promoteToAdmin)",
+  );
+  if (!targetRead.ok) return { success: false, error: "lookup_failed" };
+  const target = targetRead.data;
   if (!target) return { success: false, error: "not_found" };
   if (target.is_deleted || target.is_suspended) {
     return { success: false, error: "wrong_state" };
@@ -81,11 +93,16 @@ export async function demoteAdmin(raw: unknown): Promise<RoleActionResult> {
   }
 
   const supabase = await createClient();
-  const { data: target } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("id", parsed.data.user_id)
-    .maybeSingle();
+  const targetRead = await toTypedFailure(
+    supabase
+      .from("users")
+      .select("id, role")
+      .eq("id", parsed.data.user_id)
+      .maybeSingle(),
+    "users (demoteAdmin)",
+  );
+  if (!targetRead.ok) return { success: false, error: "lookup_failed" };
+  const target = targetRead.data;
   if (!target) return { success: false, error: "not_found" };
   if (target.role !== "admin" && target.role !== "super_admin") {
     return { success: false, error: "wrong_state" };

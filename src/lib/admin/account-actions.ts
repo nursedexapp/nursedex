@@ -52,11 +52,16 @@ export async function suspendAccount(
   }
 
   const supabase = await createClient();
-  const { data: target } = await supabase
-    .from("users")
-    .select("id, email, first_name, role, is_suspended, is_deleted")
-    .eq("id", parsed.data.user_id)
-    .maybeSingle();
+  const targetRead = await toTypedFailure(
+    supabase
+      .from("users")
+      .select("id, email, first_name, role, is_suspended, is_deleted")
+      .eq("id", parsed.data.user_id)
+      .maybeSingle(),
+    "users (suspendAccount)",
+  );
+  if (!targetRead.ok) return { success: false, error: "lookup_failed" };
+  const target = targetRead.data;
 
   if (!target) return { success: false, error: "not_found" };
   if (target.is_deleted) return { success: false, error: "wrong_state" };
@@ -79,11 +84,21 @@ export async function suspendAccount(
     return { success: false, error: "wrong_state" };
   }
 
-  await supabase.from("admin_actions").insert({
-    admin_user_id: admin.id,
-    action_type: "suspend_user",
-    target_user_id: parsed.data.user_id,
-  });
+  // The audit row. Discarded, this leaves no record that the action happened,
+  // which is the one question an audit trail exists to answer (#847, #982).
+  //
+  // Checked but NOT returned on here: by this point the decision is applied,
+  // and returning early would skip the revalidation and any notification that
+  // follows, so the admin would be looking at a stale screen for a change that
+  // did happen. The work finishes and the result says what is missing.
+  const audit = await toTypedFailure(
+    supabase.from("admin_actions").insert({
+      admin_user_id: admin.id,
+      action_type: "suspend_user",
+      target_user_id: parsed.data.user_id,
+    }),
+    "the admin_actions record for this decision",
+  );
 
   // Ban the user at the auth level so their tokens stop validating. Best
   // effort: the real enforcement is getCurrentUser treating is_suspended as
@@ -103,6 +118,7 @@ export async function suspendAccount(
 
   revalidatePath("/admin");
   revalidatePath("/admin/accounts");
+  if (!audit.ok) return { success: false, error: "audit_unwritten" };
   return { success: true };
 }
 
@@ -115,11 +131,16 @@ export async function unsuspendAccount(
   const admin = await requireAdmin();
   const supabase = await createClient();
 
-  const { data: target } = await supabase
-    .from("users")
-    .select("id, is_suspended")
-    .eq("id", parsed.data.user_id)
-    .maybeSingle();
+  const targetRead = await toTypedFailure(
+    supabase
+      .from("users")
+      .select("id, is_suspended")
+      .eq("id", parsed.data.user_id)
+      .maybeSingle(),
+    "users (unsuspendAccount)",
+  );
+  if (!targetRead.ok) return { success: false, error: "lookup_failed" };
+  const target = targetRead.data;
   if (!target) return { success: false, error: "not_found" };
   if (!target.is_suspended) return { success: false, error: "wrong_state" };
 
@@ -138,11 +159,21 @@ export async function unsuspendAccount(
     return { success: false, error: "wrong_state" };
   }
 
-  await supabase.from("admin_actions").insert({
-    admin_user_id: admin.id,
-    action_type: "unsuspend_user",
-    target_user_id: parsed.data.user_id,
-  });
+  // The audit row. Discarded, this leaves no record that the action happened,
+  // which is the one question an audit trail exists to answer (#847, #982).
+  //
+  // Checked but NOT returned on here: by this point the decision is applied,
+  // and returning early would skip the revalidation and any notification that
+  // follows, so the admin would be looking at a stale screen for a change that
+  // did happen. The work finishes and the result says what is missing.
+  const audit = await toTypedFailure(
+    supabase.from("admin_actions").insert({
+      admin_user_id: admin.id,
+      action_type: "unsuspend_user",
+      target_user_id: parsed.data.user_id,
+    }),
+    "the admin_actions record for this decision",
+  );
 
   // Lift the auth-level ban applied on suspend.
   const service = createServiceRoleClient();
@@ -152,6 +183,7 @@ export async function unsuspendAccount(
 
   revalidatePath("/admin");
   revalidatePath("/admin/accounts");
+  if (!audit.ok) return { success: false, error: "audit_unwritten" };
   return { success: true };
 }
 

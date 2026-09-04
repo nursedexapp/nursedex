@@ -12,6 +12,7 @@ import {
 } from "@/lib/schemas/review";
 import { sendNewReviewEmail } from "@/lib/email/send";
 
+import { toTypedFailure } from "@/lib/db/results";
 export type ReviewActionError =
   | "not_authenticated"
   | "wrong_role"
@@ -20,6 +21,10 @@ export type ReviewActionError =
   | "not_found"
   | "not_editable"
   | "invalid"
+  // The database could not be read, so nothing is known either way (#847).
+  // Every neighbour above is a CLAIM about the data, and making one of those
+  // from a read that fell over is the defect.
+  | "could_not_check"
   | "unknown";
 
 export interface ReviewActionResult {
@@ -58,21 +63,31 @@ export async function submitFamilyReview(
 
   const supabase = await createClient();
 
-  const { data: reveal } = await supabase
-    .from("reveals")
-    .select("id")
-    .eq("family_user_id", user.id)
-    .eq("nurse_user_id", input.nurse_user_id)
-    .maybeSingle();
+  const revealRead = await toTypedFailure(
+    supabase
+      .from("reveals")
+      .select("id")
+      .eq("family_user_id", user.id)
+      .eq("nurse_user_id", input.nurse_user_id)
+      .maybeSingle(),
+    "reveals (submitFamilyReview)",
+  );
+  if (!revealRead.ok) return { success: false, error: "could_not_check" };
+  const reveal = revealRead.data;
   if (!reveal) return { success: false, error: "not_revealed" };
 
-  const { data: existing } = await supabase
-    .from("reviews")
-    .select("id")
-    .eq("reviewer_user_id", user.id)
-    .eq("nurse_user_id", input.nurse_user_id)
-    .eq("is_external", false)
-    .maybeSingle();
+  const existingRead = await toTypedFailure(
+    supabase
+      .from("reviews")
+      .select("id")
+      .eq("reviewer_user_id", user.id)
+      .eq("nurse_user_id", input.nurse_user_id)
+      .eq("is_external", false)
+      .maybeSingle(),
+    "reviews (submitFamilyReview)",
+  );
+  if (!existingRead.ok) return { success: false, error: "could_not_check" };
+  const existing = existingRead.data;
   if (existing) return { success: false, error: "already_reviewed" };
 
   const { data: inserted, error } = await supabase
@@ -141,11 +156,16 @@ export async function updateFamilyReview(
 
   const supabase = await createClient();
 
-  const { data: row } = await supabase
-    .from("reviews")
-    .select("id, status, reviewer_user_id, nurse_user_id, is_external")
-    .eq("id", reviewId)
-    .maybeSingle();
+  const rowRead = await toTypedFailure(
+    supabase
+      .from("reviews")
+      .select("id, status, reviewer_user_id, nurse_user_id, is_external")
+      .eq("id", reviewId)
+      .maybeSingle(),
+    "reviews (updateFamilyReview)",
+  );
+  if (!rowRead.ok) return { success: false, error: "could_not_check" };
+  const row = rowRead.data;
 
   if (!row || row.reviewer_user_id !== user.id || row.is_external) {
     return { success: false, error: "not_found" };

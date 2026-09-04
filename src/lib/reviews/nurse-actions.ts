@@ -12,10 +12,15 @@ import {
 } from "@/lib/schemas/review";
 import { containsProfanity } from "./profanity";
 
+import { toTypedFailure } from "@/lib/db/results";
 export type NurseResponseError =
   | "invalid"
   | "profanity"
   | "not_found"
+  // The database could not be read, so nothing is known either way (#847).
+  // Every neighbour above is a CLAIM about the data, and making one of those
+  // from a read that fell over is the defect.
+  | "could_not_check"
   | "unknown";
 
 export interface NurseResponseResult {
@@ -61,11 +66,16 @@ export async function saveNurseResponse(
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
 
-  const { data: row } = await supabase
-    .from("reviews")
-    .select("id, nurse_user_id")
-    .eq("id", input.review_id)
-    .maybeSingle();
+  const rowRead = await toTypedFailure(
+    supabase
+      .from("reviews")
+      .select("id, nurse_user_id")
+      .eq("id", input.review_id)
+      .maybeSingle(),
+    "reviews (saveNurseResponse)",
+  );
+  if (!rowRead.ok) return { success: false, error: "could_not_check" };
+  const row = rowRead.data;
 
   if (!row || row.nurse_user_id !== user.id) {
     return { success: false, error: "not_found" };
@@ -137,11 +147,16 @@ export async function deleteNurseResponse(
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
 
-  const { data: row } = await supabase
-    .from("reviews")
-    .select("id, nurse_user_id")
-    .eq("id", reviewId)
-    .maybeSingle();
+  const rowRead = await toTypedFailure(
+    supabase
+      .from("reviews")
+      .select("id, nurse_user_id")
+      .eq("id", reviewId)
+      .maybeSingle(),
+    "reviews (deleteNurseResponse)",
+  );
+  if (!rowRead.ok) return { success: false, error: "could_not_check" };
+  const row = rowRead.data;
 
   if (!row || row.nurse_user_id !== user.id) {
     return { success: false, error: "not_found" };

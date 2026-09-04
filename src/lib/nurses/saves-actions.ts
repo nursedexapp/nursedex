@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/auth/helpers";
 
+import { toTypedFailure } from "@/lib/db/results";
 export interface ToggleSaveResult {
   success: boolean;
   isSaved: boolean;
@@ -27,12 +28,25 @@ export async function toggleSavedNurse(
 
   const supabase = await createClient();
 
-  const { data: existing } = await supabase
-    .from("saved_nurses")
-    .select("id")
-    .eq("family_user_id", user.id)
-    .eq("nurse_user_id", nurseUserId)
-    .maybeSingle();
+  // A failed read is NOT "this nurse is not saved" (#847). This control is a
+  // TOGGLE, so answering that way makes it do the opposite of what the family
+  // asked: pressing unsave on a saved nurse would save them again. The heart
+  // stays where it was and the caller is told to try again.
+  const existingRead = await toTypedFailure(
+    supabase
+      .from("saved_nurses")
+      .select("id")
+      .eq("family_user_id", user.id)
+      .eq("nurse_user_id", nurseUserId)
+      .maybeSingle(),
+    "whether this family has saved this nurse",
+  );
+  // isSaved is not read on a refusal: SaveHeartButton rolls the heart back to
+  // what it was before the optimistic flip, for every unsuccessful result.
+  if (!existingRead.ok) {
+    return { success: false, isSaved: false, error: "could_not_check" };
+  }
+  const existing = existingRead.data;
 
   if (existing) {
     const { error } = await supabase
@@ -55,6 +69,7 @@ export async function toggleSavedNurse(
   }
 
   // Best-effort analytics increment, don't fail the save if it errors.
+  // eslint-disable-next-line local/require-db-error-check -- deliberately discarded. The value is a view and save counter on the nurse's own stats page, and NOTHING reads this result. The save itself is already written, so refusing here would fail a save the family asked for in order to protect a counter.
   await supabase
     .rpc("increment_nurse_analytics", {
       p_nurse_user_id: nurseUserId,
@@ -68,6 +83,7 @@ export async function toggleSavedNurse(
   // Best-effort upsell counter for the saved nurse. RLS would block a
   // family from writing to the nurse's row directly, so this goes through
   // a SECURITY DEFINER RPC.
+  // eslint-disable-next-line local/require-db-error-check -- deliberately discarded. The value is an upsell counter on the nurse's row, and NOTHING reads this result. The save itself is already written, so refusing here would fail a save the family asked for in order to protect a counter.
   await supabase
     .rpc("increment_save_count_for_upsell", { p_nurse_user_id: nurseUserId })
     .then(

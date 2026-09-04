@@ -6,6 +6,13 @@ const h = vi.hoisted(() => {
     // Queue of .single() results, consumed in call order:
     // 1. current nurse_profiles row, 2. fresh users row, 3. completeness row
     singles: [] as unknown[],
+    // #847. The tier read fell back to FREE on a failure, which is the
+    // STRICTER schema, so a Featured nurse's own bio and photos were rejected
+    // as over a limit they do not have. And softDeleteAccount wrote is_deleted
+    // unchecked, so a failed write signed somebody out believing they were
+    // gone while their profile stayed public.
+    singleError: null as { message: string } | null,
+    updateError: null as { message: string } | null,
   };
   const calls = {
     profileUpdates: [] as Record<string, unknown>[],
@@ -18,14 +25,20 @@ const h = vi.hoisted(() => {
         let updatingUsers = false;
         b.select = () => b;
         b.eq = () =>
-          updatingUsers ? Promise.resolve({ error: null }) : b;
+          updatingUsers
+            ? Promise.resolve({ data: null, error: state.updateError })
+            : b;
         b.update = (payload: Record<string, unknown>) => {
           if (table === "nurse_profiles") calls.profileUpdates.push(payload);
           if (table === "users") updatingUsers = true;
           return b;
         };
         b.single = () =>
-          Promise.resolve({ data: state.singles.shift() ?? null, error: null });
+          Promise.resolve(
+            state.singleError
+              ? { data: null, error: state.singleError }
+              : { data: state.singles.shift() ?? null, error: null },
+          );
         return b;
       },
       auth: { signOut: vi.fn() },
@@ -137,7 +150,10 @@ function seedSingles(verificationStatus: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(console, "error").mockImplementation(() => {});
   h.calls.profileUpdates = [];
+  h.state.singleError = null;
+  h.state.updateError = null;
 });
 
 describe("updateNurseProfile resubmission", () => {
@@ -353,6 +369,58 @@ describe("saving where her face is", () => {
 
     expect(h.calls.profileUpdates).toContainEqual(
       expect.objectContaining({ photo_focal_x: 30, photo_focal_y: 70 }),
+    );
+  });
+});
+
+// #847 / #990. A `"use server"` module returns rather than throws, because a
+// throwing server action reaches the client as a redacted digest. The one
+// deliberate exception is softDeleteAccount, whose caller in SettingsForm
+// records the opposite decision in its own comment: it redirects on success,
+// so a genuine failure has to throw for Sentry to see it, and swallowing that
+// into a "done" state would be the worse bug.
+describe("when a read or write the profile path depends on fails", () => {
+  it("does not apply the free tier limits to a nurse whose tier it could not read", async () => {
+    // FREE is the STRICTER schema, so falling back to it rejects a Featured
+    // nurse's own care types as over a limit they do not have. Step 2 is where
+    // the tier is read.
+    h.state.singleError = { message: "connection reset" };
+
+    const res = await saveOnboardingStep(2, {
+      credential: "rn",
+      license_number: "12345",
+      care_types: ["elderly"],
+      primary_care_type: null,
+    });
+
+    expect(res.error).toMatch(/try again/i);
+    expect(h.calls.profileUpdates).toHaveLength(0);
+  });
+
+  it("still validates against the free limits when the tier genuinely reads free", async () => {
+    // The positive control: a real free nurse must still be held to the free
+    // schema, or the refusal above would have removed the limit entirely.
+    h.state.singles = [{ tier: "free" }];
+
+    const res = await saveOnboardingStep(2, {
+      credential: "rn",
+      license_number: "",
+      care_types: ["elderly"],
+      primary_care_type: null,
+    });
+
+    expect(res.error).toBeTruthy();
+    expect(h.calls.profileUpdates).toHaveLength(0);
+  });
+
+  it("refuses to report an account deleted when the write did not land", async () => {
+    // Stripe is cancelled before this write and the person is signed out after
+    // it, so a silent failure leaves somebody believing they are gone while
+    // their profile stays public and their subscription stays cancelled.
+    h.state.updateError = { message: "permission denied" };
+
+    await expect(softDeleteAccount()).rejects.toThrow(
+      /the account deletion this person asked for could not be written/,
     );
   });
 });

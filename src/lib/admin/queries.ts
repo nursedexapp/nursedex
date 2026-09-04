@@ -6,6 +6,7 @@ import { SEED_EMAIL_PATTERN } from "./seed";
 import { RATE_LIMITS } from "@/lib/constants";
 import { flaggedSinceDate } from "@/lib/rate-limit/flagged";
 
+import { unwrapOrThrow, unwrapCountOrThrow } from "@/lib/db/results";
 export interface AdminCounts {
   pendingVerifications: number;
   pendingReviews: number;
@@ -17,34 +18,55 @@ export interface AdminCounts {
 export async function getAdminCounts(): Promise<AdminCounts> {
   const supabase = await createClient();
 
+  // Each of these is a badge on the admin navigation, and each was read as
+  // `count ?? 0`, so a failed count showed an empty queue: nothing to verify,
+  // nothing to moderate, no disputes and no removal requests (#847). An admin
+  // has no way to tell that from a quiet afternoon, and the queues they are
+  // not looking at are the ones with a person waiting at the other end.
+  //
+  // Wrapped INSIDE the Promise.all rather than unpacked after it, because an
+  // element of a Promise.all has no destructuring for any rule to inspect and
+  // no name to check later (#991).
   const [verifications, reviews, disputes, removals, pendingComments] =
     await Promise.all([
-      supabase
-        .from("nurse_profiles")
-        .select("user_id", { count: "exact", head: true })
-        .eq("verification_status", "pending"),
-      supabase
-        .from("reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending")
-        .eq("email_verified", true),
-      supabase
-        .from("reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "disputed"),
-      supabase
-        .from("reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("removal_requested", true)
-        .eq("status", "approved"),
+      unwrapCountOrThrow(
+        supabase
+          .from("nurse_profiles")
+          .select("user_id", { count: "exact", head: true })
+          .eq("verification_status", "pending"),
+        "the count of nurses awaiting verification",
+      ),
+      unwrapCountOrThrow(
+        supabase
+          .from("reviews")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pending")
+          .eq("email_verified", true),
+        "the count of reviews awaiting moderation",
+      ),
+      unwrapCountOrThrow(
+        supabase
+          .from("reviews")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "disputed"),
+        "the count of disputed reviews",
+      ),
+      unwrapCountOrThrow(
+        supabase
+          .from("reviews")
+          .select("id", { count: "exact", head: true })
+          .eq("removal_requested", true)
+          .eq("status", "approved"),
+        "the count of review removal requests",
+      ),
       getPendingCommentCount(),
     ]);
 
   return {
-    pendingVerifications: verifications.count ?? 0,
-    pendingReviews: reviews.count ?? 0,
-    pendingDisputes: disputes.count ?? 0,
-    removalRequests: removals.count ?? 0,
+    pendingVerifications: verifications,
+    pendingReviews: reviews,
+    pendingDisputes: disputes,
+    removalRequests: removals,
     pendingComments,
   };
 }
@@ -73,27 +95,30 @@ export interface VerificationQueueItem {
  */
 export async function getVerificationQueue(): Promise<VerificationQueueItem[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("nurse_profiles")
-    .select(
-      `
-      user_id,
-      slug,
-      credential,
-      license_number,
-      tier,
-      updated_at,
-      verification_rejected_reason,
-      users!inner (
-        first_name,
-        last_name,
-        email,
-        is_deleted,
-        is_suspended
+  const data = await unwrapOrThrow(
+    supabase
+      .from("nurse_profiles")
+      .select(
+        `
+        user_id,
+        slug,
+        credential,
+        license_number,
+        tier,
+        updated_at,
+        verification_rejected_reason,
+        users!inner (
+          first_name,
+          last_name,
+          email,
+          is_deleted,
+          is_suspended
+        )
+      `,
       )
-    `,
-    )
-    .eq("verification_status", "pending");
+      .eq("verification_status", "pending"),
+    "nurse_profiles (getVerificationQueue)",
+  );
 
   if (!data) return [];
 
@@ -213,33 +238,42 @@ const REVIEW_JOIN_SELECT = `
 
 export async function getPendingReviews(): Promise<AdminReviewRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("reviews")
-    .select(REVIEW_JOIN_SELECT)
-    .eq("status", "pending")
-    .eq("email_verified", true)
-    .order("created_at", { ascending: true });
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reviews")
+      .select(REVIEW_JOIN_SELECT)
+      .eq("status", "pending")
+      .eq("email_verified", true)
+      .order("created_at", { ascending: true }),
+    "reviews (getPendingReviews)",
+  );
   return ((data ?? []) as unknown as ReviewJoinRow[]).map(shapeReviewRow);
 }
 
 export async function getRemovalRequests(): Promise<AdminReviewRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("reviews")
-    .select(REVIEW_JOIN_SELECT)
-    .eq("removal_requested", true)
-    .eq("status", "approved")
-    .order("created_at", { ascending: true });
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reviews")
+      .select(REVIEW_JOIN_SELECT)
+      .eq("removal_requested", true)
+      .eq("status", "approved")
+      .order("created_at", { ascending: true }),
+    "reviews (getRemovalRequests)",
+  );
   return ((data ?? []) as unknown as ReviewJoinRow[]).map(shapeReviewRow);
 }
 
 export async function getDisputedReviews(): Promise<AdminReviewRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("reviews")
-    .select(REVIEW_JOIN_SELECT)
-    .eq("status", "disputed")
-    .order("created_at", { ascending: true });
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reviews")
+      .select(REVIEW_JOIN_SELECT)
+      .eq("status", "disputed")
+      .order("created_at", { ascending: true }),
+    "reviews (getDisputedReviews)",
+  );
   return ((data ?? []) as unknown as ReviewJoinRow[]).map(shapeReviewRow);
 }
 
@@ -259,22 +293,25 @@ export interface FlaggedNurseRow {
  */
 export async function getFlaggedNurses(): Promise<FlaggedNurseRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("reviews")
-    .select(
-      `
-      nurse_user_id,
-      rating,
-      status,
-      nurse:users!reviews_nurse_user_id_fkey (
-        first_name,
-        last_name,
-        nurse_profiles!inner (slug, avg_rating)
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reviews")
+      .select(
+        `
+        nurse_user_id,
+        rating,
+        status,
+        nurse:users!reviews_nurse_user_id_fkey (
+          first_name,
+          last_name,
+          nurse_profiles!inner (slug, avg_rating)
+        )
+      `,
       )
-    `,
-    )
-    .eq("status", "approved")
-    .lte("rating", 3);
+      .eq("status", "approved")
+      .lte("rating", 3),
+    "reviews (getFlaggedNurses)",
+  );
 
   type Row = {
     nurse_user_id: string;
@@ -354,7 +391,9 @@ export async function getAccounts(args: {
     );
   }
 
-  const { data } = await q;
+  // A failed read is NOT "no accounts match" (#847). This is the admin account
+  // search, so an empty answer reads as "that person is not on NurseDex".
+  const data = await unwrapOrThrow(q, "the admin account search results");
 
   return (
     (data ?? []) as Array<{
@@ -397,19 +436,25 @@ export interface RateLimitFlaggedRow {
  */
 export async function getRateLimitFlagged(): Promise<RateLimitFlaggedRow[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("rate_limit_reveals")
-    .select(
-      `
-      family_user_id,
-      consecutive_captcha_days,
-      date,
-      users:family_user_id ( email, first_name, last_name )
-    `,
-    )
-    .gte("consecutive_captcha_days", RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG)
-    .gte("date", flaggedSinceDate(new Date()))
-    .order("date", { ascending: false });
+  const data = await unwrapOrThrow(
+    supabase
+      .from("rate_limit_reveals")
+      .select(
+        `
+        family_user_id,
+        consecutive_captcha_days,
+        date,
+        users:family_user_id ( email, first_name, last_name )
+      `,
+      )
+      .gte(
+        "consecutive_captcha_days",
+        RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG,
+      )
+      .gte("date", flaggedSinceDate(new Date()))
+      .order("date", { ascending: false }),
+    "rate_limit_reveals (getRateLimitFlagged)",
+  );
 
   type Row = {
     family_user_id: string;

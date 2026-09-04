@@ -1,10 +1,7 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { scheduledCrons } from "@/lib/cron/vercel-crons";
-import {
-  expectedIntervalMs,
-  OVERDUE_FACTOR,
-} from "@/lib/cron/schedule-health";
+import { expectedIntervalMs, OVERDUE_FACTOR } from "@/lib/cron/schedule-health";
 
 /**
  * What the admin job health page shows (#888).

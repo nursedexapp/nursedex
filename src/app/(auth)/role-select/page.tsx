@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { selectRole } from "@/lib/auth/actions";
 import { PendingButton } from "@/components/ui/pending-button";
+import { useInFlight } from "@/components/ui/use-in-flight";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Heart, Stethoscope } from "lucide-react";
 
@@ -10,15 +12,22 @@ type Role = "nurse" | "family";
 
 export default function RoleSelectPage() {
   const [selected, setSelected] = useState<Role | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Through the shared primitive rather than a hand-rolled flag (#987): that
+  // flag cleared on a rejection and said nothing, and selectRole can now
+  // return a refusal rather than redirecting, so there is something to say.
+  const { inFlight, run } = useInFlight<"select">();
+  const loading = inFlight === "select";
 
-  async function handleSubmit() {
+  function handleSubmit() {
     if (!selected) return;
-    setLoading(true);
-    const formData = new FormData();
-    formData.set("role", selected);
-    await selectRole(formData);
-    setLoading(false);
+    run("select", async () => {
+      const formData = new FormData();
+      formData.set("role", selected);
+      // A successful selectRole redirects and never returns, so anything that
+      // comes back is a refusal.
+      const result = await selectRole(formData);
+      if (result?.error) toast.error(result.error);
+    });
   }
 
   return (

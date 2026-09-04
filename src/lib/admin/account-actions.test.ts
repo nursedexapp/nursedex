@@ -92,7 +92,9 @@ vi.mock("@/lib/auth/helpers", () => ({
   // eslint-disable-next-line local/no-mocked-auth-guard -- see above
   requireAdmin: async () => ({ id: "admin-1" }),
 }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => h.client() }));
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => h.client(),
+}));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client(),
 }));

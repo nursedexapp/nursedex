@@ -17,6 +17,15 @@ export type AuthResult = {
   success?: string;
 };
 
+/**
+ * What every one of these actions says when a read or write it depends on
+ * failed (#847). One sentence, because the person cannot act differently on
+ * which table it was, and the table name is ours rather than theirs. The
+ * operation is named to Sentry and the server log instead.
+ */
+const COULD_NOT_COMPLETE =
+  "We couldn't complete that just now. Please try again.";
+
 export async function signUp(formData: FormData): Promise<AuthResult> {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
@@ -84,11 +93,20 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
   // service.schema("auth").from("users"). Instead read the public.users mirror
   // (created at signup by the on_auth_user_created trigger) for the id, then
   // ask the GoTrue admin API whether the email is confirmed.
-  const { data: existing } = await service
-    .from("users")
-    .select("id, first_name")
-    .eq("email", email.toLowerCase())
-    .maybeSingle();
+  // A failed read is NOT "this is a brand new address" (#847). Answering that
+  // way sends a real owner through signUp, which Supabase silently obfuscates
+  // for an address that already has a confirmed account, so they are left on
+  // the "check your email" page for a message that will never arrive.
+  const existingRead = await toTypedFailure(
+    service
+      .from("users")
+      .select("id, first_name")
+      .eq("email", email.toLowerCase())
+      .maybeSingle(),
+    "an existing account for this address",
+  );
+  if (!existingRead.ok) return { error: COULD_NOT_COMPLETE };
+  const existing = existingRead.data;
 
   if (existing) {
     const { data: authData } = await service.auth.admin.getUserById(
@@ -182,11 +200,16 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    // A failed read is NOT "this person has no role" (#847). It decides where
+    // they land, and the no-role branch sends somebody who already chose one
+    // back to role-select. It also feeds the login event's role property, and
+    // a login recorded with a null role is indistinguishable from a real one.
+    const profileRead = await toTypedFailure(
+      supabase.from("users").select("role").eq("id", user.id).single(),
+      "the role of a signing in user",
+    );
+    if (!profileRead.ok) return { error: COULD_NOT_COMPLETE };
+    const profile = profileRead.data;
 
     // After the response, so a slow or failing analytics call cannot delay a
     // login or break it. Captured here rather than on the client because every
@@ -382,11 +405,16 @@ export async function resendConfirmation(
   // The auth schema is NOT exposed to PostgREST, so read the public.users
   // mirror for the id, then ask the GoTrue admin API for confirmation status.
   const admin = createServiceRoleClient();
-  const { data: existing } = await admin
-    .from("users")
-    .select("id")
-    .eq("email", email.toLowerCase())
-    .maybeSingle();
+  const existingRead = await toTypedFailure(
+    admin
+      .from("users")
+      .select("id")
+      .eq("email", email.toLowerCase())
+      .maybeSingle(),
+    "an existing account for a resend request",
+  );
+  if (!existingRead.ok) return { error: COULD_NOT_COMPLETE };
+  const existing = existingRead.data;
 
   const { data: authData } = existing
     ? await admin.auth.admin.getUserById(existing.id)
@@ -417,7 +445,9 @@ export async function resendConfirmation(
   return { success: "Confirmation email sent. Check your inbox." };
 }
 
-export async function selectRole(formData: FormData): Promise<void> {
+export async function selectRole(
+  formData: FormData,
+): Promise<AuthResult | void> {
   const role = formData.get("role") as string;
 
   if (role !== "nurse" && role !== "family") {
@@ -433,17 +463,28 @@ export async function selectRole(formData: FormData): Promise<void> {
     redirect("/login");
   }
 
-  // Update user role
-  await supabase.from("users").update({ role }).eq("id", user.id);
+  // Update user role. Checked: unchecked, a failed write left the person with
+  // no role at all while the redirect below sent them to a dashboard that
+  // gates on having one, so they bounced straight back here (#847).
+  const roleWrite = await toTypedFailure(
+    supabase.from("users").update({ role }).eq("id", user.id),
+    "the role chosen on the role select screen",
+  );
+  if (!roleWrite.ok) return { error: COULD_NOT_COMPLETE };
 
   // Create the corresponding profile
   if (role === "nurse") {
     // Generate a temporary slug
-    const { data: userData } = await supabase
-      .from("users")
-      .select("first_name, last_name")
-      .eq("id", user.id)
-      .single();
+    const nameRead = await toTypedFailure(
+      supabase
+        .from("users")
+        .select("first_name, last_name")
+        .eq("id", user.id)
+        .single(),
+      "the name to build a nurse's first slug from",
+    );
+    if (!nameRead.ok) return { error: COULD_NOT_COMPLETE };
+    const userData = nameRead.data;
 
     const baseName =
       userData?.first_name && userData?.last_name
@@ -452,15 +493,26 @@ export async function selectRole(formData: FormData): Promise<void> {
             .replace(/[^a-z0-9-]/g, "")
         : user.id.slice(0, 8);
 
-    await supabase.from("nurse_profiles").insert({
-      user_id: user.id,
-      slug: `${baseName}-${Date.now().toString(36)}`,
-      credential: "hha", // placeholder, updated during onboarding
-    });
+    // Checked: the role is already written by now, so an unchecked failure
+    // here leaves a nurse with a role and no profile row, and every screen
+    // that reads the profile then behaves as though they do not exist.
+    const profileWrite = await toTypedFailure(
+      supabase.from("nurse_profiles").insert({
+        user_id: user.id,
+        slug: `${baseName}-${Date.now().toString(36)}`,
+        credential: "hha", // placeholder, updated during onboarding
+      }),
+      "the nurse profile row for a new nurse",
+    );
+    if (!profileWrite.ok) return { error: COULD_NOT_COMPLETE };
   } else {
-    await supabase.from("family_profiles").insert({
-      user_id: user.id,
-    });
+    const profileWrite = await toTypedFailure(
+      supabase.from("family_profiles").insert({
+        user_id: user.id,
+      }),
+      "the family profile row for a new family",
+    );
+    if (!profileWrite.ok) return { error: COULD_NOT_COMPLETE };
   }
 
   // Which of the two roles people pick is the single most useful fact the
