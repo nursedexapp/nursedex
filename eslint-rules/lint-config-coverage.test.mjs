@@ -170,3 +170,59 @@ export function F({ errors }: { errors: { email?: string } }) {
     expect(ids).not.toContain("local/require-pii-mask");
   });
 });
+
+// #847 / #986. A PostgREST call resolves to { data, error } rather than
+// throwing, so `const { data } = await supabase...` turns a failed read into an
+// empty answer and treats it as the truth. 283 sites did that on 4 September
+// 2026. The rule ships at `warn` for the length of the sweep, held by
+// scripts/db-error-ratchet.ts, so these assert the RULE ID is reported rather
+// than the severity: it has to be wired into the real config from the first
+// phase, or the sweep is the window in which number 284 gets written.
+const DISCARDED_DB_ERROR = `
+export async function load(supabase) {
+  const { data } = await supabase.from("nurse_profiles").select("slug");
+  return data;
+}
+`;
+
+describe("eslint.config.mjs coverage of the discarded-database-error guard", () => {
+  it("flags a discarded result in src/", async () => {
+    const ids = await ruleIdsFor(
+      DISCARDED_DB_ERROR,
+      path.join(repoRoot, "src/lib/example/queries.ts"),
+    );
+    expect(ids).toContain("local/require-db-error-check");
+  });
+
+  it("flags a discarded result in scripts/, which #584 says is in scope", async () => {
+    const ids = await ruleIdsFor(
+      DISCARDED_DB_ERROR,
+      path.join(repoRoot, "scripts/example-backfill.ts"),
+    );
+    expect(ids).toContain("local/require-db-error-check");
+  });
+
+  it("flags a discarded result in e2e/", async () => {
+    const ids = await ruleIdsFor(
+      DISCARDED_DB_ERROR,
+      path.join(repoRoot, "e2e/example.spec.ts"),
+    );
+    expect(ids).toContain("local/require-db-error-check");
+  });
+
+  it("does not flag a read routed through unwrapOrThrow", async () => {
+    const ids = await ruleIdsFor(
+      `
+import { unwrapOrThrow } from "@/lib/db/results";
+export async function load(supabase) {
+  return await unwrapOrThrow(
+    supabase.from("nurse_profiles").select("slug"),
+    "the nurse list",
+  );
+}
+`,
+      path.join(repoRoot, "src/lib/example/queries.ts"),
+    );
+    expect(ids).not.toContain("local/require-db-error-check");
+  });
+});

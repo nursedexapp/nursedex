@@ -10,6 +10,7 @@ import noHandRolledPageGuard from "./eslint-rules/no-hand-rolled-page-guard.mjs"
 import noHandWrittenStallCopy from "./eslint-rules/no-hand-written-stall-copy.mjs";
 import requireStatusPrecondition from "./eslint-rules/require-status-precondition.mjs";
 import requirePiiMask from "./eslint-rules/require-pii-mask.mjs";
+import requireDbErrorCheck from "./eslint-rules/require-db-error-check.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -34,6 +35,7 @@ export default [
           "no-hand-written-stall-copy": noHandWrittenStallCopy,
           "require-status-precondition": requireStatusPrecondition,
           "require-pii-mask": requirePiiMask,
+          "require-db-error-check": requireDbErrorCheck,
         },
       },
     },
@@ -81,6 +83,21 @@ export default [
       // (#714). Rendering PII without MASK_PII, or into an attribute without
       // BLOCK_PII, now fails CI.
       "local/require-pii-mask": "error",
+      // A PostgREST call does not throw: it resolves to { data, error }, so
+      // `const { data } = await supabase...` turns a permission change, an RLS
+      // refusal or a dropped connection into an empty answer and treats it as
+      // the truth. Around 244 sites did that on 4 September 2026 (#847), and
+      // the harm was never a blank screen: a family who had spent a reveal was
+      // told they had not, and a paying family was told they had no
+      // subscription (#845).
+      //
+      // At `warn` on purpose, for the length of the sweep in milestone 35 only.
+      // scripts/db-error-ratchet.ts holds the count where it is and fails CI
+      // when it RISES, so the sweep cannot be outrun by new instances of the
+      // very class it removes; #992 flips this to `error` once the tree is
+      // clean. A rule that lands last leaves the whole sweep as the window in
+      // which somebody writes number 245.
+      "local/require-db-error-check": "warn",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
