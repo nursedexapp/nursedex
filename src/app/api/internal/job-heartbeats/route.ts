@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { verifyBearerSecret } from "@/lib/security/shared-secret";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import vercelConfig from "../../../../../vercel.json";
+import { scheduledCronNames } from "@/lib/cron/vercel-crons";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,10 +33,15 @@ export const dynamic = "force-dynamic";
  * is not actually scheduled.
  */
 
-/** Every cron in vercel.json, named as withCronAlerting names it. */
-const SCHEDULED_JOB_NAMES = (vercelConfig.crons ?? []).map((cron) =>
-  cron.path.split("/").filter(Boolean).pop(),
-) as string[];
+/**
+ * Every cron in vercel.json, named as withCronAlerting names it.
+ *
+ * Derived in one shared place rather than here, because the admin job health
+ * page (#888) asks the same question. Two derivations would be two answers to
+ * "which jobs should exist", and the page could then reassure somebody about a
+ * set the watchdog was not watching.
+ */
+const SCHEDULED_JOB_NAMES = scheduledCronNames();
 
 interface HeartbeatRow {
   job_name: string;

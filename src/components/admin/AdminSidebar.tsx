@@ -12,6 +12,7 @@ import {
   BarChart3,
   KeyRound,
   FileText,
+  Timer,
   Menu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,10 @@ const NAV: NavItem[] = [
   { href: "/admin/disputes", label: "Disputes", icon: Flag },
   { href: "/admin/accounts", label: "Accounts", icon: Users },
   { href: "/admin/blog", label: "Blog", icon: FileText },
+  // Is everything running (#888). Not super admin only: it holds no user data,
+  // and an admin wondering why a review invite never went out should be able
+  // to look without asking.
+  { href: "/admin/jobs", label: "Scheduled jobs", icon: Timer },
   {
     href: "/admin/analytics",
     label: "Analytics",
