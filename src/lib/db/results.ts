@@ -76,11 +76,30 @@ export interface DbError {
   hint?: string | null;
 }
 
-/** A PostgREST result, as every Supabase query and write resolves to. */
+/**
+ * A PostgREST result, as every Supabase query and write resolves to.
+ *
+ * The helpers below are generic over the WHOLE result rather than over the row
+ * type, and read the row type back out with `R["data"]`. Supabase types a query
+ * as a UNION of a success shape (`{ data: Row; error: null }`) and a failure
+ * shape (`{ data: null; error: PostgrestError }`), and inferring a row type
+ * from `data: T | null` against both branches at once resolves it to `never`,
+ * after which the call site cannot read a single field off the row.
+ *
+ * What enforces this is `npm run typecheck` over the real call sites, and
+ * nothing else. There is deliberately no unit test for it: a hand-built union
+ * standing in for a Supabase response infers perfectly well, so such a test
+ * passes whichever signature is in place, and a test that cannot fail is worse
+ * than none. Reverting these two signatures to a row generic produces four
+ * errors in src/lib/admin/account-actions.ts, which is the guard.
+ */
 export interface DbResult<T> {
   data: T | null;
   error: DbError | null;
 }
+
+/** Anything shaped like a PostgREST result, including Supabase's own union. */
+type DbResultLike = { data: unknown; error: DbError | null };
 
 /**
  * Every helper takes the query as well as the awaited result, so a query
@@ -91,9 +110,7 @@ export interface DbResult<T> {
 type Awaitable<T> = T | PromiseLike<T>;
 
 /** The outcome a `"use server"` module hands back to the control that called it. */
-export type DbOutcome<T> =
-  | { ok: true; data: T | null }
-  | { ok: false; error: string };
+export type DbOutcome<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /** True when the only thing wrong is that no row matched. */
 function isRowNotFound(error: DbError | null): boolean {
@@ -130,10 +147,10 @@ export async function assertNoWriteError(
  * null rather than throwing, and is not reported anywhere, because it is an
  * answer.
  */
-export async function unwrapOrThrow<T>(
-  result: Awaitable<DbResult<T>>,
+export async function unwrapOrThrow<R extends DbResultLike>(
+  result: Awaitable<R>,
   context: string,
-): Promise<T | null> {
+): Promise<R["data"]> {
   const { data, error } = await result;
   if (!error) return data;
   if (isRowNotFound(error)) return null;
@@ -148,11 +165,11 @@ export async function unwrapOrThrow<T>(
  * For `"use server"` modules. Nothing throws, so this is the one helper that
  * has to report the failure itself.
  */
-export async function toTypedFailure<T>(
-  result: Awaitable<DbResult<T>>,
+export async function toTypedFailure<R extends DbResultLike>(
+  result: Awaitable<R>,
   context: string,
   userMessage: string = DB_FAILURE_MESSAGE,
-): Promise<DbOutcome<T>> {
+): Promise<DbOutcome<R["data"]>> {
   const { data, error } = await result;
   if (!error) return { ok: true, data };
   if (isRowNotFound(error)) return { ok: true, data: null };
