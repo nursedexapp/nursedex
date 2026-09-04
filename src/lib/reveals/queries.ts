@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { unwrapOrThrow } from "@/lib/db/results";
 import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import {
   NURSE_CARD_COLUMNS,
@@ -44,10 +45,16 @@ export async function getRevealedNurseIds(
   familyUserId: string,
 ): Promise<Set<string>> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("reveals")
-    .select("nurse_user_id, access_expires_at")
-    .eq("family_user_id", familyUserId);
+  // A failed read is NOT "this family has revealed nobody" (#847). This set
+  // marks and sorts search results, so an empty answer tells a family who has
+  // spent reveals that they have spent none, which is the #845 defect.
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reveals")
+      .select("nurse_user_id, access_expires_at")
+      .eq("family_user_id", familyUserId),
+    "this family's revealed nurses",
+  );
   const now = Date.now();
   return new Set(
     (data ?? [])

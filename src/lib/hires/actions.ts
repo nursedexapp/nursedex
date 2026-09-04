@@ -1,6 +1,7 @@
 "use server";
 
 import { after } from "next/server";
+import { toTypedFailure, toTypedCount } from "@/lib/db/results";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -27,6 +28,12 @@ export type HireActionError =
   | "not_found"
   | "wrong_state"
   | "too_soon"
+  // The database could not be read, so nothing is known either way (#847).
+  // Distinct from every neighbour above, each of which is a claim about the
+  // data: "not_revealed" told a family who HAD revealed the nurse that they
+  // had not, and "email_not_found" told a nurse that a real family's address
+  // does not exist.
+  | "could_not_check"
   | "unknown";
 
 // How long a nurse must wait before re-sending a hire-confirmation email to
@@ -57,20 +64,32 @@ export async function recordFamilyHire(
   const user = await requireRole(UserRole.FAMILY);
   const supabase = await createClient();
 
-  const { data: reveal } = await supabase
-    .from("reveals")
-    .select("id")
-    .eq("family_user_id", user.id)
-    .eq("nurse_user_id", parsed.data.nurse_user_id)
-    .maybeSingle();
-  if (!reveal) return { success: false, error: "not_revealed" };
+  // A failed read is NOT "this family never revealed this nurse" (#847).
+  // Answering that way refuses a hire from a family who did reveal them, and
+  // tells them they have to reveal the nurse first, which they cannot do twice.
+  const revealRead = await toTypedFailure(
+    supabase
+      .from("reveals")
+      .select("id")
+      .eq("family_user_id", user.id)
+      .eq("nurse_user_id", parsed.data.nurse_user_id)
+      .maybeSingle(),
+    "this family's reveal of this nurse",
+  );
+  if (!revealRead.ok) return { success: false, error: "could_not_check" };
+  if (!revealRead.data) return { success: false, error: "not_revealed" };
 
-  const { data: existing } = await supabase
-    .from("hires")
-    .select("id, status")
-    .eq("family_user_id", user.id)
-    .eq("nurse_user_id", parsed.data.nurse_user_id)
-    .maybeSingle();
+  const existingRead = await toTypedFailure(
+    supabase
+      .from("hires")
+      .select("id, status")
+      .eq("family_user_id", user.id)
+      .eq("nurse_user_id", parsed.data.nurse_user_id)
+      .maybeSingle(),
+    "this family's existing hire of this nurse",
+  );
+  if (!existingRead.ok) return { success: false, error: "could_not_check" };
+  const existing = existingRead.data;
   if (existing && existing.status !== "rejected") {
     return { success: false, error: "already_recorded" };
   }
@@ -131,11 +150,21 @@ export async function recordFamilyHire(
   // Notify the nurse using the service-role client to look up their
   // email; the family doesn't have RLS read on the nurse's user row.
   const service = createServiceRoleClient();
-  const { data: nurseUser } = await service
-    .from("users")
-    .select("email, first_name")
-    .eq("id", parsed.data.nurse_user_id)
-    .maybeSingle();
+  // Deliberately does NOT refuse. The hire is already written, which is what
+  // the family asked for, so reporting failure here would tell them their
+  // action did not happen when it did. What it must not do is stay silent: a
+  // failed read means the nurse is never told, and before this the send path
+  // reported success while delivering to nobody (L120). toTypedFailure logs it
+  // and files it to Sentry.
+  const nurseRead = await toTypedFailure(
+    service
+      .from("users")
+      .select("email, first_name")
+      .eq("id", parsed.data.nurse_user_id)
+      .maybeSingle(),
+    "the nurse to tell about a recorded hire",
+  );
+  const nurseUser = nurseRead.ok ? nurseRead.data : null;
   if (nurseUser?.email) {
     after(() =>
       sendHireConfirmedEmail({
@@ -177,11 +206,19 @@ export async function claimHireByEmail(
   const nurse = await requireRole(UserRole.NURSE);
   const service = createServiceRoleClient();
 
-  const { data: family } = await service
-    .from("users")
-    .select("id, email, first_name, role, is_deleted, is_suspended")
-    .eq("email", parsed.data.family_email)
-    .maybeSingle();
+  // A failed read is NOT "no such family" (#847). "email_not_found" is a claim
+  // about the address the nurse typed, and making it from a read that fell over
+  // sends them off to check a spelling that was right.
+  const familyRead = await toTypedFailure(
+    service
+      .from("users")
+      .select("id, email, first_name, role, is_deleted, is_suspended")
+      .eq("email", parsed.data.family_email)
+      .maybeSingle(),
+    "the family this nurse named by email",
+  );
+  if (!familyRead.ok) return { success: false, error: "could_not_check" };
+  const family = familyRead.data;
 
   if (!family || family.is_deleted || family.role !== "family") {
     return { success: false, error: "email_not_found" };
@@ -190,22 +227,31 @@ export async function claimHireByEmail(
     return { success: false, error: "no_reveal_record" };
   }
 
-  const { data: reveal } = await service
-    .from("reveals")
-    .select("id")
-    .eq("family_user_id", family.id)
-    .eq("nurse_user_id", nurse.id)
-    .maybeSingle();
-  if (!reveal) {
+  const revealRead = await toTypedFailure(
+    service
+      .from("reveals")
+      .select("id")
+      .eq("family_user_id", family.id)
+      .eq("nurse_user_id", nurse.id)
+      .maybeSingle(),
+    "the reveal linking this family and nurse",
+  );
+  if (!revealRead.ok) return { success: false, error: "could_not_check" };
+  if (!revealRead.data) {
     return { success: false, error: "no_reveal_record" };
   }
 
-  const { data: existing } = await service
-    .from("hires")
-    .select("id, status, claimed_by, claim_token")
-    .eq("family_user_id", family.id)
-    .eq("nurse_user_id", nurse.id)
-    .maybeSingle();
+  const existingRead = await toTypedFailure(
+    service
+      .from("hires")
+      .select("id, status, claimed_by, claim_token")
+      .eq("family_user_id", family.id)
+      .eq("nurse_user_id", nurse.id)
+      .maybeSingle(),
+    "an existing hire between this family and nurse",
+  );
+  if (!existingRead.ok) return { success: false, error: "could_not_check" };
+  const existing = existingRead.data;
   if (existing && existing.status !== "rejected") {
     // A pending claim the nurse already sent: re-send the confirmation
     // email (reusing the token) instead of blocking. A confirmed hire, or
@@ -216,28 +262,49 @@ export async function claimHireByEmail(
       const since = new Date(
         Date.now() - HIRE_CONFIRM_COOLDOWN_MS,
       ).toISOString();
-      const { count: recent } = await service
-        .from("email_log")
-        .select("id", { count: "exact", head: true })
-        .eq("recipient_user_id", family.id)
-        .eq("email_type", "hire_confirm_request")
-        .gte("sent_at", since);
-      if ((recent ?? 0) > 0) {
+      // A failed read is NOT "no email has gone out recently" (#847). The
+      // `?? 0` reads a missing count as none, which opens the one gate that
+      // stops this path being used to mail the same family over and over.
+      const recentRead = await toTypedCount(
+        service
+          .from("email_log")
+          .select("id", { count: "exact", head: true })
+          .eq("recipient_user_id", family.id)
+          .eq("email_type", "hire_confirm_request")
+          .gte("sent_at", since),
+        "recent hire confirmation emails to this family",
+      );
+      if (!recentRead.ok) return { success: false, error: "could_not_check" };
+      if (recentRead.count > 0) {
         return { success: false, error: "too_soon" };
       }
 
       const token = existing.claim_token ?? crypto.randomUUID();
       if (!existing.claim_token) {
-        await service
-          .from("hires")
-          .update({ claim_token: token })
-          .eq("id", existing.id);
+        // The token in the email is this row's only key. An unchecked failure
+        // here mails a link that matches nothing, and the family lands on a
+        // page telling them their confirmation is not valid.
+        const tokenWrite = await toTypedFailure(
+          service
+            .from("hires")
+            .update({ claim_token: token })
+            .eq("id", existing.id),
+          "the claim token for a resent hire confirmation",
+        );
+        if (!tokenWrite.ok) return { success: false, error: "unknown" };
       }
-      await service.from("email_log").insert({
-        recipient_user_id: family.id,
-        email_type: "hire_confirm_request",
-        dedup_key: existing.id,
-      });
+      // Before the email, and checked: this row IS the cooldown. Written after
+      // a failure it does not exist, so the next resend reads no recent send
+      // and the family can be mailed again immediately.
+      const logWrite = await toTypedFailure(
+        service.from("email_log").insert({
+          recipient_user_id: family.id,
+          email_type: "hire_confirm_request",
+          dedup_key: existing.id,
+        }),
+        "the email log entry for a resent hire confirmation",
+      );
+      if (!logWrite.ok) return { success: false, error: "unknown" };
       after(() =>
         sendHireConfirmRequestEmail({
           to: family.email,
@@ -305,12 +372,18 @@ export async function claimHireByEmail(
     hireId = inserted.id;
   }
 
-  // Log the send so a subsequent resend respects the cooldown window.
-  await service.from("email_log").insert({
-    recipient_user_id: family.id,
-    email_type: "hire_confirm_request",
-    dedup_key: hireId,
-  });
+  // Log the send so a subsequent resend respects the cooldown window. Checked,
+  // and before the email: written after a failure this row does not exist, so
+  // the next resend reads no recent send and mails the family again.
+  const claimLogWrite = await toTypedFailure(
+    service.from("email_log").insert({
+      recipient_user_id: family.id,
+      email_type: "hire_confirm_request",
+      dedup_key: hireId,
+    }),
+    "the email log entry for a hire confirmation request",
+  );
+  if (!claimLogWrite.ok) return { success: false, error: "unknown" };
   after(() =>
     sendHireConfirmRequestEmail({
       to: family.email,
@@ -338,11 +411,19 @@ export async function confirmHireFromToken(
   const user = await requireRole(UserRole.FAMILY);
   const supabase = await createClient();
 
-  const { data: row } = await supabase
-    .from("hires")
-    .select("id, status, family_user_id, nurse_user_id")
-    .eq("claim_token", parsed.data.token)
-    .maybeSingle();
+  // A failed read is NOT "there is no hire with this token" (#847).
+  // "not_found" tells a family their confirmation link is not valid, which is
+  // a claim about the link, and it is the last thing they can act on.
+  const tokenRead = await toTypedFailure(
+    supabase
+      .from("hires")
+      .select("id, status, family_user_id, nurse_user_id")
+      .eq("claim_token", parsed.data.token)
+      .maybeSingle(),
+    "the hire behind this confirmation link",
+  );
+  if (!tokenRead.ok) return { success: false, error: "could_not_check" };
+  const row = tokenRead.data;
   if (!row || row.family_user_id !== user.id) {
     return { success: false, error: "not_found" };
   }
@@ -373,11 +454,18 @@ export async function confirmHireFromToken(
 
   // Notify the nurse.
   const service = createServiceRoleClient();
-  const { data: nurseUser } = await service
-    .from("users")
-    .select("email, first_name")
-    .eq("id", row.nurse_user_id)
-    .maybeSingle();
+  // Same as the family path above: the confirmation is already written, so
+  // this does not refuse, but a failed read means the nurse is never told and
+  // that has to be reported rather than swallowed (L120).
+  const nurseRead = await toTypedFailure(
+    service
+      .from("users")
+      .select("email, first_name")
+      .eq("id", row.nurse_user_id)
+      .maybeSingle(),
+    "the nurse to tell about a confirmed hire",
+  );
+  const nurseUser = nurseRead.ok ? nurseRead.data : null;
   if (nurseUser?.email) {
     after(() =>
       sendHireConfirmedEmail({
@@ -408,11 +496,16 @@ export async function rejectHireFromToken(
   const user = await requireRole(UserRole.FAMILY);
   const supabase = await createClient();
 
-  const { data: row } = await supabase
-    .from("hires")
-    .select("id, status, family_user_id")
-    .eq("claim_token", parsed.data.token)
-    .maybeSingle();
+  const tokenRead = await toTypedFailure(
+    supabase
+      .from("hires")
+      .select("id, status, family_user_id")
+      .eq("claim_token", parsed.data.token)
+      .maybeSingle(),
+    "the hire behind this rejection link",
+  );
+  if (!tokenRead.ok) return { success: false, error: "could_not_check" };
+  const row = tokenRead.data;
   if (!row || row.family_user_id !== user.id) {
     return { success: false, error: "not_found" };
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { toTypedFailure } from "@/lib/db/results";
 
 // Worst case ~2.25s (3 delays between 4 attempts), well under the default
 // serverless timeout; not a background job, just a short bounded wait.
@@ -49,12 +50,22 @@ async function waitForProvisioning(sessionId: string): Promise<boolean> {
 
   const supabase = createServiceRoleClient();
   for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
-    const { data } = await supabase
-      .from("subscriptions")
-      .select("id")
-      .eq("stripe_subscription_id", subscriptionId)
-      .maybeSingle();
-    if (data) return true;
+    // A failed read is NOT "the subscription has not landed yet" (#847). It is
+    // indistinguishable from a slow webhook, so the loop just keeps polling and
+    // then sends the family on with provisioning=pending. That is the right
+    // OUTCOME, since the alternative is a blank error page after they have
+    // paid, but a failure has to be reported rather than counted as a miss:
+    // otherwise a database problem reads exactly like Stripe being slow, and
+    // this is the surface a family lands on straight after paying.
+    const row = await toTypedFailure(
+      supabase
+        .from("subscriptions")
+        .select("id")
+        .eq("stripe_subscription_id", subscriptionId)
+        .maybeSingle(),
+      "the subscription this checkout should have created",
+    );
+    if (row.ok && row.data) return true;
     if (attempt < POLL_ATTEMPTS - 1) await sleep(POLL_DELAY_MS);
   }
   return false;

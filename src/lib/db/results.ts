@@ -101,6 +101,9 @@ export interface DbResult<T> {
 /** Anything shaped like a PostgREST result, including Supabase's own union. */
 type DbResultLike = { data: unknown; error: DbError | null };
 
+/** A `select("...", { count: "exact" })` result, whose answer is the count. */
+type DbCountLike = { count: number | null; error: DbError | null };
+
 /**
  * Every helper takes the query as well as the awaited result, so a query
  * sitting as an element of a `Promise.all` can be wrapped where it is written
@@ -182,4 +185,51 @@ export async function toTypedFailure<R extends DbResultLike>(
     tags: { db_operation: context },
   });
   return { ok: false, error: userMessage };
+}
+
+/**
+ * The count from a `{ count: "exact" }` query, or a typed failure.
+ *
+ * A count needs its own pair of helpers because the answer is NOT in `data`:
+ * a `head: true` count returns `{ data: null, count: N }`, so a call site that
+ * reads the result through the data helpers gets `undefined` and `?? 0` turns
+ * it into a confident zero. Sixteen such queries share one Promise.all in the
+ * admin dashboard, each read as `count ?? 0`, so during a database problem the
+ * dashboard reports zero nurses, zero hires and zero revenue, indistinguishable
+ * from a genuinely empty product (#991).
+ *
+ * A null count without an error is refused rather than read as zero. PostgREST
+ * returns a number whenever a count was asked for, so a null one means the
+ * query did not carry the count option the caller thought it did, and zero is
+ * the one answer that would look plausible.
+ */
+export async function toTypedCount(
+  result: Awaitable<DbCountLike>,
+  context: string,
+  userMessage: string = DB_FAILURE_MESSAGE,
+): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const { count, error } = await result;
+  if (!error && count !== null) return { ok: true, count };
+  const message = error
+    ? `${context} failed: ${error.message}`
+    : `${context} returned no count, so the query did not ask for one`;
+  console.error(message);
+  Sentry.captureException(new Error(message), {
+    tags: { db_operation: context },
+  });
+  return { ok: false, error: userMessage };
+}
+
+/** The count, or a throw for the route's error boundary. See toTypedCount. */
+export async function unwrapCountOrThrow(
+  result: Awaitable<DbCountLike>,
+  context: string,
+): Promise<number> {
+  const { count, error } = await result;
+  if (!error && count !== null) return count;
+  const message = error
+    ? `${context} could not be read: ${error.message}`
+    : `${context} returned no count, so the query did not ask for one`;
+  console.error(message);
+  throw new Error(message);
 }

@@ -25,6 +25,14 @@ const h = vi.hoisted(() => {
     hireInsertError: null as unknown,
     /** Simulates losing a guarded UPDATE race: the WHERE matched no row. */
     guardLoses: false,
+    // #847. Each of these reads discarded its error, and each failure came
+    // back as a confident claim about the data: "you never revealed this
+    // nurse", "no account with that email", "no email went out recently".
+    revealReadError: null as { message: string } | null,
+    familyReadError: null as { message: string } | null,
+    hireReadError: null as { message: string } | null,
+    cooldownReadError: null as { message: string } | null,
+    emailLogWriteError: null as { message: string } | null,
   };
 
   const calls = {
@@ -50,13 +58,17 @@ const h = vi.hoisted(() => {
       // Token flows (confirm/reject) set tokenHireRow; recordFamilyHire's
       // duplicate check sets existingHire. The two flows never set both, so a
       // single builder serves both by preferring tokenHireRow.
-      maybeSingle: () => ({
-        data: state.tokenHireRow
-          ? { ...state.tokenHireRow }
-          : state.existingHire
-            ? { ...state.existingHire }
-            : null,
-      }),
+      maybeSingle: () =>
+        state.hireReadError
+          ? { data: null, error: state.hireReadError }
+          : {
+              data: state.tokenHireRow
+                ? { ...state.tokenHireRow }
+                : state.existingHire
+                  ? { ...state.existingHire }
+                  : null,
+              error: null,
+            },
       // recordFamilyHire inserts a confirmed hire; select("id") then single()
       // return the new row (pendingUpdate stays null so select just chains).
       insert: (payload) => {
@@ -105,7 +117,10 @@ const h = vi.hoisted(() => {
       if (table === "hires") return hiresServerBuilder();
       if (table === "reveals")
         return createQueryBuilder({
-          maybeSingle: () => ({ data: state.reveal }),
+          maybeSingle: () =>
+            state.revealReadError
+              ? { data: null, error: state.revealReadError }
+              : { data: state.reveal, error: null },
         });
       throw new Error(`unexpected table ${table}`);
     },
@@ -119,14 +134,25 @@ const h = vi.hoisted(() => {
         filters[col] = val;
         return "chain";
       },
-      maybeSingle: () => ({
-        data: "email" in filters ? state.family : state.nurseLookup,
-      }),
+      maybeSingle: () => {
+        if ("email" in filters && state.familyReadError) {
+          return { data: null, error: state.familyReadError };
+        }
+        return {
+          data: "email" in filters ? state.family : state.nurseLookup,
+          error: null,
+        };
+      },
     });
   }
 
   function revealsServiceBuilder() {
-    return createQueryBuilder({ maybeSingle: () => ({ data: state.reveal }) });
+    return createQueryBuilder({
+      maybeSingle: () =>
+        state.revealReadError
+          ? { data: null, error: state.revealReadError }
+          : { data: state.reveal, error: null },
+    });
   }
 
   // Two update shapes reach this table through the service-role client, and the
@@ -139,7 +165,10 @@ const h = vi.hoisted(() => {
     let pendingUpdate: Record<string, unknown> | null = null;
     let updateFilters: Record<string, unknown> = {};
     return createQueryBuilder({
-      maybeSingle: () => ({ data: state.existingHire }),
+      maybeSingle: () =>
+        state.hireReadError
+          ? { data: null, error: state.hireReadError }
+          : { data: state.existingHire, error: null },
       insert: (payload) => {
         calls.hireInsert.push(payload as Record<string, unknown>);
         return "chain";
@@ -190,11 +219,13 @@ const h = vi.hoisted(() => {
       gte: (...args) => {
         const [col, val] = args as [string, unknown];
         calls.cooldownQuery.push({ col, val });
-        return { count: state.recentEmailCount };
+        return state.cooldownReadError
+          ? { count: null, error: state.cooldownReadError }
+          : { count: state.recentEmailCount, error: null };
       },
       insert: (payload) => {
         calls.emailLogInsert.push(payload as Record<string, unknown>);
-        return { error: null };
+        return { data: null, error: state.emailLogWriteError };
       },
     });
   }
@@ -224,6 +255,7 @@ const h = vi.hoisted(() => {
 const { FAMILY_ID, OTHER_FAMILY_ID, NURSE_ID, FAMILY_EMAIL } = h;
 const TOKEN = "33333333-3333-4333-8333-333333333333";
 
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/server", () => ({ after: (fn: () => unknown) => fn() }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -269,6 +301,11 @@ beforeEach(() => {
   h.state.newHireId = "new-hire-1";
   h.state.hireInsertError = null;
   h.state.guardLoses = false;
+  h.state.revealReadError = null;
+  h.state.familyReadError = null;
+  h.state.hireReadError = null;
+  h.state.cooldownReadError = null;
+  h.state.emailLogWriteError = null;
   h.calls.hireUpdate = [];
   h.calls.hireInsert = [];
   h.calls.familyHireInsert = [];
@@ -671,5 +708,120 @@ describe("recordFamilyHire", () => {
     const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
     expect(res).toEqual({ success: false, error: "unknown" });
     expect(sendHireConfirmedEmail).not.toHaveBeenCalled();
+  });
+});
+
+// #847 / #988. Every read on this path discarded its error, and every failure
+// came back as a CLAIM about the data rather than as "we could not look". A
+// control is waiting on each of these, so they return rather than throw (#846),
+// and the sentence they return has to be one the person can act on.
+describe("when a read the hire path depends on fails", () => {
+  const FAMILY_ACTOR = { id: FAMILY_ID, role: "family", first_name: "Fam" };
+  const NURSE_ACTOR = { id: NURSE_ID, role: "nurse", first_name: "Nia" };
+
+  it("does not tell a family who revealed the nurse that they did not", async () => {
+    h.state.actor = FAMILY_ACTOR;
+    h.state.revealReadError = { message: "connection reset" };
+
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+
+    expect(res).toEqual({ success: false, error: "could_not_check" });
+    expect(h.calls.familyHireInsert).toHaveLength(0);
+  });
+
+  it("still says not_revealed when the family genuinely has not revealed", async () => {
+    // The positive control: the absent row has to stay an answer, or the
+    // refusal above would fire on every family who has not revealed the nurse.
+    h.state.actor = FAMILY_ACTOR;
+    h.state.reveal = null;
+
+    const res = await recordFamilyHire({ nurse_user_id: NURSE_ID });
+
+    expect(res).toEqual({ success: false, error: "not_revealed" });
+  });
+
+  it("does not tell a nurse that a real family's address has no account", async () => {
+    // "email_not_found" sends the nurse off to check a spelling that was right,
+    // and shows them the share-a-link fallback for a family already on NurseDex.
+    h.state.actor = NURSE_ACTOR;
+    h.state.familyReadError = { message: "connection reset" };
+
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+
+    expect(res).toEqual({ success: false, error: "could_not_check" });
+  });
+
+  it("does not tell a family their confirmation link is invalid", async () => {
+    h.state.actor = FAMILY_ACTOR;
+    h.state.hireReadError = { message: "connection reset" };
+
+    const res = await confirmHireFromToken({ token: TOKEN });
+
+    expect(res).toEqual({ success: false, error: "could_not_check" });
+  });
+
+  it("does not tell a family their rejection link is invalid", async () => {
+    h.state.actor = FAMILY_ACTOR;
+    h.state.hireReadError = { message: "connection reset" };
+
+    const res = await rejectHireFromToken({ token: TOKEN });
+
+    expect(res).toEqual({ success: false, error: "could_not_check" });
+  });
+});
+
+// The resend path's two gates, both of which failed OPEN. The cooldown is what
+// stops this being used to mail the same family over and over, and the email
+// log row IS the cooldown, so a discarded failure on either one lets the next
+// attempt through immediately.
+describe("the resend cooldown when its own reads and writes fail", () => {
+  beforeEach(() => {
+    h.state.actor = { id: NURSE_ID, role: "nurse", first_name: "Nia" };
+    h.state.family = {
+      id: FAMILY_ID,
+      email: FAMILY_EMAIL,
+      first_name: "Fam",
+      role: "family",
+      is_deleted: false,
+      is_suspended: false,
+    };
+    h.state.reveal = { id: "reveal-1" };
+    h.state.existingHire = {
+      id: "hire-1",
+      status: "claimed",
+      claimed_by: "nurse",
+      claim_token: TOKEN,
+    };
+  });
+
+  it("does not read an unreadable cooldown as no recent email", async () => {
+    h.state.cooldownReadError = { message: "connection reset" };
+
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+
+    expect(res).toEqual({ success: false, error: "could_not_check" });
+    expect(h.calls.emailLogInsert).toHaveLength(0);
+    expect(sendHireConfirmRequestEmail).not.toHaveBeenCalled();
+  });
+
+  it("still allows the resend when the cooldown genuinely reads zero", async () => {
+    // The positive control for the refusal above.
+    h.state.recentEmailCount = 0;
+
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+
+    expect(res.success).toBe(true);
+    expect(h.calls.emailLogInsert).toHaveLength(1);
+  });
+
+  it("does not send the email when the row that records it cannot be written", async () => {
+    // That row IS the cooldown. Sent without it, the next attempt reads no
+    // recent send and mails the family again straight away.
+    h.state.emailLogWriteError = { message: "permission denied" };
+
+    const res = await claimHireByEmail({ family_email: FAMILY_EMAIL });
+
+    expect(res).toEqual({ success: false, error: "unknown" });
+    expect(sendHireConfirmRequestEmail).not.toHaveBeenCalled();
   });
 });
