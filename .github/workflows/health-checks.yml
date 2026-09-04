@@ -71,6 +71,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          # Reads the production project's Skew Protection setting. It lives in
+          # the Vercel dashboard, so nothing in this repository can see it and
+          # nothing would report it being turned off.
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -o pipefail
           npm run test:health:services 2>&1 | tee health-checks.log
