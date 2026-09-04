@@ -186,3 +186,69 @@ export async function pollForProbe(deps: {
 
   return { state: "timed_out", waitedMs: deps.now() - started, attempts };
 }
+
+/**
+ * One whole round trip: capture a probe, then wait for it to become
+ * queryable. Flattened into one union so the retry rule below can be written
+ * over outcomes rather than over two nested shapes.
+ */
+export type AttemptResult =
+  | { state: "found"; waitedMs: number; attempts: number }
+  | { state: "capture_rejected"; status: number }
+  | { state: "query_rejected"; status: number }
+  | { state: "unreadable"; because: string }
+  | { state: "timed_out"; waitedMs: number; attempts: number };
+
+export interface ProbeRunResult {
+  final: AttemptResult;
+  attemptsUsed: number;
+  /** What each attempt that timed out waited for, kept for the message. */
+  timedOut: { waitedMs: number; attempts: number }[];
+}
+
+/**
+ * Runs the round trip, and sends a fresh probe if the first one times out
+ * (#960).
+ *
+ * On 2026-09-03 this check failed twice, twelve minutes apart, and the probe
+ * events were in PostHog the whole time: they took longer than the deadline to
+ * become queryable. Measured the following morning, three probes became
+ * queryable at 37.6s, 54.2s and 54.8s, so the normal case sits far inside the
+ * deadline and that was a transient excursion at PostHog rather than ingestion
+ * being broken.
+ *
+ * ONLY A TIMEOUT IS RETRIED. A rejected query means the API key is wrong; an
+ * unreadable answer means the query API changed shape; a refused capture means
+ * capture itself is failing. None of those is transient, so a second attempt
+ * would spend the whole budget again to be told the same thing, and would
+ * report a configuration fault as a slow one.
+ *
+ * The retry costs nothing on a healthy day, because the first attempt succeeds
+ * and the second never runs.
+ */
+export async function runIngestionProbe(deps: {
+  attempt: (attemptNumber: number) => Promise<AttemptResult>;
+  maxAttempts: number;
+}): Promise<ProbeRunResult> {
+  if (!Number.isInteger(deps.maxAttempts) || deps.maxAttempts < 1) {
+    throw new Error(
+      `runIngestionProbe needs at least one attempt, got ${deps.maxAttempts}. ` +
+        "Zero attempts would report an outcome nothing measured.",
+    );
+  }
+
+  const timedOut: { waitedMs: number; attempts: number }[] = [];
+  let final: AttemptResult = { state: "timed_out", waitedMs: 0, attempts: 0 };
+
+  for (let n = 1; n <= deps.maxAttempts; n += 1) {
+    final = await deps.attempt(n);
+
+    if (final.state !== "timed_out") {
+      return { final, attemptsUsed: n, timedOut };
+    }
+
+    timedOut.push({ waitedMs: final.waitedMs, attempts: final.attempts });
+  }
+
+  return { final, attemptsUsed: deps.maxAttempts, timedOut };
+}

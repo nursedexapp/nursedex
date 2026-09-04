@@ -30,11 +30,21 @@ jobs:
   services:
     name: Check the third party services answer
     runs-on: ubuntu-latest
-    # The four checks are one HTTP round trip each. Most of this job is the
-    # install. Ten minutes is far more than it needs and far less than the six
-    # hour default, which would let a hung request hold a runner and bill 360
-    # minutes (#809, L110).
-    timeout-minutes: 10
+    # Derived, not guessed. Four of the five checks are one HTTP round trip
+    # each and finish in seconds. The ingestion probe is the one that waits: it
+    # sends an event and polls until PostHog can answer for it, up to a six
+    # minute deadline, and sends a SECOND probe if the first times out (#960).
+    # So its worst case is 2 x 6 = 12 minutes, against about 55 seconds on a
+    # normal day.
+    #
+    # 20 = 12 for the probe, plus the other checks, plus checkout and install,
+    # with room to spare. Still far less than the six hour default, which would
+    # let a hung request hold a runner and bill 360 minutes (#809, L110).
+    #
+    # Raise this if the probe's deadline or its attempt count goes up, or the
+    # job will be killed mid retry and write no result at all, which is the one
+    # outcome this check cannot report.
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
