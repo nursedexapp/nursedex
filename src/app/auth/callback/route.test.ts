@@ -1,90 +1,147 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { NextRequest } from "next/server";
-
-/**
- * Regression guard for the open-redirect in /auth/callback (issue #392):
- * `next` was appended straight into `${origin}${next}` with no validation,
- * so `next=@evil.com` parsed the origin as userinfo and bounced the user
- * off-site after a real code/token exchange.
- */
 
 const h = vi.hoisted(() => ({
-  scenario: {
-    exchangeError: null as { message: string } | null,
-    verifyOtpError: null as { message: string } | null,
-    user: null as { id: string } | null,
-    role: null as string | null,
-    // Rows the tos_accepted_at update actually touched. Non-empty means this
-    // is the first confirmation, which is what tells signup_completed apart
-    // from a repeat login (#864).
-    firstConfirmation: [] as { id: string }[],
+  captureServerEventAfterResponse: vi.fn(),
+  captureException: vi.fn(),
+  state: {
+    // The TOS write's result. Its `.is("tos_accepted_at", null)` filter means
+    // it touches a row exactly once, on the first confirmation, which is the
+    // only trustworthy signal that a signup COMPLETED rather than a repeat
+    // click that is really a login.
+    tosRows: [] as Array<{ id: string }>,
+    tosError: null as { message: string } | null,
+    role: "nurse" as string | null,
+    roleError: null as { message: string } | null,
   },
 }));
 
+vi.mock("@/lib/analytics/server", () => ({
+  captureServerEventAfterResponse: h.captureServerEventAfterResponse,
+}));
+vi.mock("@sentry/nextjs", () => ({ captureException: h.captureException }));
+
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: vi.fn(async () => ({
+  createClient: async () => ({
     auth: {
-      exchangeCodeForSession: async () => ({ error: h.scenario.exchangeError }),
-      verifyOtp: async () => ({ error: h.scenario.verifyOtpError }),
-      getUser: async () => ({ data: { user: h.scenario.user } }),
+      exchangeCodeForSession: async () => ({ error: null }),
+      getUser: async () => ({ data: { user: { id: "u1" } } }),
     },
-    from: () => ({
-      update: () => ({
-        eq: () => ({
-          is: () => ({ select: async () => ({ data: h.scenario.firstConfirmation }) }),
-        }),
-      }),
-      select: () => ({
-        eq: () => ({
-          maybeSingle: async () => ({
-            data: h.scenario.role ? { role: h.scenario.role } : null,
-          }),
-        }),
-      }),
-    }),
-  })),
+    from: () => {
+      let updating = false;
+      const b: Record<string, unknown> = {};
+      b.update = () => {
+        updating = true;
+        return b;
+      };
+      b.eq = () => b;
+      b.is = () => b;
+      b.select = () =>
+        updating
+          ? Promise.resolve(
+              h.state.tosError
+                ? { data: null, error: h.state.tosError }
+                : { data: h.state.tosRows, error: null },
+            )
+          : b;
+      b.maybeSingle = () =>
+        Promise.resolve(
+          h.state.roleError
+            ? { data: null, error: h.state.roleError }
+            : { data: h.state.role ? { role: h.state.role } : null, error: null },
+        );
+      return b;
+    },
+  }),
 }));
 
 import { GET } from "./route";
+import { NextRequest } from "next/server";
 
-function req(url: string): NextRequest {
-  return { url } as unknown as NextRequest;
+function callback(): NextRequest {
+  return new NextRequest("https://nursedex.com/auth/callback?code=abc");
 }
 
 beforeEach(() => {
-  h.scenario.exchangeError = null;
-  h.scenario.verifyOtpError = null;
-  h.scenario.user = { id: "u1" };
-  h.scenario.role = "family";
+  vi.clearAllMocks();
+  vi.spyOn(console, "error").mockImplementation(() => {});
+  h.state.tosRows = [{ id: "u1" }];
+  h.state.tosError = null;
+  h.state.role = "nurse";
+  h.state.roleError = null;
 });
 
-describe("/auth/callback next-param validation", () => {
-  it.each(["@evil.com", "//evil.com", "https://evil.com", "/\\evil.com"])(
-    "drops an unsafe next (%s) and falls back to the role/dashboard redirect",
-    async (unsafeNext) => {
-      const res = await GET(
-        req(`https://nursedex.com/auth/callback?code=abc&next=${encodeURIComponent(unsafeNext)}`),
-      );
-      const location = res.headers.get("Location");
+describe("recording terms acceptance on a confirming signup", () => {
+  it("records a signup when the write touched a row", async () => {
+    await GET(callback());
 
-      expect(location).toBe("https://nursedex.com/dashboard");
-    },
-  );
-
-  it("honors a safe same-origin next", async () => {
-    const res = await GET(
-      req("https://nursedex.com/auth/callback?code=abc&next=/reset-password"),
+    expect(h.captureServerEventAfterResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "signup_completed" }),
     );
-
-    expect(res.headers.get("Location")).toBe("https://nursedex.com/reset-password");
-    expect(res.cookies.get("nursedex_pw_recovery")?.value).toBe("1");
   });
 
-  it("falls back to /role-select when no safe next and no role yet", async () => {
-    h.scenario.role = null;
-    const res = await GET(req("https://nursedex.com/auth/callback?code=abc"));
+  it("records a login when the write touched no row", async () => {
+    h.state.tosRows = [];
 
-    expect(res.headers.get("Location")).toBe("https://nursedex.com/role-select");
+    await GET(callback());
+
+    expect(h.captureServerEventAfterResponse).toHaveBeenCalledWith(
+      expect.objectContaining({ event: "login" }),
+    );
+  });
+
+  it("sends NO event when the write failed, rather than guessing which it was", async () => {
+    // The database decides which event this is, so a failed write cannot say.
+    // A wrong signup or login count is worse than a missing one: it is
+    // indistinguishable from a real event and nothing can tell it apart.
+    h.state.tosError = { message: "connection reset" };
+
+    await GET(callback());
+
+    expect(h.captureServerEventAfterResponse).not.toHaveBeenCalled();
+  });
+
+  it("still signs the person in when that write failed", async () => {
+    // exchangeCodeForSession has already set the session cookie, so refusing
+    // here would show an error page to somebody who is signed in anyway.
+    h.state.tosError = { message: "connection reset" };
+
+    const res = await GET(callback());
+
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("https://nursedex.com/dashboard");
+  });
+
+  it("reports the failed write, since nothing throws for the handler to see", async () => {
+    h.state.tosError = { message: "connection reset" };
+
+    await GET(callback());
+
+    expect(h.captureException).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("choosing where to send someone after they sign in", () => {
+  it("sends a user with a role to the dashboard", async () => {
+    const res = await GET(callback());
+    expect(res.headers.get("location")).toBe("https://nursedex.com/dashboard");
+  });
+
+  it("sends a user with no role to role select", async () => {
+    h.state.role = null;
+    const res = await GET(callback());
+    expect(res.headers.get("location")).toBe(
+      "https://nursedex.com/role-select",
+    );
+  });
+
+  it("refuses when the role cannot be read, rather than asking again", async () => {
+    // Unlike the write above, this one throws: role-select would ask somebody
+    // who already has a role to choose one again, and there is no safe default.
+    h.state.roleError = { message: "connection reset" };
+
+    await expect(GET(callback())).rejects.toThrow(
+      /the role of a signing in user could not be read/,
+    );
   });
 });

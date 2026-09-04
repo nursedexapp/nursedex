@@ -11,6 +11,7 @@ import { DisputeReviewDialog } from "@/components/reviews/DisputeReviewDialog";
 import { ReviewLinkCard } from "@/components/dashboard/ReviewLinkCard";
 import type { Review } from "@/types/database";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export const metadata: Metadata = {
   title: "Reviews | NurseDex",
 };
@@ -18,11 +19,14 @@ export const metadata: Metadata = {
 export default async function ReviewsPage() {
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select("slug, verification_status")
-    .eq("user_id", user.id)
-    .single();
+  const profile = await unwrapOrThrow(
+    supabase
+      .from("nurse_profiles")
+      .select("slug, verification_status")
+      .eq("user_id", user.id)
+      .single(),
+    "nurse_profiles (ReviewsPage)",
+  );
   const reviews = await getNurseReviews(user.id);
 
   const approved = reviews.filter((r) => r.status === "approved");
@@ -33,8 +37,7 @@ export default async function ReviewsPage() {
   // Base the empty state on what we actually render: a nurse whose only
   // review was rejected (or removed via a dispute) has reviews.length > 0 but
   // nothing in any section, which would otherwise leave the page blank.
-  const hasDisplayable =
-    pending.length + approved.length + disputed.length > 0;
+  const hasDisplayable = pending.length + approved.length + disputed.length > 0;
 
   return (
     <div className="mx-auto w-full max-w-3xl p-6 sm:p-8">

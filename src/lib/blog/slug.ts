@@ -1,6 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { slugify } from "./slugify";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 // Re-exported so existing server-side importers keep working; client code
 // should import from "./slugify" directly to avoid the service-role taint.
 export { slugify };
@@ -30,7 +31,10 @@ export async function ensureUniqueSlug(
     .like("slug", `${base}%`);
   if (excludeId) query = query.neq("id", excludeId);
 
-  const { data } = await query;
+  // A failed read is NOT "no slug starts with this base" (#847). It would hand
+  // back the bare base as available, and the insert that follows then loses to
+  // the unique constraint on a slug that is genuinely taken.
+  const data = await unwrapOrThrow(query, "the slugs already near this one");
   const taken = new Set((data ?? []).map((r) => r.slug as string));
 
   if (!taken.has(base)) return base;

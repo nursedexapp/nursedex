@@ -5,6 +5,7 @@ import { captureServerEventAfterResponse } from "@/lib/analytics/server";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { PASSWORD_RECOVERY } from "@/lib/constants";
 import { isSafeRedirectPath } from "@/lib/auth/safe-redirect";
+import { unwrapOrThrow, toTypedFailure } from "@/lib/db/results";
 
 const OTP_TYPES = new Set<EmailOtpType>([
   "signup",
@@ -36,7 +37,11 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     exchanged = !error;
-  } else if (tokenHash && tokenType && OTP_TYPES.has(tokenType as EmailOtpType)) {
+  } else if (
+    tokenHash &&
+    tokenType &&
+    OTP_TYPES.has(tokenType as EmailOtpType)
+  ) {
     const { error } = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
       type: tokenType as EmailOtpType,
@@ -54,15 +59,23 @@ export async function GET(request: NextRequest) {
     // .is filter makes this a no-op if it was already recorded, e.g.
     // when the user re-clicks the email link.
     if (user && (tokenType === "signup" || code)) {
-      const { data: firstConfirmation } = await supabase
-        .from("users")
-        .update({
-          tos_accepted_at: new Date().toISOString(),
-          tos_version: "1.0",
-        })
-        .eq("id", user.id)
-        .is("tos_accepted_at", null)
-        .select("id");
+      // Reported, not thrown (#847). exchangeCodeForSession above has already
+      // set the session cookie, so throwing here does not undo anything: it
+      // shows this person an error page while leaving them signed in with no
+      // terms acceptance recorded. The failure reaches Sentry instead and the
+      // redirect below still happens.
+      const firstConfirmation = await toTypedFailure(
+        supabase
+          .from("users")
+          .update({
+            tos_accepted_at: new Date().toISOString(),
+            tos_version: "1.0",
+          })
+          .eq("id", user.id)
+          .is("tos_accepted_at", null)
+          .select("id"),
+        "the terms acceptance for a confirming signup",
+      );
 
       // That .is filter means the update touches a row exactly once, on the
       // first confirmation, which makes it the only trustworthy signal that a
@@ -70,14 +83,22 @@ export async function GET(request: NextRequest) {
       // Google, updates nothing and is therefore a login rather than a signup.
       // Assume it runs twice: the database decides which event this is, not
       // the shape of the request.
-      const completedSignup = (firstConfirmation?.length ?? 0) > 0;
-      captureServerEventAfterResponse({
-        distinctId: user.id,
-        event: completedSignup
-          ? ANALYTICS_EVENTS.SIGNUP_COMPLETED
-          : ANALYTICS_EVENTS.LOGIN,
-        properties: { method: code ? "oauth_or_link" : "email_confirmation" },
-      });
+      //
+      // So a FAILED write cannot say which this was, and no event is sent at
+      // all rather than a guessed one. A wrong signup or login count is worse
+      // than a missing one: it is indistinguishable from a real event and
+      // nothing downstream can tell it apart (L192).
+      if (firstConfirmation.ok) {
+        const completedSignup =
+          ((firstConfirmation.data as { id: string }[] | null)?.length ?? 0) > 0;
+        captureServerEventAfterResponse({
+          distinctId: user.id,
+          event: completedSignup
+            ? ANALYTICS_EVENTS.SIGNUP_COMPLETED
+            : ANALYTICS_EVENTS.LOGIN,
+          properties: { method: code ? "oauth_or_link" : "email_confirmation" },
+        });
+      }
     }
 
     if (explicitNext) {
@@ -100,11 +121,14 @@ export async function GET(request: NextRequest) {
     }
 
     if (user) {
-      const { data: profile } = await supabase
-        .from("users")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle();
+      // Throws, unlike the write above. This decides where to send them, and
+      // a failed read has no safe default: /role-select asks somebody who
+      // already has a role to choose one again. They are signed in either way,
+      // so the error page is recoverable by navigating anywhere.
+      const profile = await unwrapOrThrow(
+        supabase.from("users").select("role").eq("id", user.id).maybeSingle(),
+        "the role of a signing in user",
+      );
       if (profile?.role) {
         return NextResponse.redirect(`${origin}/dashboard`);
       }

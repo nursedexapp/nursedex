@@ -8,6 +8,7 @@ import { SettingsForm } from "./SettingsForm";
 import { ManageSubscriptionCard } from "@/components/dashboard/ManageSubscriptionCard";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 async function updateMarketing(optOut: boolean) {
   "use server";
   const supabase = await createClient();
@@ -92,11 +93,14 @@ export default async function SettingsPage() {
     | undefined;
   if (isFamily) {
     const supabase = await createClient();
-    const { data } = await supabase
-      .from("family_profiles")
-      .select("zip_code, communication_preference")
-      .eq("user_id", user.id)
-      .single();
+    const data = await unwrapOrThrow(
+      supabase
+        .from("family_profiles")
+        .select("zip_code, communication_preference")
+        .eq("user_id", user.id)
+        .single(),
+      "family_profiles (SettingsPage)",
+    );
     familyContact = {
       zip_code: data?.zip_code ?? user.zip_code ?? null,
       communication_preference:

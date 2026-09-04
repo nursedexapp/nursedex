@@ -1,7 +1,7 @@
 {
   "rule": "local/require-db-error-check",
   "measuredOn": "2026-09-04",
-  "total": 247,
+  "total": 193,
   "exemptions": 2,
   "files": {
     "e2e/family.setup.ts": {
@@ -32,31 +32,7 @@
       "discarded": 1,
       "disables": 0
     },
-    "src/app/(dashboard)/dashboard/analytics/page.tsx": {
-      "discarded": 1,
-      "disables": 0
-    },
-    "src/app/(dashboard)/dashboard/edit/page.tsx": {
-      "discarded": 1,
-      "disables": 0
-    },
-    "src/app/(dashboard)/dashboard/onboarding/page.tsx": {
-      "discarded": 1,
-      "disables": 0
-    },
     "src/app/(dashboard)/dashboard/page.tsx": {
-      "discarded": 2,
-      "disables": 0
-    },
-    "src/app/(dashboard)/dashboard/preview/page.tsx": {
-      "discarded": 2,
-      "disables": 0
-    },
-    "src/app/(dashboard)/dashboard/reviews/page.tsx": {
-      "discarded": 1,
-      "disables": 0
-    },
-    "src/app/(dashboard)/dashboard/settings/page.tsx": {
       "discarded": 1,
       "disables": 0
     },
@@ -65,14 +41,6 @@
       "disables": 0
     },
     "src/app/(public)/nurses/page.tsx": {
-      "discarded": 1,
-      "disables": 0
-    },
-    "src/app/(public)/onboarding/family/page.tsx": {
-      "discarded": 1,
-      "disables": 0
-    },
-    "src/app/(public)/reviews/[slug]/page.tsx": {
       "discarded": 1,
       "disables": 0
     },
@@ -107,14 +75,6 @@
     "src/app/api/stripe/webhook/route.ts": {
       "discarded": 0,
       "disables": 1
-    },
-    "src/app/auth/callback/route.ts": {
-      "discarded": 2,
-      "disables": 0
-    },
-    "src/app/sitemap.ts": {
-      "discarded": 2,
-      "disables": 0
     },
     "src/lib/__tests__/data-api-grants.test.ts": {
       "discarded": 1,
@@ -172,14 +132,6 @@
       "discarded": 4,
       "disables": 0
     },
-    "src/lib/ai/estimate.ts": {
-      "discarded": 2,
-      "disables": 0
-    },
-    "src/lib/analytics/nurse-stats.ts": {
-      "discarded": 4,
-      "disables": 0
-    },
     "src/lib/auth/actions.ts": {
       "discarded": 7,
       "disables": 0
@@ -193,27 +145,11 @@
       "disables": 0
     },
     "src/lib/blog/queries.ts": {
-      "discarded": 16,
-      "disables": 0
-    },
-    "src/lib/blog/redirects.ts": {
-      "discarded": 3,
-      "disables": 0
-    },
-    "src/lib/blog/revisions.ts": {
-      "discarded": 3,
-      "disables": 0
-    },
-    "src/lib/blog/slug.ts": {
-      "discarded": 1,
+      "discarded": 4,
       "disables": 0
     },
     "src/lib/blog/taxonomy-actions.ts": {
       "discarded": 8,
-      "disables": 0
-    },
-    "src/lib/blog/taxonomy-redirects.ts": {
-      "discarded": 3,
       "disables": 0
     },
     "src/lib/blog/taxonomy.ts": {
@@ -224,24 +160,12 @@
       "discarded": 2,
       "disables": 0
     },
-    "src/lib/comments/queries.ts": {
-      "discarded": 1,
-      "disables": 0
-    },
     "src/lib/newsletter/actions.ts": {
       "discarded": 6,
       "disables": 0
     },
-    "src/lib/newsletter/queries.ts": {
-      "discarded": 1,
-      "disables": 0
-    },
     "src/lib/nurses/saves-actions.ts": {
       "discarded": 3,
-      "disables": 0
-    },
-    "src/lib/nurses/saves.ts": {
-      "discarded": 1,
       "disables": 0
     },
     "src/lib/nurses/search-gap.ts": {
@@ -253,10 +177,6 @@
       "disables": 0
     },
     "src/lib/profile/photos.ts": {
-      "discarded": 3,
-      "disables": 0
-    },
-    "src/lib/profile/queries.ts": {
       "discarded": 3,
       "disables": 0
     },
@@ -281,14 +201,6 @@
       "disables": 0
     },
     "src/lib/reviews/nurse-actions.ts": {
-      "discarded": 2,
-      "disables": 0
-    },
-    "src/lib/reviews/queries.ts": {
-      "discarded": 4,
-      "disables": 0
-    },
-    "src/lib/slack/requests.ts": {
       "discarded": 2,
       "disables": 0
     }

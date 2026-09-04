@@ -18,6 +18,7 @@ vi.mock("@/lib/supabase/server", () => ({
 import {
   getPublishedPostsPage,
   searchPublishedPosts,
+  getPublishedPostsByAuthor,
   BLOG_PAGE_SIZE,
 } from "./queries";
 
@@ -31,7 +32,9 @@ beforeEach(() => {
   // order() is chainable (pinned, then publish_at) and ends in range().
   order.mockReturnValue({ order, range });
   textSearch.mockReturnValue({ order });
-  eqStatus.mockReturnValue({ order, textSearch });
+  // Chainable, so a query with two .eq() filters (the author archive) drives
+  // the same terminal range().
+  eqStatus.mockReturnValue({ order, textSearch, eq: eqStatus });
   select.mockReturnValue({ eq: eqStatus });
   from.mockReturnValue({ select });
 });
@@ -97,5 +100,31 @@ describe("searchPublishedPosts", () => {
     const res = await searchPublishedPosts("x", 1);
     expect(res.posts).toEqual([]);
     expect(res.totalPages).toBe(0);
+  });
+});
+
+// #847. Each of these read a failed query as an empty answer and rendered it.
+// A blog archive with a failed count reads as a total of zero, and an archive
+// of zero posts renders as a 404: the page tells a visitor the author, category
+// or tag does not exist.
+describe("when an author archive read fails", () => {
+  it("refuses rather than rendering the author as not existing", async () => {
+    range.mockResolvedValue({
+      data: null,
+      count: null,
+      error: { message: "connection reset" },
+    });
+
+    await expect(getPublishedPostsByAuthor("author-1", 1)).rejects.toThrow(
+      /could not be read: connection reset/,
+    );
+  });
+
+  it("still reports no archive when the author genuinely has no posts", async () => {
+    // The positive control: a real zero has to stay an answer, or the refusal
+    // above fires on every author who has not published yet.
+    range.mockResolvedValue({ data: [], count: 0, error: null });
+
+    await expect(getPublishedPostsByAuthor("author-1", 1)).resolves.toBeNull();
   });
 });

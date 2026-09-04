@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { BlogComment } from "@/types/database";
 
+import { unwrapCountOrThrow } from "@/lib/db/results";
 export interface PublicComment {
   id: string;
   author_name: string;
@@ -44,9 +45,14 @@ export async function getCommentsForAdmin(): Promise<BlogComment[]> {
 /** Count of comments awaiting moderation. */
 export async function getPendingCommentCount(): Promise<number> {
   const supabase = createServiceRoleClient();
-  const { count } = await supabase
-    .from("blog_comments")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "pending");
-  return count ?? 0;
+  // `count ?? 0` reads a failed count as a real zero (#847), and this one is
+  // rendered as a number on an admin screen, so a database problem looks
+  // exactly like an empty queue.
+  return await unwrapCountOrThrow(
+    supabase
+      .from("blog_comments")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    "the count of comments awaiting moderation",
+  );
 }

@@ -26,6 +26,7 @@ import { searchNurses } from "@/lib/nurses/search";
 import { parseSearchParams } from "@/lib/nurses/search-params";
 import Link from "next/link";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export default async function DashboardPage() {
   const user = await requireAuth();
 
@@ -140,11 +141,10 @@ export default async function DashboardPage() {
   }
 
   // Nurse dashboard
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  const profile = await unwrapOrThrow(
+    supabase.from("nurse_profiles").select("*").eq("user_id", user.id).single(),
+    "nurse_profiles (DashboardPage)",
+  );
 
   if (!profile) {
     return (

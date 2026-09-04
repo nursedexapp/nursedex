@@ -12,6 +12,7 @@ import {
   type NurseSearchCard,
 } from "./card";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 /**
  * The most saved nurses one family can have and still be read in one request.
  * Comfortably above any real list; it exists so that passing it is a loud
@@ -31,11 +32,14 @@ export async function getSavedNurseIds(
   if (!user || user.role !== "family") return new Set();
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("saved_nurses")
-    .select("nurse_user_id")
-    .eq("family_user_id", user.id)
-    .in("nurse_user_id", candidateNurseUserIds);
+  const data = await unwrapOrThrow(
+    supabase
+      .from("saved_nurses")
+      .select("nurse_user_id")
+      .eq("family_user_id", user.id)
+      .in("nurse_user_id", candidateNurseUserIds),
+    "saved_nurses (getSavedNurseIds)",
+  );
 
   return new Set((data ?? []).map((r) => r.nurse_user_id));
 }

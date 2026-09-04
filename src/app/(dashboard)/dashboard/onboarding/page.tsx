@@ -7,16 +7,16 @@ import { getSignedPhotoUrls } from "@/lib/profile/photos";
 import { getOnboardingStatus } from "@/lib/profile/onboarding-status";
 import { OnboardingWizard } from "./OnboardingWizard";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export default async function OnboardingPage() {
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
 
   // Fetch nurse profile
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  const profile = await unwrapOrThrow(
+    supabase.from("nurse_profiles").select("*").eq("user_id", user.id).single(),
+    "nurse_profiles (OnboardingPage)",
+  );
 
   if (!profile) {
     // No profile yet (shouldn't happen, role-select creates it)

@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import type { Review } from "@/types/database";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 /**
  * The current family user's existing platform review for a given nurse,
  * if any. Used to flip the dashboard CTA between "Leave a review" and
@@ -13,13 +14,16 @@ export async function getFamilyReviewForNurse(
 ): Promise<Review | null> {
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("reviews")
-    .select("*")
-    .eq("reviewer_user_id", familyUserId)
-    .eq("nurse_user_id", nurseUserId)
-    .eq("is_external", false)
-    .maybeSingle();
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reviews")
+      .select("*")
+      .eq("reviewer_user_id", familyUserId)
+      .eq("nurse_user_id", nurseUserId)
+      .eq("is_external", false)
+      .maybeSingle(),
+    "reviews (getFamilyReviewForNurse)",
+  );
 
   return (data as Review | null) ?? null;
 }
@@ -47,14 +51,17 @@ export async function getApprovedReviews(
   nurseUserId: string,
 ): Promise<ApprovedReview[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("reviews")
-    .select(
-      "id, rating, reviewer_name, text, is_external, email_verified, nurse_response, nurse_response_at, created_at, status",
-    )
-    .eq("nurse_user_id", nurseUserId)
-    .in("status", ["approved", "disputed"])
-    .order("created_at", { ascending: false });
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reviews")
+      .select(
+        "id, rating, reviewer_name, text, is_external, email_verified, nurse_response, nurse_response_at, created_at, status",
+      )
+      .eq("nurse_user_id", nurseUserId)
+      .in("status", ["approved", "disputed"])
+      .order("created_at", { ascending: false }),
+    "reviews (getApprovedReviews)",
+  );
 
   type Row = ApprovedReview & {
     email_verified: boolean;
@@ -74,11 +81,14 @@ export async function getApprovedReviews(
  */
 export async function getNurseReviews(nurseUserId: string): Promise<Review[]> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("reviews")
-    .select("*")
-    .eq("nurse_user_id", nurseUserId)
-    .order("created_at", { ascending: false });
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reviews")
+      .select("*")
+      .eq("nurse_user_id", nurseUserId)
+      .order("created_at", { ascending: false }),
+    "reviews (getNurseReviews)",
+  );
   return (data as Review[] | null) ?? [];
 }
 
@@ -93,12 +103,15 @@ export async function getFamilyReviewsByNurse(
   if (nurseUserIds.length === 0) return new Map();
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("reviews")
-    .select("*")
-    .eq("reviewer_user_id", familyUserId)
-    .eq("is_external", false)
-    .in("nurse_user_id", nurseUserIds);
+  const data = await unwrapOrThrow(
+    supabase
+      .from("reviews")
+      .select("*")
+      .eq("reviewer_user_id", familyUserId)
+      .eq("is_external", false)
+      .in("nurse_user_id", nurseUserIds),
+    "reviews (getFamilyReviewsByNurse)",
+  );
 
   const map = new Map<string, Review>();
   for (const row of (data ?? []) as Review[]) {

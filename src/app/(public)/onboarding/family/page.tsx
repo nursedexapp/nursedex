@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/enums";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export const metadata: Metadata = {
   title: "Welcome to NurseDex",
 };
@@ -14,11 +15,14 @@ export default async function FamilyOnboardingPage() {
 
   // If already onboarded, skip to dashboard.
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("family_profiles")
-    .select("zip_code")
-    .eq("user_id", user.id)
-    .single();
+  const profile = await unwrapOrThrow(
+    supabase
+      .from("family_profiles")
+      .select("zip_code")
+      .eq("user_id", user.id)
+      .single(),
+    "family_profiles (FamilyOnboardingPage)",
+  );
   if (profile?.zip_code) {
     redirect("/dashboard");
   }

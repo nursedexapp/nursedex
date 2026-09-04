@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getSignedPhotoUrl } from "./photos";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 /**
  * Shape returned by getNurseBySlug for rendering public profiles.
  * Combines user + nurse_profiles data.
@@ -316,11 +317,14 @@ export async function getNurseContactInfo(nurseUserId: string): Promise<{
 export async function getSlugRedirect(slug: string): Promise<string | null> {
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("slug_redirects")
-    .select("new_slug")
-    .eq("old_slug", slug)
-    .single();
+  const data = await unwrapOrThrow(
+    supabase
+      .from("slug_redirects")
+      .select("new_slug")
+      .eq("old_slug", slug)
+      .single(),
+    "slug_redirects (getSlugRedirect)",
+  );
 
   return data?.new_slug ?? null;
 }
@@ -337,10 +341,13 @@ export async function getDistanceBetweenZips(
 
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("zip_codes")
-    .select("zip, latitude, longitude")
-    .in("zip", [zip1, zip2]);
+  const data = await unwrapOrThrow(
+    supabase
+      .from("zip_codes")
+      .select("zip, latitude, longitude")
+      .in("zip", [zip1, zip2]),
+    "zip_codes (getDistanceBetweenZips)",
+  );
 
   if (!data || data.length < 2) return null;
 
@@ -384,12 +391,15 @@ export async function getLicenseVerifyUrl(
 ): Promise<string | null> {
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("license_verification_urls")
-    .select("url")
-    .eq("credential", credential)
-    .eq("state", "NY")
-    .single();
+  const data = await unwrapOrThrow(
+    supabase
+      .from("license_verification_urls")
+      .select("url")
+      .eq("credential", credential)
+      .eq("state", "NY")
+      .single(),
+    "license_verification_urls (getLicenseVerifyUrl)",
+  );
 
   return data?.url ?? null;
 }

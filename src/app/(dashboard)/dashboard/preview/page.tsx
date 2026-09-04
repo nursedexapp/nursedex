@@ -11,15 +11,15 @@ import { getNurseBySlugUnfiltered } from "@/lib/profile/queries";
 import { buildPreviewViews } from "@/lib/profile/preview";
 import { PreviewViews } from "./PreviewViews";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export default async function PreviewPage() {
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  const profile = await unwrapOrThrow(
+    supabase.from("nurse_profiles").select("*").eq("user_id", user.id).single(),
+    "nurse_profiles (PreviewPage)",
+  );
 
   if (!profile) {
     redirect("/dashboard");
@@ -52,12 +52,15 @@ export default async function PreviewPage() {
       ? await getSignedPhotoUrl(profile.photos[0])
       : null;
 
-  const { data: licenseUrl } = await supabase
-    .from("license_verification_urls")
-    .select("url")
-    .eq("credential", profile.credential)
-    .eq("state", "NY")
-    .single();
+  const licenseUrl = await unwrapOrThrow(
+    supabase
+      .from("license_verification_urls")
+      .select("url")
+      .eq("credential", profile.credential)
+      .eq("state", "NY")
+      .single(),
+    "license_verification_urls (PreviewPage)",
+  );
 
   return (
     <div className="p-6 sm:p-8">
