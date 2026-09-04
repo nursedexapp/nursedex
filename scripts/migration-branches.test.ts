@@ -46,6 +46,22 @@ describe("makeBranchLookup", () => {
     expect(lookup("068")).toEqual([]);
   });
 
+  // Measured against this repository on 2026-09-04: for-each-ref returns the
+  // bare remote name alongside the real branches, because
+  // refs/remotes/origin/HEAD abbreviates to "origin". It points at main, so it
+  // cannot carry an untracked migration, but naming it in the alert would say
+  // "still on a branch: 070 (origin)", which is a sentence about nothing.
+  it("does not report the bare remote name as a branch", () => {
+    const lookup = makeBranchLookup({
+      run: fakeGit(["origin", "origin/main", "origin/feat/x"], {
+        origin: ["supabase/migrations/070_x.sql"],
+        "origin/feat/x": ["supabase/migrations/070_x.sql"],
+      }),
+    });
+
+    expect(lookup("070")).toEqual(["origin/feat/x"]);
+  });
+
   it("ignores main and HEAD, which are what untracked already means", () => {
     const lookup = makeBranchLookup({
       run: fakeGit(["origin/main", "origin/HEAD"], {

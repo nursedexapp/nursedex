@@ -56,11 +56,24 @@ export function makeBranchLookup(options: BranchLookupOptions = {}) {
       return null;
     }
 
+    // `for-each-ref refs/remotes/origin` also yields the bare remote name,
+    // because refs/remotes/origin/HEAD abbreviates to "origin", not
+    // "origin/HEAD". Measured against this repository: it came back alongside
+    // the real branches. It points at main, so it can never carry an untracked
+    // migration, but left in it would be named as a branch in the alert and
+    // "still on a branch: 070 (origin)" is a sentence about nothing.
+    const remoteName = remote.split("/").filter(Boolean).pop() ?? "origin";
+    const notABranch = new Set([
+      remoteName,
+      `${remoteName}/HEAD`,
+      `${remoteName}/main`,
+    ]);
+
     const branches = output
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
-      .filter((name) => name !== "origin/main" && name !== "origin/HEAD");
+      .filter((name) => !notABranch.has(name));
 
     // No branches at all means the refs were never fetched (a shallow default
     // checkout), not that no branch carries it.
