@@ -60,7 +60,12 @@ export default function AuthLayout({
         </div>
 
         {/* Form panel - right side */}
-        <div className="flex min-h-[80vh] items-center justify-center px-4 py-10 lg:min-h-0 lg:px-12 lg:py-16">
+        {/* No min height on mobile. It used to be 80vh with the form centred
+            inside, which on a 844px phone left about 90px of empty space above
+            the heading and again below the Sign in button, so the form floated
+            (#764). The page still fills the screen: this sits inside a flex-1
+            column, so the footer stays at the bottom either way. */}
+        <div className="flex items-center justify-center px-4 py-8 lg:min-h-0 lg:px-12 lg:py-16">
           <div className="w-full max-w-md">
             <AuthProgress />
             <AuthFade>{children}</AuthFade>

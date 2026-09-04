@@ -97,7 +97,13 @@ function LoginForm() {
       <div className="mb-8">
         <h2 className="font-heading text-3xl">Welcome back</h2>
         <p className="text-muted-foreground mt-1 text-base">
-          Your New York care community is waiting.{" "}
+          Your New York care community is waiting.
+        </p>
+        {/* Its own line rather than trailing the sentence. Inline, it wrapped
+            mid phrase at both 390px and 1200px ("...is waiting. New / here?
+            Create an account"), because the form column is max-w-md on desktop
+            too, so the desktop width was never wide enough to save it (#764). */}
+        <p className="mt-1 text-base">
           <Link href="/signup" className="text-teal-dark font-medium underline">
             New here? Create an account
           </Link>
