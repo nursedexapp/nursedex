@@ -233,3 +233,26 @@ export async function unwrapCountOrThrow(
   console.error(message);
   throw new Error(message);
 }
+
+/**
+ * Report a database failure whose OUTCOME is deliberately unchanged.
+ *
+ * A handful of readers answer a failure with a degraded value on purpose, and
+ * each has its reason written at the line: a nurse card without its town is
+ * still a usable card, a missing photo preview re-signs on the next render, and
+ * a saved-nurse list that could not be read completely says so as a third
+ * answer rather than silently widening a filter.
+ *
+ * What every one of them had in common was that the console was the only place
+ * the failure went (#1000), which is the same defect as discarding it: nobody
+ * reads the console, so a degraded screen and a correct one are the same event.
+ * This is the reporting half on its own, with no opinion about what the caller
+ * returns.
+ */
+export function reportDbFailure(context: string, error: DbError): void {
+  const message = `${context} could not be read: ${error.message}`;
+  console.error(message);
+  Sentry.captureException(new Error(message), {
+    tags: { db_operation: context },
+  });
+}

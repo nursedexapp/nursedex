@@ -62,8 +62,10 @@ vi.mock("next/headers", () => ({
 // Happy path only: this stubs the guard so the send logic past it can be
 // exercised. The refused direction (a family caller mails nobody) is covered
 // for real in src/lib/admin/authz-boundary.test.ts, which runs the guard.
-// eslint-disable-next-line local/no-mocked-auth-guard -- see above
-vi.mock("@/lib/auth/helpers", () => ({ requireAdmin: async () => ({ id: "a" }) }));
+vi.mock("@/lib/auth/helpers", () => ({
+  // eslint-disable-next-line local/no-mocked-auth-guard -- see above
+  requireAdmin: async () => ({ id: "a" }),
+}));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({ from: () => builder() }),
 }));
@@ -191,9 +193,9 @@ describe("subscribeNewsletter", () => {
 
   it("stores the hashed IP with the subscription", async () => {
     await subscribeNewsletter({ email: "a@b.com" });
-    expect(
-      (h.calls.upsert[0] as { ip_hash: string }).ip_hash,
-    ).toMatch(/^[0-9a-f]{64}$/);
+    expect((h.calls.upsert[0] as { ip_hash: string }).ip_hash).toMatch(
+      /^[0-9a-f]{64}$/,
+    );
   });
 });
 
@@ -238,7 +240,10 @@ describe("sendNewsletterIssue", () => {
       { email: "a@x.com", unsubscribe_token: "t1" },
       { email: "b@x.com", unsubscribe_token: "t2" },
     ]);
-    const res = await sendNewsletterIssue({ subject: "Hi", body: "Hello there" });
+    const res = await sendNewsletterIssue({
+      subject: "Hi",
+      body: "Hello there",
+    });
     expect(res.success).toBe(true);
     expect(res.sent).toBe(2);
     expect(h.sendBatch).toHaveBeenCalledTimes(1);

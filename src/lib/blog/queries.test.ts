@@ -56,7 +56,10 @@ describe("getPublishedPostsPage", () => {
 
   it("requests the correct range for a later page", async () => {
     await getPublishedPostsPage(3);
-    expect(range).toHaveBeenCalledWith(BLOG_PAGE_SIZE * 2, BLOG_PAGE_SIZE * 3 - 1);
+    expect(range).toHaveBeenCalledWith(
+      BLOG_PAGE_SIZE * 2,
+      BLOG_PAGE_SIZE * 3 - 1,
+    );
   });
 
   it("clamps invalid pages to 1", async () => {
@@ -74,12 +77,32 @@ describe("getPublishedPostsPage", () => {
     expect(res.totalPages).toBe(3);
   });
 
-  it("returns an empty page on error", async () => {
-    range.mockResolvedValue({ data: null, count: null, error: { message: "boom" } });
+  it("refuses on a failed read rather than rendering the index as empty", async () => {
+    // REVERSED in #1000. This used to assert an empty page, which renders the
+    // blog index as "no posts yet": the screen a visitor gets is identical to
+    // the one they get when nothing has been published, and the console line
+    // was the only difference. An error state and an empty state are different
+    // screens (L10).
+    range.mockResolvedValue({
+      data: null,
+      count: null,
+      error: { message: "boom" },
+    });
+
+    await expect(getPublishedPostsPage(1)).rejects.toThrow(
+      /could not be read: boom/,
+    );
+  });
+
+  it("still returns an empty page when nothing is published", async () => {
+    // The positive control: a real zero has to stay an answer, or the refusal
+    // above fires on a blog nobody has written for yet.
+    range.mockResolvedValue({ data: [], count: 0, error: null });
+
     const res = await getPublishedPostsPage(1);
+
     expect(res.posts).toEqual([]);
     expect(res.total).toBe(0);
-    expect(res.totalPages).toBe(0);
   });
 });
 
@@ -95,11 +118,26 @@ describe("searchPublishedPosts", () => {
     expect(range).toHaveBeenCalledWith(0, BLOG_PAGE_SIZE - 1);
   });
 
-  it("returns an empty page on error", async () => {
-    range.mockResolvedValue({ data: null, count: null, error: { message: "boom" } });
+  it("refuses on a failed read rather than reporting no results", async () => {
+    // REVERSED in #1000, same as the index above: "no results for that search"
+    // is a claim about what we hold, and a read that fell over cannot make it.
+    range.mockResolvedValue({
+      data: null,
+      count: null,
+      error: { message: "boom" },
+    });
+
+    await expect(searchPublishedPosts("x", 1)).rejects.toThrow(
+      /could not be read: boom/,
+    );
+  });
+
+  it("still reports no results when the search genuinely matches nothing", async () => {
+    range.mockResolvedValue({ data: [], count: 0, error: null });
+
     const res = await searchPublishedPosts("x", 1);
+
     expect(res.posts).toEqual([]);
-    expect(res.totalPages).toBe(0);
   });
 });
 

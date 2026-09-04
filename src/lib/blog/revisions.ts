@@ -1,7 +1,7 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { BlogPostRevision, TiptapDoc } from "@/types/database";
 
-import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
+import { assertNoWriteError, unwrapOrThrow } from "@/lib/db/results";
 export const REVISION_LIMIT = 30;
 
 export interface RevisionSnapshot {
@@ -65,15 +65,14 @@ export async function getRevisions(
   postId: string,
 ): Promise<BlogPostRevision[]> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("blog_post_revisions")
-    .select("*")
-    .eq("post_id", postId)
-    .order("created_at", { ascending: false });
-  if (error) {
-    console.error("[blog] getRevisions failed:", error.message);
-    return [];
-  }
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_post_revisions")
+      .select("*")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: false }),
+    "the revisions of this blog post",
+  );
   return (data ?? []) as BlogPostRevision[];
 }
 

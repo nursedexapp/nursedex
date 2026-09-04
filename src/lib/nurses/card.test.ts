@@ -660,7 +660,8 @@ describe("lookupZips", () => {
 
   // A failed read and a set of zips we hold nothing for both leave the town
   // blank, which is a designed state on the card. The difference has to be
-  // visible somewhere, so it is logged.
+  // visible somewhere, so it is reported: to Sentry as well as the console
+  // since #1000, because the console is a place nobody reads.
   it("reports a failed read instead of passing it off as no rows", async () => {
     const logged: unknown[][] = [];
     const errorSpy = vi
@@ -679,7 +680,7 @@ describe("lookupZips", () => {
     }));
     const rows = await lookupZips(["11779"]);
     expect(rows.size).toBe(0);
-    expect(String(logged[0]?.[1])).toContain("connection lost");
+    expect(logged.flat().map(String).join(" ")).toContain("connection lost");
     errorSpy.mockRestore();
   });
 });

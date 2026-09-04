@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { BlogComment } from "@/types/database";
 
-import { unwrapCountOrThrow } from "@/lib/db/results";
+import { unwrapCountOrThrow, unwrapOrThrow } from "@/lib/db/results";
 export interface PublicComment {
   id: string;
   author_name: string;
@@ -15,30 +15,28 @@ export async function getApprovedComments(
   postId: string,
 ): Promise<PublicComment[]> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("blog_comments")
-    .select("id, author_name, body, created_at")
-    .eq("post_id", postId)
-    .eq("status", "approved")
-    .order("created_at", { ascending: true });
-  if (error) {
-    console.error("[comments] getApprovedComments failed:", error.message);
-    return [];
-  }
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_comments")
+      .select("id, author_name, body, created_at")
+      .eq("post_id", postId)
+      .eq("status", "approved")
+      .order("created_at", { ascending: true }),
+    "the approved comments on this post",
+  );
   return (data ?? []) as PublicComment[];
 }
 
 /** Every comment for the admin moderation queue, newest first. */
 export async function getCommentsForAdmin(): Promise<BlogComment[]> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("blog_comments")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) {
-    console.error("[comments] getCommentsForAdmin failed:", error.message);
-    return [];
-  }
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_comments")
+      .select("*")
+      .order("created_at", { ascending: false }),
+    "the comment moderation queue",
+  );
   return (data ?? []) as BlogComment[];
 }
 

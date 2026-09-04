@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getSignedPhotoUrl } from "./photos";
 
-import { unwrapOrThrow } from "@/lib/db/results";
+import { reportDbFailure, unwrapOrThrow } from "@/lib/db/results";
 /**
  * Shape returned by getNurseBySlug for rendering public profiles.
  * Combines user + nurse_profiles data.
@@ -294,6 +294,10 @@ export async function getNurseContactInfo(nurseUserId: string): Promise<{
     .rpc("get_nurse_contact", { p_nurse_user_id: nurseUserId })
     .maybeSingle();
 
+  // The nulls stay, and the caller turns them into a refusal either way. But
+  // "this caller may not see the contact" and "we could not read it" were the
+  // same silent answer, on the one read a family has PAID for (#1000).
+  if (error) reportDbFailure("a revealed nurse's contact details", error);
   if (error || !data) {
     return { email: null, phone: null, communication_preference: null };
   }

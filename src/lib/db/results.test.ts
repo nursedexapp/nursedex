@@ -11,6 +11,7 @@ import {
   toTypedFailure,
   toTypedCount,
   unwrapCountOrThrow,
+  reportDbFailure,
   DB_FAILURE_MESSAGE,
 } from "./results";
 
@@ -37,7 +38,10 @@ describe("assertNoWriteError", () => {
 
   it("throws naming the operation and the database message", async () => {
     await expect(
-      assertNoWriteError(failed("permission denied"), "the blocked_emails upsert"),
+      assertNoWriteError(
+        failed("permission denied"),
+        "the blocked_emails upsert",
+      ),
     ).rejects.toThrow(
       "the blocked_emails upsert could not be written: permission denied",
     );
@@ -68,9 +72,9 @@ describe("assertNoWriteError", () => {
 
 describe("unwrapOrThrow", () => {
   it("returns the rows when the read succeeded", async () => {
-    await expect(unwrapOrThrow(ok([{ id: "a" }]), "the nurse list")).resolves.toEqual(
-      [{ id: "a" }],
-    );
+    await expect(
+      unwrapOrThrow(ok([{ id: "a" }]), "the nurse list"),
+    ).resolves.toEqual([{ id: "a" }]);
   });
 
   it("throws naming the operation and the database message", async () => {
@@ -84,7 +88,10 @@ describe("unwrapOrThrow", () => {
     // a failure, and throwing would put an error screen in front of a visitor
     // who asked for something that simply does not exist.
     await expect(
-      unwrapOrThrow(failed("no rows returned", ROW_NOT_FOUND), "the nurse profile"),
+      unwrapOrThrow(
+        failed("no rows returned", ROW_NOT_FOUND),
+        "the nurse profile",
+      ),
     ).resolves.toBeNull();
   });
 
@@ -115,9 +122,9 @@ describe("unwrapOrThrow", () => {
 
 describe("toTypedFailure", () => {
   it("carries the data through when the read succeeded", async () => {
-    await expect(toTypedFailure(ok({ id: "a" }), "load your subscription")).resolves.toEqual(
-      { ok: true, data: { id: "a" } },
-    );
+    await expect(
+      toTypedFailure(ok({ id: "a" }), "load your subscription"),
+    ).resolves.toEqual({ ok: true, data: { id: "a" } });
   });
 
   it("returns a failure a control can render, without the database message", async () => {
@@ -151,7 +158,10 @@ describe("toTypedFailure", () => {
 
   it("treats the absent row as a success carrying null", async () => {
     await expect(
-      toTypedFailure(failed("no rows returned", ROW_NOT_FOUND), "load your profile"),
+      toTypedFailure(
+        failed("no rows returned", ROW_NOT_FOUND),
+        "load your profile",
+      ),
     ).resolves.toEqual({ ok: true, data: null });
     expect(h.captureException).not.toHaveBeenCalled();
   });
@@ -163,7 +173,7 @@ describe("toTypedFailure", () => {
   });
 });
 
-describe("toTypedFailure on a write, which is what a \"use server\" module has", () => {
+describe('toTypedFailure on a write, which is what a "use server" module has', () => {
   it("carries a successful write through", async () => {
     await expect(
       toTypedFailure(ok(null), "add the address to the block list"),
@@ -181,7 +191,6 @@ describe("toTypedFailure on a write, which is what a \"use server\" module has",
     );
   });
 });
-
 
 // The answer to a `{ count: "exact" }` query is not in `data`. A head:true
 // count returns `{ data: null, count: N }`, so reading it through the data
@@ -221,15 +230,37 @@ describe("the count helpers", () => {
     // PostgREST returns a number whenever a count was requested, so a null one
     // means the option is missing. Zero is the one wrong answer that looks
     // plausible.
-    const outcome = await toTypedCount({ count: null, error: null }, "the nurses");
+    const outcome = await toTypedCount(
+      { count: null, error: null },
+      "the nurses",
+    );
     expect(outcome.ok).toBe(false);
     expect(h.captureException).toHaveBeenCalledTimes(1);
-    expect(
-      (h.captureException.mock.calls[0][0] as Error).message,
-    ).toMatch(/did not ask for one/);
+    expect((h.captureException.mock.calls[0][0] as Error).message).toMatch(
+      /did not ask for one/,
+    );
 
     await expect(
       unwrapCountOrThrow({ count: null, error: null }, "the nurses"),
     ).rejects.toThrow(/did not ask for one/);
+  });
+});
+
+// #1000. A handful of readers answer a failure with a degraded value on
+// purpose, each with its reason written at the line. What they had in common
+// was that the console was the only place the failure went, which is the same
+// defect as discarding it: nobody reads the console, so a degraded screen and a
+// correct one are the same event.
+describe("reportDbFailure", () => {
+  it("files the failure without deciding anything about the answer", () => {
+    reportDbFailure("a family's saved nurses", { message: "connection reset" });
+
+    expect(console.error).toHaveBeenCalledWith(
+      "a family's saved nurses could not be read: connection reset",
+    );
+    expect(h.captureException).toHaveBeenCalledTimes(1);
+    expect(h.captureException.mock.calls[0][1]).toEqual({
+      tags: { db_operation: "a family's saved nurses" },
+    });
   });
 });
