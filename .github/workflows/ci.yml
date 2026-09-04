@@ -142,6 +142,17 @@ jobs:
         if: steps.proof.outputs.proven != 'true'
         run: npm run lint
 
+      # #847. `local/require-db-error-check` ships at `warn`, because 283 sites
+      # already break it, and a warning nothing counts is a warning nobody
+      # reads. This holds the per-file count where it is and fails when it
+      # rises, so the sweep in milestone 35 cannot be outrun by new instances
+      # of the class it removes. #992 flips the rule to `error` and this check
+      # retires with it. About 4 seconds; it lints the tree itself rather than
+      # reading the step above, because the number has to be the tree's.
+      - name: Check the discarded-database-error ratchet
+        if: steps.proof.outputs.proven != 'true'
+        run: npx tsx scripts/db-error-ratchet.ts
+
       - name: Typecheck
         if: steps.proof.outputs.proven != 'true'
         # npm run typecheck = `next typegen && tsc --noEmit`. typegen regenerates

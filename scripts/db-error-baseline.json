@@ -1,0 +1,320 @@
+{
+  "rule": "local/require-db-error-check",
+  "measuredOn": "2026-09-04",
+  "total": 283,
+  "exemptions": 0,
+  "files": {
+    "e2e/family.setup.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "e2e/onboarding.nurse.spec.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "e2e/reveal.family.spec.ts": {
+      "discarded": 4,
+      "disables": 0
+    },
+    "e2e/review.family.spec.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "scripts/launch-cleanup.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "scripts/licence-number-backfill.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "scripts/seed-demo-nurses.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(dashboard)/dashboard/analytics/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(dashboard)/dashboard/edit/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(dashboard)/dashboard/onboarding/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(dashboard)/dashboard/page.tsx": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/app/(dashboard)/dashboard/preview/page.tsx": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/app/(dashboard)/dashboard/reviews/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(dashboard)/dashboard/settings/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(public)/hires/confirm/[token]/page.tsx": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/app/(public)/nurses/[slug]/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(public)/nurses/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(public)/onboarding/family/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(public)/reviews/[slug]/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/(public)/survey/results/page.tsx": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/api/cron/featured-analytics/route.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/api/cron/rate-limit-flag-check/route.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/app/api/cron/sentry-alerts/route.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/app/api/cron/upgrade-nudge/route.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/api/slack/interactivity/route.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/api/slack/track/route.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/api/stripe/checkout-success/route.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/app/api/stripe/webhook/route.ts": {
+      "discarded": 8,
+      "disables": 0
+    },
+    "src/app/auth/callback/route.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/app/sitemap.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/__tests__/data-api-grants.test.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/__tests__/db-guards.test.ts": {
+      "discarded": 19,
+      "disables": 0
+    },
+    "src/lib/__tests__/distance-function.test.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/__tests__/nurse-identity-gating.test.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/__tests__/rls-hardening.test.ts": {
+      "discarded": 33,
+      "disables": 0
+    },
+    "src/lib/__tests__/rls-insert-shape.test.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/__tests__/rls-policies.test.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/action-authz-boundary.test.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/admin/account-actions.ts": {
+      "discarded": 7,
+      "disables": 0
+    },
+    "src/lib/admin/analytics.ts": {
+      "discarded": 16,
+      "disables": 0
+    },
+    "src/lib/admin/queries.ts": {
+      "discarded": 11,
+      "disables": 0
+    },
+    "src/lib/admin/review-actions.ts": {
+      "discarded": 9,
+      "disables": 0
+    },
+    "src/lib/admin/role-actions.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/admin/verification-actions.ts": {
+      "discarded": 4,
+      "disables": 0
+    },
+    "src/lib/ai/estimate.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/analytics/nurse-stats.ts": {
+      "discarded": 4,
+      "disables": 0
+    },
+    "src/lib/auth/actions.ts": {
+      "discarded": 8,
+      "disables": 0
+    },
+    "src/lib/auth/helpers.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/blog/actions.ts": {
+      "discarded": 4,
+      "disables": 0
+    },
+    "src/lib/blog/queries.ts": {
+      "discarded": 16,
+      "disables": 0
+    },
+    "src/lib/blog/redirects.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/lib/blog/revisions.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/lib/blog/slug.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/blog/taxonomy-actions.ts": {
+      "discarded": 8,
+      "disables": 0
+    },
+    "src/lib/blog/taxonomy-redirects.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/lib/blog/taxonomy.ts": {
+      "discarded": 5,
+      "disables": 0
+    },
+    "src/lib/comments/actions.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/comments/queries.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/hires/actions.ts": {
+      "discarded": 13,
+      "disables": 0
+    },
+    "src/lib/hires/queries.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/newsletter/actions.ts": {
+      "discarded": 6,
+      "disables": 0
+    },
+    "src/lib/newsletter/queries.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/nurses/saves-actions.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/lib/nurses/saves.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/nurses/search-gap.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/profile/actions.ts": {
+      "discarded": 10,
+      "disables": 0
+    },
+    "src/lib/profile/photos.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/lib/profile/queries.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/lib/profile/slug.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/profile/upsell.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/reveals/actions.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/lib/reveals/queries.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/reviews/actions.ts": {
+      "discarded": 3,
+      "disables": 0
+    },
+    "src/lib/reviews/external-actions.ts": {
+      "discarded": 1,
+      "disables": 0
+    },
+    "src/lib/reviews/nurse-actions.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/reviews/queries.ts": {
+      "discarded": 4,
+      "disables": 0
+    },
+    "src/lib/slack/requests.ts": {
+      "discarded": 2,
+      "disables": 0
+    },
+    "src/lib/subscriptions/actions.ts": {
+      "discarded": 2,
+      "disables": 0
+    }
+  }
+}

@@ -7,6 +7,12 @@ import { GRACE_PERIODS } from "@/lib/constants";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { captureServerEvent } from "@/lib/analytics/server";
 import { shouldSendOnce } from "@/lib/cron/email-log";
+// A Supabase write returning {error} does not throw, so an unchecked write
+// failure here would return {received:true} 200 and Stripe would never retry,
+// silently diverging billing state from the DB. Throwing sends the error
+// through POST's catch, which returns 500 so Stripe retries. This was five
+// uses of a private copy of the helper until #986 moved it to be shared.
+import { assertNoWriteError } from "@/lib/db/results";
 import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
 import {
   sendSubscriptionConfirmedEmail,
@@ -263,7 +269,7 @@ async function handleSubscriptionDeleted(
       .eq("stripe_subscription_id", sub.id)
       .or(`last_event_at.is.null,last_event_at.lte.${incoming}`)
       .select("id");
-    assertNoWriteError(result, "subscriptions update (subscription deleted)");
+    await assertNoWriteError(result, "subscriptions update (subscription deleted)");
     if (!result.data || result.data.length === 0) return;
   }
   // No row at all (a delete delivered before its create) falls through to the
@@ -271,7 +277,7 @@ async function handleSubscriptionDeleted(
 
   // Tier sync: if a featured nurse's sub goes away, drop them to free.
   if (planType === "nurse_featured") {
-    assertNoWriteError(
+    await assertNoWriteError(
       await supabase
         .from("nurse_profiles")
         .update({ tier: "free" })
@@ -287,7 +293,7 @@ async function handleSubscriptionDeleted(
     expires.setUTCDate(
       expires.getUTCDate() + GRACE_PERIODS.CANCELLED_ACCESS_DAYS,
     );
-    assertNoWriteError(
+    await assertNoWriteError(
       await supabase
         .from("reveals")
         .update({ access_expires_at: expires.toISOString() })
@@ -336,7 +342,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, eventCreated: number) 
     .eq("stripe_subscription_id", subId)
     .or(`last_event_at.is.null,last_event_at.lte.${incoming}`)
     .select("id");
-  assertNoWriteError(paidResult, "subscriptions status update (invoice paid)");
+  await assertNoWriteError(paidResult, "subscriptions status update (invoice paid)");
 
   // Zero rows: a newer event already superseded this one. Its renewal email (if
   // any) belongs to that newer state, so this one must not send.
@@ -376,7 +382,7 @@ async function handlePaymentFailed(
   // goes on to downgrade their tier and mail them about a failed payment that
   // actually succeeded.
   const incoming = new Date(eventCreated * 1000).toISOString();
-  assertNoWriteError(
+  await assertNoWriteError(
     // eslint-disable-next-line local/require-status-precondition -- the precondition IS in the WHERE clause, keyed on last_event_at rather than status: a stale event must lose whatever status the row currently holds.
     await supabase
       .from("subscriptions")
@@ -388,21 +394,6 @@ async function handlePaymentFailed(
 }
 
 // ── Helpers ───────────────────────────────────────────────────
-
-/**
- * A Supabase write returning {error} does not throw, so an unchecked write
- * failure here would return {received:true} 200 and Stripe would never
- * retry, silently diverging billing state from the DB. Throwing sends the
- * error through POST's catch, which returns 500 so Stripe retries.
- */
-function assertNoWriteError(
-  result: { error: { message: string } | null },
-  context: string,
-): void {
-  if (result.error) {
-    throw new Error(`${context} failed: ${result.error.message}`);
-  }
-}
 
 interface UpsertArgs {
   userId: string;
@@ -474,7 +465,7 @@ async function upsertSubscription(
     }
     return false;
   }
-  assertNoWriteError(upsertResult, "subscriptions upsert");
+  await assertNoWriteError(upsertResult, "subscriptions upsert");
 
   // The DB refused the write because a newer event already landed. Returning
   // early keeps this stale event's status from leaking into the tier sync.
@@ -484,7 +475,7 @@ async function upsertSubscription(
   if (planType === "nurse_featured") {
     const tier =
       status === "active" || status === "past_due" ? "featured" : "free";
-    assertNoWriteError(
+    await assertNoWriteError(
       await supabase.from("nurse_profiles").update({ tier }).eq("user_id", userId),
       "nurse_profiles tier sync",
     );
