@@ -14,12 +14,17 @@ const h = vi.hoisted(() => ({
   nurseTotal: 0 as number | null,
   ranges: [] as Array<[number, number]>,
   blogPosts: [] as Array<Record<string, unknown>>,
+  // #847. Each section's read used to answer an empty array on a failure, so a
+  // section silently missing from the sitemap looked exactly like a section
+  // with nothing in it.
+  readError: null as { message: string } | null,
   captureMessage: vi.fn(),
+  captureException: vi.fn(),
 }));
 
 vi.mock("@sentry/nextjs", () => ({
   captureMessage: h.captureMessage,
-  captureException: vi.fn(),
+  captureException: h.captureException,
 }));
 
 vi.mock("@/lib/blog/queries", () => ({
@@ -52,6 +57,9 @@ vi.mock("@/lib/supabase/service-role", () => ({
         const source = table === "nurse_profiles" ? h.nurses : h.blogPosts;
         const total =
           table === "nurse_profiles" ? h.nurseTotal : h.blogPosts.length;
+        if (h.readError) {
+          return resolve({ data: null, count: null, error: h.readError });
+        }
         const rows = range ? source.slice(range[0], range[1] + 1) : source;
         return resolve({ data: rows, count: total, error: null });
       };
@@ -76,6 +84,7 @@ beforeEach(() => {
   h.nurses = [];
   h.nurseTotal = 0;
   h.blogPosts = [];
+  h.readError = null;
 });
 
 describe("sitemap", () => {
@@ -151,5 +160,44 @@ describe("sitemap", () => {
     await sitemap();
 
     expect(h.captureMessage).not.toHaveBeenCalled();
+  });
+});
+
+// #989. Every section is wrapped in its own try/catch so a sitemap request
+// never breaks, and the static entries still ship. What each catch must not do
+// is stay in the console: a section missing from a sitemap that is still valid
+// and still served is exactly the failure nobody notices.
+describe("when a section's read fails", () => {
+  it("still returns the static entries", async () => {
+    h.readError = { message: "connection reset" };
+
+    const entries = await sitemap();
+
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries.some((e) => e.url.includes("/nurses/"))).toBe(false);
+  });
+
+  it("files the failure, naming which section was dropped", async () => {
+    h.readError = { message: "connection reset" };
+
+    await sitemap();
+
+    const sections = h.captureException.mock.calls.map(
+      (call) => (call[1] as { tags: { sitemap_section: string } }).tags
+        .sitemap_section,
+    );
+    expect(sections).toContain("nurse profiles");
+    expect(sections).toContain("blog posts");
+    expect(sections).toContain("blog authors");
+  });
+
+  it("files nothing when every section reads cleanly", async () => {
+    // The positive control: a report on every run is a report nobody reads.
+    h.nurses = [nurse(1)];
+    h.nurseTotal = 1;
+
+    await sitemap();
+
+    expect(h.captureException).not.toHaveBeenCalled();
   });
 });

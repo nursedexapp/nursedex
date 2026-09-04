@@ -7,6 +7,7 @@ import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { ExternalReviewForm } from "@/components/reviews/ExternalReviewForm";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export const metadata: Metadata = {
   title: "Leave a review | NurseDex",
   robots: { index: false, follow: false },
@@ -34,19 +35,22 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
 
   // Resolve the slug to a publicly visible nurse (verified, not hidden, not
   // deleted/suspended). Pending or hidden profiles have no public review page.
-  const { data: nurseRow } = await applyVisibleNurseFilter(
-    service
-      .from("nurse_profiles")
-      .select(
-        `
-        user_id,
-        slug,
-        credential,
-        users!inner(first_name, is_deleted, is_suspended)
-      `,
-      )
-      .eq("slug", slug),
-  ).maybeSingle();
+  const nurseRow = await unwrapOrThrow(
+    applyVisibleNurseFilter(
+      service
+        .from("nurse_profiles")
+        .select(
+          `
+          user_id,
+          slug,
+          credential,
+          users!inner(first_name, is_deleted, is_suspended)
+        `,
+        )
+        .eq("slug", slug),
+    ).maybeSingle(),
+    "nurse_profiles (ReviewLinkPage)",
+  );
 
   if (!nurseRow) notFound();
 
@@ -62,11 +66,14 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
 
   // Get or create the review_links row for this nurse, server-side.
   // The form needs a token for submit_external_review's gate.
-  const { data: existing } = await service
-    .from("nurse_review_links")
-    .select("token")
-    .eq("nurse_user_id", nurse.user_id)
-    .maybeSingle();
+  const existing = await unwrapOrThrow(
+    service
+      .from("nurse_review_links")
+      .select("token")
+      .eq("nurse_user_id", nurse.user_id)
+      .maybeSingle(),
+    "nurse_review_links (ReviewLinkPage)",
+  );
 
   let token = existing?.token as string | undefined;
   if (!token) {

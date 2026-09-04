@@ -9,15 +9,15 @@ import {
 } from "@/lib/profile/onboarding-status";
 import { ProfileEditForm } from "./ProfileEditForm";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export default async function EditProfilePage() {
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  const profile = await unwrapOrThrow(
+    supabase.from("nurse_profiles").select("*").eq("user_id", user.id).single(),
+    "nurse_profiles (EditProfilePage)",
+  );
 
   if (!profile) {
     redirect("/dashboard");

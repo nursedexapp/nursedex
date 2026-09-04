@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface DailyPoint {
@@ -32,12 +33,15 @@ export async function getNurseStats(nurseUserId: string): Promise<NurseStats> {
   const now = Date.now();
   const priorStart = new Date(now - 60 * DAY_MS);
 
-  const { data } = await supabase
-    .from("nurse_analytics")
-    .select("date, profile_views, saves, reveals")
-    .eq("nurse_user_id", nurseUserId)
-    .gte("date", priorStart.toISOString().slice(0, 10))
-    .order("date", { ascending: true });
+  const data = await unwrapOrThrow(
+    supabase
+      .from("nurse_analytics")
+      .select("date, profile_views, saves, reveals")
+      .eq("nurse_user_id", nurseUserId)
+      .gte("date", priorStart.toISOString().slice(0, 10))
+      .order("date", { ascending: true }),
+    "nurse_analytics (getNurseStats)",
+  );
 
   type Row = {
     date: string;
@@ -116,11 +120,14 @@ export async function getCohortComparison(
   const now = Date.now();
   const since = new Date(now - 30 * DAY_MS).toISOString().slice(0, 10);
 
-  const { data: me } = await supabase
-    .from("nurse_profiles")
-    .select("credential, primary_care_type")
-    .eq("user_id", nurseUserId)
-    .maybeSingle();
+  const me = await unwrapOrThrow(
+    supabase
+      .from("nurse_profiles")
+      .select("credential, primary_care_type")
+      .eq("user_id", nurseUserId)
+      .maybeSingle(),
+    "nurse_profiles (getCohortComparison)",
+  );
   if (!me?.credential || !me.primary_care_type) {
     return {
       available: false,
@@ -130,13 +137,16 @@ export async function getCohortComparison(
     };
   }
 
-  const { data: cohort } = await supabase
-    .from("nurse_profiles")
-    .select("user_id")
-    .eq("credential", me.credential)
-    .eq("primary_care_type", me.primary_care_type)
-    .eq("verification_status", "verified")
-    .eq("is_hidden", false);
+  const cohort = await unwrapOrThrow(
+    supabase
+      .from("nurse_profiles")
+      .select("user_id")
+      .eq("credential", me.credential)
+      .eq("primary_care_type", me.primary_care_type)
+      .eq("verification_status", "verified")
+      .eq("is_hidden", false),
+    "nurse_profiles (getCohortComparison)",
+  );
   type CohortRow = { user_id: string };
   const cohortIds = ((cohort ?? []) as CohortRow[]).map((c) => c.user_id);
   if (cohortIds.length < 5) {
@@ -149,11 +159,14 @@ export async function getCohortComparison(
   }
 
   const others = cohortIds.filter((id) => id !== nurseUserId);
-  const { data: rows } = await supabase
-    .from("nurse_analytics")
-    .select("nurse_user_id, profile_views")
-    .in("nurse_user_id", others)
-    .gte("date", since);
+  const rows = await unwrapOrThrow(
+    supabase
+      .from("nurse_analytics")
+      .select("nurse_user_id, profile_views")
+      .in("nurse_user_id", others)
+      .gte("date", since),
+    "nurse_analytics (getCohortComparison)",
+  );
   type AnalyticsRow = { nurse_user_id: string; profile_views: number };
   const sums = new Map<string, number>();
   for (const r of (rows ?? []) as AnalyticsRow[]) {

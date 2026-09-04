@@ -9,6 +9,7 @@ import type {
 import { authorDisplayName } from "./author";
 import { selectRelatedPosts } from "./related";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 /**
  * Display name for a post's author, or null if there is no author (the FK
  * is ON DELETE SET NULL) or no usable name. Read with the service-role
@@ -107,7 +108,10 @@ export async function searchPublishedPosts(
     .from("blog_posts")
     .select("*", { count: "exact" })
     .eq("status", "published")
-    .textSearch("search_vector", query, { type: "websearch", config: "english" })
+    .textSearch("search_vector", query, {
+      type: "websearch",
+      config: "english",
+    })
     .order("publish_at", { ascending: false })
     .range(from, from + pageSize - 1);
 
@@ -236,7 +240,8 @@ export async function getTaxonomyForAdmin(): Promise<{
 
   const catCount = new Map<string, number>();
   for (const r of (postCats.data ?? []) as { category_id: string | null }[]) {
-    if (r.category_id) catCount.set(r.category_id, (catCount.get(r.category_id) ?? 0) + 1);
+    if (r.category_id)
+      catCount.set(r.category_id, (catCount.get(r.category_id) ?? 0) + 1);
   }
   const tagCount = new Map<string, number>();
   for (const r of (postTags.data ?? []) as { tag_id: string }[]) {
@@ -264,22 +269,27 @@ export async function getIndexableTaxonomy(): Promise<{
 }> {
   const supabase = createServiceRoleClient();
 
-  const { data: posts } = await supabase
-    .from("blog_posts")
-    .select("id, category_id")
-    .eq("status", "published");
+  const posts = await unwrapOrThrow(
+    supabase
+      .from("blog_posts")
+      .select("id, category_id")
+      .eq("status", "published"),
+    "blog_posts (getIndexableTaxonomy)",
+  );
   const pub = (posts ?? []) as { id: string; category_id: string | null }[];
   const catIds = [
-    ...new Set(pub.map((p) => p.category_id).filter((id): id is string => !!id)),
+    ...new Set(
+      pub.map((p) => p.category_id).filter((id): id is string => !!id),
+    ),
   ];
   const postIds = pub.map((p) => p.id);
 
   let tagIds: string[] = [];
   if (postIds.length > 0) {
-    const { data: pt } = await supabase
-      .from("blog_post_tags")
-      .select("tag_id")
-      .in("post_id", postIds);
+    const pt = await unwrapOrThrow(
+      supabase.from("blog_post_tags").select("tag_id").in("post_id", postIds),
+      "blog_post_tags (getIndexableTaxonomy)",
+    );
     tagIds = [
       ...new Set(((pt ?? []) as { tag_id: string }[]).map((r) => r.tag_id)),
     ];
@@ -287,10 +297,13 @@ export async function getIndexableTaxonomy(): Promise<{
 
   const categories: { slug: string; updated_at: string }[] = [];
   if (catIds.length > 0) {
-    const { data: cats } = await supabase
-      .from("blog_categories")
-      .select("slug, updated_at")
-      .in("id", catIds);
+    const cats = await unwrapOrThrow(
+      supabase
+        .from("blog_categories")
+        .select("slug, updated_at")
+        .in("id", catIds),
+      "blog_categories (getIndexableTaxonomy)",
+    );
     categories.push(
       ...((cats ?? []) as { slug: string; updated_at: string }[]),
     );
@@ -298,10 +311,10 @@ export async function getIndexableTaxonomy(): Promise<{
 
   const tags: { slug: string }[] = [];
   if (tagIds.length > 0) {
-    const { data: tg } = await supabase
-      .from("blog_tags")
-      .select("slug")
-      .in("id", tagIds);
+    const tg = await unwrapOrThrow(
+      supabase.from("blog_tags").select("slug").in("id", tagIds),
+      "blog_tags (getIndexableTaxonomy)",
+    );
     tags.push(...((tg ?? []) as { slug: string }[]));
   }
 
@@ -313,11 +326,10 @@ export async function getCategoryById(
 ): Promise<BlogCategory | null> {
   if (!id) return null;
   const supabase = createServiceRoleClient();
-  const { data } = await supabase
-    .from("blog_categories")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+  const data = await unwrapOrThrow(
+    supabase.from("blog_categories").select("*").eq("id", id).maybeSingle(),
+    "blog_categories (getCategoryById)",
+  );
   return (data as BlogCategory | null) ?? null;
 }
 
@@ -368,13 +380,21 @@ export async function getPublishedPostsByAuthor(
   const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
   const from = (safePage - 1) * pageSize;
 
-  const { data, count } = await supabase
+  const pageResult = await supabase
     .from("blog_posts")
     .select("*", { count: "exact" })
     .eq("status", "published")
     .eq("author_id", authorId)
     .order("publish_at", { ascending: false })
     .range(from, from + pageSize - 1);
+  // Both halves come off one result, so it is held and handed to the helper
+  // rather than destructured: `count ?? 0` below reads a failed count as an
+  // empty archive, and an empty archive renders as a 404.
+  const data = await unwrapOrThrow(
+    pageResult,
+    "blog_posts, one page of an author archive",
+  );
+  const count = pageResult.count;
 
   const total = count ?? 0;
   if (total === 0) return null;
@@ -397,22 +417,29 @@ export async function getPublishedPostsByCategory(
   pageSize: number = BLOG_PAGE_SIZE,
 ): Promise<CategoryArchive | null> {
   const supabase = createServiceRoleClient();
-  const { data: category } = await supabase
-    .from("blog_categories")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
+  const category = await unwrapOrThrow(
+    supabase.from("blog_categories").select("*").eq("slug", slug).maybeSingle(),
+    "blog_categories (getPublishedPostsByCategory)",
+  );
   if (!category) return null;
 
   const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
   const from = (safePage - 1) * pageSize;
-  const { data, count } = await supabase
+  const pageResult = await supabase
     .from("blog_posts")
     .select("*", { count: "exact" })
     .eq("status", "published")
     .eq("category_id", (category as BlogCategory).id)
     .order("publish_at", { ascending: false })
     .range(from, from + pageSize - 1);
+  // Both halves come off one result, so it is held and handed to the helper
+  // rather than destructured: `count ?? 0` below reads a failed count as an
+  // empty archive, and an empty archive renders as a 404.
+  const data = await unwrapOrThrow(
+    pageResult,
+    "blog_posts, one page of a category archive",
+  );
+  const count = pageResult.count;
 
   const total = count ?? 0;
   return {
@@ -432,16 +459,15 @@ export async function getPublishedPostsByTag(
   pageSize: number = BLOG_PAGE_SIZE,
 ): Promise<TagArchive | null> {
   const supabase = createServiceRoleClient();
-  const { data: tag } = await supabase
-    .from("blog_tags")
-    .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
+  const tag = await unwrapOrThrow(
+    supabase.from("blog_tags").select("*").eq("slug", slug).maybeSingle(),
+    "blog_tags (getPublishedPostsByTag)",
+  );
   if (!tag) return null;
 
   const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
   const from = (safePage - 1) * pageSize;
-  const { data, count } = await supabase
+  const pageResult = await supabase
     .from("blog_posts")
     // !inner makes the join a filter: only posts linked to this tag.
     .select("*, blog_post_tags!inner(tag_id)", { count: "exact" })
@@ -449,6 +475,14 @@ export async function getPublishedPostsByTag(
     .eq("blog_post_tags.tag_id", (tag as BlogTag).id)
     .order("publish_at", { ascending: false })
     .range(from, from + pageSize - 1);
+  // Both halves come off one result, so it is held and handed to the helper
+  // rather than destructured: `count ?? 0` below reads a failed count as an
+  // empty archive, and an empty archive renders as a 404.
+  const data = await unwrapOrThrow(
+    pageResult,
+    "blog_posts, one page of a tag archive",
+  );
+  const count = pageResult.count;
 
   const total = count ?? 0;
   return {
@@ -494,25 +528,31 @@ export async function getRelatedPosts(
   let tagMatches: BlogPost[] = [];
   const tagIds = (await getTagsForPost(post.id)).map((t) => t.id);
   if (tagIds.length > 0) {
-    const { data } = await supabase
-      .from("blog_post_tags")
-      .select("blog_posts!inner(*)")
-      .in("tag_id", tagIds)
-      .eq("blog_posts.status", "published")
-      .neq("post_id", post.id);
+    const data = await unwrapOrThrow(
+      supabase
+        .from("blog_post_tags")
+        .select("blog_posts!inner(*)")
+        .in("tag_id", tagIds)
+        .eq("blog_posts.status", "published")
+        .neq("post_id", post.id),
+      "blog_post_tags (getRelatedPosts)",
+    );
     tagMatches = ((data ?? []) as unknown as { blog_posts: BlogPost | null }[])
       .map((r) => r.blog_posts)
       .filter((p): p is BlogPost => p !== null);
   }
 
   // Recency fallback pool (a few extra so de-duping still leaves enough).
-  const { data: recent } = await supabase
-    .from("blog_posts")
-    .select("*")
-    .eq("status", "published")
-    .neq("id", post.id)
-    .order("publish_at", { ascending: false })
-    .limit(limit + 5);
+  const recent = await unwrapOrThrow(
+    supabase
+      .from("blog_posts")
+      .select("*")
+      .eq("status", "published")
+      .neq("id", post.id)
+      .order("publish_at", { ascending: false })
+      .limit(limit + 5),
+    "blog_posts (getRelatedPosts)",
+  );
 
   const chosen = selectRelatedPosts(tagMatches, (recent ?? []) as BlogPost[], {
     selfId: post.id,

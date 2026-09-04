@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
 /**
  * Record that a post's slug changed from oldSlug to newSlug so the old URL
  * keeps working. No-op when the slug did not actually change. Uses the
@@ -16,16 +17,23 @@ export async function saveBlogSlugRedirect(
   if (!oldSlug || oldSlug === newSlug) return;
   const supabase = createServiceRoleClient();
 
-  // Collapse chains: X -> oldSlug becomes X -> newSlug.
-  await supabase
-    .from("blog_slug_redirects")
-    .update({ new_slug: newSlug })
-    .eq("new_slug", oldSlug);
-
-  const { error } = await supabase.from("blog_slug_redirects").upsert(
-    { old_slug: oldSlug, new_slug: newSlug, post_id: postId },
-    { onConflict: "old_slug" },
+  // Collapse chains: X -> oldSlug becomes X -> newSlug. Checked: an unchecked
+  // failure here leaves the old chain pointing at a slug that no longer
+  // resolves, and the visitor following it gets a 404 (#847).
+  await assertNoWriteError(
+    supabase
+      .from("blog_slug_redirects")
+      .update({ new_slug: newSlug })
+      .eq("new_slug", oldSlug),
+    "the collapse of an existing blog slug redirect chain",
   );
+
+  const { error } = await supabase
+    .from("blog_slug_redirects")
+    .upsert(
+      { old_slug: oldSlug, new_slug: newSlug, post_id: postId },
+      { onConflict: "old_slug" },
+    );
   if (error) {
     console.error("[blog] saveBlogSlugRedirect failed:", error.message);
   }
@@ -36,11 +44,14 @@ export async function getBlogSlugRedirect(
   oldSlug: string,
 ): Promise<string | null> {
   const supabase = createServiceRoleClient();
-  const { data } = await supabase
-    .from("blog_slug_redirects")
-    .select("new_slug")
-    .eq("old_slug", oldSlug)
-    .maybeSingle();
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_slug_redirects")
+      .select("new_slug")
+      .eq("old_slug", oldSlug)
+      .maybeSingle(),
+    "blog_slug_redirects (getBlogSlugRedirect)",
+  );
   return (data?.new_slug as string | undefined) ?? null;
 }
 
@@ -58,11 +69,14 @@ export async function getLiveBlogSlugRedirect(
   if (!newSlug) return null;
 
   const supabase = createServiceRoleClient();
-  const { data } = await supabase
-    .from("blog_posts")
-    .select("slug")
-    .eq("slug", newSlug)
-    .eq("status", "published")
-    .maybeSingle();
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_posts")
+      .select("slug")
+      .eq("slug", newSlug)
+      .eq("status", "published")
+      .maybeSingle(),
+    "blog_posts (getLiveBlogSlugRedirect)",
+  );
   return data ? newSlug : null;
 }

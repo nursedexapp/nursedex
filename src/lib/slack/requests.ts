@@ -2,8 +2,14 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createIssue, ISSUE_LABELS } from "@/lib/github";
 import { slackPost } from "./client";
-import { RATES, requestRootBlocks, type RequestType, type RequestView } from "./views";
+import {
+  RATES,
+  requestRootBlocks,
+  type RequestType,
+  type RequestView,
+} from "./views";
 
+import { assertNoWriteError } from "@/lib/db/results";
 const ROW_FIELDS =
   "id,title,description,urgency,deadline,links,requested_by,type,rate,estimate_hours,status,approved_by,github_issue_number,github_issue_url,suggested_estimate_hours,suggested_type,suggested_rationale,suggested_labels,slack_channel,slack_thread_ts";
 
@@ -78,10 +84,16 @@ export async function ensureIssue(req: RequestRow): Promise<void> {
 
   /** Hand the claim back so a later attempt can retry a creation that failed. */
   const releaseClaim = async () => {
-    await supabase
-      .from("consulting_requests")
-      .update({ github_issue_claimed_at: null })
-      .eq("id", req.id);
+    // Checked: this write is what lets a later attempt retry a creation that
+    // failed, so an unchecked failure here leaves the claim held forever and
+    // the request is never picked up again (#847).
+    await assertNoWriteError(
+      supabase
+        .from("consulting_requests")
+        .update({ github_issue_claimed_at: null })
+        .eq("id", req.id),
+      "the release of a GitHub issue claim",
+    );
   };
 
   // Best-effort permalink so the issue points back at the Slack thread.
@@ -138,13 +150,19 @@ export async function ensureIssue(req: RequestRow): Promise<void> {
     return;
   }
 
-  await supabase
-    .from("consulting_requests")
-    .update({
-      github_issue_number: issue.number,
-      github_issue_url: issue.html_url,
-    })
-    .eq("id", req.id);
+  // The issue EXISTS on GitHub by now. An unchecked failure here loses the only
+  // link back to it, and the claim stays held, so nothing retries and nothing
+  // says why (#847).
+  await assertNoWriteError(
+    supabase
+      .from("consulting_requests")
+      .update({
+        github_issue_number: issue.number,
+        github_issue_url: issue.html_url,
+      })
+      .eq("id", req.id),
+    "the GitHub issue link on a consulting request",
+  );
 
   const fresh = await getRequest(req.id);
   if (fresh) {

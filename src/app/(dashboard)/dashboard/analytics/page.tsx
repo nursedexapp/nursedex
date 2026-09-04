@@ -13,6 +13,7 @@ import {
 } from "@/lib/analytics/nurse-stats";
 import { StatsChart } from "@/components/analytics/StatsChart";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export const metadata: Metadata = {
   title: "Analytics | NurseDex",
 };
@@ -20,11 +21,14 @@ export const metadata: Metadata = {
 export default async function NurseAnalyticsPage() {
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select("tier, verification_status")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const profile = await unwrapOrThrow(
+    supabase
+      .from("nurse_profiles")
+      .select("tier, verification_status")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    "nurse_profiles (NurseAnalyticsPage)",
+  );
 
   const isFeatured = profile?.tier === "featured";
   const stats = isFeatured ? await getNurseStats(user.id) : null;

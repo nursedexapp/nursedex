@@ -5,6 +5,7 @@ import { applyListedNurseFilter } from "@/lib/nurses/visibility";
 import { getIndexableTaxonomy } from "@/lib/blog/queries";
 import { readAllRows } from "@/lib/blog/read-all-rows";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 /**
  * A sitemap file may hold 50,000 URLs. Past that it is invalid and the
  * overflow is ignored, so the moment to split into a sitemap index is before
@@ -47,6 +48,22 @@ const STATIC_PAGES: Array<{
  * we don't need a logged-in viewer for the index). Soft-deleted and
  * suspended users are excluded. Public sitemaps don't need RLS.
  */
+/**
+ * One reporter for every section, so a dropped section is never console-only.
+ *
+ * The nurse block captured to Sentry and the other three did not, which is the
+ * same class fixed at one instance (L30). It matters more now that each block's
+ * reads THROW on a database failure rather than quietly producing an empty
+ * array (#847): a section silently missing from the sitemap is exactly the
+ * failure nobody notices, because the file is still valid and still served.
+ */
+function reportSitemapSection(section: string, err: unknown): void {
+  console.error(`[sitemap] failed to fetch ${section}:`, err);
+  Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
+    tags: { action: "sitemap", sitemap_section: section },
+  });
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
@@ -113,13 +130,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // The profiles are left out ENTIRELY rather than published as a prefix: a
     // partial list looks like a complete one to a search engine, and would
     // deindex whoever fell off the end (L10).
-    console.error("[sitemap] failed to fetch nurse profiles:", err);
-    Sentry.captureException(err instanceof Error ? err : new Error(String(err)), {
-      tags: { action: "sitemap" },
-    });
+    reportSitemapSection("nurse profiles", err);
   }
 
-  if (reportedNurseTotal !== null && reportedNurseTotal >= SITEMAP_URL_WARNING) {
+  if (
+    reportedNurseTotal !== null &&
+    reportedNurseTotal >= SITEMAP_URL_WARNING
+  ) {
     // One file cannot hold them all for much longer, and the failure past the
     // limit is silent: the file is simply invalid and the overflow ignored.
     // Said while there is still room to act.
@@ -134,10 +151,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let blogEntries: MetadataRoute.Sitemap = [];
   try {
     const supabase = createServiceRoleClient();
-    const { data } = await supabase
-      .from("blog_posts")
-      .select("slug, updated_at")
-      .eq("status", "published");
+    const data = await unwrapOrThrow(
+      supabase
+        .from("blog_posts")
+        .select("slug, updated_at")
+        .eq("status", "published"),
+      "blog_posts, for the sitemap's post entries",
+    );
 
     type BlogRow = { slug: string; updated_at: string };
     blogEntries = ((data ?? []) as BlogRow[]).map((r) => ({
@@ -147,7 +167,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     }));
   } catch (err) {
-    console.error("[sitemap] failed to fetch blog posts:", err);
+    reportSitemapSection("blog posts", err);
   }
 
   let taxonomyEntries: MetadataRoute.Sitemap = [];
@@ -168,17 +188,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }));
     taxonomyEntries = [...catEntries, ...tagEntries];
   } catch (err) {
-    console.error("[sitemap] failed to fetch blog taxonomy:", err);
+    reportSitemapSection("blog taxonomy", err);
   }
 
   let authorEntries: MetadataRoute.Sitemap = [];
   try {
     const supabase = createServiceRoleClient();
-    const { data } = await supabase
-      .from("blog_posts")
-      .select("author_id")
-      .eq("status", "published")
-      .not("author_id", "is", null);
+    const data = await unwrapOrThrow(
+      supabase
+        .from("blog_posts")
+        .select("author_id")
+        .eq("status", "published")
+        .not("author_id", "is", null),
+      "blog_posts, for the sitemap's author entries",
+    );
     const ids = [
       ...new Set(
         ((data ?? []) as { author_id: string | null }[])
@@ -192,7 +215,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.3,
     }));
   } catch (err) {
-    console.error("[sitemap] failed to fetch blog authors:", err);
+    reportSitemapSection("blog authors", err);
   }
 
   return [

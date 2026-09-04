@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { ISSUE_LABELS } from "@/lib/github";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 // Ask Claude for a rough billing type + hour estimate from a request
 // description, used to pre-fill the triage modal. Raw fetch (matching the
 // Slack and GitHub helpers) so no SDK dependency. Returns null on any
@@ -18,13 +19,16 @@ const MODEL = "claude-opus-4-8";
 async function calibrationExamples(): Promise<string> {
   try {
     const supabase = createServiceRoleClient();
-    const { data: reqs } = await supabase
-      .from("consulting_requests")
-      .select("id,title,type,estimate_hours")
-      .not("estimate_hours", "is", null)
-      .not("type", "is", null)
-      .order("id", { ascending: false })
-      .limit(10);
+    const reqs = await unwrapOrThrow(
+      supabase
+        .from("consulting_requests")
+        .select("id,title,type,estimate_hours")
+        .not("estimate_hours", "is", null)
+        .not("type", "is", null)
+        .order("id", { ascending: false })
+        .limit(10),
+      "consulting_requests (calibrationExamples)",
+    );
     const reqRows = (reqs ?? []) as Array<{
       id: number;
       title: string;
@@ -33,13 +37,16 @@ async function calibrationExamples(): Promise<string> {
     }>;
     if (!reqRows.length) return "";
 
-    const { data: entries } = await supabase
-      .from("consulting_time_entries")
-      .select("request_id,billed_min")
-      .in(
-        "request_id",
-        reqRows.map((r) => r.id),
-      );
+    const entries = await unwrapOrThrow(
+      supabase
+        .from("consulting_time_entries")
+        .select("request_id,billed_min")
+        .in(
+          "request_id",
+          reqRows.map((r) => r.id),
+        ),
+      "consulting_time_entries (calibrationExamples)",
+    );
     const actualByReq = new Map<number, number>();
     for (const e of (entries ?? []) as Array<{
       request_id: number;
@@ -147,7 +154,9 @@ export async function estimateRequest(input: {
       body: JSON.stringify(body),
     });
     if (!res.ok) {
-      console.error(`Anthropic estimate failed: ${res.status} ${await res.text()}`);
+      console.error(
+        `Anthropic estimate failed: ${res.status} ${await res.text()}`,
+      );
       return null;
     }
     const data = (await res.json()) as {

@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
 export type TaxonomyKind = "category" | "tag";
 
 const TABLE: Record<TaxonomyKind, string> = {
@@ -22,16 +23,23 @@ export async function saveTaxonomyRedirect(
   if (!oldSlug || oldSlug === newSlug) return;
   const supabase = createServiceRoleClient();
 
-  await supabase
-    .from("blog_taxonomy_redirects")
-    .update({ new_slug: newSlug })
-    .eq("kind", kind)
-    .eq("new_slug", oldSlug);
-
-  const { error } = await supabase.from("blog_taxonomy_redirects").upsert(
-    { kind, old_slug: oldSlug, new_slug: newSlug },
-    { onConflict: "kind,old_slug" },
+  // Checked, for the same reason as the post slug version: an unchecked
+  // failure leaves an old chain pointing at a slug that no longer resolves.
+  await assertNoWriteError(
+    supabase
+      .from("blog_taxonomy_redirects")
+      .update({ new_slug: newSlug })
+      .eq("kind", kind)
+      .eq("new_slug", oldSlug),
+    "the collapse of an existing taxonomy redirect chain",
   );
+
+  const { error } = await supabase
+    .from("blog_taxonomy_redirects")
+    .upsert(
+      { kind, old_slug: oldSlug, new_slug: newSlug },
+      { onConflict: "kind,old_slug" },
+    );
   if (error) {
     console.error("[blog] saveTaxonomyRedirect failed:", error.message);
   }
@@ -47,19 +55,21 @@ export async function getLiveTaxonomyRedirect(
   oldSlug: string,
 ): Promise<string | null> {
   const supabase = createServiceRoleClient();
-  const { data } = await supabase
-    .from("blog_taxonomy_redirects")
-    .select("new_slug")
-    .eq("kind", kind)
-    .eq("old_slug", oldSlug)
-    .maybeSingle();
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_taxonomy_redirects")
+      .select("new_slug")
+      .eq("kind", kind)
+      .eq("old_slug", oldSlug)
+      .maybeSingle(),
+    "blog_taxonomy_redirects (getLiveTaxonomyRedirect)",
+  );
   const newSlug = (data?.new_slug as string | undefined) ?? null;
   if (!newSlug) return null;
 
-  const { data: target } = await supabase
-    .from(TABLE[kind])
-    .select("slug")
-    .eq("slug", newSlug)
-    .maybeSingle();
+  const target = await unwrapOrThrow(
+    supabase.from(TABLE[kind]).select("slug").eq("slug", newSlug).maybeSingle(),
+    "TABLE[kind] (newSlug)",
+  );
   return target ? newSlug : null;
 }
