@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/components/shared/Header";
 import { Footer } from "@/components/shared/Footer";
+import { currentYear } from "@/lib/time/current-year";
 
 export const metadata: Metadata = {
   title: "Page not found | NurseDex",
@@ -38,7 +39,7 @@ export default function NotFound() {
           </Link>
         </div>
       </main>
-      <Footer />
+      <Footer year={currentYear()} />
     </div>
   );
 }

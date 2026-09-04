@@ -42,7 +42,7 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
         user_id,
         slug,
         credential,
-        users!inner(first_name, last_name, is_deleted, is_suspended)
+        users!inner(first_name, is_deleted, is_suspended)
       `,
       )
       .eq("slug", slug),
@@ -56,7 +56,6 @@ export default async function ReviewLinkPage({ params }: ReviewLinkPageProps) {
     credential: string;
     users: {
       first_name: string | null;
-      last_name: string | null;
     };
   };
   const nurse = nurseRow as unknown as Resolved;

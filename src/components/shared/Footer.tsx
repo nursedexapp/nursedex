@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { SocialLinks } from "@/components/shared/SocialLinks";
 
-export function Footer() {
-  const year = new Date().getFullYear();
+interface FooterProps {
+  /**
+   * The copyright year, resolved by the caller through `currentYear()` (#566).
+   * Taken as a prop rather than read from the clock here, so the value is
+   * computed once on the server and cannot differ between the HTML that is
+   * sent and the tree the browser hydrates.
+   */
+  year: number;
+}
+
+export function Footer({ year }: FooterProps) {
 
   return (
     <footer className="border-sage-light/50 bg-warm-white border-t px-6 py-12">

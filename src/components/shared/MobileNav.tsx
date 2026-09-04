@@ -10,12 +10,15 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import type { NavItem } from "./nav-items";
 
 interface MobileNavProps {
   isLoggedIn: boolean;
+  /** Built once by the Header from the viewer's role, so the two navs agree. */
+  navItems: NavItem[];
 }
 
-export function MobileNav({ isLoggedIn }: MobileNavProps) {
+export function MobileNav({ isLoggedIn, navItems }: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -32,21 +35,16 @@ export function MobileNav({ isLoggedIn }: MobileNavProps) {
         </SheetTitle>
 
         <nav className="flex flex-col gap-1 px-4">
-          <Link
-            href="/nurses"
-            onClick={() => setOpen(false)}
-            className="font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors"
-          >
-            Find a Nurse
-          </Link>
-
-          <Link
-            href="/blog"
-            onClick={() => setOpen(false)}
-            className="font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors"
-          >
-            Blog
-          </Link>
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setOpen(false)}
+              className="font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors"
+            >
+              {item.label}
+            </Link>
+          ))}
 
           {isLoggedIn ? (
             <>
