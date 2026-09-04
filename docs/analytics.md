@@ -130,6 +130,16 @@ the button speaks to. Seen matters as much as clicked, because a visitor who nev
 to the button and one who saw it and ignored it are otherwise identical in the data, and
 they point at completely different fixes.
 
+The Featured upsell: `featured_upsell_shown` and `featured_upsell_clicked`, both carrying a
+`surface` saying where the offer appeared. **Read them by surface or not at all.**
+`surface: "profile_edit"` is a toast that appears when a family saves the nurse's profile, so
+it measures family activity and had fired twice in the product's life to September 2026.
+`surface: "dashboard"` is the standing prompt at the bottom of the nurse dashboard, shown to
+every verified nurse on the free tier, and it is the one that answers whether nurses see the
+offer at all. Neither event carries tier or verification, because the dashboard only renders
+the prompt for a verified free tier nurse and a property that can hold one value reports
+nothing; the denominator (how many such nurses exist) comes from the database.
+
 Two things are deliberately NOT recorded, because PostHog already records them and a second
 measurement would be a rival number for the same fact: **page views** (PostHog's own
 `$pageview` fires on every route change) and **scroll depth**
