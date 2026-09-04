@@ -8,7 +8,12 @@ import {
   screen,
   fireEvent,
 } from "@testing-library/react";
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
+
 import { useInFlight } from "./use-in-flight";
+import { toast } from "sonner";
+import { captureException } from "@sentry/nextjs";
 
 // A surface with more than one async control (approve/reject, a row of icon
 // buttons, a whole taxonomy list) needs to know WHICH action is running, not
@@ -26,7 +31,10 @@ function hang() {
   return new Promise<void>((resolve) => hung.push(resolve));
 }
 
-beforeEach(() => vi.useFakeTimers());
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.clearAllMocks();
+});
 
 afterEach(async () => {
   // Release hung actions before the next test: React entangles concurrent async
@@ -260,11 +268,19 @@ describe("useInFlight", () => {
     expect(reject).toHaveBeenCalledTimes(1);
   });
 
-  it("does not swallow an action that throws", async () => {
-    // An admin action that blew up has to reach the error boundary and Sentry,
-    // not look like nothing happened. The hook lets it through: React takes the
-    // subtree down to the nearest boundary, which is the loud failure we want
-    // rather than a button that quietly goes back to idle as if it had worked.
+  it("keeps the surface standing when an action throws, and says what happened", async () => {
+    // REVERSED in #987. This used to assert the opposite: the rejection was
+    // let through so React would take the subtree down to the nearest error
+    // boundary, described as "the loud failure we want". That was a choice made
+    // while building the hook in #672, not a recorded decision, and #658, the
+    // issue it shipped under, says nothing about it.
+    //
+    // What it actually bought was a generic error screen in place of the whole
+    // admin surface, because one button's read failed. The property it cared
+    // about, that a blown-up action must not look like nothing happened, is
+    // answered better by the catch: the console, Sentry and the person are all
+    // told, which is more than a boundary gives any of them. Asserted in the
+    // "when the action rejects" block below.
     render(
       <Harness
         approve={async () => {
@@ -273,11 +289,134 @@ describe("useInFlight", () => {
       />,
     );
 
-    await expect(
-      act(async () => {
-        fireEvent.click(screen.getByTestId("approve"));
-        await vi.advanceTimersByTimeAsync(20);
-      }),
-    ).rejects.toThrow("boom");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("approve"));
+      await vi.advanceTimersByTimeAsync(20);
+    });
+
+    expect(screen.getByTestId("reject")).toBeEnabled();
+  });
+});
+
+// #987. The `finally` clears the flag on a rejection, so the button flicks back
+// to its idle label and says nothing. Against the standing rule that working,
+// still alive and failed must be visibly distinct, that is worse than the
+// spinner it replaced: the person presses again, on a write that may already
+// have landed. A throwing server action is not hypothetical here, because
+// milestone 35 is converting readers behind these controls onto helpers that
+// throw.
+describe("when the action rejects", () => {
+  it("says so, rather than flicking back to the idle label in silence", async () => {
+    render(
+      <Harness
+        approve={async () => {
+          throw new Error("the read failed");
+        }}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("approve"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/try again/i);
+  });
+
+  it("reports the rejection, because a digest is all the client is given", async () => {
+    const boom = new Error("the read failed");
+    render(
+      <Harness
+        approve={async () => {
+          throw boom;
+        }}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("approve"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(captureException).toHaveBeenCalledWith(boom, {
+      tags: { in_flight_action: "approve" },
+    });
+  });
+
+  it("hands the surface back, so the person can act again", async () => {
+    render(
+      <Harness
+        approve={async () => {
+          throw new Error("the read failed");
+        }}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("approve"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByTestId("approve")).toHaveTextContent("Approve");
+    expect(screen.getByTestId("approve")).not.toBeDisabled();
+  });
+
+  it("lets a caller with something better to say replace the message", async () => {
+    function Custom() {
+      const { run } = useInFlight<"approve">({
+        onError: () => toast.error("Couldn't reveal contact info. Try again."),
+      });
+      return (
+        <button
+          data-testid="approve"
+          onClick={() =>
+            run("approve", async () => {
+              throw new Error("boom");
+            })
+          }
+        />
+      );
+    }
+    render(<Custom />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("approve"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Couldn't reveal contact info. Try again.",
+    );
+  });
+
+  it("stays quiet when a superseded attempt is the one that rejected", async () => {
+    // The retry owns the surface. Reporting here would toast over its result
+    // and hand back a control it is still using (#669).
+    let failSuperseded: (() => void) | null = null;
+    const approve = (isLatest: () => boolean) =>
+      new Promise<void>((_resolve, reject) => {
+        if (failSuperseded === null) {
+          failSuperseded = () => reject(new Error("the superseded one"));
+        }
+        void isLatest;
+      });
+
+    render(<RetryHarness approve={approve} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("approve"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("retry"));
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      failSuperseded?.();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

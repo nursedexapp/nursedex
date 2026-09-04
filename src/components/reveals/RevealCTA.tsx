@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
+import { useInFlight } from "@/components/ui/use-in-flight";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock } from "lucide-react";
 import { PendingButton } from "@/components/ui/pending-button";
@@ -55,35 +55,38 @@ export function RevealCTA({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [captchaOpen, setCaptchaOpen] = useState(false);
-  // A local flag, not useTransition's isPending (#669). A retry does not cancel
-  // the request it supersedes, and useTransition stays pending until EVERY
-  // transition it started has settled, so the hung one would pin the button in
-  // "Revealing..." forever and the retry's success could never clear it.
-  const [isPending, setIsPending] = useState(false);
-  const { begin, isLatest } = useLatestAttempt();
+  // Through the shared primitive rather than a hand-rolled flag and a bare
+  // `void (async () => ...)` with its own catch (#987). This file had the catch
+  // and a comment naming #846, which is how the class came to be fixed at one
+  // instance and left open at HireButton and UnsubscribeForm. It is one hook
+  // now. The primitive tracks its own flag rather than useTransition's
+  // isPending, which is what #669 needed: a retry does not cancel what it
+  // supersedes, and useTransition stays pending until EVERY transition settles,
+  // so the hung one would pin the button in "Revealing..." forever.
+  //
+  // revealNurse's contract is to return rather than throw, and it has its own
+  // guard. The catch is the second half of that: the person is looking at this
+  // button, and if anything ever does reject, the spinner must not be left
+  // turning with no message.
+  const { inFlight, run, retry } = useInFlight<"reveal">({
+    onError: () => toast.error("Couldn't reveal contact info. Try again."),
+  });
+  const isPending = inFlight === "reveal";
 
-  const fireReveal = (turnstileToken?: string) => {
-    const attempt = begin();
-    setIsPending(true);
+  // `run` is the gate and refuses while something is in flight; `retry` is the
+  // one door past it, which is what the stalled retry-mode button needs. The
+  // captcha path takes `run`, because by the time it fires the needs_captcha
+  // answer has already come back and nothing is in flight.
+  const fireReveal = (turnstileToken?: string) =>
+    run("reveal", (isLatest) => runReveal(isLatest, turnstileToken));
 
-    void (async () => {
-      try {
-        await runReveal(attempt, turnstileToken);
-      } catch (error) {
-        // revealNurse's contract is to return rather than throw, and it has its
-        // own guard. This is the second half of that: the person is looking at
-        // this button, and if anything ever does reject, the spinner must not be
-        // left turning with no message. A control that looks identical whether
-        // the work is progressing, hung or dead is a defect.
-        console.error("[reveal] the reveal button caught a rejection:", error);
-        if (!isLatest(attempt)) return;
-        setIsPending(false);
-        toast.error("Couldn't reveal contact info. Try again.");
-      }
-    })();
-  };
+  const retryReveal = () =>
+    retry("reveal", (isLatest) => runReveal(isLatest));
 
-  const runReveal = async (attempt: number, turnstileToken?: string) => {
+  const runReveal = async (
+    isLatest: () => boolean,
+    turnstileToken?: string,
+  ) => {
     {
       if (posthog.__loaded) {
         posthog.capture(ANALYTICS_EVENTS.REVEAL_ATTEMPTED, {
@@ -96,8 +99,7 @@ export function RevealCTA({
       // nothing for a nurse the family already has), but this attempt no longer
       // owns the button: reporting here would toast over the retry's result and
       // hand back a control the retry is still using.
-      if (!isLatest(attempt)) return;
-      setIsPending(false);
+      if (!isLatest()) return;
 
       if (!result.success) {
         if (result.error === "needs_captcha") {
@@ -167,7 +169,7 @@ export function RevealCTA({
           slowLabel="Still revealing..."
           icon={<Lock className="size-3.5" aria-hidden="true" />}
           onClick={() => fireReveal()}
-          onRetry={() => fireReveal()}
+          onRetry={retryReveal}
         />
         <Dialog open={captchaOpen} onOpenChange={setCaptchaOpen}>
           <DialogContent>

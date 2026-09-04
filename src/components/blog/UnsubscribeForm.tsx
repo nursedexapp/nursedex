@@ -3,47 +3,56 @@
 import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { PendingButton } from "@/components/ui/pending-button";
-import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
+import { useInFlight } from "@/components/ui/use-in-flight";
 import { Input } from "@/components/ui/input";
 import { unsubscribeByEmail } from "@/lib/newsletter/actions";
 
 export function UnsubscribeForm() {
-  // A local flag, not useTransition (#669). useTransition stays pending until
-  // EVERY transition it started settles, so the hung request would pin the button
-  // and the retry's success could never clear it.
-  const [pending, setPending] = useState(false);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "success">("idle");
   const [error, setError] = useState<string | null>(null);
-  const { begin, isLatest } = useLatestAttempt();
+  // Through the shared primitive rather than a hand-rolled flag and a bare
+  // `void (async () => ...)` (#987). The hand-rolled version had no catch, so a
+  // rejection left the button back at its label with nothing said. The message
+  // is set here rather than toasted because this form reports inline.
+  const { inFlight, run, retry } = useInFlight<"unsubscribe">({
+    onError: () => setError("Something went wrong. Please try again."),
+  });
 
-  const run = () => {
-    const attempt = begin();
-    setPending(true);
+  const unsubscribe = async (isLatest: () => boolean) => {
+    const res = await unsubscribeByEmail({ email });
+
+    // Superseded by a retry. The first request is still in flight and may yet
+    // land; if it failed, saying so now would drag the form back out of the
+    // success the retry already reached.
+    if (!isLatest()) return;
+
+    if (!res.success) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    setStatus("success");
+  };
+
+  // `run` is the gate, so it refuses while something is in flight. `retry` is
+  // the one door past it (#669), which is what a stalled retry-mode button
+  // needs: pressed through `run` it would do nothing at all.
+  const submit = () => {
     setError(null);
+    run("unsubscribe", unsubscribe);
+  };
 
-    void (async () => {
-      const res = await unsubscribeByEmail({ email });
-
-      // Superseded by a retry. The first request is still in flight and may yet
-      // land; if it failed, saying so now would drag the form back out of the
-      // success the retry already reached.
-      if (!isLatest(attempt)) return;
-      setPending(false);
-
-      if (!res.success) {
-        setError("Enter a valid email address.");
-        return;
-      }
-      setStatus("success");
-    })();
+  const submitAgain = () => {
+    setError(null);
+    retry("unsubscribe", unsubscribe);
   };
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // A disabled submit button stops the button, not the form.
-    if (pending) return;
-    run();
+    // A disabled submit button stops the button, not the form. `run` is itself
+    // the gate too, so this is belt and braces rather than the only guard.
+    if (inFlight) return;
+    submit();
   }
 
   if (status === "success") {
@@ -75,13 +84,13 @@ export function UnsubscribeForm() {
           someone to refresh a page they are trying to leave was the whole cost of
           being cautious here. */}
       <PendingButton
-        pending={pending}
+        pending={inFlight === "unsubscribe"}
         mode="retry"
         type="submit"
         idleLabel="Unsubscribe"
         workingLabel="Unsubscribing..."
         slowLabel="Still unsubscribing..."
-        onRetry={run}
+        onRetry={submitAgain}
         className="w-full"
       />
     </form>

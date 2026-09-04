@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Briefcase, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PendingButton } from "@/components/ui/pending-button";
-import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
+import { useInFlight } from "@/components/ui/use-in-flight";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Dialog,
@@ -33,12 +33,14 @@ export function HireButton({
 }: HireButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  // A local flag, not useTransition's isPending (#669). A retry does not cancel
-  // the request it supersedes, and useTransition stays pending until EVERY
-  // transition it started has settled, so a hung one would pin the button in
-  // "Recording..." forever and the retry's success could never clear it.
-  const [pending, setPending] = useState(false);
-  const { begin, isLatest } = useLatestAttempt();
+  // Through the shared primitive, not a hand-rolled flag inside a bare
+  // `void (async () => ...)` (#987). That shape had no catch, so a rejection
+  // never reached the reset and the button span forever, which is the #846
+  // defect this file was still carrying live. The primitive tracks its own
+  // flag rather than useTransition's isPending, which is what #669 needed: a
+  // retry does not cancel what it supersedes, and useTransition stays pending
+  // until EVERY transition settles, so a hung one would pin the button.
+  const { inFlight, run, retry } = useInFlight<"confirm">();
 
   if (hire && hire.status === "confirmed") {
     return (
@@ -64,18 +66,14 @@ export function HireButton({
     );
   }
 
-  const handleConfirm = () => {
-    const attempt = begin();
-    setPending(true);
-
-    void (async () => {
+  const confirmHire = async (isLatest: () => boolean) => {
+    {
       const result = await recordFamilyHire({ nurse_user_id: nurseUserId });
 
       // Superseded by a retry. This attempt no longer owns the button: reporting
       // here would toast over the retry's result and hand back a control the
       // retry is still using.
-      if (!isLatest(attempt)) return;
-      setPending(false);
+      if (!isLatest()) return;
 
       if (!result.success) {
         if (result.error === "not_revealed") {
@@ -99,8 +97,13 @@ export function HireButton({
       toast.success(`Recorded hire of ${nurseFirstName}`);
       setOpen(false);
       router.refresh();
-    })();
+    }
   };
+
+  // `run` is the gate and refuses while something is in flight; `retry` is the
+  // one door past it, which is what a stalled retry-mode button needs (#669).
+  const handleConfirm = () => run("confirm", confirmHire);
+  const handleRetry = () => retry("confirm", confirmHire);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -124,7 +127,7 @@ export function HireButton({
             type="button"
             variant="ghost"
             onClick={() => setOpen(false)}
-            disabled={pending}
+            disabled={inFlight !== null}
           >
             Cancel
           </Button>
@@ -135,14 +138,14 @@ export function HireButton({
               the already-done that it is rather than as a failure. So a stalled
               hire can simply be tried again. */}
           <PendingButton
-            pending={pending}
+            pending={inFlight === "confirm"}
             mode="retry"
             idleLabel={`Yes, I hired ${nurseFirstName}`}
             workingLabel="Recording..."
             slowLabel="Still recording..."
             stalledVerb="recording"
             onClick={handleConfirm}
-            onRetry={handleConfirm}
+            onRetry={handleRetry}
           />
         </div>
       </DialogContent>
