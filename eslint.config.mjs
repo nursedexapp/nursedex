@@ -97,18 +97,23 @@ export default [
       // A PostgREST call does not throw: it resolves to { data, error }, so
       // `const { data } = await supabase...` turns a permission change, an RLS
       // refusal or a dropped connection into an empty answer and treats it as
-      // the truth. Around 244 sites did that on 4 September 2026 (#847), and
-      // the harm was never a blank screen: a family who had spent a reveal was
-      // told they had not, and a paying family was told they had no
-      // subscription (#845).
+      // the truth. 283 sites did that on 4 September 2026 (#847), and the harm
+      // was never a blank screen: a family who had spent a reveal was told they
+      // had not, a paying family was told they had no subscription (#845), and
+      // the admin dashboard reported zero nurses and zero revenue.
       //
-      // At `warn` on purpose, for the length of the sweep in milestone 35 only.
-      // scripts/db-error-ratchet.ts holds the count where it is and fails CI
-      // when it RISES, so the sweep cannot be outrun by new instances of the
-      // very class it removes; #992 flips this to `error` once the tree is
-      // clean. A rule that lands last leaves the whole sweep as the window in
-      // which somebody writes number 245.
-      "local/require-db-error-check": "warn",
+      // At `error` since #992, over a tree with none left. It shipped at `warn`
+      // on the FIRST day of the sweep rather than the last, held by
+      // scripts/db-error-ratchet.ts, because a rule that lands last leaves the
+      // whole sweep as the window in which somebody writes number 284.
+      //
+      // A zero is not proof the class cannot occur, so what the count used to
+      // do is now done by two things that keep measuring: the SHAPES table in
+      // eslint-rules/require-db-error-check.test.mjs, which names every shape
+      // this rule is accountable for and fails if one stops being caught, and
+      // the ratchet, which now holds the five written exemptions so adding a
+      // sixth is a diff somebody has to justify rather than one fewer warning.
+      "local/require-db-error-check": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
