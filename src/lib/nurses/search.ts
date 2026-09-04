@@ -215,6 +215,10 @@ async function runQuery(
   gate: CardGate,
   opts: QueryOptions = {},
 ): Promise<InternalNurseCard[]> {
+  // Which nurses matched the keyword on their NAME, filled in below when a
+  // keyword was given. Stays empty for every search without one, where the
+  // ranking is exactly what it was before (#936).
+  let nameMatchIds: Set<string> = new Set();
   // Search joins nurse_profiles to users for first_name / last_name /
   // zip_code on the cards. RLS on users only exposes id = auth.uid()
   // rows, which would zero out the inner join for anon and family
@@ -289,6 +293,11 @@ async function runQuery(
       const nameMatches = await nurseIdsMatchingName(filters.q, gate);
       if (nameMatches.length > 0) {
         clauses.push(`user_id.in.(${nameMatches.join(",")})`);
+        // Kept so the ranking can put the nurse the family NAMED above the
+        // ones whose bio merely contains the same string (#936). Derived here,
+        // where the set is already being computed, rather than by asking a
+        // second time and risking a different answer.
+        nameMatchIds = new Set(nameMatches);
       }
       query = query.or(clauses.join(","));
     }
@@ -317,7 +326,18 @@ async function runQuery(
   const { data, error } = await query;
   if (error || !data) return [];
 
-  return shapeNurseCards(data, gate);
+  const cards = shapeNurseCards(data, gate);
+
+  // Marked on the row rather than returned alongside it, so every caller of
+  // runQuery carries the fact into its own ranking without threading a second
+  // value through, and the two cannot get out of step.
+  if (nameMatchIds.size > 0) {
+    for (const card of cards) {
+      if (nameMatchIds.has(card.user_id)) card.name_match = true;
+    }
+  }
+
+  return cards;
 }
 
 /**

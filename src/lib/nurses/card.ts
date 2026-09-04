@@ -81,6 +81,13 @@ export interface NurseSearchCard {
  */
 export interface InternalNurseCard extends NurseSearchCard {
   photos: string[];
+  /**
+   * True when this nurse matched the search keyword on her NAME rather than
+   * on her bio (#936). Set by the search after the query, read only by the
+   * ranking, and deliberately not carried onto the public card: it describes
+   * this one search, not the nurse.
+   */
+  name_match?: boolean;
 }
 
 // ── Columns ───────────────────────────────────────────────────
@@ -344,7 +351,11 @@ function assertNurseCardRow(row: unknown): CardRow {
 
 /** Strip the internal fields before the card becomes a client-component prop. */
 export function toPublicNurseCard(card: InternalNurseCard): NurseSearchCard {
-  const { photos: _photos, ...rest } = card;
+  // Both stripped by name, not left to the type. The return type says they are
+  // gone, but a spread carries whatever the object actually holds, and this
+  // result is serialised to the browser. name_match describes ONE search, not
+  // the nurse, so it has no business on a card (#936).
+  const { photos: _photos, name_match: _nameMatch, ...rest } = card;
   return rest;
 }
 
