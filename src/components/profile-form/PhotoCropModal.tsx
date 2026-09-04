@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { PendingButton } from "@/components/ui/pending-button";
 import type { CropArea } from "@/lib/profile/crop";
+import { cardAvatarFrame } from "@/lib/profile/card-avatar-frame";
+import { DEFAULT_FOCAL } from "@/lib/profile/focal-point";
 
 interface PhotoCropModalProps {
   imageSrc: string;
@@ -30,6 +32,10 @@ export function PhotoCropModal({
   const [zoom, setZoom] = useState(1);
   const [area, setArea] = useState<CropArea | null>(null);
 
+  // What the directory card will take out of the 16:10 crop, at the focal
+  // point every new photo starts on.
+  const avatarFrame = cardAvatarFrame(16 / 10, DEFAULT_FOCAL);
+
   const onCropComplete = useCallback(
     (_area: CropArea, areaPixels: CropArea) => setArea(areaPixels),
     [],
@@ -47,11 +53,21 @@ export function PhotoCropModal({
           Frame your photo
         </DialogTitle>
         <DialogDescription className="text-soft-black-light text-sm">
-          Drag to reposition and use the slider to zoom. This is exactly how
-          your photo appears on the Find a Nurse cards.
+          Drag to reposition and use the slider to zoom. Keep your face inside
+          the circle: that circle is what families see on the Find a Nurse
+          cards. The rest of the frame shows on your profile page.
         </DialogDescription>
 
-        {/* 16:10 frame matches the search card's photo area exactly. */}
+        {/* The 16:10 frame is what gets stored and what the profile page
+            shows. The circle drawn over it is what the directory card takes
+            out of that: a square, object-cover avatar, so it sees the full
+            height of a 16:10 photo and 62.5% of its width. Its size and
+            position come from the same helper the card's own geometry is
+            described by, rather than a number restated here (#929).
+
+            It is an overlay rather than the crop shape itself, deliberately.
+            Cropping to the circle would throw away everything outside it, and
+            the profile page uses the wide frame. */}
         <div className="bg-soft-black relative mt-2 aspect-[16/10] w-full overflow-hidden rounded-lg">
           <Cropper
             image={imageSrc}
@@ -61,6 +77,17 @@ export function PhotoCropModal({
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={onCropComplete}
+          />
+          <div
+            aria-hidden="true"
+            data-testid="card-avatar-overlay"
+            className="pointer-events-none absolute rounded-full border-2 border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+            style={{
+              left: `${avatarFrame.leftFraction * 100}%`,
+              top: `${avatarFrame.topFraction * 100}%`,
+              width: `${avatarFrame.widthFraction * 100}%`,
+              height: `${avatarFrame.heightFraction * 100}%`,
+            }}
           />
         </div>
 
