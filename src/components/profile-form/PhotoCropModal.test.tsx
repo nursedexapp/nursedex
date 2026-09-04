@@ -102,3 +102,73 @@ describe("the crop modal's upload button", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 });
+
+// #929. She was being asked to frame a 16:10 banner, and the directory card
+// then took a circle out of it that she never saw. The circle is now drawn on
+// the frame she is composing in.
+describe("the circle families actually see", () => {
+  it("is drawn on the crop frame", () => {
+    render(
+      <PhotoCropModal
+        imageSrc="blob:photo"
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId("card-avatar-overlay")).toBeInTheDocument();
+  });
+
+  // Sized from the shared geometry, not a number restated in the component:
+  // a square avatar with object-cover over a 16:10 photo sees its full height
+  // and 62.5% of its width, centred.
+  it("covers the full height and 62.5% of the width of the 16:10 frame", () => {
+    render(
+      <PhotoCropModal
+        imageSrc="blob:photo"
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+
+    const overlay = screen.getByTestId("card-avatar-overlay");
+    expect(overlay.style.height).toBe("100%");
+    expect(parseFloat(overlay.style.width)).toBeCloseTo(62.5, 1);
+    expect(parseFloat(overlay.style.left)).toBeCloseTo(18.75, 1);
+    expect(parseFloat(overlay.style.top)).toBeCloseTo(0, 1);
+  });
+
+  it("is decoration, so a screen reader is not told about it twice", () => {
+    render(
+      <PhotoCropModal
+        imageSrc="blob:photo"
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId("card-avatar-overlay")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+  });
+
+  // The old copy said the frame was "exactly how your photo appears on the
+  // Find a Nurse cards", which stopped being true the moment the card took a
+  // circle out of it.
+  it("is what the instructions now point at", () => {
+    render(
+      <PhotoCropModal
+        imageSrc="blob:photo"
+        onCancel={() => {}}
+        onConfirm={() => {}}
+      />,
+    );
+
+    const description = screen.getByText(/circle/i);
+    expect(description).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(
+      "exactly how your photo appears",
+    );
+  });
+});
