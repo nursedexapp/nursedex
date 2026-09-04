@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/helpers";
+import { primaryNavItems } from "./nav-items";
 import { MobileNav } from "./MobileNav";
 
 export async function Header() {
   const user = await getCurrentUser();
   const isLoggedIn = !!user;
+  const navItems = primaryNavItems(user?.role ?? null);
 
   return (
     <header className="border-sage-light/50 bg-warm-white border-b">
@@ -16,19 +18,15 @@ export async function Header() {
 
         {/* Desktop nav */}
         <nav className="hidden items-center gap-6 md:flex">
-          <Link
-            href="/nurses"
-            className="font-body text-soft-black-light hover:text-soft-black text-sm transition-colors"
-          >
-            Find a Nurse
-          </Link>
-
-          <Link
-            href="/blog"
-            className="font-body text-soft-black-light hover:text-soft-black text-sm transition-colors"
-          >
-            Blog
-          </Link>
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="font-body text-soft-black-light hover:text-soft-black text-sm transition-colors"
+            >
+              {item.label}
+            </Link>
+          ))}
 
           {isLoggedIn ? (
             <Link
@@ -56,7 +54,7 @@ export async function Header() {
         </nav>
 
         {/* Mobile nav */}
-        <MobileNav isLoggedIn={isLoggedIn} />
+        <MobileNav isLoggedIn={isLoggedIn} navItems={navItems} />
       </div>
     </header>
   );

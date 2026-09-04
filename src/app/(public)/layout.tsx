@@ -1,5 +1,6 @@
 import { Header } from "@/components/shared/Header";
 import { Footer } from "@/components/shared/Footer";
+import { currentYear } from "@/lib/time/current-year";
 
 // Public marketing/flow pages share one chrome: a full-height column with the
 // site Header and Footer rendered once. Pages render their content as a flex-1
@@ -13,7 +14,7 @@ export default function PublicLayout({
     <div className="bg-warm-white flex min-h-screen flex-col">
       <Header />
       {children}
-      <Footer />
+      <Footer year={currentYear()} />
     </div>
   );
 }
