@@ -152,6 +152,26 @@ describe("PostHog ingestion", () => {
       maxAttempts: MAX_ATTEMPTS,
     });
 
+    // A retry that succeeded must not pass in silence (L77). The check going
+    // green is the right outcome for one slow window, but a window that is
+    // slow EVERY day would then be invisible: the run would pass forever while
+    // the latency this deadline was set from crept up underneath it. So a used
+    // retry is said out loud, in the run log, with what it waited.
+    //
+    // This is a line in the log rather than a counted rate, which is the
+    // weaker half of L77 and is tracked in #961. It is enough to make a
+    // recurring retry visible to anybody reading a green run.
+    for (const [index, timedOut] of run.timedOut.entries()) {
+      console.warn(
+        `[posthog-ingestion] probe ${index + 1} of ${MAX_ATTEMPTS} timed out ` +
+          `after ${Math.round(timedOut.waitedMs / 1000)}s and ` +
+          `${timedOut.attempts} polls, so another was sent. A healthy probe ` +
+          "becomes queryable in 35 to 55 seconds (measured 4 September 2026). " +
+          "One of these is a slow window at PostHog. Several in a row means " +
+          "the deadline needs re-measuring, not retrying.",
+      );
+    }
+
     expect(run.final.state, explain(run)).toBe("found");
   }, DEADLINE_MS * MAX_ATTEMPTS + 60_000);
 });
