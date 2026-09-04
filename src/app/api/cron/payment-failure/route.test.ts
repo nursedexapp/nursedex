@@ -321,6 +321,38 @@ describe("payment-failure cron: a failed send is retried tomorrow", () => {
     expect(json.failed).toBe(3);
   });
 
+  /**
+   * Each person lands in exactly one bucket. "Nothing was sent to this person"
+   * and "this person was skipped" became the same condition when the failure
+   * path was added, so somebody whose emails all failed was counted in both,
+   * and the two numbers the alerting is read from disagreed with each other.
+   */
+  it("counts a person whose sends all failed as failed, not also as skipped", async () => {
+    h.warningEmail.mockResolvedValue(false);
+    h.finalEmail.mockResolvedValue(false);
+    h.state.subs = [pastDue()];
+
+    const json = await (await GET(fakeRequest())).json();
+
+    expect(json.failed).toBe(3);
+    expect(json.skipped).toBe(0);
+  });
+
+  it("still counts a person nothing was attempted for as skipped", async () => {
+    // Already claimed, so every step is a skip and nothing is attempted. This
+    // is the case the skipped counter exists for, and it has to survive the
+    // fix above rather than being traded for it.
+    h.sentKeys.add("user_1|payment_failure_warning|sub_1:pf_day1");
+    h.sentKeys.add("user_1|payment_failure_warning|sub_1:pf_day2");
+    h.sentKeys.add("user_1|payment_failure_final|sub_1:pf_final");
+    h.state.subs = [pastDue()];
+
+    const json = await (await GET(fakeRequest())).json();
+
+    expect(json.skipped).toBe(1);
+    expect(json.failed).toBe(0);
+  });
+
   it("keeps a 200 and reports the count when only some of the run failed", async () => {
     // Day 1 and day 2 land, the final notice does not.
     h.warningEmail.mockResolvedValue(true);
