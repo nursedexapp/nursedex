@@ -21,6 +21,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const h = vi.hoisted(() => ({
   scenario: {
     blocked: null as { id: string } | null,
+    // #982. The block list read discarded its error, so a failed read answered
+    // "not blocked" and admitted a banned address.
+    blockedReadError: null as { message: string } | null,
     // public.users mirror row (exists for any signed-up user, confirmed or not)
     profile: null as { id: string; first_name: string | null } | null,
     // what the GoTrue admin API (getUserById) returns as the auth user
@@ -40,7 +43,7 @@ type Builder = {
   from: (t: string) => Builder;
   select: () => Builder;
   eq: () => Builder;
-  maybeSingle: () => Promise<{ data: unknown }>;
+  maybeSingle: () => Promise<{ data: unknown; error?: { message: string } | null }>;
 };
 
 // Mock service-role so importing auth/actions doesn't pull in `server-only`
@@ -60,7 +63,11 @@ vi.mock("@/lib/supabase/service-role", () => ({
         select: () => b,
         eq: () => b,
         maybeSingle: async () => {
-          if (table === "blocked_emails") return { data: h.scenario.blocked };
+          if (table === "blocked_emails") {
+            return h.scenario.blockedReadError
+              ? { data: null, error: h.scenario.blockedReadError }
+              : { data: h.scenario.blocked, error: null };
+          }
           if (table === "users") return { data: h.scenario.profile };
           return { data: null };
         },
@@ -117,6 +124,7 @@ vi.mock("next/headers", () => ({
   })),
 }));
 vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
+vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { signUp, resendConfirmation } from "@/lib/auth/actions";
@@ -138,6 +146,7 @@ async function flushAfter(): Promise<void> {
 
 beforeEach(() => {
   h.scenario.blocked = null;
+  h.scenario.blockedReadError = null;
   h.scenario.authUser = null;
   h.scenario.profile = null;
   h.signUpResult.error = null;
@@ -211,6 +220,39 @@ describe("signUp duplicate-email handling", () => {
     expect(result).toEqual({
       error: "This email address cannot be used to create an account.",
     });
+  });
+});
+
+// #982. Dan's call on 4 September 2026: refuse the signup and say so, rather
+// than admit the person. "A ban list that stops working under load is not a ban
+// list", and signups here are rare enough that the cost of refusing during an
+// outage is small. Before this, "could not look" and "not on the list" were the
+// same answer, so a genuinely banned address was admitted with nothing anywhere
+// reporting a fault.
+describe("signUp when the block list cannot be read", () => {
+  it("refuses the signup rather than admitting the person", async () => {
+    h.scenario.blockedReadError = { message: "connection reset" };
+
+    const result = await signUp(signupForm("someone@example.com"));
+    await flushAfter();
+
+    expect(h.signUp).not.toHaveBeenCalled();
+    expect(result.success).toBeUndefined();
+    expect(result.error).toMatch(/try again/i);
+  });
+
+  it("does not tell the caller whether the address was on the list", async () => {
+    // The refusal is about our failure, not about them, and saying otherwise
+    // would turn an outage into an enumeration oracle.
+    h.scenario.blockedReadError = { message: "connection reset" };
+    const outage = await signUp(signupForm("someone@example.com"));
+
+    h.scenario.blockedReadError = null;
+    h.scenario.blocked = { id: "b1" };
+    const banned = await signUp(signupForm("someone@example.com"));
+
+    expect(outage.error).not.toBe(banned.error);
+    expect(outage.error).not.toMatch(/cannot be used/i);
   });
 });
 

@@ -20,6 +20,7 @@ import {
   suspendAccount,
   unsuspendAccount,
   removeAccount,
+  type AccountActionError,
 } from "@/lib/admin/account-actions";
 
 // wait, not retry (#443 phase 4). Suspending locks a real person out and emails
@@ -121,6 +122,25 @@ function SuspendDialog({ userId, email }: { userId: string; email: string }) {
   );
 }
 
+/**
+ * What each refusal actually means for the account, and what the admin can do
+ * about it. Keyed by every member of AccountActionError so a new one cannot be
+ * added without deciding what it says here (#982, L113).
+ */
+const REMOVE_FAILURE_MESSAGES: Record<AccountActionError, string> = {
+  self_action: "You can't remove your own admin account.",
+  invalid: "That removal request was not valid. Please try again.",
+  not_found: "That account no longer exists.",
+  wrong_state: "That account has already been removed.",
+  lookup_failed:
+    "We couldn't read that account, so nothing was changed. Please try again.",
+  ban_unwritten:
+    "The block list could not be updated, so nothing was changed and this person could still sign up again. Please try again.",
+  audit_unwritten:
+    "The account was removed, but the removal was not recorded in the admin log. There is nothing to retry; the failure has been reported.",
+  unknown: "Could not remove. Please try again.",
+};
+
 function RemoveDialog({ userId, email }: { userId: string; email: string }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -135,11 +155,12 @@ function RemoveDialog({ userId, email }: { userId: string; email: string }) {
     startTransition(async () => {
       const result = await removeAccount({ user_id: userId, reason });
       if (!result.success) {
-        toast.error(
-          result.error === "self_action"
-            ? "You can't remove your own admin account."
-            : "Could not remove. Please try again.",
-        );
+        // Each of these leaves the account in a different state, and one of
+        // them is not a failure to remove at all (#982). "Please try again" is
+        // actively wrong on audit_unwritten: the removal already happened, so
+        // a retry comes back wrong_state and the admin is sent round a loop
+        // that cannot end.
+        toast.error(REMOVE_FAILURE_MESSAGES[result.error ?? "unknown"]);
         return;
       }
       toast.success("Account removed");
