@@ -68,6 +68,32 @@ describe("step1Schema", () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // #934. The form normalises too, but the schema is what every write goes
+  // through, so the stored spelling cannot depend on which client sent it.
+  it("title cases every word of a language on the way in", () => {
+    const result = step1Schema.safeParse({
+      first_name: "Jane",
+      last_name: "Doe",
+      gender: "female",
+      years_experience: 5,
+      languages: ["English", "haitian creole"],
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.languages).toEqual(["English", "Haitian Creole"]);
+  });
+
+  it("collapses two spellings of one language into one entry", () => {
+    const result = step1Schema.safeParse({
+      first_name: "Jane",
+      last_name: "Doe",
+      gender: "female",
+      years_experience: 5,
+      languages: ["Haitian creole", "haitian Creole"],
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.languages).toEqual(["Haitian Creole"]);
+  });
 });
 
 describe("step2Schema", () => {

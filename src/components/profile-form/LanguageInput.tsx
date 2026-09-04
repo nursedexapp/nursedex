@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { normalizeLanguage } from "@/lib/profile/language";
 
 const COMMON_LANGUAGES = [
   "Spanish",
@@ -39,9 +40,10 @@ export function LanguageInput({ value, onChange, error }: LanguageInputProps) {
     const trimmed = lang.trim();
     if (!trimmed) return;
 
-    // Normalize capitalization
-    const normalized =
-      trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+    // Title cased through the same helper the profile schema uses, so what a
+    // nurse sees here is what gets stored (#934).
+    const normalized = normalizeLanguage(trimmed);
+    if (!normalized) return;
 
     if (!value.includes(normalized)) {
       onChange([...value, normalized]);

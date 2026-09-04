@@ -22,6 +22,7 @@ import {
   type CompletenessInput,
 } from "./completeness";
 import { claimSlug, saveSlugRedirect } from "./slug";
+import { normalizeLanguageList } from "./language";
 import { resubmissionPatch } from "./resubmission";
 import {
   getSignedUploadUrl as _getSignedUploadUrl,
@@ -149,7 +150,7 @@ export async function saveOnboardingStep(
       .update({
         gender: data.gender,
         years_experience: data.years_experience,
-        languages: data.languages,
+        languages: normalizeLanguageList(data.languages as string[]),
       })
       .eq("user_id", user.id);
 
@@ -441,7 +442,7 @@ export async function updateNurseProfile(
     skills: data.skills ?? [],
     gender: data.gender,
     years_experience: data.years_experience,
-    languages: data.languages,
+    languages: normalizeLanguageList(data.languages as string[]),
     bio: data.bio,
     photos,
     has_photo: photos.length > 0,
