@@ -83,14 +83,21 @@ export async function getRevealedNurses(
   if (limit) revealQuery = revealQuery.limit(limit);
 
   const { data: revealRows, error: revealError } = await revealQuery;
+  // #780. A failed read is not an empty list: telling a family she has
+  // revealed nobody hides both the outage and the contacts she paid for.
   if (revealError) {
     console.error(
       "getRevealedNurses reveal query failed:",
       revealError.message,
     );
-    return [];
+    throw new Error(`Revealed nurses query failed: ${revealError.message}`);
   }
-  if (!revealRows || revealRows.length === 0) return [];
+  if (!revealRows) {
+    throw new Error(
+      "Revealed nurses query returned no result set, which is not the same as having revealed nobody.",
+    );
+  }
+  if (revealRows.length === 0) return [];
 
   // #770: a reveal past its access_expires_at is no longer the family's to
   // see. getRevealedNurseIds and migration 057's RPC already refuse it; this
@@ -109,11 +116,14 @@ export async function getRevealedNurses(
     .in("user_id", nurseIds);
   const { data, error } = await applyVisibleNurseFilter(cardsQuery);
 
-  if (error || !data) {
-    if (error) {
-      console.error("getRevealedNurses card query failed:", error.message);
-    }
-    return [];
+  if (error) {
+    console.error("getRevealedNurses card query failed:", error.message);
+    throw new Error(`Revealed nurses card query failed: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(
+      "Revealed nurses card query returned no result set, which is not the same as matching no nurses.",
+    );
   }
 
   // Every reveal left in activeReveals is one this family still has access to,

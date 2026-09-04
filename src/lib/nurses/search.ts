@@ -1,9 +1,6 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import {
-  applyListedNurseFilter,
-  applyAvailabilityFilter,
-} from "./visibility";
+import { applyListedNurseFilter, applyAvailabilityFilter } from "./visibility";
 import { keywordPattern, matchesNurseName } from "./search-keyword";
 import { SEARCH } from "@/lib/constants";
 import {
@@ -324,7 +321,20 @@ async function runQuery(
   query = query.limit(SQL_FETCH_CAP);
 
   const { data, error } = await query;
-  if (error || !data) return [];
+  // #780. A failed read must never become an empty result: the page then says
+  // "No nurses listed yet", which is a confident, wrong claim about the
+  // business shown to the visitors we most want to convert, and nothing
+  // reports that it happened. Two distinct causes, two messages, because a
+  // permissions regression and a driver returning nothing are diagnosed
+  // differently and used to read identically.
+  if (error) {
+    throw new Error(`Nurse directory query failed: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(
+      "Nurse directory query returned no result set, which is not the same as matching no nurses.",
+    );
+  }
 
   const cards = shapeNurseCards(data, gate);
 
@@ -360,7 +370,9 @@ async function nurseIdsMatchingName(
 
   let query = supabase
     .from("nurse_profiles")
-    .select("user_id,users!inner(first_name,last_name,is_deleted,is_suspended)");
+    .select(
+      "user_id,users!inner(first_name,last_name,is_deleted,is_suspended)",
+    );
   query = applyListedNurseFilter(query);
 
   const { data, error } = await query.limit(SQL_FETCH_CAP);
