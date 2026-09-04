@@ -1,7 +1,7 @@
 {
   "rule": "local/require-db-error-check",
   "measuredOn": "2026-09-04",
-  "total": 283,
+  "total": 279,
   "exemptions": 0,
   "files": {
     "e2e/family.setup.ts": {
@@ -157,7 +157,7 @@
       "disables": 0
     },
     "src/lib/admin/account-actions.ts": {
-      "discarded": 7,
+      "discarded": 4,
       "disables": 0
     },
     "src/lib/admin/analytics.ts": {
@@ -189,7 +189,7 @@
       "disables": 0
     },
     "src/lib/auth/actions.ts": {
-      "discarded": 8,
+      "discarded": 7,
       "disables": 0
     },
     "src/lib/auth/helpers.ts": {
