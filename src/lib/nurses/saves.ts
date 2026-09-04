@@ -118,7 +118,25 @@ export async function getSavedNurses(
     .eq("family_user_id", familyUserId)
     .order("saved_at", { ascending: false });
 
-  if (savedError || !savedRows || savedRows.length === 0) return [];
+  // #780. Three outcomes that used to be one. A family whose saves could not
+  // be read was told she had saved nothing, which reads as her own data having
+  // been lost rather than as a failure on our side. Only the third is an
+  // honest empty list. The server side log stays alongside the throw: in
+  // production the boundary shows the visitor a digest, so this is the only
+  // place the cause is written down.
+  if (savedError) {
+    console.error(
+      "getSavedNurses saved list query failed:",
+      savedError.message,
+    );
+    throw new Error(`Saved nurses query failed: ${savedError.message}`);
+  }
+  if (!savedRows) {
+    throw new Error(
+      "Saved nurses query returned no result set, which is not the same as having saved nobody.",
+    );
+  }
+  if (savedRows.length === 0) return [];
 
   const nurseIds = savedRows.map((r) => r.nurse_user_id);
 
@@ -128,11 +146,14 @@ export async function getSavedNurses(
     .in("user_id", nurseIds);
   const { data, error } = await applyVisibleNurseFilter(cardsQuery);
 
-  if (error || !data) {
-    if (error) {
-      console.error("getSavedNurses card query failed:", error.message);
-    }
-    return [];
+  if (error) {
+    console.error("getSavedNurses card query failed:", error.message);
+    throw new Error(`Saved nurses card query failed: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(
+      "Saved nurses card query returned no result set, which is not the same as matching no nurses.",
+    );
   }
 
   // #770 / #771: one shared shaper, with the identity gate inside it, so this
