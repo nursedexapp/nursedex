@@ -11,11 +11,43 @@ Run these before pushing. CI runs the same `lint`, `typecheck`, and `test`.
 | `npm run check`     | `typecheck` then `lint` in one shot                         | sum of the two                                                                                                                                              |
 | `npm test`          | Vitest (`vitest run`)                                       | a few seconds                                                                                                                                               |
 
+| `npm run clean`     | Delete the disposable build caches (see below)               | a second or two                                                                                                                                                |
+
 Notes:
 
 - `typecheck` runs `next typegen` first so it validates generated route types too. This catches route/page type errors that otherwise only surface during `next build`, and avoids false errors from a stale `.next/types` after routes move.
 - ESLint config lives in `eslint.config.mjs` (flat config, ESLint 9). There is no `.eslintrc`.
 - If `typecheck` or `lint` seems stuck, give it the first-run budget above before assuming it hung.
+
+## Clearing the build caches
+
+`npm run clean` removes three caches:
+
+| Path                          | What it holds                                    |
+| ----------------------------- | ------------------------------------------------ |
+| `.next`                       | the dev server's Turbopack cache and build output |
+| `node_modules/.cache/eslint`  | ESLint's per-file cache                           |
+| `.vitest-cache`               | vitest's slowest-first ordering store             |
+
+All three are gitignored and rebuild themselves; the only cost is one slower
+dev start and one slower lint. `npm run clean -- -n` says what it would remove
+and removes nothing.
+
+Run it when the working copy is unexpectedly large, or when a build behaves in
+a way the source does not explain.
+
+**Why this is a command and not a setting.** The dev server's Turbopack cache
+grows and nothing prunes it. Measured on one machine: `.next/dev` was 2.4 GB on
+2026-08-21 and 3.0 GB on 2026-09-03, against 4 MB of actual source.
+`.next/dev/cache/turbopack` held 163 SST files, 93 of them written in July and
+still present in September, so old entries are retained rather than compacted
+or evicted.
+
+This Next version has no knob for it. It exposes `turbopackFileSystemCacheForDev`
+(a boolean, default `true`) and `turbopackMemoryLimit` (memory, not disk), and
+nothing that caps the on-disk cache or prunes it by age. Switching the cache off
+would pay for the disk with every cold start, which is the wrong trade, so the
+remedy is a command people know about rather than a configuration change (#750).
 
 ## Which command runs which test
 
