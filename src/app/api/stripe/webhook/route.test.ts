@@ -7,6 +7,7 @@ const h = vi.hoisted(() => {
     signatureError: null as string | null,
     errors: {} as Record<string, { message: string; code?: string } | null>,
     reads: {} as Record<string, unknown>,
+    readErrors: {} as Record<string, { message: string } | undefined>,
     writes: {} as Record<string, unknown>,
     // Rows a write's terminal .select() hands back. An empty array models a
     // guarded UPDATE whose WHERE matched nothing (superseded by a newer
@@ -42,9 +43,17 @@ const h = vi.hoisted(() => {
       return makeBuilder(table, "update");
     };
     b.maybeSingle = () =>
-      Promise.resolve({ data: state.reads[table] ?? null, error: null });
+      Promise.resolve(
+        state.readErrors[table]
+          ? { data: null, error: state.readErrors[table] }
+          : { data: state.reads[table] ?? null, error: null },
+      );
     b.single = () =>
-      Promise.resolve({ data: state.reads[table] ?? null, error: null });
+      Promise.resolve(
+        state.readErrors[table]
+          ? { data: null, error: state.readErrors[table] }
+          : { data: state.reads[table] ?? null, error: null },
+      );
     b.then = (
       resolve: (v: { data: unknown; error: unknown }) => unknown,
       reject: (e: unknown) => unknown,
@@ -99,7 +108,10 @@ vi.mock("@/lib/analytics/server", () => ({
   captureServerEvent: vi.fn(async () => {}),
 }));
 vi.mock("@/lib/cron/email-log", () => ({
-  shouldSendOnce: vi.fn(async () => false),
+  // sendOnce claims the dedup row, sends, and releases the claim when the send
+  // did not land (#998). The default is "skipped", the same as the old gate
+  // denying; a test that wants the email to go drives the send callback.
+  sendOnce: vi.fn(async () => "skipped" as const),
 }));
 vi.mock("@/lib/email/send", () => ({
   sendSubscriptionConfirmedEmail: vi.fn(async () => {}),
@@ -117,14 +129,16 @@ vi.mock("@/lib/slack/client", () => ({
 process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
 
 import { POST } from "./route";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import {
   sendSubscriptionConfirmedEmail,
   sendRenewalSuccessEmail,
   sendCancellationConfirmationEmail,
 } from "@/lib/email/send";
 
-function fakeRequest(signature: string | null = "sig_test"): Parameters<typeof POST>[0] {
+function fakeRequest(
+  signature: string | null = "sig_test",
+): Parameters<typeof POST>[0] {
   return {
     headers: { get: () => signature },
     text: async () => "{}",
@@ -162,6 +176,7 @@ beforeEach(() => {
   h.state.signatureError = null;
   h.state.errors = {};
   h.state.reads = {};
+  h.state.readErrors = {};
   h.state.writes = {};
   h.state.rpcResults = {};
   // Default: the guarded UPDATE matched its row, so cleanup proceeds.
@@ -184,7 +199,9 @@ describe("stripe webhook: write-failure propagation (#412)", () => {
         },
       },
     };
-    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = {
+      message: "db unavailable",
+    };
 
     const res = await POST(fakeRequest());
 
@@ -223,7 +240,9 @@ describe("stripe webhook: write-failure propagation (#412)", () => {
         },
       },
     };
-    h.state.errors["nurse_profiles.update"] = { message: "constraint violation" };
+    h.state.errors["nurse_profiles.update"] = {
+      message: "constraint violation",
+    };
 
     const res = await POST(fakeRequest());
 
@@ -454,7 +473,9 @@ describe("stripe webhook: event ordering (#414, #528)", () => {
   it("puts the ordering guard in the invoice.paid UPDATE's own filter", async () => {
     h.subscriptionsRetrieve.mockResolvedValue({
       items: {
-        data: [{ current_period_start: 1700000000, current_period_end: 1702592000 }],
+        data: [
+          { current_period_start: 1700000000, current_period_end: 1702592000 },
+        ],
       },
     });
     h.state.event = {
@@ -513,7 +534,9 @@ describe("stripe webhook: event ordering (#414, #528)", () => {
     // describes a state that is no longer true and must not go out.
     h.subscriptionsRetrieve.mockResolvedValue({
       items: {
-        data: [{ current_period_start: 1700000000, current_period_end: 1702592000 }],
+        data: [
+          { current_period_start: 1700000000, current_period_end: 1702592000 },
+        ],
       },
     });
     h.state.rows["subscriptions.update"] = [];
@@ -626,7 +649,9 @@ describe("stripe webhook: duplicate active subscription handling (#417)", () => 
         },
       },
     };
-    h.subscriptionsRetrieve.mockResolvedValue(fakeSubscription({ id: "sub_2" }));
+    h.subscriptionsRetrieve.mockResolvedValue(
+      fakeSubscription({ id: "sub_2" }),
+    );
     h.state.errors["rpc.apply_subscription_event"] = {
       message:
         'duplicate key value violates unique constraint "uniq_subscriptions_active_per_plan"',
@@ -652,7 +677,9 @@ describe("stripe webhook: duplicate active subscription handling (#417)", () => 
         },
       },
     };
-    h.subscriptionsRetrieve.mockResolvedValue(fakeSubscription({ id: "sub_2" }));
+    h.subscriptionsRetrieve.mockResolvedValue(
+      fakeSubscription({ id: "sub_2" }),
+    );
     h.state.errors["rpc.apply_subscription_event"] = {
       message: "duplicate key value violates unique constraint",
       code: "23505",
@@ -677,7 +704,9 @@ describe("stripe webhook: duplicate active subscription handling (#417)", () => 
         },
       },
     };
-    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = {
+      message: "db unavailable",
+    };
 
     const res = await POST(fakeRequest());
 
@@ -701,7 +730,9 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = {
+      message: "db unavailable",
+    };
 
     await POST(fakeRequest());
 
@@ -731,7 +762,9 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = {
+      message: "db unavailable",
+    };
 
     await POST(fakeRequest());
 
@@ -763,7 +796,9 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = {
+      message: "db unavailable",
+    };
 
     const res = await POST(fakeRequest());
 
@@ -806,7 +841,9 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = {
+      message: "db unavailable",
+    };
     h.state.reads["webhook_alert_log"] = { event_id: "evt_retry" };
 
     await POST(fakeRequest());
@@ -828,7 +865,9 @@ describe("stripe webhook: failure alerting (#396)", () => {
         },
       },
     };
-    h.state.errors["rpc.apply_subscription_event"] = { message: "db unavailable" };
+    h.state.errors["rpc.apply_subscription_event"] = {
+      message: "db unavailable",
+    };
     h.state.reads["webhook_alert_log"] = { event_id: "evt_retry2" };
 
     await POST(fakeRequest());
@@ -856,7 +895,8 @@ describe("stripe webhook: request-level verification (#473)", () => {
   });
 
   it("returns 400 when Stripe signature verification fails", async () => {
-    h.state.signatureError = "No signatures found matching the expected signature";
+    h.state.signatureError =
+      "No signatures found matching the expected signature";
 
     const res = await POST(fakeRequest());
 
@@ -1070,9 +1110,14 @@ describe("stripe webhook: invoice.payment_failed marks past_due (#473)", () => {
 });
 
 describe("stripe webhook: lifecycle email dedup gating (#473)", () => {
-  it("sends the subscription-confirmed email only when shouldSendOnce allows it", async () => {
-    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
-    h.state.reads["users"] = { email: "family@example.com", first_name: "Robin" };
+  it("sends the subscription-confirmed email only when the dedup gate allows it", async () => {
+    vi.mocked(sendOnce).mockImplementationOnce(async (_client, _args, send) =>
+      (await send()) ? "sent" : "failed",
+    );
+    h.state.reads["users"] = {
+      email: "family@example.com",
+      first_name: "Robin",
+    };
     h.state.event = {
       type: "checkout.session.completed",
       created: EVENT_CREATED,
@@ -1090,13 +1135,19 @@ describe("stripe webhook: lifecycle email dedup gating (#473)", () => {
 
     expect(res.status).toBe(200);
     expect(sendSubscriptionConfirmedEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: "family@example.com", planType: "family_access" }),
+      expect.objectContaining({
+        to: "family@example.com",
+        planType: "family_access",
+      }),
     );
   });
 
-  it("does not send the subscription-confirmed email when shouldSendOnce denies it (retry dedup)", async () => {
-    vi.mocked(shouldSendOnce).mockResolvedValueOnce(false);
-    h.state.reads["users"] = { email: "family@example.com", first_name: "Robin" };
+  it("does not send the subscription-confirmed email when the dedup gate denies it (retry dedup)", async () => {
+    vi.mocked(sendOnce).mockResolvedValueOnce("skipped");
+    h.state.reads["users"] = {
+      email: "family@example.com",
+      first_name: "Robin",
+    };
     h.state.event = {
       type: "checkout.session.completed",
       created: EVENT_CREATED,
@@ -1115,8 +1166,10 @@ describe("stripe webhook: lifecycle email dedup gating (#473)", () => {
     expect(sendSubscriptionConfirmedEmail).not.toHaveBeenCalled();
   });
 
-  it("sends the renewal-success email only on subscription_cycle invoices when shouldSendOnce allows it", async () => {
-    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
+  it("sends the renewal-success email only on subscription_cycle invoices when the dedup gate allows it", async () => {
+    vi.mocked(sendOnce).mockImplementationOnce(async (_client, _args, send) =>
+      (await send()) ? "sent" : "failed",
+    );
     h.state.reads["users"] = { email: "renew@example.com", first_name: "Sam" };
     h.state.reads["subscriptions"] = {
       user_id: "user_1",
@@ -1165,8 +1218,13 @@ describe("stripe webhook: lifecycle email dedup gating (#473)", () => {
   });
 
   it("sends the cancellation-confirmation email when a subscription transitions to cancel_at_period_end", async () => {
-    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
-    h.state.reads["users"] = { email: "cancel@example.com", first_name: "Jamie" };
+    vi.mocked(sendOnce).mockImplementationOnce(async (_client, _args, send) =>
+      (await send()) ? "sent" : "failed",
+    );
+    h.state.reads["users"] = {
+      email: "cancel@example.com",
+      first_name: "Jamie",
+    };
     h.state.event = {
       type: "customer.subscription.updated",
       created: EVENT_CREATED,
@@ -1188,7 +1246,7 @@ describe("stripe webhook: lifecycle email dedup gating (#473)", () => {
 });
 
 // Stripe delivers webhooks at least once, so the same event arriving twice is
-// normal, not an attack. shouldSendOnce is the email idempotency gate: it
+// normal, not an attack. sendOnce is the email idempotency gate: it
 // returns true on the first delivery of a dedup key and false thereafter, so a
 // retry must not re-send. Each case below dispatches the identical event twice
 // and asserts exactly one email and a 200 on both (so Stripe stops retrying).
@@ -1207,9 +1265,14 @@ describe("stripe webhook: duplicate delivery is idempotent (#491)", () => {
   };
 
   it("sends the confirmation email once across a duplicate checkout.session.completed", async () => {
-    // First delivery proceeds; the retry gets shouldSendOnce=false (default).
-    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
-    h.state.reads["users"] = { email: "family@example.com", first_name: "Robin" };
+    // First delivery proceeds; the retry gets sendOnce=false (default).
+    vi.mocked(sendOnce).mockImplementationOnce(async (_client, _args, send) =>
+      (await send()) ? "sent" : "failed",
+    );
+    h.state.reads["users"] = {
+      email: "family@example.com",
+      first_name: "Robin",
+    };
     h.state.event = checkoutEvent;
 
     const first = await POST(fakeRequest());
@@ -1230,16 +1293,23 @@ describe("stripe webhook: duplicate delivery is idempotent (#491)", () => {
     await POST(fakeRequest());
     await POST(fakeRequest());
 
-    const rpcCalls = h.calls.filter((c) => c === "rpc.apply_subscription_event");
+    const rpcCalls = h.calls.filter(
+      (c) => c === "rpc.apply_subscription_event",
+    );
     expect(rpcCalls).toHaveLength(2);
     expect(h.calls).not.toContain("subscriptions.upsert");
     expect(h.calls).not.toContain("subscriptions.insert");
   });
 
   it("sends the renewal email once across a duplicate invoice.paid renewal", async () => {
-    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
+    vi.mocked(sendOnce).mockImplementationOnce(async (_client, _args, send) =>
+      (await send()) ? "sent" : "failed",
+    );
     h.state.reads["users"] = { email: "renew@example.com", first_name: "Sam" };
-    h.state.reads["subscriptions"] = { user_id: "user_1", plan_type: "nurse_featured" };
+    h.state.reads["subscriptions"] = {
+      user_id: "user_1",
+      plan_type: "nurse_featured",
+    };
     h.state.event = {
       type: "invoice.paid",
       created: EVENT_CREATED,
@@ -1261,8 +1331,13 @@ describe("stripe webhook: duplicate delivery is idempotent (#491)", () => {
   });
 
   it("sends the cancellation email once across a duplicate subscription.updated cancellation", async () => {
-    vi.mocked(shouldSendOnce).mockResolvedValueOnce(true);
-    h.state.reads["users"] = { email: "cancel@example.com", first_name: "Jamie" };
+    vi.mocked(sendOnce).mockImplementationOnce(async (_client, _args, send) =>
+      (await send()) ? "sent" : "failed",
+    );
+    h.state.reads["users"] = {
+      email: "cancel@example.com",
+      first_name: "Jamie",
+    };
     h.state.reads["subscriptions"] = {
       user_id: "user_1",
       plan_type: "family_access",
@@ -1280,5 +1355,63 @@ describe("stripe webhook: duplicate delivery is idempotent (#491)", () => {
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(sendCancellationConfirmationEmail).toHaveBeenCalledTimes(1);
+  });
+});
+
+// #998. The dedup claim used to be written BEFORE the recipient's address was
+// read, so a read that fell over spent the one send: the retry found the key
+// held and the email was never sent at all. Reading first means a failed read
+// refuses before anything is claimed.
+describe("a failed recipient lookup does not spend the send", () => {
+  it("claims nothing when the address cannot be read", async () => {
+    h.state.readErrors["users"] = { message: "connection reset" };
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+
+    const res = await POST(fakeRequest());
+
+    // 500, so Stripe retries, and the retry can still send it because the
+    // dedup key was never claimed.
+    expect(res.status).toBe(500);
+    expect(sendOnce).not.toHaveBeenCalled();
+    expect(sendSubscriptionConfirmedEmail).not.toHaveBeenCalled();
+  });
+
+  it("still claims and sends when the address reads cleanly", async () => {
+    // The positive control for the refusal above.
+    vi.mocked(sendOnce).mockImplementationOnce(async (_client, _args, send) =>
+      (await send()) ? "sent" : "failed",
+    );
+    h.state.reads["users"] = {
+      email: "family@example.com",
+      first_name: "Robin",
+    };
+    h.state.event = {
+      type: "checkout.session.completed",
+      created: EVENT_CREATED,
+      data: {
+        object: {
+          client_reference_id: "user_1",
+          metadata: { plan_type: "family_access" },
+          customer: "cus_1",
+          subscription: "sub_1",
+        },
+      },
+    };
+
+    await POST(fakeRequest());
+
+    expect(sendOnce).toHaveBeenCalledTimes(1);
+    expect(sendSubscriptionConfirmedEmail).toHaveBeenCalled();
   });
 });
