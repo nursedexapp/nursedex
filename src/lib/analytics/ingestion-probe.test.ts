@@ -10,6 +10,8 @@ import {
   queryBody,
   interpretQueryResult,
   pollForProbe,
+  runIngestionProbe,
+  type AttemptResult,
 } from "./ingestion-probe";
 
 /**
@@ -215,5 +217,105 @@ describe("pollForProbe", () => {
       because: "response had no results array",
     });
     expect(h.slept).toEqual([]);
+  });
+});
+
+/**
+ * One slow window at PostHog must not fail the workflow (#960).
+ *
+ * On 2026-09-03 the probe timed out twice, twelve minutes apart, and the
+ * events were in PostHog the whole time: they simply took longer than the
+ * deadline to become queryable. Measured on 2026-09-04, three probes became
+ * queryable at 37.6s, 54.2s and 54.8s, so the normal case is well inside the
+ * deadline and the failure was a transient excursion.
+ *
+ * A second probe costs nothing on a healthy day, because the first one
+ * succeeds and the retry never runs.
+ */
+describe("runIngestionProbe", () => {
+  function attempts(...results: AttemptResult[]) {
+    const seen: number[] = [];
+    return {
+      seen,
+      attempt: async (n: number) => {
+        seen.push(n);
+        return results[n - 1] ?? results[results.length - 1];
+      },
+    };
+  }
+
+  const FOUND: AttemptResult = { state: "found", waitedMs: 40_000, attempts: 14 };
+  const TIMED_OUT: AttemptResult = {
+    state: "timed_out",
+    waitedMs: 360_000,
+    attempts: 120,
+  };
+
+  it("stops at the first attempt when the event lands", async () => {
+    const a = attempts(FOUND);
+    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+
+    expect(result.final.state).toBe("found");
+    expect(result.attemptsUsed).toBe(1);
+    expect(a.seen).toEqual([1]);
+  });
+
+  it("sends a second probe when the first times out, and passes if that lands", async () => {
+    const a = attempts(TIMED_OUT, FOUND);
+    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+
+    expect(result.final.state).toBe("found");
+    expect(result.attemptsUsed).toBe(2);
+    expect(a.seen).toEqual([1, 2]);
+  });
+
+  it("fails when every attempt times out, and keeps what each one waited", async () => {
+    const a = attempts(TIMED_OUT, TIMED_OUT);
+    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+
+    expect(result.final.state).toBe("timed_out");
+    expect(result.attemptsUsed).toBe(2);
+    expect(result.timedOut).toHaveLength(2);
+    expect(result.timedOut[0].waitedMs).toBe(360_000);
+  });
+
+  // A rejected query means the API key is wrong and an unreadable answer means
+  // the query API changed shape. Neither is transient, so retrying spends the
+  // whole budget again to be told the same thing, and worse, reports a
+  // configuration fault as a slow one.
+  it("does not retry a rejected query", async () => {
+    const a = attempts({ state: "query_rejected", status: 401 }, FOUND);
+    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+
+    expect(result.final.state).toBe("query_rejected");
+    expect(result.attemptsUsed).toBe(1);
+    expect(a.seen).toEqual([1]);
+  });
+
+  it("does not retry an unreadable answer", async () => {
+    const a = attempts(
+      { state: "unreadable", because: "first row held no count" },
+      FOUND,
+    );
+    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+
+    expect(result.final.state).toBe("unreadable");
+    expect(result.attemptsUsed).toBe(1);
+  });
+
+  it("does not retry a refused capture, which is not slowness either", async () => {
+    const a = attempts({ state: "capture_rejected", status: 400 }, FOUND);
+    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+
+    expect(result.final.state).toBe("capture_rejected");
+    expect(result.attemptsUsed).toBe(1);
+  });
+
+  it("refuses a maxAttempts below one rather than reporting a pass it never ran", async () => {
+    const a = attempts(FOUND);
+    await expect(
+      runIngestionProbe({ attempt: a.attempt, maxAttempts: 0 }),
+    ).rejects.toThrow(/at least one/i);
+    expect(a.seen).toEqual([]);
   });
 });
