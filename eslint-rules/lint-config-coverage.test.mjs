@@ -226,3 +226,55 @@ export async function load(supabase) {
     expect(ids).not.toContain("local/require-db-error-check");
   });
 });
+
+// #987. `void (async () => { ... await action() ... })()` sets a pending flag
+// before the IIFE and clears it after the await, so a rejection skips the reset
+// and the button spins forever with nothing said. It shipped three times, and
+// `local/require-pending-button` passed every one of those files. The tree has
+// none left, which is the case a guard cannot be told apart from one that
+// matches nothing, so this proves it is wired into the REAL config.
+const UNCAUGHT_ASYNC_IIFE = `
+export function Control() {
+  const go = () => {
+    setPending(true);
+    void (async () => {
+      const result = await recordFamilyHire({ id: 1 });
+      setPending(false);
+      if (!result.success) toast.error("no");
+    })();
+  };
+  return go;
+}
+`;
+
+describe("eslint.config.mjs coverage of the uncaught async IIFE guard", () => {
+  it("flags the shape in a new component", async () => {
+    const ids = await ruleIdsFor(
+      UNCAUGHT_ASYNC_IIFE,
+      path.join(repoRoot, "src/components/example/Control.tsx"),
+    );
+    expect(ids).toContain("local/no-uncaught-async-iife");
+  });
+
+  it("flags it in a page too", async () => {
+    const ids = await ruleIdsFor(
+      UNCAUGHT_ASYNC_IIFE,
+      path.join(repoRoot, "src/app/(public)/example/page.tsx"),
+    );
+    expect(ids).toContain("local/no-uncaught-async-iife");
+  });
+
+  it("does not flag a control routed through useInFlight", async () => {
+    const ids = await ruleIdsFor(
+      `
+import { useInFlight } from "@/components/ui/use-in-flight";
+export function Control() {
+  const { run } = useInFlight();
+  return () => run("confirm", async () => { await recordFamilyHire({ id: 1 }); });
+}
+`,
+      path.join(repoRoot, "src/components/example/Control.tsx"),
+    );
+    expect(ids).not.toContain("local/no-uncaught-async-iife");
+  });
+});

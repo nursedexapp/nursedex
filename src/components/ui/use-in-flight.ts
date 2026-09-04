@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useRef, useState, useTransition } from "react";
+import * as Sentry from "@sentry/nextjs";
+import { toast } from "sonner";
 
 import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
 
@@ -24,6 +26,13 @@ import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
  * and nothing at all would happen. It is a separate door on purpose, so opening
  * it for a retry does not also open it for the neighbouring button.
  *
+ * A rejection is REPORTED, not merely cleared (#987). Clearing alone flicks the
+ * button back to its idle label in silence, and against the standing rule that
+ * working, still alive and failed must be visibly distinct that is worse than
+ * the spinner it replaced: the person presses again, on a write that may
+ * already have landed. This is not hypothetical, because milestone 35 is
+ * converting the readers behind these controls onto helpers that throw.
+ *
  * Usage:
  *   const { inFlight, busy, run, retry } = useInFlight<"approve" | "reject">();
  *   <PendingButton pending={inFlight === "approve"} disabled={busy} ... />
@@ -36,7 +45,23 @@ import { useLatestAttempt } from "@/components/ui/use-latest-attempt";
  */
 type InFlightAction = (isLatest: () => boolean) => Promise<unknown>;
 
-export function useInFlight<T extends string>() {
+/** What the person is told when the action rejected rather than returned. */
+export const ACTION_FAILED_MESSAGE =
+  "Something went wrong. Please try again.";
+
+interface UseInFlightOptions<T extends string> {
+  /**
+   * Replace the default toast where the surface has something more useful to
+   * say. The rejection is still reported to Sentry either way, so an override
+   * cannot accidentally make a failure invisible.
+   */
+  onError?: (error: unknown, key: T) => void;
+}
+
+export function useInFlight<T extends string>(
+  options?: UseInFlightOptions<T>,
+) {
+  const onError = options?.onError;
   const [inFlight, setInFlight] = useState<T | null>(null);
   const [, startTransition] = useTransition();
   // The gate reads a ref, not the state: `inFlight` is captured by the closure
@@ -56,6 +81,19 @@ export function useInFlight<T extends string>() {
       startTransition(async () => {
         try {
           await action(() => isLatest(attempt));
+        } catch (error) {
+          // A server action that throws reaches the client as a redacted
+          // digest, so the console line and the Sentry report are the only
+          // record of what actually happened.
+          console.error(`[in-flight] the ${key} action rejected:`, error);
+          Sentry.captureException(error, { tags: { in_flight_action: key } });
+          // Same rule as the success path below: a superseded attempt no
+          // longer owns the surface, and speaking here would toast over the
+          // retry's result (#669).
+          if (isLatest(attempt)) {
+            if (onError) onError(error, key);
+            else toast.error(ACTION_FAILED_MESSAGE);
+          }
         } finally {
           // Only the newest attempt owns the surface. The request a retry
           // superseded is still in flight and will land eventually; when it does
@@ -68,7 +106,7 @@ export function useInFlight<T extends string>() {
         }
       });
     },
-    [begin, isLatest],
+    [begin, isLatest, onError],
   );
 
   const run = useCallback(

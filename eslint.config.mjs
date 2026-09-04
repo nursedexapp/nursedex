@@ -11,6 +11,7 @@ import noHandWrittenStallCopy from "./eslint-rules/no-hand-written-stall-copy.mj
 import requireStatusPrecondition from "./eslint-rules/require-status-precondition.mjs";
 import requirePiiMask from "./eslint-rules/require-pii-mask.mjs";
 import requireDbErrorCheck from "./eslint-rules/require-db-error-check.mjs";
+import noUncaughtAsyncIife from "./eslint-rules/no-uncaught-async-iife.mjs";
 
 export default [
   ...tseslint.configs.recommended,
@@ -36,6 +37,7 @@ export default [
           "require-status-precondition": requireStatusPrecondition,
           "require-pii-mask": requirePiiMask,
           "require-db-error-check": requireDbErrorCheck,
+          "no-uncaught-async-iife": noUncaughtAsyncIife,
         },
       },
     },
@@ -83,6 +85,15 @@ export default [
       // (#714). Rendering PII without MASK_PII, or into an attribute without
       // BLOCK_PII, now fails CI.
       "local/require-pii-mask": "error",
+      // `void (async () => { ... })()` was how three controls tracked their own
+      // in-flight state, and it is the #846 defect: the pending flag is set
+      // before the IIFE, the reset lives after the await, and a rejection skips
+      // every line between, so the button spins forever with nothing said.
+      // HireButton was still carrying it live when #987 was written and
+      // require-pending-button passed the file, which is what says checking
+      // callers by hand is not a plan. useInFlight owns the flag, the gate, the
+      // retry door and the catch in one place.
+      "local/no-uncaught-async-iife": "error",
       // A PostgREST call does not throw: it resolves to { data, error }, so
       // `const { data } = await supabase...` turns a permission change, an RLS
       // refusal or a dropped connection into an empty answer and treats it as
