@@ -11,6 +11,7 @@ import {
 import { TIER_LIMITS } from "@/lib/constants";
 import type { NurseTier } from "@/types/enums";
 import { validatePhone } from "@/lib/utils/phone";
+import { normalizeLanguageList } from "@/lib/profile/language";
 
 // ── Step 1: Basics ──────────────────────────────────────────
 
@@ -29,9 +30,14 @@ export const step1Schema = z.object({
     .int("Must be a whole number")
     .min(0, "Cannot be negative")
     .max(70, "Must be 70 or fewer"),
+  // Normalised on the way in, not only in the form component, so a write that
+  // did not come through the wizard cannot store a spelling the directory's
+  // language filter will then show back to families (#934). The min(1) runs
+  // after the transform, so a list of nothing but blanks is still refused.
   languages: z
     .array(z.string().min(1))
-    .min(1, "At least one language is required"),
+    .transform(normalizeLanguageList)
+    .refine((langs) => langs.length >= 1, "At least one language is required"),
 });
 
 export type Step1Data = z.infer<typeof step1Schema>;
@@ -271,7 +277,10 @@ export function fullProfileSchema(tier: NurseTier) {
       last_name: z.string().min(1).max(50),
       gender: z.nativeEnum(Gender),
       years_experience: z.number().int().min(0).max(70),
-      languages: z.array(z.string().min(1)).min(1),
+      languages: z
+        .array(z.string().min(1))
+        .transform(normalizeLanguageList)
+        .refine((langs) => langs.length >= 1),
       // Step 2
       credential: z.nativeEnum(Credential),
       license_number: z.string().max(30),

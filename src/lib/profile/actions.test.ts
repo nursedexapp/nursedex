@@ -179,6 +179,51 @@ describe("updateNurseProfile server-side validation", () => {
   });
 });
 
+// #934. Both writers used to store the list exactly as it was submitted, so
+// normalising in the form or in the schema would not have reached the
+// database: the actions validate with the schema and then write the RAW
+// input. These assert on the payload that actually goes to nurse_profiles.
+describe("the spelling of a language that reaches the database", () => {
+  it("is title cased on the profile edit form's save", async () => {
+    seedSingles("verified");
+    const res = await updateNurseProfile({
+      ...editData,
+      languages: ["english", "haitian creole"],
+    });
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      languages: ["English", "Haitian Creole"],
+    });
+  });
+
+  it("is title cased on the onboarding wizard's step 1 save", async () => {
+    seedSingles("pending");
+    const res = await saveOnboardingStep(1, {
+      first_name: "Test",
+      last_name: "Nurse",
+      gender: "female",
+      years_experience: 5,
+      languages: ["English", "haitian creole"],
+    });
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      languages: ["English", "Haitian Creole"],
+    });
+  });
+
+  it("stores one entry when two spellings mean one language", async () => {
+    seedSingles("verified");
+    const res = await updateNurseProfile({
+      ...editData,
+      languages: ["Haitian creole", "haitian Creole"],
+    });
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      languages: ["Haitian Creole"],
+    });
+  });
+});
+
 describe("saveOnboardingStep server-side validation (step 2 credentials)", () => {
   const step2 = {
     credential: "rn",
