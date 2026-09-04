@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import Link from "next/link";
-import { captureClientEvent } from "@/lib/analytics/capture";
+import { TrackedLink } from "./TrackedLink";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface TrackedCtaProps {
@@ -24,9 +22,10 @@ interface TrackedCtaProps {
  * who never scrolled to the button and one who saw it and ignored it look
  * identical in the data today, and they point at completely different fixes.
  *
- * Scroll depth deliberately is NOT captured here. PostHog already records
- * $prev_pageview_max_scroll_percentage on every page leave, so a second
- * measurement would be a rival number for the same fact.
+ * The behaviour itself lives in TrackedLink, which the Featured upsell shares
+ * (#969). This stays as the homepage's own name for it, so a call site reads as
+ * a homepage call to action rather than as a generic link with two event names
+ * threaded through it.
  */
 export function TrackedCta({
   href,
@@ -36,57 +35,15 @@ export function TrackedCta({
   className,
   children,
 }: TrackedCtaProps) {
-  const ref = useRef<HTMLAnchorElement>(null);
-  const seenFired = useRef(false);
-  const properties = { audience, cta, placement };
-  const latestProperties = useRef(properties);
-  latestProperties.current = properties;
-
-  useEffect(() => {
-    const element = ref.current;
-    // No typeof guard for IntersectionObserver: next/link uses the same API for
-    // prefetching, so a browser without it has already lost the link long
-    // before it reaches this line. A guard here would be dead code that reads
-    // like a considered decision.
-    if (!element) return;
-
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting || seenFired.current) continue;
-        // Only mark it seen, and only stop watching, if the event actually
-        // went. Setting the flag first meant a capture that arrived before
-        // PostHog had loaded was dropped AND the observer disconnected, so the
-        // sighting could never be recorded at all.
-        if (
-          !captureClientEvent(
-            ANALYTICS_EVENTS.HOMEPAGE_CTA_SEEN,
-            latestProperties.current,
-          )
-        ) {
-          continue;
-        }
-        seenFired.current = true;
-        observer.disconnect();
-      }
-    });
-
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <Link
-      ref={ref}
+    <TrackedLink
       href={href}
+      seenEvent={ANALYTICS_EVENTS.HOMEPAGE_CTA_SEEN}
+      clickedEvent={ANALYTICS_EVENTS.HOMEPAGE_CTA_CLICKED}
+      properties={{ audience, cta, placement }}
       className={className}
-      onClick={() =>
-        captureClientEvent(
-          ANALYTICS_EVENTS.HOMEPAGE_CTA_CLICKED,
-          latestProperties.current,
-        )
-      }
     >
       {children}
-    </Link>
+    </TrackedLink>
   );
 }
