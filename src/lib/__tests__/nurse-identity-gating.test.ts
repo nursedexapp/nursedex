@@ -6,6 +6,7 @@ import {
   createTestUser as createLiveTestUser,
 } from "./helpers/live-supabase";
 
+import { assertNoWriteError } from "@/lib/db/results";
 // Issue #381. get_public_nurse_by_slug is SECURITY DEFINER and GRANTed to
 // anon, so it is callable directly with the anon key from the client bundle.
 // Migration 041 returned last_name and license_number to everyone; the only
@@ -89,7 +90,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await service.from("nurse_profiles").delete().eq("user_id", nurseId);
+  await assertNoWriteError(
+    service.from("nurse_profiles").delete().eq("user_id", nurseId),
+    "nurse_profiles, a fixture write in nurse-identity-gating",
+  );
   for (const id of createdUserIds) {
     await service.auth.admin.deleteUser(id);
   }

@@ -6,6 +6,7 @@ import { completionBlocks, RATES, type RequestType } from "@/lib/slack/views";
 import { getRequest, postReply, refreshRoot } from "@/lib/slack/requests";
 import { verifySecretHeader } from "@/lib/security/shared-secret";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -56,12 +57,19 @@ async function completedResponse(
   rate: number,
   status: string,
 ) {
-  const { data: entries } = await supabase
-    .from("consulting_time_entries")
-    .select("billed_min")
-    .eq("request_id", id);
+  // A failed read is NOT "no time logged against this request" (#847). The
+  // total below is what gets shown in Slack and billed from, so an empty
+  // answer reports zero hours on work that was done.
+  const entries = await unwrapOrThrow(
+    supabase
+      .from("consulting_time_entries")
+      .select("billed_min")
+      .eq("request_id", id),
+    "the time entries logged against this request",
+  );
   const totalMin = (entries ?? []).reduce(
-    (sum: number, e: { billed_min: number | null }) => sum + (e.billed_min ?? 0),
+    (sum: number, e: { billed_min: number | null }) =>
+      sum + (e.billed_min ?? 0),
     0,
   );
   const hrs = totalMin / 60;

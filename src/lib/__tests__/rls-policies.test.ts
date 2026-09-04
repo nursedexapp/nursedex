@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import path from "path";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
 
 // These tests run against the LOCAL Supabase instance.
@@ -58,7 +59,10 @@ describe("RLS policies - anon user", () => {
   });
 
   it("cannot read nurse_profiles as anon (only verified profiles visible to authenticated)", async () => {
-    const { data } = await anon.from("nurse_profiles").select("id").limit(1);
+    const data = await unwrapOrThrow(
+      anon.from("nurse_profiles").select("id").limit(1),
+      "nurse_profiles, a fixture read in rls-policies",
+    );
 
     // Anon should see nothing (RLS requires auth for profile views)
     // or only see verified profiles if the policy allows anon
@@ -68,7 +72,10 @@ describe("RLS policies - anon user", () => {
   it("cannot read admin_actions (admin only)", async () => {
     // Since #387, anon has no grant on this table at all: permission denied,
     // not an RLS-filtered empty array.
-    const { data, error } = await anon.from("admin_actions").select("id").limit(1);
+    const { data, error } = await anon
+      .from("admin_actions")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
@@ -80,19 +87,28 @@ describe("RLS policies - anon user", () => {
   });
 
   it("cannot read blocked_emails (admin only)", async () => {
-    const { data, error } = await anon.from("blocked_emails").select("id").limit(1);
+    const { data, error } = await anon
+      .from("blocked_emails")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
 
   it("cannot read family_profiles (requires auth)", async () => {
-    const { data, error } = await anon.from("family_profiles").select("id").limit(1);
+    const { data, error } = await anon
+      .from("family_profiles")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
 
   it("cannot read subscriptions (requires auth)", async () => {
-    const { data, error } = await anon.from("subscriptions").select("id").limit(1);
+    const { data, error } = await anon
+      .from("subscriptions")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
@@ -124,7 +140,10 @@ describe("RLS policies - anon user", () => {
   });
 
   it("cannot read search_gap_log (admin only)", async () => {
-    const { data, error } = await anon.from("search_gap_log").select("id").limit(1);
+    const { data, error } = await anon
+      .from("search_gap_log")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });

@@ -3,7 +3,11 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { guardedStatusUpdate } from "@/lib/db/guarded-status-update";
 import { isUniqueViolation } from "@/lib/db/postgres-errors";
 import { estimateRequest } from "@/lib/ai/estimate";
-import { OPS_CHANNEL_ID, slackPost, verifySlackRequest } from "@/lib/slack/client";
+import {
+  OPS_CHANNEL_ID,
+  slackPost,
+  verifySlackRequest,
+} from "@/lib/slack/client";
 import { OPS_NOTIFY_USER_ID } from "@/lib/slack/constants";
 import {
   APPROVE_ACTION,
@@ -19,8 +23,14 @@ import {
   triageModalView,
   type RequestType,
 } from "@/lib/slack/views";
-import { ensureIssue, getRequest, postReply, refreshRoot } from "@/lib/slack/requests";
+import {
+  ensureIssue,
+  getRequest,
+  postReply,
+  refreshRoot,
+} from "@/lib/slack/requests";
 
+import { toTypedFailure } from "@/lib/db/results";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -253,15 +263,23 @@ async function handleNewRequest(
       });
       if (!est) return;
       const svc = createServiceRoleClient();
-      await svc
-        .from("consulting_requests")
-        .update({
-          suggested_estimate_hours: est.hours,
-          suggested_type: est.type,
-          suggested_rationale: est.rationale,
-          suggested_labels: est.labels,
-        })
-        .eq("id", requestId);
+      // Reported, not thrown. This runs after the Slack response has gone out,
+      // so throwing cannot change what anybody saw, and the value is an AI
+      // suggestion beside the request rather than the request itself.
+      // Discarded, a failure meant the suggestion silently never appeared and
+      // nothing said why (#847).
+      await toTypedFailure(
+        svc
+          .from("consulting_requests")
+          .update({
+            suggested_estimate_hours: est.hours,
+            suggested_type: est.type,
+            suggested_rationale: est.rationale,
+            suggested_labels: est.labels,
+          })
+          .eq("id", requestId),
+        "the AI estimate suggested for a consulting request",
+      );
     });
 
     return ACK;
@@ -364,7 +382,11 @@ async function handleDecision(
     id,
     expectedStatus: "triaged",
     patch: approve
-      ? { status: "approved", approved_at: new Date().toISOString(), approved_by: userId }
+      ? {
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          approved_by: userId,
+        }
       : { status: "rejected", approved_by: userId },
   });
   if (result.outcome === "error") {

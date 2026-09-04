@@ -44,13 +44,20 @@ export default async function DashboardPage() {
 
   // Family dashboard
   if (!isNurse) {
-    const [{ data: familyProfile }, recentReveals, featured, familySub] =
+    const [familyProfile, recentReveals, featured, familySub] =
       await Promise.all([
-        supabase
-          .from("family_profiles")
-          .select("survey_completed")
-          .eq("user_id", user.id)
-          .single(),
+        // Wrapped inside the Promise.all: an element of one has no
+        // destructuring for any rule to inspect (#847, #991). A failed read
+        // here answered "this family has not done the survey", so the
+        // dashboard kept asking somebody who had.
+        unwrapOrThrow(
+          supabase
+            .from("family_profiles")
+            .select("survey_completed")
+            .eq("user_id", user.id)
+            .single(),
+          "whether this family has completed the survey",
+        ),
         getRevealedNurses(user.id, 3),
         searchNurses({
           filters: parseSearchParams(new URLSearchParams()),

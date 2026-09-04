@@ -12,6 +12,7 @@ import {
   toURLSearchParams,
 } from "@/lib/nurses/search-params";
 
+import { toTypedFailure } from "@/lib/db/results";
 const ZERO_RESULTS_THRESHOLD = 3;
 
 export const metadata: Metadata = {
@@ -57,14 +58,18 @@ export default async function SurveyResultsPage({
   // block the page.
   if (viewer?.role === "family") {
     const supabase = await createClient();
-    await supabase
-      .from("family_profiles")
-      .update({ survey_completed: true })
-      .eq("user_id", viewer.id)
-      .then(
-        () => undefined,
-        () => undefined,
-      );
+    // Reported, not thrown. This page is the family's survey RESULTS, which
+    // they have earned by finishing it, and failing the render over a flag
+    // that only silences a dashboard prompt would be the worse trade. The
+    // `.then(noop, noop)` said nothing at all though, so a failed write left
+    // the prompt asking them forever with no record of why (#847).
+    await toTypedFailure(
+      supabase
+        .from("family_profiles")
+        .update({ survey_completed: true })
+        .eq("user_id", viewer.id),
+      "the survey completion flag for a family",
+    );
   }
 
   // For "browse all nurses" we want the same filter set, minus pagination.

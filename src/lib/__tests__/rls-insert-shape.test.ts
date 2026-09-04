@@ -6,6 +6,7 @@ import {
   createTestUser as createLiveTestUser,
 } from "./helpers/live-supabase";
 
+import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
 // Issue #523: a systematic re-audit of every self-write INSERT policy for the
 // bug class #522 found in hires and reviews. Those policies checked WHO owned
 // the row but not its SHAPE, so a caller could insert a row in a state the app
@@ -24,7 +25,11 @@ import {
 //
 // These tests attempt each write as the attacker would, so they must never run
 // against anything but a local/CI throwaway stack.
-const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceKey: SERVICE_KEY } = getLiveSupabaseEnv();
+const {
+  url: SUPABASE_URL,
+  anonKey: ANON_KEY,
+  serviceKey: SERVICE_KEY,
+} = getLiveSupabaseEnv();
 
 assertLocalSupabaseUrl(SUPABASE_URL, "RLS insert-shape tests");
 
@@ -61,17 +66,21 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await service
-    .from("contact_submissions")
-    .delete()
-    .like("email", `insert-shape-%${stamp}%`);
+  await assertNoWriteError(
+    service
+      .from("contact_submissions")
+      .delete()
+      .like("email", `insert-shape-%${stamp}%`),
+    "contact_submissions, a fixture write in rls-insert-shape",
+  );
   for (const id of createdUserIds) {
     await service.auth.admin.deleteUser(id).catch(() => {});
   }
 });
 
 describe("contact_submissions insert shape (issue #523)", () => {
-  const email = () => `insert-shape-contact-${stamp}-${Math.random()}@example.com`;
+  const email = () =>
+    `insert-shape-contact-${stamp}-${Math.random()}@example.com`;
 
   it("lets an anonymous visitor submit a normal contact form", async () => {
     const { error } = await anon.from("contact_submissions").insert({
@@ -113,11 +122,14 @@ describe("contact_submissions insert shape (issue #523)", () => {
     });
     expect(error).toBeNull();
 
-    const { data } = await service
-      .from("contact_submissions")
-      .select("is_read, admin_notes")
-      .eq("email", addr)
-      .single();
+    const data = await unwrapOrThrow(
+      service
+        .from("contact_submissions")
+        .select("is_read, admin_notes")
+        .eq("email", addr)
+        .single(),
+      "contact_submissions, a fixture read in rls-insert-shape",
+    );
     expect(data!.is_read).toBe(false);
     expect(data!.admin_notes).toBeNull();
   });

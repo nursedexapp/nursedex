@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { slugify } from "./slug";
 
+import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
 /**
  * Normalize a list of taxonomy names: trim, drop blanks, and dedupe case
  * insensitively while preserving the first-seen casing and order. Pure, so
@@ -56,12 +57,18 @@ export async function findOrCreateCategory(
   if (!slug) return null;
 
   const supabase = createServiceRoleClient();
-  const existing = await supabase
-    .from("blog_categories")
-    .select("id")
-    .eq("slug", slug)
-    .maybeSingle();
-  if (existing.data) return existing.data.id as string;
+  // A failed read is NOT "no category with this slug" (#847). It falls through
+  // to the insert, which the unique constraint then refuses, and the retry
+  // read below returns null, so the post is saved with no category at all.
+  const existing = await unwrapOrThrow(
+    supabase
+      .from("blog_categories")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle(),
+    "an existing category with this slug",
+  );
+  if (existing) return existing.id as string;
 
   const inserted = await supabase
     .from("blog_categories")
@@ -70,12 +77,18 @@ export async function findOrCreateCategory(
     .single();
   if (!inserted.error && inserted.data) return inserted.data.id as string;
 
-  const retry = await supabase
-    .from("blog_categories")
-    .select("id")
-    .eq("slug", slug)
-    .maybeSingle();
-  return (retry.data?.id as string) ?? null;
+  // The insert lost to a concurrent caller, so this read is the answer: their
+  // row. A failed read here returned null, which the caller stores as "no
+  // category".
+  const retry = await unwrapOrThrow(
+    supabase
+      .from("blog_categories")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle(),
+    "the category a concurrent caller created first",
+  );
+  return (retry?.id as string) ?? null;
 }
 
 /** Resolve tag names to ids, creating any that do not exist. */
@@ -87,13 +100,15 @@ export async function findOrCreateTags(names: string[]): Promise<string[]> {
     const slug = slugify(name);
     if (!slug) continue;
 
-    const existing = await supabase
-      .from("blog_tags")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (existing.data) {
-      ids.push(existing.data.id as string);
+    // Same as the category pair above: a failed read falls through to an
+    // insert the unique constraint refuses, and the retry then returns null,
+    // so the post is saved without this tag (#847).
+    const existing = await unwrapOrThrow(
+      supabase.from("blog_tags").select("id").eq("slug", slug).maybeSingle(),
+      "an existing tag with this slug",
+    );
+    if (existing) {
+      ids.push(existing.id as string);
       continue;
     }
 
@@ -107,12 +122,11 @@ export async function findOrCreateTags(names: string[]): Promise<string[]> {
       continue;
     }
 
-    const retry = await supabase
-      .from("blog_tags")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (retry.data) ids.push(retry.data.id as string);
+    const retry = await unwrapOrThrow(
+      supabase.from("blog_tags").select("id").eq("slug", slug).maybeSingle(),
+      "the tag a concurrent caller created first",
+    );
+    if (retry) ids.push(retry.id as string);
   }
 
   return ids;
@@ -124,7 +138,13 @@ export async function syncPostTags(
   tagIds: string[],
 ): Promise<void> {
   const supabase = createServiceRoleClient();
-  await supabase.from("blog_post_tags").delete().eq("post_id", postId);
+  // Checked: this clears the post's existing tags before the new set is
+  // written, so an unchecked failure leaves the old tags in place and the post
+  // ends up carrying both (#847).
+  await assertNoWriteError(
+    supabase.from("blog_post_tags").delete().eq("post_id", postId),
+    "the removal of a post's existing tags",
+  );
   if (tagIds.length === 0) return;
   const rows = tagIds.map((tag_id) => ({ post_id: postId, tag_id }));
   const { error } = await supabase.from("blog_post_tags").insert(rows);

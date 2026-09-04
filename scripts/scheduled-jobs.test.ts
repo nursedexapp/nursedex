@@ -114,7 +114,9 @@ describe("expectedIntervalMs", () => {
 describe("evaluateScheduledJobs", () => {
   const NOW = new Date("2026-09-01T12:00:00Z").getTime();
 
-  function job(over: Partial<Parameters<typeof evaluateScheduledJobs>[0]["jobs"][number]>) {
+  function job(
+    over: Partial<Parameters<typeof evaluateScheduledJobs>[0]["jobs"][number]>,
+  ) {
     return {
       name: "CI Health",
       source: "ci-health.yml",
@@ -301,7 +303,8 @@ describe("collectScheduledWorkflows", () => {
     const jobs = collectScheduledWorkflows([
       {
         path: ".github/workflows/ci-health.yml",
-        contents: 'name: CI Health\non:\n  schedule:\n    - cron: "0 9 * * 1"\n',
+        contents:
+          'name: CI Health\non:\n  schedule:\n    - cron: "0 9 * * 1"\n',
       },
       {
         path: ".github/workflows/ci.yml",
@@ -523,13 +526,15 @@ describe("attachHeartbeats", () => {
 
 describe("parseMaxDurationSeconds", () => {
   it("reads the route's declared budget", () => {
-    expect(
-      parseMaxDurationSeconds('export const maxDuration = 60;\n'),
-    ).toBe(60);
+    expect(parseMaxDurationSeconds("export const maxDuration = 60;\n")).toBe(
+      60,
+    );
   });
 
   it("returns null when a route declares none", () => {
-    expect(parseMaxDurationSeconds("export const runtime = 'nodejs';")).toBeNull();
+    expect(
+      parseMaxDurationSeconds("export const runtime = 'nodejs';"),
+    ).toBeNull();
   });
 });
 

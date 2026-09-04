@@ -160,29 +160,28 @@ function resolveVariable(scope, name) {
  * chain, or reassigned from one, which is how an optional filter gets added.
  */
 function holdsQuery(variable) {
-  const fromDef = (variable?.defs ?? []).some(
-    (def) => def.type === "Variable" && isPostgrestChain(def.node.init),
-  );
-  if (fromDef) return true;
   return (variable?.references ?? []).some((ref) => {
     const write = ref.writeExpr;
     if (!write) return false;
     if (isPostgrestChain(write)) return true;
-    // `q = q.eq(...)` keeps it a query.
-    const names = chainCallNames(write);
-    return names.length > 0 && holdsQueryIdentifier(write);
+    // `q = q.eq(...)`, the builder pattern, and ONLY that. The base of the
+    // chain has to be this same variable: without that test, any promise
+    // reassigned or initialised from a call whose chain bottoms out in an
+    // identifier read as a query, and `const facets = await facetsPromise`
+    // was flagged on a page that touches no database at all.
+    return chainBaseName(write) === variable.name;
   });
 }
 
-/** The base of a chain is the variable itself, as in `q = q.eq("id", id)`. */
-function holdsQueryIdentifier(node) {
+/** The identifier a member chain hangs off, or null. */
+function chainBaseName(node) {
   let cur = unwrap(node);
   while (cur) {
     if (cur.type === "CallExpression") cur = unwrap(cur.callee);
     else if (cur.type === "MemberExpression") cur = unwrap(cur.object);
     else break;
   }
-  return cur?.type === "Identifier";
+  return cur?.type === "Identifier" ? cur.name : null;
 }
 
 /** Does this object pattern bind `error`, or a rest that would capture it? */
@@ -334,16 +333,25 @@ export default {
       // discarding a result by never asking for it is the same defect.
       ExpressionStatement(node) {
         let expression = unwrap(node.expression);
+        let discarded = false;
         if (
           expression?.type === "UnaryExpression" &&
           expression.operator === "void"
         ) {
           expression = unwrap(expression.argument);
+          discarded = true;
         }
         if (expression?.type === "AwaitExpression") return;
-        if (isPostgrestChain(expression)) {
-          context.report({ node: expression, messageId: "discarded" });
-        }
+        if (!isPostgrestChain(expression)) return;
+        // A chain matched only by `.rpc(` needs the `void`, because `.rpc(...)`
+        // on its own is not distinctive: a mock client recording calls into a
+        // spy named `rpc` reads identically, and that is not a database call.
+        // A chain with a `.from(...)` and a verb is specific enough to stand
+        // alone. A false positive here pressures somebody into silencing the
+        // rule on correct code, which is the one thing it must not do.
+        const names = chainCallNames(expression);
+        if (!discarded && !names.includes("from")) return;
+        context.report({ node: expression, messageId: "discarded" });
       },
 
       AwaitExpression(node) {

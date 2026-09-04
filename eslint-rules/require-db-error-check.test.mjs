@@ -78,6 +78,16 @@ describe("the shape the sweep exists to remove", () => {
     );
   });
 
+  it("follows a query assigned once and awaited later, with no reassignment", () => {
+    // The other half of the builder pattern: nothing reassigns `query`, so the
+    // base-name test above cannot see it and the declaration itself has to.
+    expectFlagged(
+      fn(`const query = supabase.from("t").select("slug").like("slug", "a%");
+          const { data } = await query;
+          return data;`),
+    );
+  });
+
   it("follows a query built up across statements", () => {
     expectFlagged(
       fn(`let q = supabase.from("t").select("x");
@@ -205,6 +215,25 @@ describe("what it must not flag, so nobody is pressured into a disable", () => {
     expectClean(fn(`const { data } = await fetchJson("/api/x");`));
   });
 
+  it("does not flag an awaited promise that only looks like a builder", () => {
+    // The chain bottoms out in an identifier, the same as `q = q.eq(...)`
+    // does, so the builder test has to check that the base is the variable
+    // ITSELF. Copied from the page that this rule flagged without it, which
+    // touches no database at all.
+    expectClean(`
+      export default async function NursesPage() {
+        const facetsPromise = getDirectoryFacets().catch((error: unknown) => {
+          console.error("[nurses] directory facet read failed:", error);
+          return null;
+        });
+
+        const [a] = await Promise.all([Promise.resolve(1)]);
+        const facets = await facetsPromise;
+        return [a, facets];
+      }
+    `);
+  });
+
   it("does not flag a query builder that is never awaited here", () => {
     expectClean(
       `export function build(supabase) {
@@ -222,8 +251,24 @@ describe("results that are never awaited at all", () => {
     );
   });
 
-  it("flags a bare un-awaited rpc call", () => {
-    expectFlagged(fn(`supabase.rpc("increment_views", { id });`));
+  it("flags a bare voided rpc call", () => {
+    expectFlagged(fn(`void supabase.rpc("increment_views", { id });`));
+  });
+
+  it("does not flag a mock recording calls into a spy named rpc", () => {
+    // `.rpc(...)` alone is not distinctive enough to stand without a `void` or
+    // an `await`: this is a test double, not a database call, and it was
+    // flagged before the rule asked for one.
+    expectClean(`
+      function client(writes) {
+        return {
+          rpc: (...a) => {
+            writes.rpc(...a);
+            return Promise.resolve({ data: null, error: null });
+          },
+        };
+      }
+    `);
   });
 });
 

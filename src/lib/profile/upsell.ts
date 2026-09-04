@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { NurseProfile } from "@/types/database";
 
+import { toTypedFailure } from "@/lib/db/results";
 export const UPSELL_SAVE_THRESHOLD = 1;
 export const UPSELL_COOLDOWN_DAYS = 14;
 
@@ -38,8 +39,15 @@ export async function markUpsellShown(
   supabase: SupabaseClient,
   nurseUserId: string,
 ): Promise<void> {
-  await supabase
-    .from("nurse_profiles")
-    .update({ last_upsell_shown_at: new Date().toISOString() })
-    .eq("user_id", nurseUserId);
+  // Reported, not thrown. This stamp only starts the cooldown on an upsell
+  // the nurse has already been shown, so a failed write shows it again sooner
+  // than intended; failing her profile save over it would be the worse trade.
+  // It said nothing at all before (#847).
+  await toTypedFailure(
+    supabase
+      .from("nurse_profiles")
+      .update({ last_upsell_shown_at: new Date().toISOString() })
+      .eq("user_id", nurseUserId),
+    "the upsell cooldown stamp",
+  );
 }

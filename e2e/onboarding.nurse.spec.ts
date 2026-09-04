@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { serviceClient, resetNurseToPreOnboarding } from "./helpers/provision";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 // A nurse from signup to a live public profile (#485).
 //
 // This is the supply side of the marketplace: no nurses, no product. The unit
@@ -35,11 +36,16 @@ interface ProfileRow {
 }
 
 async function profileOf(nurseId: string): Promise<ProfileRow | null> {
-  const { data } = await serviceClient()
-    .from("nurse_profiles")
-    .select("slug, verification_status, photo_focal_x, photo_focal_y")
-    .eq("user_id", nurseId)
-    .maybeSingle();
+  // A fixture read or write that silently fails makes the assertion after it
+  // pass while testing nothing, which is #847 wearing a green tick.
+  const data = await unwrapOrThrow(
+    serviceClient()
+      .from("nurse_profiles")
+      .select("slug, verification_status, photo_focal_x, photo_focal_y")
+      .eq("user_id", nurseId)
+      .maybeSingle(),
+    "the nurse profile this assertion is about",
+  );
   return data as ProfileRow | null;
 }
 

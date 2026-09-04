@@ -266,6 +266,7 @@ export default async function NurseProfilePage({
 async function trackProfileView(nurseUserId: string) {
   try {
     const supabase = await createClient();
+    // eslint-disable-next-line local/require-db-error-check -- deliberately discarded. The value is a daily view counter on the nurse's own stats page, and NOTHING reads this result. The whole function is wrapped in a try/catch for the same reason: analytics must never break a public profile.
     await supabase.rpc("increment_nurse_analytics", {
       p_nurse_user_id: nurseUserId,
       p_field: "profile_views",

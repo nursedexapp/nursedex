@@ -231,28 +231,44 @@ export async function getTaxonomyForAdmin(): Promise<{
   tags: TagWithCount[];
 }> {
   const supabase = createServiceRoleClient();
+  // Wrapped inside the Promise.all: an element of one has no destructuring for
+  // any rule to inspect (#847, #991). Each `?? []` below reads a failed query
+  // as an empty list, so the admin taxonomy screen showed no categories, no
+  // tags, and a post count of zero against every one that survived.
   const [catsRes, tagsRes, postCats, postTags] = await Promise.all([
-    supabase.from("blog_categories").select("*").order("name"),
-    supabase.from("blog_tags").select("*").order("name"),
-    supabase.from("blog_posts").select("category_id"),
-    supabase.from("blog_post_tags").select("tag_id"),
+    unwrapOrThrow(
+      supabase.from("blog_categories").select("*").order("name"),
+      "the blog categories",
+    ),
+    unwrapOrThrow(
+      supabase.from("blog_tags").select("*").order("name"),
+      "the blog tags",
+    ),
+    unwrapOrThrow(
+      supabase.from("blog_posts").select("category_id"),
+      "the category of every blog post",
+    ),
+    unwrapOrThrow(
+      supabase.from("blog_post_tags").select("tag_id"),
+      "the tags on every blog post",
+    ),
   ]);
 
   const catCount = new Map<string, number>();
-  for (const r of (postCats.data ?? []) as { category_id: string | null }[]) {
+  for (const r of (postCats ?? []) as { category_id: string | null }[]) {
     if (r.category_id)
       catCount.set(r.category_id, (catCount.get(r.category_id) ?? 0) + 1);
   }
   const tagCount = new Map<string, number>();
-  for (const r of (postTags.data ?? []) as { tag_id: string }[]) {
+  for (const r of (postTags ?? []) as { tag_id: string }[]) {
     tagCount.set(r.tag_id, (tagCount.get(r.tag_id) ?? 0) + 1);
   }
 
-  const categories = ((catsRes.data ?? []) as BlogCategory[]).map((c) => ({
+  const categories = ((catsRes ?? []) as BlogCategory[]).map((c) => ({
     ...c,
     postCount: catCount.get(c.id) ?? 0,
   }));
-  const tags = ((tagsRes.data ?? []) as BlogTag[]).map((t) => ({
+  const tags = ((tagsRes ?? []) as BlogTag[]).map((t) => ({
     ...t,
     postCount: tagCount.get(t.id) ?? 0,
   }));

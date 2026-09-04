@@ -10,6 +10,7 @@ import {
   UPSELL_COOLDOWN_DAYS,
 } from "@/lib/profile/upsell";
 
+import { toTypedFailure } from "@/lib/db/results";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -99,11 +100,18 @@ const handleUpgradeNudge = withCronAlerting(
       }
 
       // Stamp last_upsell_shown_at so the in-app toast also respects the
-      // cooldown started by this email.
-      await supabase
-        .from("nurse_profiles")
-        .update({ last_upsell_shown_at: new Date().toISOString() })
-        .eq("user_id", row.user_id);
+      // cooldown started by this email. Reported, not thrown: the email has
+      // ALREADY gone out by this point, so failing the job would not unsend
+      // it, and the throw would abandon every nurse still to be nudged in
+      // this run. What a failed write costs is an in-app toast that ignores
+      // the cooldown for one nurse (#847).
+      await toTypedFailure(
+        supabase
+          .from("nurse_profiles")
+          .update({ last_upsell_shown_at: new Date().toISOString() })
+          .eq("user_id", row.user_id),
+        "the upsell cooldown stamp after a nudge email",
+      );
       sent++;
     }
 

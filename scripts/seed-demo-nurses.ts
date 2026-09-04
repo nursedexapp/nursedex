@@ -24,6 +24,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
 
@@ -466,11 +467,16 @@ async function seedOne(nurse: SeedNurse, index: number): Promise<void> {
   const tag = `[seed ${String(index + 1).padStart(2, "0")}]`;
 
   // Check if user with this email already exists.
-  const { data: existing } = await supabase
-    .from("users")
-    .select("id, role")
-    .eq("email", nurse.email)
-    .maybeSingle();
+  // A failed read is NOT "this seed nurse does not exist yet" (#847). It would
+  // create a second account for the same address on every run.
+  const existing = await unwrapOrThrow(
+    supabase
+      .from("users")
+      .select("id, role")
+      .eq("email", nurse.email)
+      .maybeSingle(),
+    "an existing account for this seed nurse",
+  );
 
   let userId = existing?.id as string | undefined;
 

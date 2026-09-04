@@ -29,6 +29,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { assertNoWriteError } from "@/lib/db/results";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
 
@@ -99,7 +100,9 @@ async function deleteTestAccounts() {
     console.log("\n[test accounts] none passed (set TEST_EMAILS). Skipping.");
     return;
   }
-  console.log(`\n[test accounts] ${TEST_EMAILS.length} requested for deletion.`);
+  console.log(
+    `\n[test accounts] ${TEST_EMAILS.length} requested for deletion.`,
+  );
   for (const email of TEST_EMAILS) {
     if (PROTECTED.has(email)) {
       console.error(`  REFUSING to delete protected account: ${email}`);
@@ -126,9 +129,15 @@ async function deleteTestAccounts() {
       .from(PHOTO_BUCKET)
       .list(user.id);
     if (files && files.length > 0) {
-      await supabase.storage
-        .from(PHOTO_BUCKET)
-        .remove(files.map((f) => `${user.id}/${f.name}`));
+      // Checked: the auth user is deleted immediately below, so an unchecked
+      // failure here leaves photos in a paid bucket that nothing will ever
+      // name again, and the script reports the cleanup as done (#847).
+      await assertNoWriteError(
+        supabase.storage
+          .from(PHOTO_BUCKET)
+          .remove(files.map((f) => `${user.id}/${f.name}`)),
+        "the removal of a deleted user's photo folder",
+      );
     }
     const { error: delErr } = await supabase.auth.admin.deleteUser(user.id);
     if (delErr) {

@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { serviceClient } from "./helpers/provision";
 
+import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
 // A review from written to published (#485).
 //
 // The last of the three journeys. A family who has revealed a nurse writes a
@@ -32,12 +33,17 @@ async function reviewOf(
   familyId: string,
   nurseId: string,
 ): Promise<{ id: string; status: string } | null> {
-  const { data } = await serviceClient()
-    .from("reviews")
-    .select("id, status")
-    .eq("reviewer_user_id", familyId)
-    .eq("nurse_user_id", nurseId)
-    .maybeSingle();
+  // A fixture read or write that silently fails makes the assertion after
+  // it pass while testing nothing, which is #847 wearing a green tick.
+  const data = await unwrapOrThrow(
+    serviceClient()
+      .from("reviews")
+      .select("id, status")
+      .eq("reviewer_user_id", familyId)
+      .eq("nurse_user_id", nurseId)
+      .maybeSingle(),
+    "the review this assertion is about",
+  );
   return data as { id: string; status: string } | null;
 }
 
@@ -48,11 +54,14 @@ test.beforeEach(async () => {
   const { familyId, reviewNurseId } = fixture();
   const db = serviceClient();
 
-  await db
-    .from("reviews")
-    .delete()
-    .eq("reviewer_user_id", familyId)
-    .eq("nurse_user_id", reviewNurseId);
+  await assertNoWriteError(
+    db
+      .from("reviews")
+      .delete()
+      .eq("reviewer_user_id", familyId)
+      .eq("nurse_user_id", reviewNurseId),
+    "the clearing of this family's fixture review",
+  );
 
   // A family may only review a nurse they have revealed. The reveal itself is
   // covered end to end by reveal.family.spec.ts, so it is a precondition here
