@@ -16,8 +16,8 @@ const h = vi.hoisted(() => {
   };
   return {
     state,
-    shouldSendOnce: vi.fn(async () => true),
-    sendUpgradeNudgeEmail: vi.fn(async () => {}),
+    sendOnce: vi.fn(async (_c: unknown, _a: unknown, send: () => Promise<boolean>): Promise<"sent" | "skipped" | "failed"> => ((await send()) ? "sent" : "failed")),
+    sendUpgradeNudgeEmail: vi.fn(async () => true),
     client: { from: () => createQueryBuilder({ then: () => h.state.nurses }) },
   };
 });
@@ -28,7 +28,7 @@ vi.mock("@/lib/cron/alerting", () => ({
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client,
 }));
-vi.mock("@/lib/cron/email-log", () => ({ shouldSendOnce: h.shouldSendOnce }));
+vi.mock("@/lib/cron/email-log", () => ({ sendOnce: h.sendOnce }));
 vi.mock("@/lib/email/send", () => ({
   sendUpgradeNudgeEmail: h.sendUpgradeNudgeEmail,
 }));
@@ -58,7 +58,6 @@ const nurse = () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.shouldSendOnce.mockResolvedValue(true);
   h.state.nurses = { data: [], error: null };
 });
 
@@ -69,7 +68,7 @@ describe("upgrade-nudge cron", () => {
       h.state.nurses = { data: [nurse()], error: null };
     },
     sideEffectSpies: {
-      shouldSendOnce: h.shouldSendOnce,
+      sendOnce: h.sendOnce,
       sendUpgradeNudgeEmail: h.sendUpgradeNudgeEmail,
     },
   });
@@ -78,22 +77,23 @@ describe("upgrade-nudge cron", () => {
     h.state.nurses = { data: [nurse()], error: null };
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0 });
-    expect(h.shouldSendOnce).toHaveBeenCalledWith(
+    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0, failed: 0 });
+    expect(h.sendOnce).toHaveBeenCalledWith(
       h.client,
       expect.objectContaining({
         emailType: "upgrade_nudge",
         dedupKey: expect.stringMatching(/^week_\d{4}-\d{2}-\d{2}$/),
       }),
+      expect.any(Function),
     );
     expect(h.sendUpgradeNudgeEmail).toHaveBeenCalledTimes(1);
   });
 
   it("skips when the dedup gate has already fired this week", async () => {
     h.state.nurses = { data: [nurse()], error: null };
-    h.shouldSendOnce.mockResolvedValue(false);
+    h.sendOnce.mockResolvedValue("skipped");
     const res = await GET(req());
-    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1 });
+    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1, failed: 0 });
     expect(h.sendUpgradeNudgeEmail).not.toHaveBeenCalled();
   });
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendHireFollowupEmail } from "@/lib/email/send";
 
@@ -86,6 +86,7 @@ const handleHireFollowup = withCronAlerting(
     }
 
     let sent = 0;
+    let failed = 0;
     let skipped = 0;
 
     // Every candidate family's hires in ONE query, rather than one per family
@@ -130,24 +131,38 @@ const handleHireFollowup = withCronAlerting(
       }
 
       const todayBucket = new Date().toISOString().slice(0, 10);
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: familyUserId,
-        emailType: "hire_followup",
-        dedupKey: `bucket_${todayBucket}`,
-      });
-      if (!ok) {
+      const outcome = await sendOnce(
+        supabase,
+        {
+          recipientUserId: familyUserId,
+          emailType: "hire_followup",
+          dedupKey: `bucket_${todayBucket}`,
+        },
+        () =>
+          sendHireFollowupEmail({
+            to: info.email,
+            firstName: info.firstName ?? undefined,
+          }),
+      );
+      if (outcome === "skipped") {
         skipped++;
         continue;
       }
-
-      await sendHireFollowupEmail({
-        to: info.email,
-        firstName: info.firstName ?? undefined,
-      });
+      if (outcome === "failed") {
+        failed++;
+        continue;
+      }
       sent++;
     }
 
-    return NextResponse.json({ success: true, sent, skipped });
+    if (sent === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every hire followup failed to send", sent, skipped, failed },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, sent, skipped, failed });
   },
 );
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendAccessExpiryReminderEmail } from "@/lib/email/send";
 
@@ -28,6 +28,7 @@ const handleAccessExpiry = withCronAlerting(
 
     const summary: Record<number, number> = {};
     let skipped = 0;
+    let failed = 0;
     const failedWindows: number[] = [];
 
     for (const days of REMINDER_DAYS) {
@@ -81,16 +82,6 @@ const handleAccessExpiry = withCronAlerting(
           continue;
         }
 
-        const ok = await shouldSendOnce(supabase, {
-          recipientUserId: row.user_id,
-          emailType: "access_expiry_reminder",
-          dedupKey: `${row.id}:${days}d`,
-        });
-        if (!ok) {
-          skipped++;
-          continue;
-        }
-
         const expiryDateLabel = new Date(
           row.access_expires_at,
         ).toLocaleDateString("en-US", {
@@ -99,12 +90,30 @@ const handleAccessExpiry = withCronAlerting(
           year: "numeric",
         });
 
-        await sendAccessExpiryReminderEmail({
-          to: row.users.email,
-          firstName: row.users.first_name ?? undefined,
-          daysUntilExpiry: days,
-          expiryDateLabel,
-        });
+        const user = row.users;
+        const outcome = await sendOnce(
+          supabase,
+          {
+            recipientUserId: row.user_id,
+            emailType: "access_expiry_reminder",
+            dedupKey: `${row.id}:${days}d`,
+          },
+          () =>
+            sendAccessExpiryReminderEmail({
+              to: user.email,
+              firstName: user.first_name ?? undefined,
+              daysUntilExpiry: days,
+              expiryDateLabel,
+            }),
+        );
+        if (outcome === "skipped") {
+          skipped++;
+          continue;
+        }
+        if (outcome === "failed") {
+          failed++;
+          continue;
+        }
         summary[days]++;
       }
     }
@@ -119,7 +128,20 @@ const handleAccessExpiry = withCronAlerting(
       );
     }
 
-    return NextResponse.json({ success: true, sentByDay: summary, skipped });
+    const sentTotal = Object.values(summary).reduce((a, b) => a + b, 0);
+    if (sentTotal === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every expiry reminder failed to send", skipped, failed },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      sentByDay: summary,
+      skipped,
+      failed,
+    });
   },
 );
 

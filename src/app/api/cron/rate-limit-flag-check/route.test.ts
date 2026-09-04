@@ -27,10 +27,14 @@ const h = vi.hoisted(() => {
   return {
     state,
     calls,
-    shouldSendOnce: vi.fn(async () => h.state.shouldSend),
+    sendOnce: vi.fn(async (_c: unknown, _a: unknown, send: () => Promise<boolean>): Promise<"sent" | "skipped" | "failed"> => (!h.state.shouldSend ? "skipped" : (await send()) ? "sent" : "failed")),
     sendRateLimitFlaggedAdminEmail: vi.fn(async (args: unknown) => {
       h.calls.emails.push(args);
       if (h.state.sendError) throw h.state.sendError;
+      // Senders now report whether the email landed, and sendOnce releases the
+      // dedup claim on a false, so a mock returning nothing would read as a
+      // failed send (#415).
+      return true;
     }),
   };
 });
@@ -57,7 +61,7 @@ process.env.CRON_SECRET = TEST_CRON_SECRET;
 vi.mock("@/lib/cron/alerting", () => ({
   withCronAlerting: (_name: string, fn: unknown) => fn,
 }));
-vi.mock("@/lib/cron/email-log", () => ({ shouldSendOnce: h.shouldSendOnce }));
+vi.mock("@/lib/cron/email-log", () => ({ sendOnce: h.sendOnce }));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => ({ from: (t: string) => builderFor(t) }),
 }));
@@ -202,7 +206,7 @@ describe("rate-limit-flag-check behaviour", () => {
       h.state.admins = [{ id: "admin-1", email: "admin@nursedex.com" }];
     },
     sideEffectSpies: {
-      shouldSendOnce: h.shouldSendOnce,
+      sendOnce: h.sendOnce,
       sendRateLimitFlaggedAdminEmail: h.sendRateLimitFlaggedAdminEmail,
     },
   });

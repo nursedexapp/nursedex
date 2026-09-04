@@ -26,10 +26,11 @@ const h = vi.hoisted(() => {
   };
   return {
     state,
-    shouldSendOnce: vi.fn(async () => true),
     sendNotListedNudgeEmail: vi.fn(async () => true),
     releaseClaim: vi.fn(async (_dedupKey: unknown) => {}),
     captureMessage: vi.fn(),
+    /** Recipients already claimed, so a second attempt gets 23505 back. */
+    claimed: new Set<string>(),
     client: {
       from: (table: string) =>
         table === "email_log"
@@ -37,11 +38,26 @@ const h = vi.hoisted(() => {
               // Hand-rolled rather than the shared builder: this asserts the
               // exact delete chain that releases a claim, and the builder
               // answers every method by chaining, which would let a wrong
-              // chain pass.
+              // chain pass. The real sendOnce runs against it (#415), rather
+              // than being stubbed, so the claim and the release are proved
+              // here and not merely assumed.
+              insert: async (payload: Record<string, string>) => {
+                const key = payload.recipient_user_id;
+                if (h.claimed.has(key)) {
+                  return {
+                    error: { message: "duplicate key value", code: "23505" },
+                  };
+                }
+                h.claimed.add(key);
+                return { error: null };
+              },
               delete: () => ({
                 eq: () => ({
                   eq: () => ({
-                    eq: async (_c: string, v: unknown) => h.releaseClaim(v),
+                    eq: async (_c: string, v: unknown) => {
+                      await h.releaseClaim(v);
+                      return { error: null };
+                    },
                   }),
                 }),
               }),
@@ -58,7 +74,6 @@ vi.mock("@sentry/nextjs", () => ({ captureMessage: h.captureMessage }));
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client,
 }));
-vi.mock("@/lib/cron/email-log", () => ({ shouldSendOnce: h.shouldSendOnce }));
 vi.mock("@/lib/email/send", () => ({
   sendNotListedNudgeEmail: h.sendNotListedNudgeEmail,
 }));
@@ -96,7 +111,7 @@ const nurse = (
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.shouldSendOnce.mockResolvedValue(true);
+  h.claimed.clear();
   h.sendNotListedNudgeEmail.mockResolvedValue(true);
   h.state.nurses = { data: [], error: null };
   delete process.env.NOT_LISTED_NUDGE_SEND;
@@ -114,7 +129,6 @@ describeCronAuthGuard({
   },
   sideEffectSpies: {
     sendNotListedNudgeEmail: h.sendNotListedNudgeEmail,
-    shouldSendOnce: h.shouldSendOnce,
   },
 });
 
@@ -158,7 +172,9 @@ describe("the not-listed nudge, switched on", () => {
 
   it("does not email a nurse who has already had it", async () => {
     h.state.nurses = { data: [nurse("a")], error: null };
-    h.shouldSendOnce.mockResolvedValue(false);
+    // Her claim is already in the log, so the insert comes back 23505 and the
+    // send never happens. That is the database deciding, not a stub.
+    h.claimed.add("a");
 
     const body = await (await GET(req())).json();
 

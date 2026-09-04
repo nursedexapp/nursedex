@@ -2,7 +2,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createQueryBuilder } from "../../../test/supabase-mock";
-import { shouldSendOnce } from "./email-log";
+import { shouldSendOnce, sendOnce } from "./email-log";
+
+const captureMessage = vi.fn();
+vi.mock("@sentry/nextjs", () => ({
+  captureMessage: (...args: unknown[]) => captureMessage(...args),
+}));
 
 /**
  * shouldSendOnce takes the Supabase client as an argument, so the client is the
@@ -86,5 +91,123 @@ describe("shouldSendOnce", () => {
 
     expect(result).toBe(false);
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+/**
+ * sendOnce exists because the claim and the release have to be one piece of
+ * code (#415). Nine crons claimed a dedup row, sent, and never released the
+ * claim when the send failed, so a transient Resend outage marked the person as
+ * told forever: the email was lost and nothing would ever retry it. The not
+ * listed nudge cron had the release written out by hand, correctly, and none of
+ * its neighbours did, which is exactly the shape that gets copied wrong.
+ */
+const sendState = {
+  insertError: null as { message: string; code?: string } | null,
+  deleted: [] as { column: string; value: unknown }[],
+  deleteCalled: 0,
+};
+
+function sendMockClient(): SupabaseClient {
+  return {
+    from: (table: string) =>
+      createQueryBuilder({
+        insert: () => ({ error: sendState.insertError }),
+        delete: () => {
+          if (table === "email_log") sendState.deleteCalled++;
+          return "chain";
+        },
+        eq: (...args: unknown[]) => {
+          sendState.deleted.push({ column: String(args[0]), value: args[1] });
+          return "chain";
+        },
+        then: () => ({ error: null }),
+      }),
+  } as unknown as SupabaseClient;
+}
+
+describe("sendOnce", () => {
+  beforeEach(() => {
+    sendState.insertError = null;
+    sendState.deleted = [];
+    sendState.deleteCalled = 0;
+    captureMessage.mockClear();
+  });
+
+  it("sends and reports it sent when the claim is fresh", async () => {
+    const send = vi.fn(async () => true);
+
+    const outcome = await sendOnce(sendMockClient(), ARGS, send);
+
+    expect(outcome).toBe("sent");
+    expect(send).toHaveBeenCalledOnce();
+    expect(sendState.deleteCalled).toBe(0);
+  });
+
+  it("does not send at all when someone else already claimed this email", async () => {
+    sendState.insertError = { message: "duplicate key value", code: "23505" };
+    const send = vi.fn(async () => true);
+
+    const outcome = await sendOnce(sendMockClient(), ARGS, send);
+
+    expect(outcome).toBe("skipped");
+    expect(send).not.toHaveBeenCalled();
+    expect(sendState.deleteCalled).toBe(0);
+  });
+
+  /**
+   * The failure this whole helper exists for. Left standing, the claim says the
+   * person was told, so tomorrow's run skips them and the email is gone for
+   * good. Releasing it risks sending twice if the send landed and only the
+   * reply failed, which is much the better of the two mistakes.
+   */
+  it("releases the claim when the send does not land, so the next run retries", async () => {
+    const send = vi.fn(async () => false);
+
+    const outcome = await sendOnce(sendMockClient(), ARGS, send);
+
+    expect(outcome).toBe("failed");
+    expect(sendState.deleteCalled).toBe(1);
+    expect(sendState.deleted).toEqual([
+      { column: "recipient_user_id", value: "user-1" },
+      { column: "email_type", value: "renewal_reminder" },
+      { column: "dedup_key", value: "sub-1" },
+    ]);
+  });
+
+  it("releases the claim when the send throws rather than returning false", async () => {
+    const send = vi.fn(async () => {
+      throw new Error("socket hang up");
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const outcome = await sendOnce(sendMockClient(), ARGS, send);
+
+    expect(outcome).toBe("failed");
+    expect(sendState.deleteCalled).toBe(1);
+  });
+
+  /**
+   * A console line is not monitoring. Every one of these crons answers 200 on a
+   * partial failure, so a swallowed send reaches nobody, every day, for as long
+   * as it lasts.
+   */
+  it("reports a failed send to Sentry", async () => {
+    const send = vi.fn(async () => false);
+
+    await sendOnce(sendMockClient(), ARGS, send);
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.stringContaining("renewal_reminder"),
+      "warning",
+    );
+  });
+
+  it("says nothing to Sentry when the send lands", async () => {
+    const send = vi.fn(async () => true);
+
+    await sendOnce(sendMockClient(), ARGS, send);
+
+    expect(captureMessage).not.toHaveBeenCalled();
   });
 });

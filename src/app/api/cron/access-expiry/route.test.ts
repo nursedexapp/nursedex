@@ -42,8 +42,8 @@ const h = vi.hoisted(() => {
     state,
     client,
     resetCall: () => (state.callCount = 0),
-    shouldSendOnce: vi.fn(async () => true),
-    sendAccessExpiryReminderEmail: vi.fn(async () => {}),
+    sendOnce: vi.fn(async (_c: unknown, _a: unknown, send: () => Promise<boolean>): Promise<"sent" | "skipped" | "failed"> => ((await send()) ? "sent" : "failed")),
+    sendAccessExpiryReminderEmail: vi.fn(async () => true),
   };
 });
 
@@ -51,7 +51,7 @@ vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client(),
 }));
 vi.mock("@/lib/cron/email-log", () => ({
-  shouldSendOnce: h.shouldSendOnce,
+  sendOnce: h.sendOnce,
 }));
 vi.mock("@/lib/email/send", () => ({
   sendAccessExpiryReminderEmail: h.sendAccessExpiryReminderEmail,
@@ -95,7 +95,7 @@ describe("access-expiry cron: auth guard", () => {
       h.state.results = [dueFamily, dueFamily, dueFamily];
     },
     sideEffectSpies: {
-      shouldSendOnce: h.shouldSendOnce,
+      sendOnce: h.sendOnce,
       sendAccessExpiryReminderEmail: h.sendAccessExpiryReminderEmail,
     },
   });

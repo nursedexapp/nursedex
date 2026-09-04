@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { sendReviewInviteEmail } from "@/lib/email/send";
@@ -59,28 +59,44 @@ const handleReviewInvite = withCronAlerting(
     };
 
     let sent = 0;
+    let failed = 0;
     let skipped = 0;
 
     for (const row of (data ?? []) as unknown as Row[]) {
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: row.user_id,
-        emailType: "review_invite",
-        dedupKey: "post_verification_v1",
-      });
-      if (!ok) {
+      const user = row.users;
+      const outcome = await sendOnce(
+        supabase,
+        {
+          recipientUserId: row.user_id,
+          emailType: "review_invite",
+          dedupKey: "post_verification_v1",
+        },
+        () =>
+          sendReviewInviteEmail({
+            to: user.email,
+            firstName: user.first_name ?? undefined,
+            reviewLinkUrl: `https://nursedex.com/reviews/${row.slug}`,
+          }),
+      );
+      if (outcome === "skipped") {
         skipped++;
         continue;
       }
-
-      await sendReviewInviteEmail({
-        to: row.users.email,
-        firstName: row.users.first_name ?? undefined,
-        reviewLinkUrl: `https://nursedex.com/reviews/${row.slug}`,
-      });
+      if (outcome === "failed") {
+        failed++;
+        continue;
+      }
       sent++;
     }
 
-    return NextResponse.json({ success: true, sent, skipped });
+    if (sent === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every review invite failed to send", sent, skipped, failed },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, sent, skipped, failed });
   },
 );
 

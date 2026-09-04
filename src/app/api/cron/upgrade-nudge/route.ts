@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { sendUpgradeNudgeEmail } from "@/lib/email/send";
@@ -68,23 +68,36 @@ const handleUpgradeNudge = withCronAlerting(
     const todayBucket = new Date().toISOString().slice(0, 10);
     let sent = 0;
     let skipped = 0;
+    let failed = 0;
 
     for (const row of (data ?? []) as unknown as Row[]) {
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: row.user_id,
-        emailType: "upgrade_nudge",
-        dedupKey: `week_${todayBucket}`,
-      });
-      if (!ok) {
+      const user = row.users;
+      const outcome = await sendOnce(
+        supabase,
+        {
+          recipientUserId: row.user_id,
+          emailType: "upgrade_nudge",
+          dedupKey: `week_${todayBucket}`,
+        },
+        () =>
+          sendUpgradeNudgeEmail({
+            to: user.email,
+            firstName: user.first_name ?? undefined,
+            saveCount: row.save_count_for_upsell,
+          }),
+      );
+      if (outcome === "skipped") {
         skipped++;
         continue;
       }
+      // A failed send has had its claim released, so the next run tries again.
+      // The cooldown stamp below must not be written for a nudge she never
+      // received, or the in-app toast goes quiet as well (#415).
+      if (outcome === "failed") {
+        failed++;
+        continue;
+      }
 
-      await sendUpgradeNudgeEmail({
-        to: row.users.email,
-        firstName: row.users.first_name ?? undefined,
-        saveCount: row.save_count_for_upsell,
-      });
       // Stamp last_upsell_shown_at so the in-app toast also respects the
       // cooldown started by this email.
       await supabase
@@ -94,7 +107,14 @@ const handleUpgradeNudge = withCronAlerting(
       sent++;
     }
 
-    return NextResponse.json({ success: true, sent, skipped });
+    if (sent === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every upgrade nudge failed to send", sent, skipped, failed },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, sent, skipped, failed });
   },
 );
 
