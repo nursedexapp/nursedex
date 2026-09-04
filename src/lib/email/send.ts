@@ -27,6 +27,49 @@ function getSiteUrl(): string {
   );
 }
 
+/**
+ * POST one email to its Route Handler and REPORT whether it went (#415).
+ *
+ * Every sender below repeated this fetch, this auth header and a block that
+ * logged a failure and returned nothing. That last part is the defect: ten of
+ * these are driven by crons that claim a dedup row before sending, so a caller
+ * that cannot tell a failure from a success leaves the claim standing and the
+ * person is marked as told forever. Reporting is the whole point, so the answer
+ * is a boolean rather than void, and a thrown network error is caught here
+ * rather than escaping into a loop over other recipients.
+ *
+ * `label` names the sender in the log line, because "email failed" without one
+ * cannot be acted on.
+ */
+export async function postEmail(
+  path: string,
+  payload: unknown,
+  label: string,
+): Promise<boolean> {
+  const baseUrl = await getBaseUrl();
+
+  try {
+    const res = await fetch(`${baseUrl}/api/email/${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error(`[email] ${label} email failed:`, res.status, body);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[email] ${label} email could not be sent:`, err);
+    return false;
+  }
+}
+
 export async function sendProfileSetupEmail(
   to: string,
   firstName: string | undefined,
@@ -74,32 +117,11 @@ export async function sendNotListedNudgeEmail(args: {
   firstName?: string;
   gaps: ListingGap[];
 }): Promise<boolean> {
-  const baseUrl = await getBaseUrl();
-
-  try {
-    const res = await fetch(`${baseUrl}/api/email/not-listed-nudge`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.CRON_SECRET}`,
-      },
-      body: JSON.stringify({
-        to: args.to,
-        firstName: args.firstName,
-        gaps: args.gaps,
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      console.error("[email] Not listed nudge failed:", res.status, body);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("[email] Not listed nudge could not be sent:", err);
-    return false;
-  }
+  return postEmail(
+    "not-listed-nudge",
+    { to: args.to, firstName: args.firstName, gaps: args.gaps },
+    "Not listed nudge",
+  );
 }
 
 export async function sendCommentSubmittedEmail(
@@ -339,26 +361,11 @@ export async function sendLicenceNumberNeededEmail(args: {
   to: string;
   firstName?: string;
 }): Promise<boolean> {
-  const baseUrl = await getBaseUrl();
-  try {
-    const res = await fetch(`${baseUrl}/api/email/licence-number-needed`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.CRON_SECRET}`,
-      },
-      body: JSON.stringify({ to: args.to, firstName: args.firstName }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      console.error("[email] Licence number needed failed:", res.status, body);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("[email] Licence number needed could not be sent:", err);
-    return false;
-  }
+  return postEmail(
+    "licence-number-needed",
+    { to: args.to, firstName: args.firstName },
+    "Licence number needed",
+  );
 }
 
 interface SendVerificationRejectedArgs {
@@ -444,24 +451,8 @@ interface SendPaymentFailureWarningArgs {
 }
 export async function sendPaymentFailureWarningEmail(
   args: SendPaymentFailureWarningArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/payment-failure-warning`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Payment failure warning email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail("payment-failure-warning", args, "Payment failure warning");
 }
 
 interface SendPaymentFailureFinalArgs {
@@ -473,24 +464,8 @@ interface SendPaymentFailureFinalArgs {
 }
 export async function sendPaymentFailureFinalEmail(
   args: SendPaymentFailureFinalArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/payment-failure-final`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Payment failure final email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail("payment-failure-final", args, "Payment failure final");
 }
 
 interface SendAccessExpiryReminderArgs {
@@ -501,24 +476,8 @@ interface SendAccessExpiryReminderArgs {
 }
 export async function sendAccessExpiryReminderEmail(
   args: SendAccessExpiryReminderArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/access-expiry-reminder`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Access expiry reminder email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail("access-expiry-reminder", args, "Access expiry reminder");
 }
 
 interface SendSlaAlertAdminArgs {
@@ -528,20 +487,8 @@ interface SendSlaAlertAdminArgs {
 }
 export async function sendSlaAlertAdminEmail(
   args: SendSlaAlertAdminArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/sla-alert-admin`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] SLA alert admin email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("sla-alert-admin", args, "SLA alert admin");
 }
 
 interface SendSubscriptionConfirmedArgs {
@@ -636,20 +583,8 @@ interface SendRenewalReminderArgs {
 }
 export async function sendRenewalReminderEmail(
   args: SendRenewalReminderArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/renewal-reminder`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Renewal reminder email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("renewal-reminder", args, "Renewal reminder");
 }
 
 interface SendFeaturedAnalyticsArgs {
@@ -660,20 +595,8 @@ interface SendFeaturedAnalyticsArgs {
 }
 export async function sendFeaturedAnalyticsEmail(
   args: SendFeaturedAnalyticsArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/featured-analytics`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Featured analytics email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("featured-analytics", args, "Featured analytics");
 }
 
 interface SendUpgradeNudgeArgs {
@@ -683,20 +606,8 @@ interface SendUpgradeNudgeArgs {
 }
 export async function sendUpgradeNudgeEmail(
   args: SendUpgradeNudgeArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/upgrade-nudge`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Upgrade nudge email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("upgrade-nudge", args, "Upgrade nudge");
 }
 
 interface SendRateLimitFlaggedAdminArgs {
@@ -705,24 +616,12 @@ interface SendRateLimitFlaggedAdminArgs {
 }
 export async function sendRateLimitFlaggedAdminEmail(
   args: SendRateLimitFlaggedAdminArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/rate-limit-flagged-admin`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Rate limit flagged admin email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail(
+    "rate-limit-flagged-admin",
+    args,
+    "Rate limit flagged admin",
+  );
 }
 
 interface SendContactReceivedArgs {
@@ -761,20 +660,8 @@ interface SendReviewInviteArgs {
 }
 export async function sendReviewInviteEmail(
   args: SendReviewInviteArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/review-invite`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Review invite email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("review-invite", args, "Review invite");
 }
 
 interface SendHireFollowupArgs {
@@ -783,20 +670,8 @@ interface SendHireFollowupArgs {
 }
 export async function sendHireFollowupEmail(
   args: SendHireFollowupArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/hire-followup`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Hire followup email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("hire-followup", args, "Hire followup");
 }
 
 interface SendHireConfirmRequestArgs {

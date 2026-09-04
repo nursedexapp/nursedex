@@ -16,8 +16,8 @@ const h = vi.hoisted(() => {
   };
   return {
     state,
-    shouldSendOnce: vi.fn(async () => true),
-    sendRenewalReminderEmail: vi.fn(async () => {}),
+    sendOnce: vi.fn(async (_c: unknown, _a: unknown, send: () => Promise<boolean>): Promise<"sent" | "skipped" | "failed"> => ((await send()) ? "sent" : "failed")),
+    sendRenewalReminderEmail: vi.fn(async () => true),
     client: {
       from: () =>
         createQueryBuilder({
@@ -37,7 +37,7 @@ vi.mock("@/lib/cron/alerting", () => ({
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client,
 }));
-vi.mock("@/lib/cron/email-log", () => ({ shouldSendOnce: h.shouldSendOnce }));
+vi.mock("@/lib/cron/email-log", () => ({ sendOnce: h.sendOnce }));
 vi.mock("@/lib/email/send", () => ({
   sendRenewalReminderEmail: h.sendRenewalReminderEmail,
 }));
@@ -66,7 +66,6 @@ const sub = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   filters.reset();
-  h.shouldSendOnce.mockResolvedValue(true);
   h.state.subs = { data: [], error: null };
 });
 
@@ -84,7 +83,7 @@ describe("renewal-reminder cron", () => {
       h.state.subs = { data: [sub()], error: null };
     },
     sideEffectSpies: {
-      shouldSendOnce: h.shouldSendOnce,
+      sendOnce: h.sendOnce,
       sendRenewalReminderEmail: h.sendRenewalReminderEmail,
     },
   });
@@ -93,13 +92,14 @@ describe("renewal-reminder cron", () => {
     h.state.subs = { data: [sub()], error: null };
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0 });
-    expect(h.shouldSendOnce).toHaveBeenCalledWith(
+    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0, failed: 0 });
+    expect(h.sendOnce).toHaveBeenCalledWith(
       h.client,
       expect.objectContaining({
         emailType: "renewal_reminder",
         dedupKey: "sub-1:2026-08-01T00:00:00.000Z",
       }),
+      expect.any(Function),
     );
     expect(h.sendRenewalReminderEmail).toHaveBeenCalledTimes(1);
   });
@@ -110,16 +110,16 @@ describe("renewal-reminder cron", () => {
       error: null,
     };
     const res = await GET(req());
-    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1 });
-    expect(h.shouldSendOnce).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1, failed: 0 });
+    expect(h.sendOnce).not.toHaveBeenCalled();
     expect(h.sendRenewalReminderEmail).not.toHaveBeenCalled();
   });
 
   it("skips when the dedup gate has already fired for this period", async () => {
     h.state.subs = { data: [sub()], error: null };
-    h.shouldSendOnce.mockResolvedValue(false);
+    h.sendOnce.mockResolvedValue("skipped");
     const res = await GET(req());
-    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1 });
+    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1, failed: 0 });
     expect(h.sendRenewalReminderEmail).not.toHaveBeenCalled();
   });
 

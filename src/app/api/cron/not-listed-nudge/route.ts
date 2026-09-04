@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import * as Sentry from "@sentry/nextjs";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyUnlistedNurseFilter } from "@/lib/nurses/visibility";
 import { listingGaps } from "@/lib/nurses/listing";
@@ -87,50 +86,29 @@ const handleNotListedNudge = withCronAlerting(
     let failed = 0;
 
     for (const row of rows) {
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: row.user_id,
-        emailType: EMAIL_TYPE,
-        dedupKey: DEDUP_KEY,
-      });
-      if (!ok) {
-        skipped++;
-        continue;
-      }
-
-      const delivered = await sendNotListedNudgeEmail({
-        to: row.users.email,
-        firstName: row.users.first_name ?? undefined,
-        gaps: listingGaps(row),
-      });
-
-      if (delivered) {
-        sent++;
-        continue;
-      }
-
-      // The claim is written before the send so two overlapping runs cannot
-      // both email her. Left standing after a failure it would mark her as
-      // told forever, and she is exactly the person who needs telling. So
-      // release it and let tomorrow's run try again. If the send actually
-      // landed and only the reply failed, she gets it twice, which is much
-      // the better of the two mistakes.
-      failed++;
-      await supabase
-        .from("email_log")
-        .delete()
-        .eq("recipient_user_id", row.user_id)
-        .eq("email_type", EMAIL_TYPE)
-        .eq("dedup_key", DEDUP_KEY);
-    }
-
-    if (failed > 0) {
-      // A console line is not monitoring. withCronAlerting reports a throw or
-      // a non-2xx and nothing else, so a 200 carrying a failure count would
-      // reach nobody, every day, for as long as it lasted.
-      Sentry.captureMessage(
-        `[not-listed-nudge] ${failed} of ${failed + sent} nudges did not go out; their claims were released for the next run.`,
-        "warning",
+      // The claim, the send and the release of a failed claim now live in one
+      // shared helper (#415). This cron had them written out correctly by hand
+      // and its nine neighbours did not, which is what the helper fixes: it
+      // also reports each failure to Sentry, so the summary line that used to
+      // be assembled here is no longer needed.
+      const outcome = await sendOnce(
+        supabase,
+        {
+          recipientUserId: row.user_id,
+          emailType: EMAIL_TYPE,
+          dedupKey: DEDUP_KEY,
+        },
+        () =>
+          sendNotListedNudgeEmail({
+            to: row.users.email,
+            firstName: row.users.first_name ?? undefined,
+            gaps: listingGaps(row),
+          }),
       );
+
+      if (outcome === "skipped") skipped++;
+      else if (outcome === "failed") failed++;
+      else sent++;
     }
 
     // Every attempt failing is an outage rather than a bad address: answer

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendRateLimitFlaggedAdminEmail } from "@/lib/email/send";
 import { RATE_LIMITS } from "@/lib/constants";
@@ -65,26 +65,44 @@ const handleRateLimitFlagCheck = withCronAlerting(
 
     const todayBucket = new Date().toISOString().slice(0, 10);
     let sent = 0;
+    let failed = 0;
     let skipped = 0;
 
     for (const admin of (admins ?? []) as AdminRow[]) {
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: admin.id,
-        emailType: "rate_limit_flagged_admin",
-        dedupKey: `bucket_${todayBucket}`,
-      });
-      if (!ok) {
+      const outcome = await sendOnce(
+        supabase,
+        {
+          recipientUserId: admin.id,
+          emailType: "rate_limit_flagged_admin",
+          dedupKey: `bucket_${todayBucket}`,
+        },
+        () => sendRateLimitFlaggedAdminEmail({ to: admin.email, flaggedCount }),
+      );
+      if (outcome === "skipped") {
         skipped++;
         continue;
       }
-      await sendRateLimitFlaggedAdminEmail({
-        to: admin.email,
-        flaggedCount,
-      });
+      if (outcome === "failed") {
+        failed++;
+        continue;
+      }
       sent++;
     }
 
-    return NextResponse.json({ success: true, sent, skipped, flaggedCount });
+    if (sent === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every rate limit alert failed to send", skipped, failed },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      sent,
+      skipped,
+      failed,
+      flaggedCount,
+    });
   },
 );
 

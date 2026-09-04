@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   sendPaymentFailureWarningEmail,
@@ -77,12 +77,17 @@ const handlePaymentFailureCron = withCronAlerting(
     let day2 = 0;
     let finalAndDowngrade = 0;
     let skipped = 0;
+    let failed = 0;
 
     for (const row of (subs ?? []) as unknown as Row[]) {
       if (!row.users || row.users.is_deleted || row.users.is_suspended) {
         skipped++;
         continue;
       }
+      // Held in its own constant because the sends below now happen inside a
+      // callback, and TypeScript's narrowing from the guard above does not
+      // reach into one.
+      const user = row.users;
 
       const periodEnd = new Date(row.current_period_end).getTime();
       const hoursPast = (now - periodEnd) / HOUR_MS;
@@ -104,52 +109,64 @@ const handlePaymentFailureCron = withCronAlerting(
       let sentAny = false;
 
       if (daysPast >= 1) {
-        const ok = await shouldSendOnce(supabase, {
-          recipientUserId: row.user_id,
-          emailType: "payment_failure_warning",
-          dedupKey: `${row.id}:pf_day1`,
-        });
-        if (ok) {
-          await sendPaymentFailureWarningEmail({
-            to: row.users.email,
-            firstName: row.users.first_name ?? undefined,
-            dayNumber: 1,
-            planLabel,
-            consequenceLabel: isNurse
-              ? "If we can't charge by day 3, your Featured badge will end and you'll go back to the free plan."
-              : "If we can't charge by day 3, your access to revealed nurse contact info will end.",
-            portalUrl: PORTAL_URL,
-          });
+        const outcome = await sendOnce(
+          supabase,
+          {
+            recipientUserId: row.user_id,
+            emailType: "payment_failure_warning",
+            dedupKey: `${row.id}:pf_day1`,
+          },
+          () =>
+            sendPaymentFailureWarningEmail({
+              to: user.email,
+              firstName: user.first_name ?? undefined,
+              dayNumber: 1,
+              planLabel,
+              consequenceLabel: isNurse
+                ? "If we can't charge by day 3, your Featured badge will end and you'll go back to the free plan."
+                : "If we can't charge by day 3, your access to revealed nurse contact info will end.",
+              portalUrl: PORTAL_URL,
+            }),
+        );
+        if (outcome === "sent") {
           day1++;
           sentAny = true;
+        } else if (outcome === "failed") {
+          failed++;
         }
       }
 
       if (daysPast >= 2) {
-        const ok = await shouldSendOnce(supabase, {
-          recipientUserId: row.user_id,
-          emailType: "payment_failure_warning",
-          dedupKey: `${row.id}:pf_day2`,
-        });
-        if (ok) {
-          await sendPaymentFailureWarningEmail({
-            to: row.users.email,
-            firstName: row.users.first_name ?? undefined,
-            dayNumber: 2,
-            planLabel,
-            consequenceLabel: isNurse
-              ? "Tomorrow your Featured badge ends and you go back to the free plan unless we can charge."
-              : "Tomorrow your access to revealed nurse contact info ends unless we can charge.",
-            portalUrl: PORTAL_URL,
-          });
+        const outcome = await sendOnce(
+          supabase,
+          {
+            recipientUserId: row.user_id,
+            emailType: "payment_failure_warning",
+            dedupKey: `${row.id}:pf_day2`,
+          },
+          () =>
+            sendPaymentFailureWarningEmail({
+              to: user.email,
+              firstName: user.first_name ?? undefined,
+              dayNumber: 2,
+              planLabel,
+              consequenceLabel: isNurse
+                ? "Tomorrow your Featured badge ends and you go back to the free plan unless we can charge."
+                : "Tomorrow your access to revealed nurse contact info ends unless we can charge.",
+              portalUrl: PORTAL_URL,
+            }),
+        );
+        if (outcome === "sent") {
           day2++;
           sentAny = true;
+        } else if (outcome === "failed") {
+          failed++;
         }
       }
 
       if (daysPast >= 3) {
         // Downgrade first and check its error; only record pf_final as sent
-        // (via shouldSendOnce) once the downgrade actually succeeded. The old
+        // (via sendOnce) once the downgrade actually succeeded. The old
         // order recorded "sent" before the write, so a failed downgrade was
         // never retried and an already-emailed user could keep paid access
         // forever (#416).
@@ -170,28 +187,50 @@ const handlePaymentFailureCron = withCronAlerting(
             downgradeResult.error.message,
           );
         } else {
-          const ok = await shouldSendOnce(supabase, {
-            recipientUserId: row.user_id,
-            emailType: "payment_failure_final",
-            dedupKey: `${row.id}:pf_final`,
-          });
-          if (ok) {
-            await sendPaymentFailureFinalEmail({
-              to: row.users.email,
-              firstName: row.users.first_name ?? undefined,
-              planLabel,
-              consequenceSummary: isNurse
-                ? "After three days of unsuccessful billing attempts, your Featured badge has been removed and your profile is back on the free plan."
-                : "After three days of unsuccessful billing attempts, your access to revealed nurse contact info has ended.",
-              portalUrl: PORTAL_URL,
-            });
+          // The downgrade has already happened by here, so a failed notice is
+          // the worst case in this whole cron: access is gone and the person
+          // was never told why. Releasing the claim is what gives tomorrow's
+          // run another go at telling them (#415).
+          const outcome = await sendOnce(
+            supabase,
+            {
+              recipientUserId: row.user_id,
+              emailType: "payment_failure_final",
+              dedupKey: `${row.id}:pf_final`,
+            },
+            () =>
+              sendPaymentFailureFinalEmail({
+                to: user.email,
+                firstName: user.first_name ?? undefined,
+                planLabel,
+                consequenceSummary: isNurse
+                  ? "After three days of unsuccessful billing attempts, your Featured badge has been removed and your profile is back on the free plan."
+                  : "After three days of unsuccessful billing attempts, your access to revealed nurse contact info has ended.",
+                portalUrl: PORTAL_URL,
+              }),
+          );
+          if (outcome === "sent") {
             finalAndDowngrade++;
             sentAny = true;
+          } else if (outcome === "failed") {
+            failed++;
           }
         }
       }
 
       if (!sentAny) skipped++;
+    }
+
+    // Every attempt failing is an outage rather than a bad address: answer
+    // non-2xx so the cron alerting fires and no heartbeat is written for a run
+    // that told nobody. A run that mostly worked keeps its 200, because
+    // discarding the heartbeat would report the whole job as dead.
+    const sentTotal = day1 + day2 + finalAndDowngrade;
+    if (sentTotal === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every dunning email failed to send", failed, skipped },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
@@ -200,6 +239,7 @@ const handlePaymentFailureCron = withCronAlerting(
       day2,
       finalAndDowngrade,
       skipped,
+      failed,
     });
   },
 );

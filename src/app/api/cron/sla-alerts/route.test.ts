@@ -17,8 +17,8 @@ const h = vi.hoisted(() => {
   };
   return {
     state,
-    shouldSendOnce: vi.fn(async () => true),
-    sendSlaAlertAdminEmail: vi.fn(async () => {}),
+    sendOnce: vi.fn(async (_c: unknown, _a: unknown, send: () => Promise<boolean>): Promise<"sent" | "skipped" | "failed"> => ((await send()) ? "sent" : "failed")),
+    sendSlaAlertAdminEmail: vi.fn(async () => true),
     getSlaState: vi.fn(() => h.state.slaState),
     client: {
       from: (table: string) =>
@@ -35,7 +35,7 @@ vi.mock("@/lib/cron/alerting", () => ({
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client,
 }));
-vi.mock("@/lib/cron/email-log", () => ({ shouldSendOnce: h.shouldSendOnce }));
+vi.mock("@/lib/cron/email-log", () => ({ sendOnce: h.sendOnce }));
 vi.mock("@/lib/email/send", () => ({
   sendSlaAlertAdminEmail: h.sendSlaAlertAdminEmail,
 }));
@@ -50,7 +50,6 @@ import { GET } from "./route";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.shouldSendOnce.mockResolvedValue(true);
   h.state.pending = { data: [] };
   h.state.admins = { data: [] };
   h.state.slaState = "ok";
@@ -68,7 +67,7 @@ describe("sla-alerts cron", () => {
       h.state.admins = { data: [{ id: "admin-1", email: "admin@example.com" }] };
     },
     sideEffectSpies: {
-      shouldSendOnce: h.shouldSendOnce,
+      sendOnce: h.sendOnce,
       sendSlaAlertAdminEmail: h.sendSlaAlertAdminEmail,
     },
   });
@@ -102,13 +101,14 @@ describe("sla-alerts cron", () => {
       skipped: 0,
       overdueCount: 1,
     });
-    expect(h.shouldSendOnce).toHaveBeenCalledWith(
+    expect(h.sendOnce).toHaveBeenCalledWith(
       h.client,
       expect.objectContaining({
         recipientUserId: "admin-1",
         emailType: "sla_alert_admin",
         dedupKey: expect.stringMatching(/^bucket_\d{4}-\d{2}-\d{2}$/),
       }),
+      expect.any(Function),
     );
     expect(h.sendSlaAlertAdminEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "admin@example.com", overdueCount: 1 }),
@@ -141,7 +141,7 @@ describe("sla-alerts cron", () => {
     };
     h.state.slaState = "overdue";
     h.state.admins = { data: [{ id: "admin-1", email: "admin@example.com" }] };
-    h.shouldSendOnce.mockResolvedValue(false);
+    h.sendOnce.mockResolvedValue("skipped");
     const res = await GET(req());
     expect(await res.json()).toMatchObject({ sent: 0, skipped: 1 });
     expect(h.sendSlaAlertAdminEmail).not.toHaveBeenCalled();

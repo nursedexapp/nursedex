@@ -19,8 +19,8 @@ const h = vi.hoisted(() => {
   };
   return {
     state,
-    shouldSendOnce: vi.fn(async () => true),
-    sendReviewInviteEmail: vi.fn(async () => {}),
+    sendOnce: vi.fn(async (_c: unknown, _a: unknown, send: () => Promise<boolean>): Promise<"sent" | "skipped" | "failed"> => ((await send()) ? "sent" : "failed")),
+    sendReviewInviteEmail: vi.fn(async () => true),
     client: {
       from: () =>
         createQueryBuilder({
@@ -40,7 +40,7 @@ vi.mock("@/lib/cron/alerting", () => ({
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client,
 }));
-vi.mock("@/lib/cron/email-log", () => ({ shouldSendOnce: h.shouldSendOnce }));
+vi.mock("@/lib/cron/email-log", () => ({ sendOnce: h.sendOnce }));
 vi.mock("@/lib/email/send", () => ({
   sendReviewInviteEmail: h.sendReviewInviteEmail,
 }));
@@ -67,7 +67,6 @@ const nurse = () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   filters.reset();
-  h.shouldSendOnce.mockResolvedValue(true);
   h.state.nurses = { data: [], error: null };
 });
 
@@ -82,7 +81,7 @@ describe("review-invite cron", () => {
       h.state.nurses = { data: [nurse()], error: null };
     },
     sideEffectSpies: {
-      shouldSendOnce: h.shouldSendOnce,
+      sendOnce: h.sendOnce,
       sendReviewInviteEmail: h.sendReviewInviteEmail,
     },
   });
@@ -91,13 +90,14 @@ describe("review-invite cron", () => {
     h.state.nurses = { data: [nurse()], error: null };
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0 });
-    expect(h.shouldSendOnce).toHaveBeenCalledWith(
+    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0, failed: 0 });
+    expect(h.sendOnce).toHaveBeenCalledWith(
       h.client,
       expect.objectContaining({
         emailType: "review_invite",
         dedupKey: "post_verification_v1",
       }),
+      expect.any(Function),
     );
     expect(h.sendReviewInviteEmail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -109,9 +109,9 @@ describe("review-invite cron", () => {
 
   it("skips when the dedup gate has already fired", async () => {
     h.state.nurses = { data: [nurse()], error: null };
-    h.shouldSendOnce.mockResolvedValue(false);
+    h.sendOnce.mockResolvedValue("skipped");
     const res = await GET(req());
-    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1 });
+    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1, failed: 0 });
     expect(h.sendReviewInviteEmail).not.toHaveBeenCalled();
   });
 

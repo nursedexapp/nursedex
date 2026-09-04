@@ -17,8 +17,14 @@ const h = vi.hoisted(() => {
   };
   return {
     state,
-    shouldSendOnce: vi.fn(async () => true),
-    sendFeaturedAnalyticsEmail: vi.fn(async () => {}),
+    sendOnce: vi.fn(
+      async (
+        _supabase: unknown,
+        _args: unknown,
+        send: () => Promise<boolean>,
+      ) => ((await send()) ? "sent" : "failed"),
+    ),
+    sendFeaturedAnalyticsEmail: vi.fn(async () => true),
     client: {
       from: (table: string) =>
         createQueryBuilder({
@@ -35,7 +41,7 @@ vi.mock("@/lib/cron/alerting", () => ({
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client,
 }));
-vi.mock("@/lib/cron/email-log", () => ({ shouldSendOnce: h.shouldSendOnce }));
+vi.mock("@/lib/cron/email-log", () => ({ sendOnce: h.sendOnce }));
 vi.mock("@/lib/email/send", () => ({
   sendFeaturedAnalyticsEmail: h.sendFeaturedAnalyticsEmail,
 }));
@@ -59,7 +65,7 @@ const featuredNurse = () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.shouldSendOnce.mockResolvedValue(true);
+  h.sendFeaturedAnalyticsEmail.mockResolvedValue(true);
   h.state.featured = { data: [], error: null };
   h.state.analytics = { data: [] };
 });
@@ -72,7 +78,7 @@ describe("featured-analytics cron", () => {
       h.state.analytics = { data: [{ profile_views: 5, saves: 1, reveals: 2 }] };
     },
     sideEffectSpies: {
-      shouldSendOnce: h.shouldSendOnce,
+      shouldSendOnce: h.sendOnce,
       sendFeaturedAnalyticsEmail: h.sendFeaturedAnalyticsEmail,
     },
   });
@@ -84,13 +90,14 @@ describe("featured-analytics cron", () => {
     };
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0 });
-    expect(h.shouldSendOnce).toHaveBeenCalledWith(
+    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0, failed: 0 });
+    expect(h.sendOnce).toHaveBeenCalledWith(
       h.client,
       expect.objectContaining({
         emailType: "featured_analytics",
         dedupKey: expect.stringMatching(/^week_\d{4}-\d{2}-\d{2}$/),
       }),
+      expect.any(Function),
     );
     expect(h.sendFeaturedAnalyticsEmail).toHaveBeenCalledTimes(1);
   });
@@ -99,8 +106,8 @@ describe("featured-analytics cron", () => {
     h.state.featured = { data: [featuredNurse()], error: null };
     h.state.analytics = { data: [] };
     const res = await GET(req());
-    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1 });
-    expect(h.shouldSendOnce).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1, failed: 0 });
+    expect(h.sendOnce).not.toHaveBeenCalled();
     expect(h.sendFeaturedAnalyticsEmail).not.toHaveBeenCalled();
   });
 

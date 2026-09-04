@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { sendFeaturedAnalyticsEmail } from "@/lib/email/send";
@@ -61,6 +61,7 @@ const handleFeaturedAnalytics = withCronAlerting(
 
     const todayBucket = new Date().toISOString().slice(0, 10);
     let sent = 0;
+    let failed = 0;
     let skipped = 0;
 
     for (const row of (featured ?? []) as unknown as Row[]) {
@@ -88,26 +89,41 @@ const handleFeaturedAnalytics = withCronAlerting(
         continue;
       }
 
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: row.user_id,
-        emailType: "featured_analytics",
-        dedupKey: `week_${todayBucket}`,
-      });
-      if (!ok) {
+      const user = row.users;
+      const outcome = await sendOnce(
+        supabase,
+        {
+          recipientUserId: row.user_id,
+          emailType: "featured_analytics",
+          dedupKey: `week_${todayBucket}`,
+        },
+        () =>
+          sendFeaturedAnalyticsEmail({
+            to: user.email,
+            firstName: user.first_name ?? undefined,
+            thisWeek,
+            lastWeek,
+          }),
+      );
+      if (outcome === "skipped") {
         skipped++;
         continue;
       }
-
-      await sendFeaturedAnalyticsEmail({
-        to: row.users.email,
-        firstName: row.users.first_name ?? undefined,
-        thisWeek,
-        lastWeek,
-      });
+      if (outcome === "failed") {
+        failed++;
+        continue;
+      }
       sent++;
     }
 
-    return NextResponse.json({ success: true, sent, skipped });
+    if (sent === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every featured analytics email failed to send", skipped, failed },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, sent, skipped, failed });
   },
 );
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendSlaAlertAdminEmail } from "@/lib/email/send";
 import { SLA_HOURS, getSlaState } from "@/lib/admin/sla";
@@ -81,30 +81,47 @@ const handleSlaAlerts = withCronAlerting(
 
     const todayBucket = new Date().toISOString().slice(0, 10);
     let sent = 0;
+    let failed = 0;
     let skipped = 0;
 
     for (const admin of (admins ?? []) as AdminRow[]) {
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: admin.id,
-        emailType: "sla_alert_admin",
-        dedupKey: `bucket_${todayBucket}`,
-      });
-      if (!ok) {
+      const outcome = await sendOnce(
+        supabase,
+        {
+          recipientUserId: admin.id,
+          emailType: "sla_alert_admin",
+          dedupKey: `bucket_${todayBucket}`,
+        },
+        () =>
+          sendSlaAlertAdminEmail({
+            to: admin.email,
+            approachingCount,
+            overdueCount,
+          }),
+      );
+      if (outcome === "skipped") {
         skipped++;
         continue;
       }
-      await sendSlaAlertAdminEmail({
-        to: admin.email,
-        approachingCount,
-        overdueCount,
-      });
+      if (outcome === "failed") {
+        failed++;
+        continue;
+      }
       sent++;
+    }
+
+    if (sent === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every SLA alert failed to send", skipped, failed },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
       success: true,
       sent,
       skipped,
+      failed,
       approachingCount,
       overdueCount,
     });

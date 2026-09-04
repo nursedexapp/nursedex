@@ -22,8 +22,8 @@ const h = vi.hoisted(() => {
   return {
     state,
     counts,
-    shouldSendOnce: vi.fn(async () => true),
-    sendHireFollowupEmail: vi.fn(async () => {}),
+    sendOnce: vi.fn(async (_c: unknown, _a: unknown, send: () => Promise<boolean>): Promise<"sent" | "skipped" | "failed"> => ((await send()) ? "sent" : "failed")),
+    sendHireFollowupEmail: vi.fn(async () => true),
     client: {
       from: (table: string) => {
         if (table === "hires") counts.hiresQueries++;
@@ -46,7 +46,7 @@ vi.mock("@/lib/cron/alerting", () => ({
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: () => h.client,
 }));
-vi.mock("@/lib/cron/email-log", () => ({ shouldSendOnce: h.shouldSendOnce }));
+vi.mock("@/lib/cron/email-log", () => ({ sendOnce: h.sendOnce }));
 vi.mock("@/lib/email/send", () => ({
   sendHireFollowupEmail: h.sendHireFollowupEmail,
 }));
@@ -71,7 +71,6 @@ const reveal = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   filters.reset();
-  h.shouldSendOnce.mockResolvedValue(true);
   h.state.reveals = { data: [], error: null };
   h.state.hires = { data: [], error: null };
   h.counts.hiresQueries = 0;
@@ -89,7 +88,7 @@ describe("hire-followup cron", () => {
       h.state.hires = { data: [], error: null };
     },
     sideEffectSpies: {
-      shouldSendOnce: h.shouldSendOnce,
+      sendOnce: h.sendOnce,
       sendHireFollowupEmail: h.sendHireFollowupEmail,
     },
   });
@@ -99,14 +98,15 @@ describe("hire-followup cron", () => {
     h.state.hires = { data: [], error: null };
     const res = await GET(req());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0 });
-    expect(h.shouldSendOnce).toHaveBeenCalledWith(
+    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 0, failed: 0 });
+    expect(h.sendOnce).toHaveBeenCalledWith(
       h.client,
       expect.objectContaining({
         recipientUserId: "fam-1",
         emailType: "hire_followup",
         dedupKey: expect.stringMatching(/^bucket_\d{4}-\d{2}-\d{2}$/),
       }),
+      expect.any(Function),
     );
     expect(h.sendHireFollowupEmail).toHaveBeenCalledTimes(1);
   });
@@ -118,8 +118,8 @@ describe("hire-followup cron", () => {
       error: null,
     };
     const res = await GET(req());
-    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1 });
-    expect(h.shouldSendOnce).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 1, failed: 0 });
+    expect(h.sendOnce).not.toHaveBeenCalled();
     expect(h.sendHireFollowupEmail).not.toHaveBeenCalled();
   });
 
@@ -162,7 +162,7 @@ describe("hire-followup cron", () => {
 
     const res = await GET(req());
 
-    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 1 });
+    expect(await res.json()).toEqual({ success: true, sent: 1, skipped: 1, failed: 0 });
     expect(h.sendHireFollowupEmail).toHaveBeenCalledTimes(1);
   });
 
@@ -172,7 +172,7 @@ describe("hire-followup cron", () => {
       error: null,
     };
     const res = await GET(req());
-    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 0 });
+    expect(await res.json()).toEqual({ success: true, sent: 0, skipped: 0, failed: 0 });
     expect(h.sendHireFollowupEmail).not.toHaveBeenCalled();
   });
 

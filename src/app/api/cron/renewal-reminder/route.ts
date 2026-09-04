@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+import { sendOnce } from "@/lib/cron/email-log";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendRenewalReminderEmail } from "@/lib/email/send";
 import { PRICING } from "@/lib/constants";
@@ -70,6 +70,7 @@ const handleRenewalReminder = withCronAlerting(
     };
 
     let sent = 0;
+    let failed = 0;
     let skipped = 0;
 
     for (const row of (subs ?? []) as unknown as Row[]) {
@@ -77,16 +78,6 @@ const handleRenewalReminder = withCronAlerting(
         skipped++;
         continue;
       }
-      const ok = await shouldSendOnce(supabase, {
-        recipientUserId: row.user_id,
-        emailType: "renewal_reminder",
-        dedupKey: `${row.id}:${row.current_period_end}`,
-      });
-      if (!ok) {
-        skipped++;
-        continue;
-      }
-
       const isNurse = row.plan_type === "nurse_featured";
       // Show the amount that will actually be charged at renewal: Featured is
       // monthly, Family Access is $9.99/mo or $99/yr depending on the plan.
@@ -95,20 +86,48 @@ const handleRenewalReminder = withCronAlerting(
         : row.billing_interval === "year"
           ? PRICING.FAMILY_ACCESS_ANNUAL
           : PRICING.FAMILY_ACCESS_MONTHLY;
-      await sendRenewalReminderEmail({
-        to: row.users.email,
-        firstName: row.users.first_name ?? undefined,
-        planLabel: isNurse ? "Featured" : "Family Access",
-        amount: `$${renewalDollars.toFixed(2)}`,
-        renewalDateLabel: new Date(row.current_period_end).toLocaleDateString(
-          "en-US",
-          { month: "long", day: "numeric", year: "numeric" },
-        ),
-      });
+      const user = row.users;
+      const outcome = await sendOnce(
+        supabase,
+        {
+          recipientUserId: row.user_id,
+          emailType: "renewal_reminder",
+          dedupKey: `${row.id}:${row.current_period_end}`,
+        },
+        () =>
+          sendRenewalReminderEmail({
+            to: user.email,
+            firstName: user.first_name ?? undefined,
+            planLabel: isNurse ? "Featured" : "Family Access",
+            amount: `$${renewalDollars.toFixed(2)}`,
+            renewalDateLabel: new Date(
+              row.current_period_end,
+            ).toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            }),
+          }),
+      );
+      if (outcome === "skipped") {
+        skipped++;
+        continue;
+      }
+      if (outcome === "failed") {
+        failed++;
+        continue;
+      }
       sent++;
     }
 
-    return NextResponse.json({ success: true, sent, skipped });
+    if (sent === 0 && failed > 0) {
+      return NextResponse.json(
+        { error: "Every renewal reminder failed to send", sent, skipped, failed },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, sent, skipped, failed });
   },
 );
 
