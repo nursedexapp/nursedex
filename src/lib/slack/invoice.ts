@@ -83,9 +83,47 @@ export async function generateAndPostInvoice(
     });
   }
 
-  // No billable hours: post nothing.
-  if (!fields.length) {
+  // Nothing to invoice: post nothing (#383).
+  //
+  // The guard used to ask whether any request had been GROUPED, which is a
+  // different question. A time entry with billed_min 0 still carries a valid
+  // request, so it produced one field reading "0.00 hrs x $75.00 = $0.00",
+  // fields.length was 1, and the "invoice ready to send" ping fired on a $0
+  // month. That is what happened on July 1 2026 for June.
+  //
+  // The question that matters is whether there is money to bill, so the guard
+  // reads the computed total. Zero minutes and zero requests are the same
+  // outcome for the reader, and both are silent.
+  const totalMinutes = [...byReq.values()].reduce((sum, r) => sum + r.minutes, 0);
+  if (total <= 0 && totalMinutes === 0) {
     return { total: 0, lines: 0, posted: false };
+  }
+
+  // Hours were logged and the total is still zero, which means a rate was
+  // never set on the request. That is a billing error, not a quiet month, and
+  // silencing it here would hide it behind the same silence as an empty month.
+  // It goes to the same channel as a plainly different message, with no
+  // "ready to send" ping, because there is nothing to send yet.
+  if (total <= 0) {
+    await slackPost("chat.postMessage", {
+      channel: OPS_CHANNEL_ID,
+      text: `${monthLabel}: ${(totalMinutes / 60).toFixed(2)} hrs logged but nothing to bill`,
+      blocks: [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text:
+              `*${monthLabel}: no invoice.* ` +
+              `${(totalMinutes / 60).toFixed(2)} hrs were logged across ` +
+              `${byReq.size} request(s), and every one of them bills at ` +
+              `${money(0)}. Set a rate on the request and this will invoice ` +
+              `on the next run.`,
+          },
+        },
+      ],
+    });
+    return { total: 0, lines: fields.length, posted: true };
   }
 
   // Slack allows at most 10 fields per section.
