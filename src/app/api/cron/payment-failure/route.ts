@@ -107,6 +107,12 @@ const handlePaymentFailureCron = withCronAlerting(
       // missed cron run (Vercel outage, deploy window) still catches up on
       // every step it skipped instead of losing it permanently (#421).
       let sentAny = false;
+      // Tracked separately from sentAny so each person lands in exactly one
+      // bucket. Without it, somebody whose emails all failed is counted in
+      // `failed` and again in `skipped`, because "nothing was sent" and
+      // "nothing was attempted" are different things and only the second is
+      // a skip.
+      let failedAny = false;
 
       if (daysPast >= 1) {
         const outcome = await sendOnce(
@@ -133,6 +139,7 @@ const handlePaymentFailureCron = withCronAlerting(
           sentAny = true;
         } else if (outcome === "failed") {
           failed++;
+          failedAny = true;
         }
       }
 
@@ -161,6 +168,7 @@ const handlePaymentFailureCron = withCronAlerting(
           sentAny = true;
         } else if (outcome === "failed") {
           failed++;
+          failedAny = true;
         }
       }
 
@@ -214,11 +222,12 @@ const handlePaymentFailureCron = withCronAlerting(
             sentAny = true;
           } else if (outcome === "failed") {
             failed++;
+            failedAny = true;
           }
         }
       }
 
-      if (!sentAny) skipped++;
+      if (!sentAny && !failedAny) skipped++;
     }
 
     // Every attempt failing is an outage rather than a bad address: answer
