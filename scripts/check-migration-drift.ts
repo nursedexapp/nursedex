@@ -10,6 +10,7 @@
  *   supabase migration list --linked --output-format json | npx tsx scripts/check-migration-drift.ts
  */
 import { runDriftCheck } from "./migration-drift";
+import { makeBranchLookup } from "./migration-branches";
 import { announce } from "./slack-alert";
 
 async function readStdin(): Promise<string> {
@@ -29,6 +30,12 @@ async function main(): Promise<void> {
     announceImpl: announce,
     token: process.env.SLACK_BOT_TOKEN,
     log: (message) => console.log(message),
+    // Tells "applied ahead of an unmerged PR", which is the safe order, from
+    // "applied from nowhere", which is not (#908). Needs the workflow's
+    // fetch-depth: 0; without it the lookup answers null and everything
+    // untracked keeps failing, which is the old behaviour rather than a
+    // silent all clear.
+    lookupBranches: makeBranchLookup(),
   });
 
   if (code !== 0) process.exit(code);

@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseMigrationList,
   detectDrift,
+  classifyDrift,
   formatDriftReport,
   runDriftCheck,
 } from "./migration-drift";
@@ -102,34 +103,127 @@ describe("detectDrift", () => {
   });
 });
 
-describe("formatDriftReport", () => {
-  it("names the pending migrations and how to apply them", () => {
-    const msg = formatDriftReport({
-      pending: ["053", "054"],
-      untracked: [],
-      hasDrift: true,
-    });
-    expect(msg).toContain("053");
-    expect(msg).toContain("054");
-    expect(msg).toMatch(/db push/);
+/**
+ * Telling a deliberate apply-ahead-of-merge from a hand applied migration
+ * (#908).
+ *
+ * The check runs against main, so a migration applied to production from an
+ * unmerged branch reads as untracked. For any migration live code depends on
+ * that is the SAFE order, and the old check failed the job on it. An alert
+ * that fires on correct behaviour is what teaches people to skim the channel.
+ */
+describe("classifyDrift", () => {
+  const untracked = { pending: [], untracked: ["068"], hasDrift: true };
+
+  it("does not block when the migration is on a branch that has not merged", () => {
+    const result = classifyDrift(untracked, () => ["origin/feat/analytics"]);
+
+    expect(result.untracked[0].kind).toBe("ahead-of-main");
+    expect(result.untracked[0].branches).toEqual(["origin/feat/analytics"]);
+    expect(result.blocking).toBe(false);
+    // Still reported: not blocking is not the same as not saying anything.
+    expect(result.hasDrift).toBe(true);
   });
 
-  it("names untracked migrations as applied but missing from git", () => {
-    const msg = formatDriftReport({
-      pending: [],
-      untracked: ["099"],
-      hasDrift: true,
+  it("blocks when the migration is on no branch at all", () => {
+    const result = classifyDrift(untracked, () => []);
+
+    expect(result.untracked[0].kind).toBe("not-in-repo");
+    expect(result.blocking).toBe(true);
+  });
+
+  // Standing down on a question nobody answered is how a check goes quiet
+  // without anyone deciding it should.
+  it("blocks when the lookup could not run", () => {
+    const result = classifyDrift(untracked, () => null);
+
+    expect(result.untracked[0].kind).toBe("unknown");
+    expect(result.blocking).toBe(true);
+  });
+
+  it("blocks when the lookup throws, and calls that unknown rather than absent", () => {
+    const result = classifyDrift(untracked, () => {
+      throw new Error("not a git repository");
     });
+
+    expect(result.untracked[0].kind).toBe("unknown");
+    expect(result.blocking).toBe(true);
+  });
+
+  // The #518 hazard is unaffected by any of this.
+  it("still blocks on a migration committed but never applied", () => {
+    const result = classifyDrift(
+      { pending: ["043"], untracked: [], hasDrift: true },
+      () => ["origin/anything"],
+    );
+
+    expect(result.blocking).toBe(true);
+  });
+
+  it("blocks when one untracked migration is fine and another is not", () => {
+    const result = classifyDrift(
+      { pending: [], untracked: ["068", "099"], hasDrift: true },
+      (version) => (version === "068" ? ["origin/feat/x"] : []),
+    );
+
+    expect(result.blocking).toBe(true);
+  });
+});
+
+describe("formatDriftReport", () => {
+  it("names the pending migrations and how to apply them", () => {
+    const msg = formatDriftReport(
+      classifyDrift(
+        { pending: ["053", "054"], untracked: [], hasDrift: true },
+        () => [],
+      ),
+    );
+    expect(msg).toContain("053");
+    expect(msg).toContain("054");
+    expect(msg).toMatch(/migration list/);
+  });
+
+  // The old wording told people to apply a migration after its code was live,
+  // which is the order that opens the window this project hit on 2026-09-02.
+  it("says a migration live code depends on is applied BEFORE the merge", () => {
+    const msg = formatDriftReport(
+      classifyDrift({ pending: ["053"], untracked: [], hasDrift: true }, () => []),
+    );
+    expect(msg).toMatch(/before its pull request merges/i);
+  });
+
+  it("names an untracked migration that is still on a branch, and says it clears", () => {
+    const msg = formatDriftReport(
+      classifyDrift({ pending: [], untracked: ["068"], hasDrift: true }, () => [
+        "origin/feat/analytics",
+      ]),
+    );
+    expect(msg).toContain("068");
+    expect(msg).toContain("origin/feat/analytics");
+    expect(msg).toMatch(/no action needed/i);
+    expect(msg).not.toMatch(/drift detected/i);
+  });
+
+  it("names an untracked migration that is on no branch as something to fix", () => {
+    const msg = formatDriftReport(
+      classifyDrift({ pending: [], untracked: ["099"], hasDrift: true }, () => []),
+    );
     expect(msg).toContain("099");
-    expect(msg).toMatch(/not in git/i);
+    expect(msg).toMatch(/no branch in this repository/i);
+  });
+
+  it("says plainly when the lookup could not run, rather than excusing it", () => {
+    const msg = formatDriftReport(
+      classifyDrift({ pending: [], untracked: ["099"], hasDrift: true }, () => null),
+    );
+    expect(msg).toMatch(/not an all clear/i);
+    expect(msg).toMatch(/fetch-depth/);
   });
 
   it("says so plainly when there is no drift", () => {
-    const msg = formatDriftReport({
-      pending: [],
-      untracked: [],
-      hasDrift: false,
-    });
+    const msg = formatDriftReport(
+      classifyDrift({ pending: [], untracked: [], hasDrift: false }, () => []),
+    );
     expect(msg).toMatch(/in sync/i);
   });
 });
@@ -166,6 +260,9 @@ describe("runDriftCheck", () => {
       announceImpl: announce.impl,
       token: "xoxb-test",
       log: (m) => log.push(m),
+      // Answers nothing, so nothing is excused: these cases assert the
+      // behaviour they asserted before the branch lookup existed (#908).
+      lookupBranches: () => null,
     });
 
     expect(code).toBe(0);
@@ -181,6 +278,9 @@ describe("runDriftCheck", () => {
       announceImpl: announce.impl,
       token: "xoxb-test",
       log: () => {},
+      // Answers nothing, so nothing is excused: these cases assert the
+      // behaviour they asserted before the branch lookup existed (#908).
+      lookupBranches: () => null,
     });
 
     expect(code).toBe(1);
@@ -203,6 +303,9 @@ describe("runDriftCheck", () => {
       announceImpl: announce.impl,
       token: "xoxb-test",
       log: () => {},
+      // Answers nothing, so nothing is excused: these cases assert the
+      // behaviour they asserted before the branch lookup existed (#908).
+      lookupBranches: () => null,
     });
 
     expect(code).toBe(1);
@@ -226,9 +329,56 @@ describe("runDriftCheck", () => {
       },
       token: "xoxb-test",
       log: (m) => log.push(m),
+      // Answers nothing, so nothing is excused: these cases assert the
+      // behaviour they asserted before the branch lookup existed (#908).
+      lookupBranches: () => null,
     });
 
     expect(code).toBe(1);
     expect(log.join("\n")).toContain("slack unreachable");
+  });
+});
+
+/**
+ * The whole decision, end to end, for the case #908 is about: a migration
+ * applied to production before its pull request merged.
+ */
+describe("runDriftCheck and a migration applied ahead of its merge", () => {
+  it("exits 0 and posts nothing when the migration is on an unmerged branch", async () => {
+    const posts: unknown[] = [];
+    const lines: string[] = [];
+
+    const code = await runDriftCheck({
+      raw: payload([{ local: "", remote: "068", time: "068" }]),
+      announceImpl: async (args) => {
+        posts.push(args);
+      },
+      token: "xoxb-test",
+      log: (m: string) => lines.push(m),
+      lookupBranches: () => ["origin/feat/analytics"],
+    });
+
+    expect(code).toBe(0);
+    expect(posts).toHaveLength(0);
+    // It still says what it saw. Not blocking is not the same as not looking.
+    expect(lines.join("\n")).toContain("068");
+    expect(lines.join("\n")).toContain("origin/feat/analytics");
+  });
+
+  it("exits 1 and posts when the migration is on no branch", async () => {
+    const posts: unknown[] = [];
+
+    const code = await runDriftCheck({
+      raw: payload([{ local: "", remote: "099", time: "099" }]),
+      announceImpl: async (args) => {
+        posts.push(args);
+      },
+      token: "xoxb-test",
+      log: () => {},
+      lookupBranches: () => [],
+    });
+
+    expect(code).toBe(1);
+    expect(posts).toHaveLength(1);
   });
 });

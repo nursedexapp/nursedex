@@ -38,7 +38,14 @@ jobs:
     # (#809, L110).
     timeout-minutes: 5
     steps:
+      # Full history and every remote branch. The drift check asks whether an
+      # untracked migration exists on a branch that has not merged yet, which
+      # is the safe order for a migration live code depends on (#908). A
+      # shallow checkout has no other branches to look at, and the lookup then
+      # answers "could not tell" and keeps failing, which is the old behaviour.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
