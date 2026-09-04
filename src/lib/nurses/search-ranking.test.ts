@@ -87,8 +87,11 @@ describe("RANKING_CRITERIA", () => {
     expect(RANKING_CRITERIA[0].phrase).toContain("featured");
   });
 
-  it("marks the criterion that only applies to some viewers", () => {
-    expect(RANKING_CRITERIA.filter((c) => c.conditional)).toHaveLength(1);
+  // Two now: the contact preference match, and the name match a keyword
+  // search adds (#936). Both are absent for most viewers, so a sentence built
+  // for everyone may use neither.
+  it("marks the criteria that only apply to some viewers", () => {
+    expect(RANKING_CRITERIA.filter((c) => c.conditional)).toHaveLength(2);
   });
 
   it("describes the zip order as closest first", () => {
@@ -356,5 +359,153 @@ describe("orderNurses with a chosen sort", () => {
     expect(
       orderNurses([b, a], null, { sort: "complete" }).map((n) => n.user_id),
     ).toEqual(["a-nurse", "b-nurse"]);
+  });
+});
+
+/**
+ * A family who was given a nurse's name and types it should find that nurse
+ * (#936). A keyword used to narrow the result set without reordering it, so
+ * the nurse she named could sit below people whose bio happened to contain
+ * the same string.
+ *
+ * Dan's call, 2026-09-04: paid Featured placement is absolute. A name match
+ * ranks above every other signal EXCEPT Featured, which is never pushed down.
+ */
+describe("ranking a nurse the family named", () => {
+  it("puts a name match above a nurse matched only on her bio text", () => {
+    const named = nurse({ user_id: "zz-named", name_match: true });
+    const textOnly = nurse({ user_id: "aa-text", name_match: false });
+
+    expect(rankNurses([textOnly, named], null).map((n) => n.user_id)).toEqual([
+      "zz-named",
+      "aa-text",
+    ]);
+  });
+
+  // The decision. A Featured nurse is never pushed below anything.
+  it("leaves a Featured nurse above a name match", () => {
+    const named = nurse({ user_id: "zz-named", name_match: true });
+    const featured = nurse({ user_id: "aa-featured", tier: "featured" });
+
+    expect(rankNurses([named, featured], null).map((n) => n.user_id)).toEqual([
+      "aa-featured",
+      "zz-named",
+    ]);
+  });
+
+  it("still separates two Featured nurses by whether one was named", () => {
+    const namedFeatured = nurse({
+      user_id: "zz-named",
+      tier: "featured",
+      name_match: true,
+    });
+    const otherFeatured = nurse({ user_id: "aa-other", tier: "featured" });
+
+    expect(
+      rankNurses([otherFeatured, namedFeatured], null).map((n) => n.user_id),
+    ).toEqual(["zz-named", "aa-other"]);
+  });
+
+  // A name is an identification, not a preference, so it outranks the signals
+  // that stand in for one.
+  it("puts a name match above a photo, a contact match and a fuller profile", () => {
+    const named = nurse({ user_id: "zz-named", name_match: true });
+    const polished = nurse({
+      user_id: "aa-polished",
+      has_photo: true,
+      communication_preference: "email",
+      profile_completeness: 100,
+      review_count: 20,
+      avg_rating: 5,
+    });
+
+    expect(
+      rankNurses([polished, named], "email").map((n) => n.user_id),
+    ).toEqual(["zz-named", "aa-polished"]);
+  });
+
+  it("changes nothing when no search keyword was given", () => {
+    const a = nurse({ user_id: "a", has_photo: true });
+    const b = nurse({ user_id: "b" });
+
+    // No card carries name_match at all, which is every search without a
+    // keyword and every listing page.
+    expect(rankNurses([b, a], null).map((n) => n.user_id)).toEqual(["a", "b"]);
+  });
+
+  describe("when the family also gave a zip", () => {
+    const ctx = { originResolved: true, featuredRangeMiles: 25 };
+
+    it("puts the nurse she named above closer nurses she did not", () => {
+      const named = nurse({
+        user_id: "zz-named",
+        name_match: true,
+        distance_miles: 40,
+      });
+      const near = nurse({ user_id: "aa-near", distance_miles: 2 });
+
+      expect(
+        rankNurses([near, named], null, ctx).map((n) => n.user_id),
+      ).toEqual(["zz-named", "aa-near"]);
+    });
+
+    it("still leaves a Featured nurse in range on top", () => {
+      const named = nurse({
+        user_id: "zz-named",
+        name_match: true,
+        distance_miles: 40,
+      });
+      const featured = nurse({
+        user_id: "aa-featured",
+        tier: "featured",
+        distance_miles: 5,
+      });
+
+      expect(
+        rankNurses([named, featured], null, ctx).map((n) => n.user_id),
+      ).toEqual(["aa-featured", "zz-named"]);
+    });
+
+    // A Featured nurse outside the paid range does not hold the top slot, and
+    // that rule is unchanged: the name match now sits above her too.
+    it("puts a name match above a Featured nurse who is out of range", () => {
+      // The Featured nurse is CLOSER, so distance alone would put her first.
+      // Only the name match can flip it, which is what this asserts.
+      const named = nurse({
+        user_id: "zz-named",
+        name_match: true,
+        distance_miles: 400,
+      });
+      const farFeatured = nurse({
+        user_id: "aa-far",
+        tier: "featured",
+        distance_miles: 200,
+      });
+
+      expect(
+        rankNurses([farFeatured, named], null, ctx).map((n) => n.user_id),
+      ).toEqual(["zz-named", "aa-far"]);
+    });
+
+    it("orders two named nurses by distance between themselves", () => {
+      const far = nurse({ user_id: "aa-far", name_match: true, distance_miles: 40 });
+      const near = nurse({ user_id: "aa-near", name_match: true, distance_miles: 3 });
+
+      expect(
+        rankNurses([far, near], null, ctx).map((n) => n.user_id),
+      ).toEqual(["aa-near", "aa-far"]);
+    });
+  });
+
+  // An explicit sort is the family's own instruction and still wins outright.
+  it("does not survive an explicitly chosen sort", () => {
+    const named = nurse({ user_id: "zz-named", name_match: true, profile_completeness: 10 });
+    const fuller = nurse({ user_id: "aa-fuller", profile_completeness: 90 });
+
+    expect(
+      orderNurses([named, fuller], null, { sort: "complete" }).map(
+        (n) => n.user_id,
+      ),
+    ).toEqual(["aa-fuller", "zz-named"]);
   });
 });

@@ -10,6 +10,12 @@ export interface RankableNurse {
   distance_miles?: number | null;
   /** When she was verified, for the newest-first sort. */
   verified_at?: string | null;
+  /**
+   * True when this nurse matched the search keyword ON HER NAME, rather than
+   * on her bio or care philosophy (#936). Absent on every search without a
+   * keyword, and on every listing page, where it changes nothing.
+   */
+  name_match?: boolean;
 }
 
 /**
@@ -44,6 +50,7 @@ export interface DistanceContext {
  */
 export const RANKING_CRITERIA = [
   { phrase: "featured nurses", conditional: false },
+  { phrase: "nurses whose name matches your search", conditional: true },
   { phrase: "nurses with a photo", conditional: false },
   { phrase: "a match on how you prefer to be contacted", conditional: true },
   { phrase: "more complete profiles", conditional: false },
@@ -59,6 +66,7 @@ export const RANKING_CRITERIA = [
 export const DISTANCE_RANKING_CRITERIA = [
   { phrase: "the closest nurses", conditional: false },
   { phrase: "featured nurses near you", conditional: false },
+  { phrase: "nurses whose name matches your search", conditional: true },
   { phrase: "more complete profiles", conditional: false },
 ] as const;
 
@@ -109,8 +117,18 @@ export function rankingScore(
   const commPref =
     viewerCommPref && n.communication_preference === viewerCommPref ? 1 : 0;
 
+  // A family who was given a nurse's name and types it is identifying someone,
+  // not expressing a preference, so the match outranks every signal that
+  // stands in for one: a photo, a contact match, a fuller profile, and even
+  // distance. It sits BELOW the paid Featured placement, which is absolute
+  // (Dan's call, 2026-09-04): a Featured nurse is never pushed down.
+  //
+  // Absent on every search without a keyword, where it is 0 for everyone and
+  // the order is exactly what it was before (#936).
+  const named = n.name_match ? 1 : 0;
+
   if (!distance?.originResolved) {
-    return [n.tier === "featured" ? 1 : 0, photo, commPref, quality];
+    return [n.tier === "featured" ? 1 : 0, named, photo, commPref, quality];
   }
 
   const miles = n.distance_miles ?? null;
@@ -118,6 +136,7 @@ export function rankingScore(
 
   return [
     n.tier === "featured" && inRange ? 1 : 0,
+    named,
     miles === null ? 0 : 1,
     miles === null ? 0 : -miles,
     photo,

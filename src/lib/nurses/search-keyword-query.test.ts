@@ -20,7 +20,7 @@ const selects: string[] = [];
 const orClauses: string[] = [];
 
 /** Lets one test break the name lookup without touching the card query. */
-const state = { nameReadFails: false };
+const state = { nameReadFails: false, cardRows: null as unknown[] | null };
 
 function profileRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -78,7 +78,8 @@ vi.mock("@/lib/supabase/service-role", () => ({
           return "chain";
         },
         then: () => {
-          if (selected.includes("slug")) return { data: [profileRow()] };
+          if (selected.includes("slug"))
+            return { data: state.cardRows ?? [profileRow()] };
           return state.nameReadFails
             ? { data: null, error: { message: "connection reset" } }
             : { data: NAMES };
@@ -104,6 +105,7 @@ beforeEach(() => {
   selects.length = 0;
   orClauses.length = 0;
   state.nameReadFails = false;
+  state.cardRows = null;
 });
 
 const keywordClause = () => orClauses.find((c) => c.includes("ilike"));
@@ -228,5 +230,86 @@ describe("when the name lookup fails", () => {
       viewerIsSignedIn: true,
     });
     expect(ok.items).toHaveLength(1);
+  });
+});
+
+
+/**
+ * The ranking half of #936. The query already found both nurses; what was
+ * missing is that the one the family NAMED came back somewhere below the one
+ * whose bio happened to contain the same string.
+ *
+ * Asserted through searchNurses rather than through the ranking alone,
+ * because the rule and the wiring are two different things: the ranking can
+ * be right while nothing ever tells it who matched by name.
+ */
+describe("what a name search puts first", () => {
+  /** nurse-1 is Marisol Okonkwo in NAMES, so she is the name match. */
+  const named = () =>
+    profileRow({
+      user_id: "nurse-1",
+      slug: "marisol-o",
+      profile_completeness: 10,
+      has_photo: false,
+      review_count: 0,
+    });
+
+  /** In no NAMES row, so she can only have matched on her bio text. */
+  const textOnly = () =>
+    profileRow({
+      user_id: "nurse-9",
+      slug: "someone-else",
+      bio: "Marisol was my mentor.",
+      profile_completeness: 100,
+      has_photo: true,
+      review_count: 30,
+      avg_rating: 5,
+      users: {
+        first_name: "Dana",
+        last_name: "Vance",
+        zip_code: null,
+        communication_preference: "email",
+        is_deleted: false,
+        is_suspended: false,
+      },
+    });
+
+  it("puts the nurse whose name matched above one matched only on her bio", async () => {
+    // The text-only nurse wins on every other signal there is, so nothing but
+    // the name match can put the named one first.
+    state.cardRows = [textOnly(), named()];
+
+    const result = await searchNurses({
+      filters: parseSearchParams({ q: "marisol" }),
+      viewerIsSignedIn: true,
+    });
+
+    expect(result.items.map((n) => n.user_id)).toEqual(["nurse-1", "nurse-9"]);
+  });
+
+  it("does not carry the name match onto the card sent to the browser", async () => {
+    state.cardRows = [named()];
+
+    const result = await searchNurses({
+      filters: parseSearchParams({ q: "marisol" }),
+      viewerIsSignedIn: true,
+    });
+
+    // It describes one search, not the nurse, and this object is serialised
+    // to the client.
+    expect(result.items[0]).not.toHaveProperty("name_match");
+  });
+
+  it("leaves the order alone when there is no keyword at all", async () => {
+    state.cardRows = [named(), textOnly()];
+
+    const result = await searchNurses({
+      filters: parseSearchParams({}),
+      viewerIsSignedIn: true,
+    });
+
+    // No keyword, so no name match: the fuller profile with a photo wins, as
+    // it did before any of this.
+    expect(result.items.map((n) => n.user_id)).toEqual(["nurse-9", "nurse-1"]);
   });
 });
