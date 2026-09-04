@@ -11,9 +11,14 @@ const NOW = new Date("2026-06-01T12:00:00Z");
 const EXPIRED = "2026-05-01T00:00:00Z"; // a month before NOW
 const STILL_ACTIVE = "2026-07-01T00:00:00Z"; // a month after NOW
 
-const state: { reveals: unknown[]; profiles: unknown[] } = {
+const state: {
+  reveals: unknown[];
+  profiles: unknown[];
+  revealsError: { message: string } | null;
+} = {
   reveals: [],
   profiles: [],
+  revealsError: null,
 };
 
 function profileRow(userId: string, lastName: string) {
@@ -86,7 +91,12 @@ vi.mock("@/lib/supabase/server", () => ({
                   .map((z) => ({ zip: z, ...ZIP_ROWS[z] })),
               }),
             }
-          : { then: () => ({ data: state.reveals }) },
+          : {
+              then: () =>
+                state.revealsError
+                  ? { data: null, error: state.revealsError }
+                  : { data: state.reveals, error: null },
+            },
       ),
   }),
 }));
@@ -102,6 +112,7 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   state.reveals = [];
   state.profiles = [];
+  state.revealsError = null;
 });
 
 afterEach(() => {
@@ -222,5 +233,26 @@ describe("getRevealedNurses card fields", () => {
     expect(card.bio).toBe("Ten years with medically complex children.");
     expect(card.rate_min).toBe(32);
     expect(card.availability_commitment).toEqual(["part_time"]);
+  });
+});
+
+// #847. This set marks and sorts search results, so an empty answer tells a
+// family who has spent reveals that they have spent none, which is the #845
+// defect: hasRevealedNurse told a family who had spent a capped daily reveal
+// that they had not. A reader that answers the same way for "no row" and
+// "could not look" cannot be told apart from a correct one.
+describe("getRevealedNurseIds when the read fails", () => {
+  it("refuses rather than reporting that nobody has been revealed", async () => {
+    state.revealsError = { message: "connection reset" };
+    await expect(getRevealedNurseIds("fam-1")).rejects.toThrow(
+      "this family's revealed nurses could not be read: connection reset",
+    );
+  });
+
+  it("still returns an empty set when the family genuinely has none", async () => {
+    // The positive control: an empty answer has to stay an answer, or the
+    // refusal above would fire on every family who has revealed nobody.
+    state.reveals = [];
+    await expect(getRevealedNurseIds("fam-1")).resolves.toEqual(new Set());
   });
 });

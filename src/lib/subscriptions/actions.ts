@@ -15,6 +15,7 @@ import {
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { getActiveSubscription } from "./queries";
+import { toTypedFailure } from "@/lib/db/results";
 
 interface CheckoutResult {
   url?: string;
@@ -56,17 +57,28 @@ async function createCheckoutSession(
   }
 
   // Reuse the customer if we've ever made one for this user.
+  //
+  // A failed read is NOT "this person has never had a Stripe customer" (#847).
+  // Answering that way sends them to checkout with no customer id, and Stripe
+  // mints a SECOND customer for the same person: their billing history, their
+  // saved card and their portal all stay on the first one. Refuse instead; a
+  // control is waiting, so this returns rather than throws (#846).
   let customerId: string | undefined;
   const supabase = await createClient();
-  const { data: anyExisting } = await supabase
-    .from("subscriptions")
-    .select("stripe_customer_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (anyExisting?.stripe_customer_id) {
-    customerId = anyExisting.stripe_customer_id;
+  const anyExisting = await toTypedFailure(
+    supabase
+      .from("subscriptions")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    "an existing Stripe customer for this user",
+    "We couldn't start checkout just now. Please try again.",
+  );
+  if (!anyExisting.ok) return { error: anyExisting.error };
+  if (anyExisting.data?.stripe_customer_id) {
+    customerId = anyExisting.data.stripe_customer_id;
   }
 
   const origin = await siteOrigin();
@@ -168,21 +180,30 @@ export async function getCustomerPortalUrl(
   if (!user) return { error: "Not authenticated" };
 
   const supabase = await createClient();
-  const { data: row } = await supabase
-    .from("subscriptions")
-    .select("stripe_customer_id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!row?.stripe_customer_id) {
+  // A failed read used to come back as "No Stripe customer record found",
+  // which tells a paying family they have no billing record at all (#847,
+  // #845). The two are different sentences now because they need different
+  // things from the person: one is ours to fix, the other is not.
+  const row = await toTypedFailure(
+    supabase
+      .from("subscriptions")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    "this user's Stripe customer",
+    "We couldn't open the billing portal just now. Please try again.",
+  );
+  if (!row.ok) return { error: row.error };
+  if (!row.data?.stripe_customer_id) {
     return { error: "No Stripe customer record found." };
   }
 
   const origin = await siteOrigin();
   try {
     const session = await getStripe().billingPortal.sessions.create({
-      customer: row.stripe_customer_id,
+      customer: row.data.stripe_customer_id,
       return_url: `${origin}${returnTo}`,
     });
     return { url: session.url };

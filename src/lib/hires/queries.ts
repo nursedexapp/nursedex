@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { unwrapOrThrow } from "@/lib/db/results";
 import type { Hire } from "@/types/database";
 
 /**
@@ -12,12 +13,19 @@ export async function getFamilyHireForNurse(
   nurseUserId: string,
 ): Promise<Hire | null> {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("hires")
-    .select("*")
-    .eq("family_user_id", familyUserId)
-    .eq("nurse_user_id", nurseUserId)
-    .maybeSingle();
+  // A failed read is NOT "this family has not hired this nurse" (#847). It
+  // decides whether the profile shows the Hired badge or the button that
+  // records a hire, so answering the same way for "no row" and "could not
+  // look" offers to record a hire that already exists.
+  const data = await unwrapOrThrow(
+    supabase
+      .from("hires")
+      .select("*")
+      .eq("family_user_id", familyUserId)
+      .eq("nurse_user_id", nurseUserId)
+      .maybeSingle(),
+    "this family's hire of this nurse",
+  );
   return (data as Hire | null) ?? null;
 }
 
@@ -27,11 +35,14 @@ export async function getFamilyHiresByNurse(
 ): Promise<Map<string, Hire>> {
   if (nurseUserIds.length === 0) return new Map();
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("hires")
-    .select("*")
-    .eq("family_user_id", familyUserId)
-    .in("nurse_user_id", nurseUserIds);
+  const data = await unwrapOrThrow(
+    supabase
+      .from("hires")
+      .select("*")
+      .eq("family_user_id", familyUserId)
+      .in("nurse_user_id", nurseUserIds),
+    "this family's hires",
+  );
 
   const map = new Map<string, Hire>();
   for (const row of (data ?? []) as Hire[]) {

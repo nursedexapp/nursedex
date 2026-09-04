@@ -130,6 +130,15 @@ describe("what it must not flag, so nobody is pressured into a disable", () => {
     );
   });
 
+  it("accepts a count query wrapped in the count helper", () => {
+    expectClean(
+      fn(`return await unwrapCountOrThrow(
+            supabase.from("t").select("*", { count: "exact", head: true }),
+            "the rows",
+          );`),
+    );
+  });
+
   it("accepts a query wrapped in a helper", () => {
     expectClean(
       fn(`return await unwrapOrThrow(supabase.from("t").select("x"), "the rows");`),

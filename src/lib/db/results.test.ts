@@ -9,6 +9,8 @@ import {
   assertNoWriteError,
   unwrapOrThrow,
   toTypedFailure,
+  toTypedCount,
+  unwrapCountOrThrow,
   DB_FAILURE_MESSAGE,
 } from "./results";
 
@@ -180,3 +182,54 @@ describe("toTypedFailure on a write, which is what a \"use server\" module has",
   });
 });
 
+
+// The answer to a `{ count: "exact" }` query is not in `data`. A head:true
+// count returns `{ data: null, count: N }`, so reading it through the data
+// helpers yields undefined and `?? 0` turns that into a confident zero (#991).
+describe("the count helpers", () => {
+  it("returns the count", async () => {
+    await expect(
+      toTypedCount({ count: 7, error: null }, "the nurses"),
+    ).resolves.toEqual({ ok: true, count: 7 });
+    await expect(
+      unwrapCountOrThrow({ count: 7, error: null }, "the nurses"),
+    ).resolves.toBe(7);
+  });
+
+  it("keeps a real zero, which is an answer", async () => {
+    await expect(
+      toTypedCount({ count: 0, error: null }, "the nurses"),
+    ).resolves.toEqual({ ok: true, count: 0 });
+    await expect(
+      unwrapCountOrThrow({ count: 0, error: null }, "the nurses"),
+    ).resolves.toBe(0);
+  });
+
+  it("refuses a failed count rather than answering zero", async () => {
+    await expect(
+      toTypedCount({ count: null, error: { message: "boom" } }, "the nurses"),
+    ).resolves.toEqual({ ok: false, error: DB_FAILURE_MESSAGE });
+    await expect(
+      unwrapCountOrThrow(
+        { count: null, error: { message: "boom" } },
+        "the nurses",
+      ),
+    ).rejects.toThrow("the nurses could not be read: boom");
+  });
+
+  it("refuses a null count with no error, because the query asked for none", async () => {
+    // PostgREST returns a number whenever a count was requested, so a null one
+    // means the option is missing. Zero is the one wrong answer that looks
+    // plausible.
+    const outcome = await toTypedCount({ count: null, error: null }, "the nurses");
+    expect(outcome.ok).toBe(false);
+    expect(h.captureException).toHaveBeenCalledTimes(1);
+    expect(
+      (h.captureException.mock.calls[0][0] as Error).message,
+    ).toMatch(/did not ask for one/);
+
+    await expect(
+      unwrapCountOrThrow({ count: null, error: null }, "the nurses"),
+    ).rejects.toThrow(/did not ask for one/);
+  });
+});

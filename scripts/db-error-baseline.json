@@ -1,8 +1,8 @@
 {
   "rule": "local/require-db-error-check",
   "measuredOn": "2026-09-04",
-  "total": 279,
-  "exemptions": 0,
+  "total": 247,
+  "exemptions": 2,
   "files": {
     "e2e/family.setup.ts": {
       "discarded": 1,
@@ -60,10 +60,6 @@
       "discarded": 1,
       "disables": 0
     },
-    "src/app/(public)/hires/confirm/[token]/page.tsx": {
-      "discarded": 2,
-      "disables": 0
-    },
     "src/app/(public)/nurses/[slug]/page.tsx": {
       "discarded": 1,
       "disables": 0
@@ -108,13 +104,9 @@
       "discarded": 1,
       "disables": 0
     },
-    "src/app/api/stripe/checkout-success/route.ts": {
-      "discarded": 1,
-      "disables": 0
-    },
     "src/app/api/stripe/webhook/route.ts": {
-      "discarded": 8,
-      "disables": 0
+      "discarded": 0,
+      "disables": 1
     },
     "src/app/auth/callback/route.ts": {
       "discarded": 2,
@@ -236,14 +228,6 @@
       "discarded": 1,
       "disables": 0
     },
-    "src/lib/hires/actions.ts": {
-      "discarded": 13,
-      "disables": 0
-    },
-    "src/lib/hires/queries.ts": {
-      "discarded": 2,
-      "disables": 0
-    },
     "src/lib/newsletter/actions.ts": {
       "discarded": 6,
       "disables": 0
@@ -285,12 +269,8 @@
       "disables": 0
     },
     "src/lib/reveals/actions.ts": {
-      "discarded": 3,
-      "disables": 0
-    },
-    "src/lib/reveals/queries.ts": {
-      "discarded": 1,
-      "disables": 0
+      "discarded": 0,
+      "disables": 1
     },
     "src/lib/reviews/actions.ts": {
       "discarded": 3,
@@ -309,10 +289,6 @@
       "disables": 0
     },
     "src/lib/slack/requests.ts": {
-      "discarded": 2,
-      "disables": 0
-    },
-    "src/lib/subscriptions/actions.ts": {
       "discarded": 2,
       "disables": 0
     }

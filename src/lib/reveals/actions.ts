@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth/helpers";
 import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
 import { getNurseContactInfo } from "@/lib/profile/queries";
 import { verifyTurnstileToken } from "@/lib/turnstile/verify";
+import { toTypedFailure } from "@/lib/db/results";
 
 export interface RevealResult {
   success: boolean;
@@ -18,6 +19,10 @@ export interface RevealResult {
     | "needs_captcha"
     | "captcha_failed"
     | "rate_limited"
+    // The database could not be read, so nothing is known either way (#847).
+    // Distinct from "unknown", which means the reveal was attempted and did
+    // not land: this one means it was never attempted.
+    | "could_not_check"
     | "unknown";
   // The contact fields are only returned on success, same shape as the
   // public profile so the page can re-render with them.
@@ -83,21 +88,41 @@ async function revealNurseOrThrow(
   const supabase = await createClient();
 
   // Already revealed? Idempotent, return contact without rate-limit bump.
-  const { data: existing } = await supabase
-    .from("reveals")
-    .select("id")
-    .eq("family_user_id", user.id)
-    .eq("nurse_user_id", nurseUserId)
-    .maybeSingle();
+  //
+  // A failed read is NOT "this family has not revealed this nurse" (#847).
+  // Answering that way sends an already-revealed family down the rate limit
+  // path for contact details they already own, which is the #845 defect.
+  const existingReveal = await toTypedFailure(
+    supabase
+      .from("reveals")
+      .select("id")
+      .eq("family_user_id", user.id)
+      .eq("nurse_user_id", nurseUserId)
+      .maybeSingle(),
+    "this family's existing reveal of this nurse",
+  );
+  if (!existingReveal.ok) return { success: false, error: "could_not_check" };
+  const existing = existingReveal.data;
 
   if (existing) {
     return await fetchContactResult(nurseUserId);
   }
 
   // Rate limit check via DB function (atomic read).
-  const { data: rate } = await supabase
-    .rpc("check_reveal_rate_limit", { p_family_user_id: user.id })
-    .single();
+  //
+  // A failed read is NOT "no reveals yet today" (#847). The coercion below
+  // reads a null row as allowed with no captcha, which is right for a family
+  // who has revealed nobody and catastrophic for a read that fell over: the
+  // cap and the captcha are both gates, and a gate that opens when it cannot
+  // be read is not a gate. The absent ROW still coerces, because that case is
+  // real; only an ERROR refuses.
+  const rate = await toTypedFailure(
+    supabase
+      .rpc("check_reveal_rate_limit", { p_family_user_id: user.id })
+      .single(),
+    "this family's reveal rate limit",
+  );
+  if (!rate.ok) return { success: false, error: "could_not_check" };
   type RateRow = {
     allowed: boolean | null;
     current_count: number | null;
@@ -106,7 +131,7 @@ async function revealNurseOrThrow(
   // Defensive: the RPC can return NULL fields for a family with no reveals
   // yet today (no rate_limit_reveals row). NULL means zero reveals, which is
   // allowed, so coerce rather than letting !null read as rate-limited.
-  const raw = rate as RateRow | null;
+  const raw = rate.data as RateRow | null;
   const rl = {
     allowed: raw?.allowed ?? true,
     current_count: raw?.current_count ?? 0,
@@ -145,6 +170,7 @@ async function revealNurseOrThrow(
   if (!revealed.allowed) return { success: false, error: "rate_limited" };
 
   // Best-effort analytics increment.
+  // eslint-disable-next-line local/require-db-error-check -- the value is a reveal counter on the nurse's own stats page, and NOTHING reads this result. The reveal itself is already written and paid for by the transaction above, so refusing here would fail a reveal the family owns in order to protect a counter.
   await supabase
     .rpc("increment_nurse_analytics", {
       p_nurse_user_id: nurseUserId,

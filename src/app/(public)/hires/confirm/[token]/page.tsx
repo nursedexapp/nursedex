@@ -5,6 +5,7 @@ import { Briefcase } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/helpers";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { unwrapOrThrow } from "@/lib/db/results";
 import { HireDecisionButtons } from "@/components/hires/HireDecisionButtons";
 
 export const metadata: Metadata = {
@@ -71,11 +72,17 @@ export default async function ConfirmHirePage({
   }
 
   const supabase = await createClient();
-  const { data: hire } = await supabase
-    .from("hires")
-    .select("id, status, family_user_id, nurse_user_id")
-    .eq("claim_token", token)
-    .maybeSingle();
+  // A failed read is NOT "this link is not valid" (#847). This is a page
+  // render, so it throws to the route's error boundary, which says something
+  // went wrong, rather than telling the family their confirmation link is dead.
+  const hire = await unwrapOrThrow(
+    supabase
+      .from("hires")
+      .select("id, status, family_user_id, nurse_user_id")
+      .eq("claim_token", token)
+      .maybeSingle(),
+    "the hire behind this confirmation link",
+  );
 
   type HireRow = {
     id: string;
@@ -143,11 +150,14 @@ export default async function ConfirmHirePage({
 
   // Look up the nurse's first name for context.
   const service = createServiceRoleClient();
-  const { data: nurseUser } = await service
-    .from("users")
-    .select("first_name, last_name")
-    .eq("id", row.nurse_user_id)
-    .maybeSingle();
+  const nurseUser = await unwrapOrThrow(
+    service
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", row.nurse_user_id)
+      .maybeSingle(),
+    "the nurse named on this hire",
+  );
   const nurseName = nurseUser
     ? `${nurseUser.first_name ?? ""} ${nurseUser.last_name ?? ""}`.trim() ||
       "this nurse"

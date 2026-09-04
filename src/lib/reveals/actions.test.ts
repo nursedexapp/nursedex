@@ -22,6 +22,10 @@ const h = vi.hoisted(() => {
     // the family was already at the hard cap. `already_revealed: true` means the
     // reveal was already there, so the function spent nothing.
     revealReadError: null as { message: string } | null,
+    // #847. The rate limit read discarded its error, and the coercion below it
+    // reads a null row as allowed with no captcha, so a failed read opened both
+    // gates at once.
+    rateRowError: null as { message: string } | null,
     subscriptionError: null as { message: string } | null,
     revealRow: {
       allowed: true,
@@ -93,7 +97,12 @@ const h = vi.hoisted(() => {
     rpc: (fn: string, params: unknown) => {
       if (fn === "check_reveal_rate_limit") {
         calls.rateLimitRpc.push(params);
-        return { single: async () => ({ data: state.rateRow }) };
+        return {
+          single: async () =>
+            state.rateRowError
+              ? { data: null, error: state.rateRowError }
+              : { data: state.rateRow, error: null },
+        };
       }
       if (fn === "increment_nurse_analytics") {
         calls.analyticsRpc.push(params);
@@ -173,7 +182,16 @@ beforeEach(() => {
   h.state.user = { id: "fam-1", role: "family" };
   h.state.hasAccess = true;
   h.state.existingReveal = null;
+  // Reset here rather than only where each is set. The hasRevealedNurse tests
+  // below set these two and left them set, so both leaked into every test
+  // declared after them, and the suite passed only because none existed yet.
+  // subscriptionError makes hasActiveFamilyAccess throw, which revealNurse's
+  // outer catch turns into "unknown", so a leaked one is invisible: every
+  // later test simply gets the same plausible refusal (L205).
+  h.state.revealReadError = null;
+  h.state.subscriptionError = null;
   h.state.rateRow = { allowed: true, current_count: 0, needs_captcha: false };
+  h.state.rateRowError = null;
   h.state.revealRow = {
     allowed: true,
     current_count: 1,
@@ -492,5 +510,47 @@ describe("hasRevealedNurse", () => {
   it("says it could not read, rather than naming the reveal state", async () => {
     h.state.revealReadError = { message: "connection terminated" };
     await expect(hasRevealedNurse(NURSE_ID)).rejects.toThrow(/could not be read/i);
+  });
+});
+
+// #847 / #988. Two reads on the reveal path discarded their error, and both
+// failed OPEN. A control is waiting on this action, so it returns rather than
+// throws (#846), and the sentence it returns says the check could not be made
+// rather than claiming a result.
+describe("revealNurse when a read it depends on fails", () => {
+  it("does not treat an unreadable reveal table as never revealed", async () => {
+    // Answering "not revealed" sends a family who already owns this nurse's
+    // details down the rate limit path for something they have paid for.
+    h.state.revealReadError = { message: "connection reset" };
+
+    const res = await revealNurse(NURSE_ID);
+
+    expect(res).toEqual({ success: false, error: "could_not_check" });
+    expect(h.calls.rateLimitRpc).toHaveLength(0);
+    expect(h.calls.revealRpc).toHaveLength(0);
+  });
+
+  it("does not open the cap and the captcha when the rate limit cannot be read", async () => {
+    // The null coercion reads a missing row as allowed with no captcha, which
+    // is right for a family who has revealed nobody today and catastrophic for
+    // a read that fell over. A gate that opens when it cannot be read is not a
+    // gate.
+    h.state.rateRowError = { message: "connection reset" };
+
+    const res = await revealNurse(NURSE_ID);
+
+    expect(res).toEqual({ success: false, error: "could_not_check" });
+    expect(h.calls.revealRpc).toHaveLength(0);
+  });
+
+  it("still coerces a genuinely absent rate limit row to allowed", async () => {
+    // The positive control. This is the family with no reveals yet today, and
+    // the refusal above must not fire on them.
+    h.state.rateRow = null;
+
+    const res = await revealNurse(NURSE_ID);
+
+    expect(res.success).toBe(true);
+    expect(h.calls.revealRpc).toHaveLength(1);
   });
 });

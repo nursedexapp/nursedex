@@ -45,6 +45,10 @@ const HELPERS = new Set([
   "assertNoWriteError",
   "unwrapOrThrow",
   "toTypedFailure",
+  // The count pair. A `{ count: "exact" }` answer is not in `data`, so these
+  // exist separately rather than as an option on the two above (#991).
+  "toTypedCount",
+  "unwrapCountOrThrow",
 ]);
 
 /**

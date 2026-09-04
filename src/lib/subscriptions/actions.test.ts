@@ -5,6 +5,9 @@ import { createQueryBuilder } from "../../../test/supabase-mock";
 const h = vi.hoisted(() => {
   const state = {
     customerId: "cus_123" as string | null,
+    // #847. The customer read discarded its error, so a failed read answered
+    // "this person has never had a Stripe customer".
+    customerReadError: null as { message: string } | null,
     activeSubscription: null as Record<string, unknown> | null,
     checkoutError: null as Error | null,
     // Resolved price IDs, read live by the config mock so a test can blank one
@@ -80,11 +83,15 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({
     from: () =>
       createQueryBuilder({
-        maybeSingle: () => ({
-          data: h.state.customerId
-            ? { stripe_customer_id: h.state.customerId }
-            : null,
-        }),
+        maybeSingle: () =>
+          h.state.customerReadError
+            ? { data: null, error: h.state.customerReadError }
+            : {
+                data: h.state.customerId
+                  ? { stripe_customer_id: h.state.customerId }
+                  : null,
+                error: null,
+              },
       }),
   }),
 }));
@@ -101,6 +108,7 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.customerId = "cus_123";
+  h.state.customerReadError = null;
   h.state.activeSubscription = null;
   h.state.checkoutError = null;
   h.state.prices = {
@@ -197,6 +205,7 @@ describe("createFamilyAccessCheckout", () => {
 describe("createCheckoutSession customer branch", () => {
   it("reuses the existing Stripe customer and omits customer_email", async () => {
     h.state.customerId = "cus_123";
+  h.state.customerReadError = null;
     const res = await createFamilyAccessCheckout({});
     expect(res.url).toBe("https://checkout.stripe.test/session");
     const call = h.calls.checkout[0];
@@ -288,5 +297,50 @@ describe("createNurseFeaturedCheckout", () => {
     );
     expect(res.url).toBeUndefined();
     expect(h.calls.checkout).toHaveLength(0);
+  });
+});
+
+// #847 / #988. Both of these reads answered the same way for "this person has
+// no Stripe customer" and "we could not look", and the two want different
+// things from the person. Money path, so the reader returns to the control
+// rather than throwing at it (#846).
+describe("when the Stripe customer read fails", () => {
+  it("does not send checkout on without a customer id", async () => {
+    // Stripe would mint a SECOND customer for the same person, and their
+    // billing history, saved card and portal all stay on the first one.
+    h.state.customerReadError = { message: "connection reset" };
+
+    const result = await createFamilyAccessCheckout({});
+
+    expect(result.url).toBeUndefined();
+    expect(result.error).toMatch(/try again/i);
+    expect(h.calls.checkout).toHaveLength(0);
+  });
+
+  it("does not tell a paying family they have no billing record", async () => {
+    h.state.customerReadError = { message: "connection reset" };
+
+    const outage = await getCustomerPortalUrl();
+
+    expect(outage.url).toBeUndefined();
+    expect(outage.error).toMatch(/try again/i);
+    expect(outage.error).not.toMatch(/no stripe customer record/i);
+    expect(h.calls.portal).toHaveLength(0);
+  });
+
+  it("still says so when there genuinely is no customer record", async () => {
+    // The positive control: an absent row has to stay an answer, or the
+    // refusal above would fire on everyone who has never paid.
+    h.state.customerId = null;
+
+    const result = await getCustomerPortalUrl();
+
+    expect(result.error).toBe("No Stripe customer record found.");
+  });
+
+  it("reports the failed read, since nothing throws for the handler to see", async () => {
+    h.state.customerReadError = { message: "connection reset" };
+    await getCustomerPortalUrl();
+    expect(h.captureException).toHaveBeenCalledTimes(1);
   });
 });

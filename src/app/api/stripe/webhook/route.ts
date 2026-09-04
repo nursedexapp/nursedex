@@ -12,7 +12,7 @@ import { shouldSendOnce } from "@/lib/cron/email-log";
 // silently diverging billing state from the DB. Throwing sends the error
 // through POST's catch, which returns 500 so Stripe retries. This was five
 // uses of a private copy of the helper until #986 moved it to be shared.
-import { assertNoWriteError } from "@/lib/db/results";
+import { assertNoWriteError, unwrapOrThrow, toTypedFailure } from "@/lib/db/results";
 import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
 import {
   sendSubscriptionConfirmedEmail,
@@ -102,6 +102,7 @@ async function alertOpsSlack(event: Stripe.Event, err: unknown): Promise<void> {
   // with the same failure. Sentry capture (above) isn't deduped here since
   // Sentry already groups identical errors into one issue by fingerprint.
   const supabase = createServiceRoleClient();
+  // eslint-disable-next-line local/require-db-error-check -- deliberately discarded (#847). The value gates an ALERT, so refusing on a failed read suppresses the alert during exactly the outage it exists to report. A discarded error here reads as "not yet alerted", which sends the alert, and the worst case is a duplicate Slack message during a database problem.
   const { data: alreadyAlerted } = await supabase
     .from("webhook_alert_log")
     .select("event_id")
@@ -114,7 +115,14 @@ async function alertOpsSlack(event: Stripe.Event, err: unknown): Promise<void> {
     channel: ALERTS_CHANNEL_ID,
     text: `Stripe webhook failed: \`${event.type}\` (event \`${event.id}\`)\n${message}`,
   });
-  await supabase.from("webhook_alert_log").insert({ event_id: event.id });
+  // Reported, not refused. This row is the dedup, so a failed write means the
+  // next Stripe retry alerts again, which is a duplicate message rather than a
+  // missing one. Throwing here would replace the original webhook failure this
+  // function exists to report. toTypedFailure logs it and files it to Sentry.
+  await toTypedFailure(
+    supabase.from("webhook_alert_log").insert({ event_id: event.id }),
+    "the webhook alert dedup record",
+  );
 }
 
 // ── Handlers ──────────────────────────────────────────────────
@@ -184,11 +192,18 @@ async function handleSubscriptionUpserted(
   // Checkout (see createCheckoutSession). For older subs we may need to
   // look up by stripe_subscription_id.
   const supabase = createServiceRoleClient();
-  const { data: existing } = await supabase
-    .from("subscriptions")
-    .select("user_id, plan_type, cancel_at_period_end")
-    .eq("stripe_subscription_id", sub.id)
-    .maybeSingle();
+  // A failed read is NOT "no subscription row yet" (#847). It falls through to
+  // the event metadata, and where that is absent the handler warns and returns
+  // 200, so Stripe never retries and the update is lost. Throwing reaches
+  // POST's catch, which returns 500 and Stripe retries.
+  const existing = await unwrapOrThrow(
+    supabase
+      .from("subscriptions")
+      .select("user_id, plan_type, cancel_at_period_end")
+      .eq("stripe_subscription_id", sub.id)
+      .maybeSingle(),
+    "the subscription this event updates",
+  );
 
   const userId =
     existing?.user_id ?? (sub.metadata?.user_id as string | undefined);
@@ -229,11 +244,14 @@ async function handleSubscriptionDeleted(
   eventCreated: number,
 ) {
   const supabase = createServiceRoleClient();
-  const { data: row } = await supabase
-    .from("subscriptions")
-    .select("user_id, plan_type")
-    .eq("stripe_subscription_id", sub.id)
-    .maybeSingle();
+  const row = await unwrapOrThrow(
+    supabase
+      .from("subscriptions")
+      .select("user_id, plan_type")
+      .eq("stripe_subscription_id", sub.id)
+      .maybeSingle(),
+    "the subscription this delete event names",
+  );
 
   // Fall back to the event's own metadata when no row exists yet (e.g. a
   // delete delivered before its create), so cleanup can proceed regardless
@@ -352,11 +370,18 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, eventCreated: number) 
   // subscription_create invoice (the welcome email handles that).
   if (invoice.billing_reason !== "subscription_cycle") return;
 
-  const { data: row } = await supabase
-    .from("subscriptions")
-    .select("user_id, plan_type")
-    .eq("stripe_subscription_id", subId)
-    .maybeSingle();
+  // A failed read is NOT "no such subscription" (#847). Returning here skips
+  // the renewal email in silence; throwing returns 500 so Stripe retries, and
+  // the status update above is keyed on last_event_at while the email is
+  // deduped by shouldSendOnce, so the retry is a no-op on both.
+  const row = await unwrapOrThrow(
+    supabase
+      .from("subscriptions")
+      .select("user_id, plan_type")
+      .eq("stripe_subscription_id", subId)
+      .maybeSingle(),
+    "the subscription this renewal belongs to",
+  );
   if (!row) return;
 
   await maybeNotifyRenewal({
@@ -556,11 +581,19 @@ async function maybeNotifyConfirmed({
   });
   if (!ok) return;
 
-  const { data: user } = await supabase
-    .from("users")
-    .select("email, first_name")
-    .eq("id", userId)
-    .maybeSingle();
+  // A failed read is NOT "this user has no email address" (#847). shouldSendOnce
+  // above has ALREADY claimed the dedup key, so returning here spends the one
+  // send and the email never goes at all, with nothing reporting it. Throwing
+  // at least returns 500 and files the failure. It does not recover the send:
+  // the retry finds the key already claimed. That ordering is #998.
+  const user = await unwrapOrThrow(
+    supabase
+      .from("users")
+      .select("email, first_name")
+      .eq("id", userId)
+      .maybeSingle(),
+    "the person to email about a new subscription",
+  );
   if (!user?.email) return;
 
   await sendSubscriptionConfirmedEmail({
@@ -583,11 +616,19 @@ async function maybeNotifyRenewal(
   });
   if (!ok) return;
 
-  const { data: user } = await supabase
-    .from("users")
-    .select("email, first_name")
-    .eq("id", args.userId)
-    .maybeSingle();
+  // A failed read is NOT "this user has no email address" (#847). shouldSendOnce
+  // above has ALREADY claimed the dedup key, so returning here spends the one
+  // send and the email never goes at all, with nothing reporting it. Throwing
+  // at least returns 500 and files the failure. It does not recover the send:
+  // the retry finds the key already claimed. That ordering is #998.
+  const user = await unwrapOrThrow(
+    supabase
+      .from("users")
+      .select("email, first_name")
+      .eq("id", args.userId)
+      .maybeSingle(),
+    "the person to email about a successful renewal",
+  );
   if (!user?.email) return;
 
   await sendRenewalSuccessEmail({
@@ -616,11 +657,19 @@ async function maybeNotifyCancellation({
   });
   if (!ok) return;
 
-  const { data: user } = await supabase
-    .from("users")
-    .select("email, first_name")
-    .eq("id", userId)
-    .maybeSingle();
+  // A failed read is NOT "this user has no email address" (#847). shouldSendOnce
+  // above has ALREADY claimed the dedup key, so returning here spends the one
+  // send and the email never goes at all, with nothing reporting it. Throwing
+  // at least returns 500 and files the failure. It does not recover the send:
+  // the retry finds the key already claimed. That ordering is #998.
+  const user = await unwrapOrThrow(
+    supabase
+      .from("users")
+      .select("email, first_name")
+      .eq("id", userId)
+      .maybeSingle(),
+    "the person to email about a cancellation",
+  );
   if (!user?.email) return;
 
   await sendCancellationConfirmationEmail({
