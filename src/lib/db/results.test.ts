@@ -143,9 +143,7 @@ describe("toTypedFailure", () => {
     await toTypedFailure(failed("boom"), "load your subscription");
     expect(h.captureException).toHaveBeenCalledTimes(1);
     const [err, ctx] = h.captureException.mock.calls[0];
-    expect((err as Error).message).toBe(
-      "load your subscription could not be read: boom",
-    );
+    expect((err as Error).message).toBe("load your subscription failed: boom");
     expect(ctx).toEqual({ tags: { db_operation: "load your subscription" } });
   });
 
@@ -160,5 +158,24 @@ describe("toTypedFailure", () => {
     await expect(
       toTypedFailure(Promise.resolve(ok("x")), "load it"),
     ).resolves.toEqual({ ok: true, data: "x" });
+  });
+});
+
+describe("toTypedFailure on a write, which is what a \"use server\" module has", () => {
+  it("carries a successful write through", async () => {
+    await expect(
+      toTypedFailure(ok(null), "add the address to the block list"),
+    ).resolves.toEqual({ ok: true, data: null });
+  });
+
+  it("names the operation without claiming it was a read", async () => {
+    await toTypedFailure(
+      failed("permission denied"),
+      "add the address to the block list",
+    );
+    const [err] = h.captureException.mock.calls[0];
+    expect((err as Error).message).toBe(
+      "add the address to the block list failed: permission denied",
+    );
   });
 });

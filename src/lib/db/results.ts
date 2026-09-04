@@ -156,7 +156,10 @@ export async function toTypedFailure<T>(
   const { data, error } = await result;
   if (!error) return { ok: true, data };
   if (isRowNotFound(error)) return { ok: true, data: null };
-  const message = `${context} could not be read: ${error.message}`;
+  // "failed" rather than "could not be read": a `"use server"` module reaches
+  // here for its writes too, and there is no second helper for those, because
+  // a write in an action must return to the control rather than throw at it.
+  const message = `${context} failed: ${error.message}`;
   console.error(message);
   Sentry.captureException(new Error(message), {
     tags: { db_operation: context },
