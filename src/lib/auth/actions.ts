@@ -10,6 +10,7 @@ import { sendAccountExistsNoticeEmail } from "@/lib/email/send";
 import { captureServerEventAfterResponse } from "@/lib/analytics/server";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { PASSWORD, PASSWORD_RECOVERY } from "@/lib/constants";
+import { toTypedFailure } from "@/lib/db/results";
 
 export type AuthResult = {
   error?: string;
@@ -44,13 +45,30 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
   // block silently never fires (a removed user could re-signup, and Supabase
   // then obfuscates the response since the auth row still exists).
   const service = createServiceRoleClient();
-  const { data: blocked } = await service
-    .from("blocked_emails")
-    .select("id")
-    .eq("email", email.toLowerCase())
-    .maybeSingle();
+  const blocked = await toTypedFailure(
+    service
+      .from("blocked_emails")
+      .select("id")
+      .eq("email", email.toLowerCase())
+      .maybeSingle(),
+    "the signup block list",
+  );
 
-  if (blocked) {
+  // A failed read is NOT "not on the list" (#982). This used to discard the
+  // error, so any failure to read admitted the address, and a security control
+  // that fails open under load is not a control. Dan's call on 4 September
+  // 2026: refuse and say so. Signups here are rare enough that the cost of
+  // refusing during an outage is small, against a removed user walking back in.
+  //
+  // The sentence is deliberately about OUR failure and says nothing about the
+  // address, so an outage cannot be used to probe who is on the list.
+  if (!blocked.ok) {
+    return {
+      error: "We couldn't complete your signup just now. Please try again.",
+    };
+  }
+
+  if (blocked.data) {
     return { error: "This email address cannot be used to create an account." };
   }
 

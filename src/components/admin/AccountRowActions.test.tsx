@@ -19,6 +19,7 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 import { AccountRowActions } from "./AccountRowActions";
 import { STALL_MS } from "@/components/ui/pending-button";
 import { suspendAccount, removeAccount } from "@/lib/admin/account-actions";
+import { toast } from "sonner";
 
 // Phase 4 of #443. Suspending locks a real person out and emails them; removing
 // soft-deletes them, cancels their Stripe subscriptions and blocks their email
@@ -173,5 +174,61 @@ describe("removing an account", () => {
     });
 
     expect(removeAccount).toHaveBeenCalledTimes(1);
+  });
+});
+
+// #982. Three outcomes that "Could not remove. Please try again." reads as, and
+// is wrong about in two of them: the ban was not written (retrying works), the
+// removal happened but was not recorded (retrying cannot help and would report
+// wrong_state), and the account could not be read at all.
+describe("what the admin is told when a removal partly fails", () => {
+  async function removeWith(error: string) {
+    cleanup();
+    vi.mocked(removeAccount).mockResolvedValue({
+      success: false,
+      error: error as never,
+    });
+    setup();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/reason/i), {
+        target: { value: "Repeated policy violations" },
+      });
+    });
+    await act(async () => {
+      fireEvent.submit(document.querySelector("form")!);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    return vi.mocked(toast.error).mock.calls.at(-1)?.[0] as string;
+  }
+
+  it("says nothing was done when the block list write failed", async () => {
+    const message = await removeWith("ban_unwritten");
+    expect(message).toMatch(/block list/i);
+    expect(message).toMatch(/try again/i);
+  });
+
+  it("does not tell the admin to try again when the removal already happened", async () => {
+    // Retrying would come back wrong_state, so "please try again" sends them
+    // round a loop that cannot end.
+    const message = await removeWith("audit_unwritten");
+    expect(message).toMatch(/removed/i);
+    expect(message).not.toMatch(/try again/i);
+  });
+
+  it("gives every outcome its own message", async () => {
+    const messages = new Set([
+      await removeWith("ban_unwritten"),
+      await removeWith("audit_unwritten"),
+      await removeWith("lookup_failed"),
+      await removeWith("unknown"),
+      await removeWith("not_found"),
+      await removeWith("wrong_state"),
+      await removeWith("invalid"),
+      await removeWith("self_action"),
+    ]);
+    expect(messages.size).toBe(8);
   });
 });
