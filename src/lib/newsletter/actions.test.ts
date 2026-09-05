@@ -417,3 +417,75 @@ describe("when the confirmation email does not go out", () => {
     await expect(confirmNewsletter("tok")).resolves.toBe("confirmed");
   });
 });
+
+/**
+ * #422. Each batch is sent through sendNewsletterBatch, which reports whether
+ * it went. The loop only counted the ones that did and said nothing about the
+ * rest, so an issue that reached nobody returned success with a count of zero,
+ * and the admin's toast read "Sent to 0 subscribers" in a success colour.
+ *
+ * A cheerful empty state over a failure is the one thing this screen must not
+ * do (L10): the admin has no other way to learn that a send they just paid for
+ * reached nobody, and the subscribers who missed it are invisible.
+ */
+describe("when a newsletter batch fails to send", () => {
+  const issue = { subject: "Hello", body: "Body" };
+
+  function subscribers(n: number) {
+    h.getConfirmed.mockResolvedValue(
+      Array.from({ length: n }, (_, i) => ({
+        email: `r${i}@example.com`,
+        unsubscribe_token: `t${i}`,
+      })),
+    );
+  }
+
+  it("reports how many people it could not reach", async () => {
+    subscribers(150);
+    // Two batches of 100 and 50: the first goes, the second does not.
+    h.sendBatch.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    const res = await sendNewsletterIssue(issue);
+
+    expect(res.sent).toBe(100);
+    expect(res.failed).toBe(50);
+  });
+
+  it("refuses to call it a success when nobody was reached", async () => {
+    // Zero sent out of a real list is not a quiet outcome. Reporting success
+    // here is what put "Sent to 0 subscribers" on screen in a success colour.
+    subscribers(30);
+    h.sendBatch.mockResolvedValue(false);
+
+    const res = await sendNewsletterIssue(issue);
+
+    expect(res.success).toBe(false);
+    expect(res.error).toBe("send_failed");
+    expect(res.failed).toBe(30);
+  });
+
+  it("still succeeds when every batch went", async () => {
+    // The positive control: without it, a rule that failed on any send at all
+    // would satisfy the two above and break every real send.
+    subscribers(150);
+    h.sendBatch.mockResolvedValue(true);
+
+    const res = await sendNewsletterIssue(issue);
+
+    expect(res.success).toBe(true);
+    expect(res.sent).toBe(150);
+    expect(res.failed).toBe(0);
+  });
+
+  it("reports no failures when there was nobody to send to", async () => {
+    // An empty list is a real and different state from a failed send, and it
+    // must not read as one.
+    subscribers(0);
+
+    const res = await sendNewsletterIssue(issue);
+
+    expect(res.success).toBe(true);
+    expect(res.sent).toBe(0);
+    expect(res.failed).toBe(0);
+  });
+});
