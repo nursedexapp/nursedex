@@ -337,6 +337,32 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
     anonPage.getByRole("heading", { level: 1, name: FIRST_NAME }),
   ).toBeVisible();
 
+  // ── And the framing she chose reaches the card a family actually sees.
+  //
+  // The steps above prove the control moves on screen and that the choice
+  // reaches her profile row. Neither says the DIRECTORY uses it, and that is
+  // the whole point of the feature: the card crops her photo to a small
+  // circle, and #768 exists because the fixed upper-third crop was cutting
+  // heads off. A number stored in a column nothing reads is the same as no
+  // number at all (#926, L46).
+  await anonPage.goto("/nurses");
+  const herCard = anonPage.locator("article", { hasText: FIRST_NAME });
+  await expect(herCard).toBeVisible({ timeout: 20_000 });
+
+  const rendered = await herCard
+    .locator("img")
+    .first()
+    .evaluate((el) => getComputedStyle(el).objectPosition);
+
+  // Read back from HER profile rather than restated, so this cannot pass by
+  // agreeing with a number the test itself chose (L70).
+  const saved = (await profileOf(nurseId))!;
+  expect(rendered).toBe(`${saved.photo_focal_x}% ${saved.photo_focal_y}%`);
+  // The positive control: the default would be 50% 25%, so a card that
+  // ignored the column entirely and a card that used it would look the same
+  // if she happened to have chosen the default. She did not, asserted above.
+  expect(rendered).not.toBe("50% 25%");
+
   await anon.close();
   await adminCtx.close();
 });
