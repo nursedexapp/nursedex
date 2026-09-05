@@ -35,6 +35,37 @@ const FIXTURE_NURSES = [
       rate_max: 48,
       availability_commitment: ["part_time"],
       profile_completeness: 90,
+      // Distinct verification dates on the two LISTED nurses, so an order can
+      // be seen to change (#926). Without them both sort keys tie and a sort
+      // control that did nothing at all would pass.
+      verified_at: "2026-01-01T00:00:00Z",
+    },
+  },
+  {
+    // A second LISTED nurse in Adaeze's own zip (#926). The sort control is
+    // only rendered when more than one nurse matched, which is right (there is
+    // nothing to order otherwise) and means a zip-narrowed search on Adaeze
+    // alone renders no control at all: the "Closest is offered once a zip is
+    // set" case was unprovable without somebody else in range.
+    //
+    // Her completeness and her verification date both sit BETWEEN the other
+    // two, so she cannot become the first card under either sort and the
+    // order assertions stay about the pair they were written for.
+    email: "e2e-redesign-nearby@nursedex.test",
+    first_name: "Della",
+    last_name: "Roux",
+    zip_code: "11779",
+    profile: {
+      credential: "lpn",
+      primary_care_type: "elderly",
+      care_types: ["elderly"],
+      years_experience: 3,
+      bio: "Three years of overnight care on the north shore.",
+      rate_min: null,
+      rate_max: null,
+      availability_commitment: [],
+      profile_completeness: 50,
+      verified_at: "2026-03-01T00:00:00Z",
     },
   },
   {
@@ -60,6 +91,9 @@ const FIXTURE_NURSES = [
       rate_max: null,
       availability_commitment: [],
       profile_completeness: 10,
+      // The newer of the two, and the less complete, so "Newest" and "Most
+      // complete profile" put the pair in opposite orders.
+      verified_at: "2026-06-01T00:00:00Z",
     },
   },
   {
@@ -436,5 +470,92 @@ test.describe("the filter chips", () => {
     await page.goto("/nurses?zip=11779&distance=25");
 
     await expect(page.getByText("Location: 25 miles of 11779")).toBeVisible();
+  });
+});
+
+/**
+ * The sort control (#725), driven rather than unit tested (#926).
+ *
+ * It decides the order a family sees, and it was covered by unit tests and by
+ * nothing that opened a browser. The order it produces is the whole product on
+ * this page, and the control writes into the URL and back through a server
+ * round trip, which is the part a unit test with a stubbed router cannot show.
+ *
+ * The two listed fixtures are deliberately opposite: Adaeze is the more
+ * complete and the older, Bev the less complete and the newer, so "Most
+ * complete profile" and "Newest" cannot both be satisfied by one order. A
+ * control that did nothing would fail rather than tie.
+ */
+test.describe("the sort control", () => {
+  /** The nurse names on the page, in the order the grid renders them. */
+  async function order(page: Page): Promise<string[]> {
+    await expect(page.locator("article").first()).toBeVisible();
+    return page.locator("article h3").allInnerTexts();
+  }
+
+  test("changes the order a family sees, and says which one she chose", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/nurses?sort=complete");
+
+    const byCompleteness = await order(page);
+    // The positive control: without both nurses on the page, every order
+    // assertion below would be about a list of one.
+    expect(byCompleteness.length).toBeGreaterThan(1);
+    expect(byCompleteness[0]).toContain("Adaeze");
+
+    await page.getByLabel("Sort by").selectOption("newest");
+
+    // The choice goes into the URL, so a sorted search can be shared and
+    // reloaded and paging keeps it.
+    await page.waitForURL(/sort=newest/);
+
+    // Polled on the ORDER rather than read once after the URL changes. The new
+    // order arrives from a server round trip that finishes after the URL does,
+    // so a bare read here would sometimes see the previous grid and the test
+    // would be asserting about the machine's load (L290).
+    await expect.poll(async () => (await order(page))[0]).toContain("Bev");
+
+    const byNewest = await order(page);
+    expect(byNewest).not.toEqual(byCompleteness);
+
+    // And the control shows the order actually in effect, rather than falling
+    // back to its default while the page shows something else.
+    await expect(page.getByLabel("Sort by")).toHaveValue("newest");
+  });
+
+  test("does not offer Closest until there is a zip to measure from", async ({
+    page,
+  }) => {
+    // A control that silently does nothing is worse than an absent one: the
+    // page would go on showing a different order with no explanation.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/nurses");
+
+    const sort = page.getByLabel("Sort by");
+    await expect(sort).toBeVisible();
+    await expect(sort.locator("option", { hasText: "Closest" })).toHaveCount(0);
+    // The positive control in the same read: the options that do not need a
+    // zip ARE there, so the absence above is about Closest and not about a
+    // control that failed to render.
+    await expect(
+      sort.locator("option", { hasText: "Most complete profile" }),
+    ).toHaveCount(1);
+  });
+
+  test("offers it once she has entered one", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/nurses?zip=11779&distance=25");
+
+    // Two nurses share this zip on purpose. The control is only rendered when
+    // more than one nurse matched, which is right and means a search that
+    // narrows to one renders no control to read at all: this case was
+    // unprovable until somebody else was in range.
+    await expect(page.locator("article").nth(1)).toBeVisible();
+
+    await expect(
+      page.getByLabel("Sort by").locator("option", { hasText: "Closest" }),
+    ).toHaveCount(1);
   });
 });
