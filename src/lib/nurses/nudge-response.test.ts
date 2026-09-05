@@ -97,8 +97,19 @@ const h = vi.hoisted(() => {
   return { builders, state, from };
 });
 
+// Deliberately NOT stubbed as a working client. email_log carries no grant to
+// anon or authenticated, so a read through the caller's own JWT is refused in
+// production, and a test that quietly accepted either client would not have
+// noticed (#520 found this).
 vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ from: h.from }),
+  createClient: async () => {
+    throw new Error(
+      "getNudgeResponse must not read email_log through the caller's own JWT: it carries no grant.",
+    );
+  },
+}));
+vi.mock("@/lib/supabase/service-role", () => ({
+  createServiceRoleClient: () => ({ from: h.from }),
 }));
 
 import { getNudgeResponse, NUDGE_COHORTS, TOLD_CAP } from "./nudge-response";
@@ -116,6 +127,27 @@ beforeEach(() => {
   h.state.countError = null;
   h.state.nullCount = false;
   h.state.movedCount = 0;
+});
+
+describe("which client reads the log", () => {
+  it("reads email_log with the service role client, not the caller's JWT", async () => {
+    // Migration 044 revoked ALL on every table from anon and authenticated and
+    // granted email_log to neither, so PostgREST refuses the read outright:
+    // "permission denied for table email_log", measured against production on
+    // 2026-09-05. This panel is behind requireAdmin, but an admin is an
+    // ordinary authenticated role as far as grants are concerned, so the read
+    // has to be a service role one exactly as every other reader of this table
+    // already is.
+    //
+    // The failure this replaces was not silent, which is the only reason it
+    // was survivable: the panel would have rendered its "could not be read"
+    // state forever rather than a wrong number.
+    h.state.log = [told("a", "not_listed_nudge", "2026-09-04T14:50:00Z")];
+
+    const res = await getNudgeResponse();
+
+    expect(res.ok).toBe(true);
+  });
 });
 
 describe("who moved after being told", () => {

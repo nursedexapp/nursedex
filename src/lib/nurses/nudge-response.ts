@@ -1,5 +1,5 @@
 import "server-only";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyListedNurseFilter } from "./visibility";
 
 /**
@@ -74,7 +74,18 @@ export type NudgeResponse =
 export const TOLD_CAP = 1000;
 
 export async function getNudgeResponse(): Promise<NudgeResponse> {
-  const supabase = await createClient();
+  // Service role, and it has to be. Migration 044 revoked ALL on every table
+  // in public from anon and authenticated, and granted email_log to neither,
+  // so PostgREST refuses a read through the caller's own JWT outright:
+  // "permission denied for table email_log", measured against production on
+  // 2026-09-05. This page is behind requireAdmin, but an admin is an ordinary
+  // authenticated role as far as grants are concerned.
+  //
+  // Every other reader of this table already does the same. The nurse counts
+  // below go through the same client for one round trip rather than two, and
+  // the directory's own predicates are applied in the query, which is how
+  // visibility.ts expects a service role caller to use them.
+  const supabase = createServiceRoleClient();
 
   const { data, error } = await supabase
     .from("email_log")
