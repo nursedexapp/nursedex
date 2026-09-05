@@ -42,6 +42,33 @@ const FIXTURE_NURSES = [
     },
   },
   {
+    // A second LISTED nurse in Adaeze's own zip (#926). The sort control is
+    // only rendered when more than one nurse matched, which is right (there is
+    // nothing to order otherwise) and means a zip-narrowed search on Adaeze
+    // alone renders no control at all: the "Closest is offered once a zip is
+    // set" case was unprovable without somebody else in range.
+    //
+    // Her completeness and her verification date both sit BETWEEN the other
+    // two, so she cannot become the first card under either sort and the
+    // order assertions stay about the pair they were written for.
+    email: "e2e-redesign-nearby@nursedex.test",
+    first_name: "Della",
+    last_name: "Roux",
+    zip_code: "11779",
+    profile: {
+      credential: "lpn",
+      primary_care_type: "elderly",
+      care_types: ["elderly"],
+      years_experience: 3,
+      bio: "Three years of overnight care on the north shore.",
+      rate_min: null,
+      rate_max: null,
+      availability_commitment: [],
+      profile_completeness: 50,
+      verified_at: "2026-03-01T00:00:00Z",
+    },
+  },
+  {
     // Every field this card can be missing, missing at once. The absent states
     // are designed, so they have to be seen rather than assumed.
     //
@@ -520,6 +547,12 @@ test.describe("the sort control", () => {
   test("offers it once she has entered one", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/nurses?zip=11779&distance=25");
+
+    // Two nurses share this zip on purpose. The control is only rendered when
+    // more than one nurse matched, which is right and means a search that
+    // narrows to one renders no control to read at all: this case was
+    // unprovable until somebody else was in range.
+    await expect(page.locator("article").nth(1)).toBeVisible();
 
     await expect(
       page.getByLabel("Sort by").locator("option", { hasText: "Closest" }),
