@@ -22,7 +22,6 @@ import {
   type CompletenessInput,
 } from "./completeness";
 import { claimSlug, saveSlugRedirect } from "./slug";
-import { normalizeLanguageList } from "./language";
 import { resubmissionPatch } from "./resubmission";
 import {
   getSignedUploadUrl as _getSignedUploadUrl,
@@ -120,38 +119,28 @@ export async function saveOnboardingStep(
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
 
-  // Re-validate with the same schema the client form uses. Server actions are
-  // a public entry point, so the form rules (including the credential-aware
-  // license number requirement) must be enforced here too, not just client side.
-  if (step >= 1 && step <= 5) {
-    let tier: NurseTier | null = null;
-    if (step === 2 || step === 4) {
-      tier = await getNurseTier(supabase, user.id);
-      if (tier === null) {
-        return { error: "We could not save that just now. Please try again." };
-      }
-    }
-    const schema =
-      step === 2 || step === 4
-        ? (step === 2 ? step2Schema : step4Schema)(tier as NurseTier)
-        : step === 1
-          ? step1Schema
-          : step === 3
-            ? step3Schema
-            : step5Schema;
-    const parsed = schema.safeParse(data);
-    if (!parsed.success) {
-      return { error: firstValidationError(parsed.error) };
-    }
-  }
+  // Every branch validates with the same schema the client form uses, and
+  // then writes what the schema RETURNED. Server actions are a public entry
+  // point, so the form rules (including the credential-aware license number
+  // requirement) must be enforced here too, not just client side; and writing
+  // parsed.data rather than the submitted object is what makes the schema the
+  // single description of a valid profile. Writing the raw input meant every
+  // transform, trim and default existed only in the type system and never
+  // reached the database (#963).
 
   // Step 1 updates both users table and nurse_profiles
   if (step === 1) {
+    const parsed = step1Schema.safeParse(data);
+    if (!parsed.success) {
+      return { error: firstValidationError(parsed.error) };
+    }
+    const values = parsed.data;
+
     const { error: userError } = await supabase
       .from("users")
       .update({
-        first_name: data.first_name as string,
-        last_name: data.last_name as string,
+        first_name: values.first_name,
+        last_name: values.last_name,
       })
       .eq("id", user.id);
 
@@ -163,9 +152,10 @@ export async function saveOnboardingStep(
     const { error: profileError } = await supabase
       .from("nurse_profiles")
       .update({
-        gender: data.gender,
-        years_experience: data.years_experience,
-        languages: normalizeLanguageList(data.languages as string[]),
+        gender: values.gender,
+        years_experience: values.years_experience,
+        // Already normalised by the schema's transform.
+        languages: values.languages,
       })
       .eq("user_id", user.id);
 
@@ -179,13 +169,26 @@ export async function saveOnboardingStep(
 
   // Step 2: Credentials
   if (step === 2) {
+    // Null rather than FREE on a failed tier read (#847): FREE is the stricter
+    // schema, so validating against it would refuse a Featured nurse's own
+    // care types as over a limit she does not have.
+    const tier = await getNurseTier(supabase, user.id);
+    if (tier === null) {
+      return { error: "We could not save that just now. Please try again." };
+    }
+    const parsed = step2Schema(tier).safeParse(data);
+    if (!parsed.success) {
+      return { error: firstValidationError(parsed.error) };
+    }
+    const values = parsed.data;
+
     const { error } = await supabase
       .from("nurse_profiles")
       .update({
-        credential: data.credential,
-        license_number: ((data.license_number as string) ?? "").trim() || null,
-        care_types: data.care_types,
-        primary_care_type: data.primary_care_type ?? null,
+        credential: values.credential,
+        license_number: values.license_number.trim() || null,
+        care_types: values.care_types,
+        primary_care_type: values.primary_care_type,
       })
       .eq("user_id", user.id);
 
@@ -199,18 +202,24 @@ export async function saveOnboardingStep(
 
   // Step 3: Skills & Details
   if (step === 3) {
+    const parsed = step3Schema.safeParse(data);
+    if (!parsed.success) {
+      return { error: firstValidationError(parsed.error) };
+    }
+    const values = parsed.data;
+
     const { error } = await supabase
       .from("nurse_profiles")
       .update({
-        skills: data.skills,
-        availability_commitment: data.availability_commitment,
-        time_slots: data.time_slots,
-        rate_min: data.rate_min ?? null,
-        rate_max: data.rate_max ?? null,
-        has_transportation: data.has_transportation,
-        covid_vaccinated: data.covid_vaccinated ?? null,
-        care_philosophy: data.care_philosophy ?? null,
-        additional_certs: data.additional_certs,
+        skills: values.skills,
+        availability_commitment: values.availability_commitment,
+        time_slots: values.time_slots,
+        rate_min: values.rate_min,
+        rate_max: values.rate_max,
+        has_transportation: values.has_transportation,
+        covid_vaccinated: values.covid_vaccinated,
+        care_philosophy: values.care_philosophy,
+        additional_certs: values.additional_certs,
       })
       .eq("user_id", user.id);
 
@@ -224,15 +233,24 @@ export async function saveOnboardingStep(
 
   // Step 4: Bio & Photos
   if (step === 4) {
-    const photos = (data.photos as string[]) || [];
+    const tier = await getNurseTier(supabase, user.id);
+    if (tier === null) {
+      return { error: "We could not save that just now. Please try again." };
+    }
+    const parsed = step4Schema(tier).safeParse(data);
+    if (!parsed.success) {
+      return { error: firstValidationError(parsed.error) };
+    }
+    const values = parsed.data;
+
     const { error } = await supabase
       .from("nurse_profiles")
       .update({
-        bio: data.bio,
-        photos,
-        has_photo: photos.length > 0,
-        photo_focal_x: data.photo_focal_x,
-        photo_focal_y: data.photo_focal_y,
+        bio: values.bio,
+        photos: values.photos,
+        has_photo: values.photos.length > 0,
+        photo_focal_x: values.photo_focal_x,
+        photo_focal_y: values.photo_focal_y,
       })
       .eq("user_id", user.id);
 
@@ -246,12 +264,18 @@ export async function saveOnboardingStep(
 
   // Step 5: Contact Info (updates users table + nurse_profiles)
   if (step === 5) {
+    const parsed = step5Schema.safeParse(data);
+    if (!parsed.success) {
+      return { error: firstValidationError(parsed.error) };
+    }
+    const values = parsed.data;
+
     const { error: userError } = await supabase
       .from("users")
       .update({
-        phone: (data.contact_phone as string) || null,
-        zip_code: data.zip_code as string,
-        communication_preference: data.communication_preference,
+        phone: values.contact_phone || null,
+        zip_code: values.zip_code,
+        communication_preference: values.communication_preference,
       })
       .eq("id", user.id);
 
@@ -269,7 +293,7 @@ export async function saveOnboardingStep(
     const { error: profileError } = await supabase
       .from("nurse_profiles")
       .update({
-        travel_radius_miles: data.travel_radius_miles,
+        travel_radius_miles: values.travel_radius_miles,
       })
       .eq("user_id", user.id);
 
@@ -410,16 +434,20 @@ export async function updateNurseProfile(
   if (!parsed.success) {
     return { error: firstValidationError(parsed.error) };
   }
+  // Everything below writes what the schema RETURNED, never the submitted
+  // object, so a transform, trim or default added to fullProfileSchema
+  // actually reaches the database (#963).
+  const values = parsed.data;
 
   // Update users table (name, phone, zip, comm preference)
   const { error: userError } = await supabase
     .from("users")
     .update({
-      first_name: data.first_name as string,
-      last_name: data.last_name as string,
-      phone: (data.contact_phone as string) || null,
-      zip_code: data.zip_code as string,
-      communication_preference: data.communication_preference,
+      first_name: values.first_name,
+      last_name: values.last_name,
+      phone: values.contact_phone || null,
+      zip_code: values.zip_code,
+      communication_preference: values.communication_preference,
     })
     .eq("id", user.id);
 
@@ -429,7 +457,7 @@ export async function updateNurseProfile(
   }
 
   // Check if slug needs regeneration (name or credential changed)
-  const credentialChanged = currentProfile.credential !== data.credential;
+  const credentialChanged = currentProfile.credential !== values.credential;
 
   // Name change is detected by the users table trigger, but we
   // also need to regenerate the slug
@@ -448,7 +476,7 @@ export async function updateNurseProfile(
   let needsNewSlug = false;
   if (freshUser) {
     const expectedSlugBase =
-      `${freshUser.first_name}-${freshUser.last_name}-${data.credential as string}`
+      `${freshUser.first_name}-${freshUser.last_name}-${values.credential}`
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, "")
         .replace(/-+/g, "-");
@@ -459,7 +487,7 @@ export async function updateNurseProfile(
   // If credential changed, the DB trigger will reset verification_status.
   // We just need to save the new credential.
 
-  const photos = (data.photos as string[]) || [];
+  const photos = values.photos;
 
   // A rejected profile re-enters the review queue on save. The rule is shared
   // with the wizard's own completion path, which is where a nurse whose
@@ -470,28 +498,29 @@ export async function updateNurseProfile(
   // Build the profile update; the slug is set per-path below.
   const profileUpdate = {
     ...resubmission,
-    credential: data.credential,
-    license_number: ((data.license_number as string) ?? "").trim() || null,
-    care_types: data.care_types,
-    primary_care_type: data.primary_care_type ?? null,
-    skills: data.skills ?? [],
-    gender: data.gender,
-    years_experience: data.years_experience,
-    languages: normalizeLanguageList(data.languages as string[]),
-    bio: data.bio,
+    credential: values.credential,
+    license_number: values.license_number.trim() || null,
+    care_types: values.care_types,
+    primary_care_type: values.primary_care_type,
+    skills: values.skills,
+    gender: values.gender,
+    years_experience: values.years_experience,
+    // Already normalised by the schema's transform.
+    languages: values.languages,
+    bio: values.bio,
     photos,
     has_photo: photos.length > 0,
-    photo_focal_x: data.photo_focal_x,
-    photo_focal_y: data.photo_focal_y,
-    rate_min: data.rate_min ?? null,
-    rate_max: data.rate_max ?? null,
-    has_transportation: data.has_transportation,
-    covid_vaccinated: data.covid_vaccinated ?? null,
-    care_philosophy: data.care_philosophy ?? null,
-    additional_certs: data.additional_certs ?? [],
-    availability_commitment: data.availability_commitment ?? [],
-    time_slots: data.time_slots ?? [],
-    travel_radius_miles: data.travel_radius_miles ?? null,
+    photo_focal_x: values.photo_focal_x,
+    photo_focal_y: values.photo_focal_y,
+    rate_min: values.rate_min,
+    rate_max: values.rate_max,
+    has_transportation: values.has_transportation,
+    covid_vaccinated: values.covid_vaccinated,
+    care_philosophy: values.care_philosophy,
+    additional_certs: values.additional_certs,
+    availability_commitment: values.availability_commitment,
+    time_slots: values.time_slots,
+    travel_radius_miles: values.travel_radius_miles,
   };
 
   if (needsNewSlug && freshUser) {
@@ -502,7 +531,7 @@ export async function updateNurseProfile(
       slugDb,
       freshUser.first_name || "",
       freshUser.last_name || "",
-      data.credential as string,
+      values.credential,
       user.id,
       async (candidate) => {
         const { error: updateError } = await supabase
