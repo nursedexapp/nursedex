@@ -350,14 +350,89 @@ function assertNurseCardRow(row: unknown): CardRow {
   return { ...r, users: users as Record<string, unknown> } as CardRow;
 }
 
-/** Strip the internal fields before the card becomes a client-component prop. */
+/**
+ * Every field the public card carries, named (#968).
+ *
+ * The public card used to be built by SUBTRACTING the internal fields, which
+ * made the rule "remember to add your field to that destructure", enforced by
+ * nothing: the return type says a field is gone, but a spread carries whatever
+ * the object actually holds, and this result is serialised into the RSC payload
+ * every visitor downloads. InternalNurseCard extends the public card precisely
+ * so it can carry things the public one should not, which makes it the natural
+ * place to put something that must never be sent.
+ *
+ * Built by inclusion, the failure inverts: a field added to the internal card
+ * is absent from the public one until somebody adds it here deliberately.
+ */
+export const PUBLIC_NURSE_CARD_KEYS = [
+  "user_id",
+  "slug",
+  "first_name",
+  "last_name",
+  "last_initial",
+  "credential",
+  "primary_care_type",
+  "care_types",
+  "tier",
+  "has_photo",
+  "photo_url",
+  "avg_rating",
+  "review_count",
+  "is_available",
+  "unavailable_visibility",
+  "profile_completeness",
+  "verified_at",
+  "photo_focal_x",
+  "photo_focal_y",
+  "zip_code",
+  "distance_miles",
+  "communication_preference",
+  "years_experience",
+  "bio",
+  "rate_min",
+  "rate_max",
+  "availability_commitment",
+  "has_rate",
+  "has_availability",
+  "city",
+  "state",
+  "revealed",
+] as const;
+
+/** True only when the two unions hold exactly the same members. */
+type SameKeys<A, B> = [A] extends [B]
+  ? [B] extends [A]
+    ? true
+    : false
+  : false;
+
+/**
+ * The list above is exactly the public card's own keys.
+ *
+ * A field added to NurseSearchCard and not to the list stops compiling here,
+ * so the list cannot silently fall behind the type it claims to describe. It
+ * is the compile-time half of the pair; card.test.ts asserts the keys the
+ * built object actually carries, so neither end answers for the other.
+ */
+const _publicKeysMatchTheType: SameKeys<
+  (typeof PUBLIC_NURSE_CARD_KEYS)[number],
+  keyof NurseSearchCard
+> = true;
+void _publicKeysMatchTheType;
+
+/** Build the client-safe card by naming what it HAS, never by removing. */
 export function toPublicNurseCard(card: InternalNurseCard): NurseSearchCard {
-  // Both stripped by name, not left to the type. The return type says they are
-  // gone, but a spread carries whatever the object actually holds, and this
-  // result is serialised to the browser. name_match describes ONE search, not
-  // the nurse, so it has no business on a card (#936).
-  const { photos: _photos, name_match: _nameMatch, ...rest } = card;
-  return rest;
+  const out: Partial<NurseSearchCard> = {};
+  for (const key of PUBLIC_NURSE_CARD_KEYS) {
+    // `in` rather than an undefined check: `revealed` is optional, and a card
+    // that never had it should not gain the key with an undefined value, which
+    // would ship as `null` through the RSC payload and read as "not revealed"
+    // where the absence means "this producer does not know".
+    if (key in card) {
+      (out as Record<string, unknown>)[key] = card[key];
+    }
+  }
+  return out as NurseSearchCard;
 }
 
 // ── Photos ────────────────────────────────────────────────────
