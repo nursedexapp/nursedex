@@ -22,6 +22,10 @@ const METHODS = [
   "or",
   "order",
   "limit",
+  // Paged reads. A caller that pages rather than reading unbounded is doing
+  // the right thing (PostgREST caps a select and returns a healthy looking
+  // prefix), so the shared builder has to be able to stand in for it.
+  "range",
   "maybeSingle",
   "single",
   "insert",
@@ -99,9 +103,9 @@ export function createQueryBuilder(
       // Terminal calls (e.g. .maybeSingle()) are awaited by the caller, not
       // chained, so the runtime value is a Promise<Resolved> even though the
       // static type below claims QueryBuilder for uniform chaining.
-      return (
-        result === "chain" ? builder : Promise.resolve(result)
-      ) as unknown as QueryBuilder;
+      return (result === "chain"
+        ? builder
+        : Promise.resolve(result)) as unknown as QueryBuilder;
     };
   }
 
