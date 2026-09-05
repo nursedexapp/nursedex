@@ -1,0 +1,69 @@
+name: Stale Pull Requests
+
+# Nothing reported that a pull request had gone stale, so one could sit red
+# indefinitely and look exactly like a repo where nobody is working (#907).
+#
+# PR #713 was open from 2026-07-13 to 2026-09-02, failing a single check the
+# whole time, and it carried the fix for three priority-p0 privacy issues: a
+# privacy policy making claims the code did not honour, and personal data
+# reaching session replay. The failing check was a test reading a gitignored
+# file, so it could never have passed in CI however long it waited. The cost
+# was not the PR, it was what the PR was carrying, and the only signal was a
+# red mark on a page nobody had a reason to open.
+#
+# A red run and a refused run also look identical in a list, so this doubles as
+# an early warning that CI itself has stopped.
+#
+# IT NEVER FAILS ON A FINDING. A stale pull request is a thing for a person to
+# look at, not a broken build, and a workflow that goes red every week for a
+# backlog is one whose red stops meaning anything. A failed READ does fail the
+# job, because a report of "nothing stale" that could not look is exactly the
+# defect this exists to remove.
+
+on:
+  # Weekly. Daily would report the same backlog every morning, which is how a
+  # notice teaches people to skip it; two weeks would let a fortnight-old PR go
+  # a month before anybody heard.
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+# Read-only, listed rather than granted wholesale: an over-broad permission is
+# invisible, because the code never attempts what it is not meant to do, while
+# a missing one fails loudly on the first run (L503).
+permissions:
+  contents: read # checkout
+  pull-requests: read # listing the open pull requests
+  checks: read # reading each one's check runs
+
+concurrency:
+  group: stale-prs
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Report pull requests open for weeks
+    runs-on: ubuntu-latest
+    # Two small API calls plus one per open pull request. Five minutes is far
+    # more than it needs and far less than the six hour default, which would
+    # let a hung request hold a runner and bill 360 minutes (#809, L110).
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install tsx
+        uses: ./.github/actions/setup-tsx
+
+      # SLACK_BOT_TOKEN is optional and follows Production Smoke: without it the
+      # run log is the only signal, and the checker says so rather than skipping
+      # in silence.
+      - name: Report any pull request left waiting
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: tsx scripts/check-stale-prs.ts
