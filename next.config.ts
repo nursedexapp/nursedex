@@ -44,6 +44,18 @@ export const nextConfig: NextConfig = {
   // PostHog ingestion paths are trailing-slash sensitive; don't let Next
   // 308-redirect them and break the proxied requests.
   skipTrailingSlashRedirect: true,
+  // The weekly data drift cron (#927) compares production's zip coordinates
+  // against the reference list the seed is generated from, which is a CSV in
+  // the repository rather than anything the bundler can see it importing. Next
+  // traces a function's files from its imports, so without this the file is
+  // absent at runtime and the route throws.
+  //
+  // Deliberately not silent: the route refuses an empty reference list rather
+  // than comparing against it, because an empty one skips every zip and would
+  // report a perfectly clean result having compared nothing at all.
+  outputFileTracingIncludes: {
+    "/api/cron/data-drift": ["./data/ny_zip_codes.csv"],
+  },
 };
 
 // Wraps the config with a build-time plugin that uploads source maps

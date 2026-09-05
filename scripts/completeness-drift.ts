@@ -14,77 +14,23 @@
  *   npx tsx scripts/completeness-drift.ts
  *   npx tsx scripts/completeness-drift.ts --apply
  */
+// The decision and the paged read now live in src, because the weekly data
+// drift cron (#927) asks the same question and two copies of "which rows have
+// drifted" would be two answers. Re-exported so this script's own tests and
+// any existing caller keep their import path.
+export {
+  rowsNeedingRepair,
+  summarise,
+  parseReportedTotal,
+  readScoredProfiles,
+  type DriftRow,
+  type ScoredRow,
+} from "../src/lib/data-drift/completeness";
 import {
-  calculateCompleteness,
-  COMPLETENESS_COLUMNS,
-  type CompletenessInput,
-} from "../src/lib/profile/completeness";
-
-export interface DriftRow {
-  user_id: string;
-  stored: number;
-  derived: number;
-}
-
-type ScoredRow = CompletenessInput & {
-  user_id: string;
-  profile_completeness: number;
-};
-
-/** The rows whose stored score is not what their profile earns. */
-export function rowsNeedingRepair(rows: ScoredRow[]): DriftRow[] {
-  const out: DriftRow[] = [];
-  for (const row of rows) {
-    const { score } = calculateCompleteness(row);
-    if (score !== row.profile_completeness) {
-      out.push({
-        user_id: row.user_id,
-        stored: row.profile_completeness,
-        derived: score,
-      });
-    }
-  }
-  return out;
-}
-
-/**
- * Both directions, counted separately. A score that is too HIGH is a nurse
- * ranked on credit she does not have, which is a different and worse thing
- * than one ranked too low, and folding them into one number would hide it.
- */
-export function summarise(drift: DriftRow[]): string {
-  if (drift.length === 0) return "No drift: every stored score is what the profile earns.";
-
-  const low = drift.filter((d) => d.derived > d.stored);
-  const high = drift.filter((d) => d.derived < d.stored);
-  const gaps = low.map((d) => d.derived - d.stored).sort((a, b) => a - b);
-
-  const lines = [
-    `${low.length} scored below what the profile earns` +
-      (gaps.length
-        ? ` (by ${gaps[0]} to ${gaps[gaps.length - 1]} points)`
-        : ""),
-    `${high.length} scored above what the profile earns`,
-  ];
-  return lines.join("\n");
-}
-
-/**
- * How many rows the server says there are, from a PostgREST content-range
- * header, or null when it does not say or says something we cannot read.
- *
- * Returned as null rather than a number, and mapped to a refusal by the
- * caller, because a value parsed straight into a comparison lands on the
- * permissive side when the parse fails: NaN compares unequal to everything,
- * and "*" or a missing header would otherwise become 0 and make an empty read
- * look complete.
- */
-export function parseReportedTotal(contentRange: string | null): number | null {
-  const total = contentRange?.split("/")[1];
-  if (!total || total === "*") return null;
-  const parsed = Number(total);
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
-}
+  rowsNeedingRepair,
+  summarise,
+  readScoredProfiles,
+} from "../src/lib/data-drift/completeness";
 
 async function main(): Promise<void> {
   const apply = process.argv.includes("--apply");
@@ -97,48 +43,10 @@ async function main(): Promise<void> {
   }
   const headers = { apikey: key, Authorization: `Bearer ${key}` };
 
-  // Paged rather than one unbounded read: PostgREST caps a select at a page
-  // and returns a healthy looking prefix, so an unbounded read would repair
-  // the first page and silently leave the rest.
-  //
-  // A short page ends the loop, which is also what a truncated read looks
-  // like, so the total is checked against the count the server reports. A
-  // repair that quietly covered half the roster would report success and
-  // leave the other half wrong, which is the failure this whole script exists
-  // to find.
-  const rows: ScoredRow[] = [];
-  const pageSize = 500;
-  let reportedTotal: number | null = null;
-  for (let from = 0; ; from += pageSize) {
-    const res = await fetch(
-      `${url}/rest/v1/nurse_profiles?select=user_id,profile_completeness,${encodeURIComponent(COMPLETENESS_COLUMNS)}`,
-      {
-        headers: {
-          ...headers,
-          Range: `${from}-${from + pageSize - 1}`,
-          Prefer: "count=exact",
-        },
-      },
-    );
-    if (!res.ok) throw new Error(`Read failed: ${res.status} ${await res.text()}`);
-    if (reportedTotal === null) {
-      reportedTotal = parseReportedTotal(res.headers.get("content-range"));
-    }
-    const page = (await res.json()) as ScoredRow[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-
-  if (reportedTotal === null) {
-    throw new Error(
-      "The server did not report how many profiles there are, so a short read could not be told from a complete one.",
-    );
-  }
-  if (rows.length !== reportedTotal) {
-    throw new Error(
-      `Read ${rows.length} profiles but the server reports ${reportedTotal}. Refusing to repair a partial roster.`,
-    );
-  }
+  // Paged, and only when the whole roster arrived: the reader refuses a short
+  // read rather than repairing a prefix. It lives in src alongside the rule,
+  // so the monitor and the repair cannot read different populations.
+  const rows = await readScoredProfiles({ fetchFn: fetch, url, headers });
 
   const drift = rowsNeedingRepair(rows);
   console.log(`Examined ${rows.length} profiles.`);

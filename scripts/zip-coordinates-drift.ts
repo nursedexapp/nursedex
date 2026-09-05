@@ -19,158 +19,31 @@
  *   npx tsx scripts/zip-coordinates-drift.ts
  *   npx tsx scripts/zip-coordinates-drift.ts --apply
  */
-import { readFileSync } from "node:fs";
-
-/** Anything closer than this is left alone: it moves nobody meaningfully. */
-export const CORRECTION_MILES = 3;
-
-export interface ZipPoint {
-  zip: string;
-  latitude: number;
-  longitude: number;
-}
-
-export interface ZipCorrection extends ZipPoint {
-  /** How far the stored position is from the reference. */
-  miles: number;
-}
-
-function milesBetween(a: ZipPoint, b: ZipPoint): number {
-  const R = 3959;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLng = toRad(b.longitude - a.longitude);
-  const x =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.latitude)) *
-      Math.cos(toRad(b.latitude)) *
-      Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.asin(Math.sqrt(x));
-}
-
-/**
- * The stored zips that are far enough from the reference to be worth moving,
- * carrying the reference position to move them to.
- *
- * A zip the reference has never heard of is skipped rather than treated as an
- * error: four rows are carried over from the launch seed precisely because
- * GeoNames has no entry for them, and refusing the whole run over rows nobody
- * can correct would stop the ones that can be.
- */
-export function zipsNeedingCorrection(
-  storedRows: ZipPoint[],
-  reference: Map<string, ZipPoint>,
-  threshold = CORRECTION_MILES,
-): ZipCorrection[] {
-  const out: ZipCorrection[] = [];
-  for (const stored of storedRows) {
-    const ref = reference.get(stored.zip);
-    if (!ref) continue;
-    const miles = milesBetween(stored, ref);
-    if (miles > threshold) {
-      out.push({
-        zip: stored.zip,
-        latitude: ref.latitude,
-        longitude: ref.longitude,
-        miles,
-      });
-    }
-  }
-  return out;
-}
-
-export function summariseZips(corrections: ZipCorrection[]): string {
-  if (corrections.length === 0) {
-    return `No zip is more than ${CORRECTION_MILES} miles from the reference.`;
-  }
-  const worst = corrections.reduce((a, b) => (a.miles > b.miles ? a : b));
-  return `${corrections.length} zips are more than ${CORRECTION_MILES} miles out; the worst (${worst.zip}) is ${worst.miles.toFixed(1)} miles.`;
-}
-
-/** The reference list the seed is generated from. */
-export function readReference(path = "data/ny_zip_codes.csv"): Map<string, ZipPoint> {
-  const [header, ...lines] = readFileSync(path, "utf8").trim().split("\n");
-  const cols = header.split(",");
-  const iZip = cols.indexOf("zip");
-  const iLat = cols.indexOf("latitude");
-  const iLng = cols.indexOf("longitude");
-  if (iZip < 0 || iLat < 0 || iLng < 0) {
-    throw new Error(`${path} does not carry zip, latitude and longitude.`);
-  }
-  const out = new Map<string, ZipPoint>();
-  for (const line of lines) {
-    const parts = line.split(",");
-    out.set(parts[iZip], {
-      zip: parts[iZip],
-      latitude: Number(parts[iLat]),
-      longitude: Number(parts[iLng]),
-    });
-  }
-  return out;
-}
-
+// The decision, the reference and the paged read now live in src, because the
+// weekly data drift cron (#927) asks the same question and two copies of
+// "which zips have drifted" would be two answers. Re-exported here so the
+// script's own tests and any existing caller keep their import path.
+export {
+  CORRECTION_MILES,
+  zipsNeedingCorrection,
+  summariseZips,
+  readReference,
+  readAllZips,
+  type ZipPoint,
+  type ZipCorrection,
+} from "../src/lib/data-drift/zips";
+import {
+  zipsNeedingCorrection,
+  summariseZips,
+  readReference,
+  readAllZips,
+  type ZipCorrection,
+} from "../src/lib/data-drift/zips";
 
 interface RequestDeps {
   fetchFn: typeof fetch;
   url: string;
   headers: Record<string, string>;
-}
-
-/**
- * Every zip row, paged, and only when the whole list arrived.
- *
- * A short page ends the loop, which is also exactly what a truncated read
- * looks like, so the total is checked against the count the server reports.
- * Correcting a partial list would report success and leave the rest wrong.
- *
- * The fetch is an argument so this can be exercised without a network: the
- * part that decides whether the list is complete is the part most worth
- * testing, and a function that builds its own client cannot be.
- */
-export async function readAllZips(
-  deps: RequestDeps & { pageSize?: number },
-): Promise<ZipPoint[]> {
-  const pageSize = deps.pageSize ?? 1000;
-  const rows: ZipPoint[] = [];
-  let reportedTotal: number | null = null;
-
-  for (let from = 0; ; from += pageSize) {
-    const res = await deps.fetchFn(
-      `${deps.url}/rest/v1/zip_codes?select=zip,latitude,longitude&order=zip`,
-      {
-        headers: {
-          ...deps.headers,
-          Range: `${from}-${from + pageSize - 1}`,
-          Prefer: "count=exact",
-        },
-      },
-    );
-    if (!res.ok) {
-      throw new Error(`Read failed: ${res.status} ${await res.text()}`);
-    }
-    if (reportedTotal === null) {
-      const total = res.headers.get("content-range")?.split("/")[1];
-      reportedTotal =
-        total && total !== "*" && Number.isInteger(Number(total))
-          ? Number(total)
-          : null;
-    }
-    const page = (await res.json()) as ZipPoint[];
-    rows.push(...page);
-    if (page.length < pageSize) break;
-  }
-
-  if (reportedTotal === null) {
-    throw new Error(
-      "The server gave no count, so a partial read could not be told from a complete one. Refusing to correct.",
-    );
-  }
-  if (rows.length !== reportedTotal) {
-    throw new Error(
-      `Read ${rows.length} zips but the server reports ${reportedTotal}. Refusing to correct a partial list.`,
-    );
-  }
-  return rows;
 }
 
 /**
