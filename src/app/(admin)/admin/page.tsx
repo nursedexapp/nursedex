@@ -5,6 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getAdminCounts } from "@/lib/admin/queries";
 import { getDirectoryCoverage } from "@/lib/nurses/coverage";
 import { DirectoryCoverage } from "./DirectoryCoverage";
+import { getNudgeResponse } from "@/lib/nurses/nudge-response";
+import { NudgeResponse } from "./NudgeResponse";
 
 export const metadata: Metadata = {
   title: "Admin | NurseDex",
@@ -12,9 +14,10 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminDashboardPage() {
-  const [counts, coverage] = await Promise.all([
+  const [counts, coverage, nudges] = await Promise.all([
     getAdminCounts(),
     getDirectoryCoverage(),
+    getNudgeResponse(),
   ]);
 
   return (
@@ -56,6 +59,8 @@ export default async function AdminDashboardPage() {
       </div>
 
       <DirectoryCoverage coverage={coverage} />
+
+      <NudgeResponse response={nudges} />
     </div>
   );
 }

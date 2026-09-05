@@ -42,6 +42,11 @@ const SURFACES: Array<{ file: string; filter: FilterName; what: string }> = [
     what: "telling the nurses the directory does not show that it does not",
   },
   {
+    file: "src/lib/nurses/nudge-response.ts",
+    filter: "applyListedNurseFilter",
+    what: "whether the nurses told families cannot see them have since become listed (#947), which has to be the same question the directory answers or the readout reassures somebody about a population the directory does not show",
+  },
+  {
     file: "src/lib/nurses/saves.ts",
     filter: "applyVisibleNurseFilter",
     what: "a family's saved nurses, which she chose herself",
