@@ -80,3 +80,99 @@ jobs:
           supabase link --project-ref "$PROJECT_REF"
           supabase migration list --linked --output-format json \
             | tsx scripts/check-migration-drift.ts
+
+  # ── What production's schema actually IS, not what version it reports (#890).
+  #
+  # The job above compares version NUMBERS. That catches a migration that never
+  # ran, and cannot catch one that ran and did something different from its
+  # file: once a version is recorded as applied, production and the file can
+  # disagree in any way at all and it reports "in sync" forever.
+  #
+  # Migrations 066 and 067 were applied through the Supabase dashboard by hand,
+  # assembled from the files rather than executed from them, and the history row
+  # recording them was written by hand too. That is exactly the case the version
+  # comparison cannot see.
+  #
+  # Its own job rather than a step on the one above, because it needs a whole
+  # local Supabase and takes minutes rather than seconds, and because a failure
+  # of one must not hide the other: they answer different questions and a
+  # missing migration and a mangled one need different work (L73).
+  #
+  # THE EXPECTED SHAPE IS NEVER WRITTEN DOWN. It is read out of a database built
+  # from the migrations, through the same query run against production, so a
+  # hand kept list of expected columns, which is the same defect one level up,
+  # cannot drift.
+  contents:
+    name: Compare production's schema against the migrations
+    runs-on: ubuntu-latest
+    # Dominated by `supabase start`, which pulls container images. The e2e job
+    # budgets 30 for a run that also builds the app and drives a browser; this
+    # one starts the stack and runs two queries. Without a timeout a job
+    # inherits GitHub's six hour default (#809, L110).
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install tsx
+        uses: ./.github/actions/setup-tsx
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: latest
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The same exclusion list the e2e job uses, through the same checker, so
+      # a service name that stops being valid fails here the way it does there
+      # rather than being silently ignored.
+      - name: Start Supabase from the migrations
+        env:
+          EXCLUDED_SERVICES: >-
+            studio logflare vector edge-runtime realtime mailpit postgres-meta
+        run: |
+          set -euo pipefail
+          exclude=$(tsx scripts/check-supabase-exclusions.ts check)
+          echo "Excluding: $exclude"
+          supabase start -x "$exclude"
+          docker ps --filter name=supabase --format '{{.Names}}' \
+            | tsx scripts/check-supabase-exclusions.ts count
+
+      # Both sides through ONE query file. Two queries would be two definitions
+      # of "the shape", and they would drift apart in exactly the way this job
+      # exists to catch (L70).
+      - name: Read the shape the migrations build
+        run: |
+          set -euo pipefail
+          supabase db query --local --output-format json \
+            -f scripts/schema-shape.sql > /tmp/from-migrations.json
+
+      - name: Read production's shape
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$PROJECT_REF"
+          supabase db query --linked --output-format json \
+            -f scripts/schema-shape.sql > /tmp/production.json
+
+      # Reports, and does NOT yet fail on a difference. Nobody has seen what a
+      # healthy comparison between a hosted project and a local one looks like,
+      # and failing on the platform's own additions would train everyone to
+      # ignore this before it had said anything true (L56). Promoting it to a
+      # gate, with SCHEMA_DRIFT_ENFORCE=1, is #1031, filed alongside this so an
+      # inactive guard is not one nothing is tracking (L65).
+      #
+      # A failed READ does fail, now: the checker refuses an empty or
+      # unreadable payload rather than reporting a match nobody measured.
+      - name: Compare the schema contents
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          tsx scripts/check-schema-drift.ts \
+            /tmp/from-migrations.json /tmp/production.json
