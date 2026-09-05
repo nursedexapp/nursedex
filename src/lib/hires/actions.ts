@@ -171,7 +171,7 @@ export async function recordFamilyHire(
         to: nurseUser.email,
         firstName: nurseUser.first_name ?? undefined,
         familyFirstName: user.first_name ?? "A NurseDex family",
-      }).catch((err) => console.error("[email] hire confirmed failed:", err)),
+      }),
     );
   }
 
@@ -311,9 +311,7 @@ export async function claimHireByEmail(
           firstName: family.first_name ?? undefined,
           nurseFirstName: nurse.first_name ?? "Your NurseDex nurse",
           claimToken: token,
-        }).catch((err) =>
-          console.error("[email] hire confirm request resend failed:", err),
-        ),
+        }),
       );
       return { success: true, hireId: existing.id, resent: true };
     }
@@ -390,9 +388,7 @@ export async function claimHireByEmail(
       firstName: family.first_name ?? undefined,
       nurseFirstName: nurse.first_name ?? "Your NurseDex nurse",
       claimToken,
-    }).catch((err) =>
-      console.error("[email] hire confirm request failed:", err),
-    ),
+    }),
   );
 
   revalidatePath("/dashboard");
@@ -472,7 +468,7 @@ export async function confirmHireFromToken(
         to: nurseUser.email,
         firstName: nurseUser.first_name ?? undefined,
         familyFirstName: user.first_name ?? "A NurseDex family",
-      }).catch((err) => console.error("[email] hire confirmed failed:", err)),
+      }),
     );
   }
 

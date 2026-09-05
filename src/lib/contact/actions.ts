@@ -73,9 +73,7 @@ export async function submitContact(
       email: input.email,
       subject: input.subject,
       message: input.message,
-    }).catch((err) =>
-      console.error("[email] contact received notify failed:", err),
-    ),
+    }),
   );
 
   return { success: true };

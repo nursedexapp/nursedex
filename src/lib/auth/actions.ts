@@ -117,9 +117,7 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
         sendAccountExistsNoticeEmail({
           to: email.toLowerCase(),
           firstName: existing.first_name ?? undefined,
-        }).catch((err) =>
-          console.error("[email] Account exists notice error:", err),
-        ),
+        }),
       );
       return { success: "Check your email for a confirmation link." };
     }
@@ -421,11 +419,7 @@ export async function resendConfirmation(
     : { data: { user: null } };
 
   if (authData?.user?.email_confirmed_at) {
-    after(() =>
-      sendAccountExistsNoticeEmail({ to: email.toLowerCase() }).catch((err) =>
-        console.error("[email] Account exists notice error:", err),
-      ),
-    );
+    after(() => sendAccountExistsNoticeEmail({ to: email.toLowerCase() }));
     return { success: "Confirmation email sent. Check your inbox." };
   }
 

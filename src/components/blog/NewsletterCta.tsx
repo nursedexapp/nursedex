@@ -25,7 +25,9 @@ export function NewsletterCta({ source }: { source: string }) {
           res.fieldErrors?.email ??
             (res.error === "rate_limited"
               ? "Too many attempts from your network. Please try again later."
-              : "Something went wrong. Please try again."),
+              : res.error === "email_unsent"
+                ? "We could not send the confirmation email. Please try again."
+                : "Something went wrong. Please try again."),
         );
         return;
       }

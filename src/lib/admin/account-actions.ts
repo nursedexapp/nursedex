@@ -113,7 +113,7 @@ export async function suspendAccount(
     sendAccountSuspendedEmail({
       to: target.email,
       firstName: target.first_name ?? undefined,
-    }).catch((err) => console.error("[email] account suspended failed:", err)),
+    }),
   );
 
   revalidatePath("/admin");
@@ -302,7 +302,7 @@ export async function removeAccount(
       to: target.email,
       firstName: target.first_name ?? undefined,
       reason: parsed.data.reason,
-    }).catch((err) => console.error("[email] account removed failed:", err)),
+    }),
   );
 
   revalidatePath("/admin");

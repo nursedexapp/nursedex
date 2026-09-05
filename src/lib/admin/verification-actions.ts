@@ -163,9 +163,7 @@ export async function approveVerification(
       to: approvedUser.email,
       firstName: approvedUser.first_name ?? undefined,
       slug: row.slug,
-    }).catch((err) =>
-      console.error("[email] verification approved failed:", err),
-    ),
+    }),
   );
 
   revalidatePath("/admin");
@@ -263,9 +261,7 @@ export async function rejectVerification(
       to: rejectedUser.email,
       firstName: rejectedUser.first_name ?? undefined,
       reason: reasonText,
-    }).catch((err) =>
-      console.error("[email] verification rejected failed:", err),
-    ),
+    }),
   );
 
   revalidatePath("/admin");

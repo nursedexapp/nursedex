@@ -165,7 +165,7 @@ export async function submitExternalReview(
       to: input.reviewer_email,
       reviewerName: input.reviewer_name,
       verificationToken: row.verification_token,
-    }).catch((err) => console.error("[reviews] verify email failed:", err)),
+    }),
   );
 
   return { success: true, reviewId: row.review_id };
@@ -215,7 +215,7 @@ export async function verifyExternalReview(
       nurseUserId: row.nurse_user_id,
       rating: row.rating,
       reviewerName: row.reviewer_name,
-    }).catch((err) => console.error("[reviews] new-review email failed:", err)),
+    }),
   );
 
   return {
