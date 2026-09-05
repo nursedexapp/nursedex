@@ -8,7 +8,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseCronSchedules, expectedIntervalMs } from "./scheduled-jobs";
+import {
+  collectScheduledWorkflows,
+  parseCronSchedules,
+  expectedIntervalMs,
+  selfWorkflowSource,
+} from "./scheduled-jobs";
+import { readdirSync } from "node:fs";
 
 const PATH = join(process.cwd(), ".github/workflows/job-watchdog.yml");
 const WORKFLOW = readFileSync(PATH, "utf8");
@@ -129,5 +135,40 @@ describe("the watchdog runs after the checks it judges", () => {
     expect(EXECUTABLE).toMatch(
       /github\.event\.workflow_run\.event\s*==\s*'schedule'/,
     );
+  });
+  /**
+   * The self entry is real, and the special case that handles it is live code.
+   *
+   * The watchdog derives its watched set from the workflow files, so it has
+   * always included itself. If that ever stops being true the dispatch
+   * measurement becomes a branch nothing reaches, and a reason recorded beside
+   * code nothing calls is a decision nobody revisits (L346, L29).
+   */
+  it("watches itself, which is what the dispatch measurement is for", () => {
+    const dir = join(process.cwd(), ".github/workflows");
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"))
+      .map((f) => ({
+        path: join(dir, f),
+        contents: readFileSync(join(dir, f), "utf8"),
+      }));
+
+    const sources = collectScheduledWorkflows(files).map((j) => j.source);
+    expect(sources).toContain("job-watchdog.yml");
+  });
+
+  /**
+   * The link between the workflow and the entry it treats as itself. GitHub
+   * sets GITHUB_WORKFLOW_REF from the file that is running, so the name the
+   * script resolves has to be the name the watched set uses (L70: the two
+   * sides of a guard must not come from one lookup).
+   */
+  it("resolves its own file name to the same string the watched set uses", () => {
+    expect(
+      selfWorkflowSource({
+        GITHUB_WORKFLOW_REF:
+          "nursedexapp/nursedex/.github/workflows/job-watchdog.yml@refs/heads/main",
+      }),
+    ).toBe(PATH.split("/").pop());
   });
 });

@@ -27,6 +27,21 @@ name: Job Watchdog
 # and the fact that the daily "all healthy" line stops appearing in the run
 # log. Watching the watcher from inside the same account is not possible
 # without a second, independent system.
+#
+# ITS OWN ENTRY IS MEASURED DIFFERENTLY, and has to be. Every other job here is
+# judged on when it last SUCCEEDED. Judging this one that way latches it: the
+# first time it correctly reports some other job it exits 1, its own success
+# clock stops, and the next run finds ITSELF overdue, fails for that reason,
+# and pushes its own clock a further day out, forever, long after the original
+# problem is fixed. That is not hypothetical. Third Party Health failed on
+# 2026-09-03, this correctly reported it on the 4th, it recovered hours later,
+# and from the 5th every run of this reported nothing but itself.
+#
+# So its own entry is judged on whether its SCHEDULE STILL FIRES, not on
+# whether the run passed. A run of it that fired and failed is already alerting
+# through its own red run; being dispatched at all is the only thing about
+# itself that nothing else would say. The relaxation is scoped to that one
+# entry and to nothing else (L324).
 
 on:
   # Daily, and deliberately not weekly: the jobs it watches include daily ones,

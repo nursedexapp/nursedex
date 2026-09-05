@@ -25,6 +25,8 @@ import {
   attachHeartbeats,
   parseMaxDurationSeconds,
   fetchHeartbeatRows,
+  selfWorkflowSource,
+  loadGitHubWorkflowJobs,
 } from "./scheduled-jobs";
 
 const HOUR = 60 * 60 * 1000;
@@ -685,5 +687,168 @@ describe("fetchHeartbeatRows", () => {
         fetchImpl: async () => response({ jobs: [] }),
       }),
     ).resolves.toEqual([]);
+  });
+});
+
+// The watchdog watches itself, and on 2026-09-05 that turned into a latch it
+// could not get out of (#1039).
+//
+// Third Party Health genuinely failed on 2026-09-03. The watchdog correctly
+// reported it and exited 1 on the 4th, which is what it is for. But its own
+// failure stopped its own success clock, so on the 5th it looked at itself,
+// found 47 hours with no success, reported that, and failed again. From then
+// on every run pushed its own clock a further day out. Third Party Health had
+// recovered hours after being reported and nothing else was ever wrong.
+//
+// The fix is scoped to the one entry that causes it: the watchdog judges
+// ITSELF on whether its schedule still fires, not on whether the run passed.
+// That is the distinction its own alert text already draws. A watchdog that
+// runs and fails is already alerting through its own red run; the thing only
+// it can detect about itself is GitHub disabling the schedule (L324: the stand
+// down is no broader than the reason for standing down).
+describe("selfWorkflowSource", () => {
+  it("names the workflow file this run is executing as", () => {
+    expect(
+      selfWorkflowSource({
+        GITHUB_WORKFLOW_REF:
+          "nursedexapp/nursedex/.github/workflows/job-watchdog.yml@refs/heads/main",
+      }),
+    ).toBe("job-watchdog.yml");
+  });
+
+  it("is null when nothing is running as a workflow, so a local run is unaffected", () => {
+    expect(selfWorkflowSource({})).toBeNull();
+  });
+
+  /**
+   * The failure path. Without a self reference every job is judged by success
+   * again, including this one, and the latch comes back with no symptom at all
+   * until two days later. In CI the variable is always set, so its absence is
+   * a broken watchdog rather than a job to report on (L11, L289).
+   */
+  it("refuses to run inside CI without one, rather than silently latching again", () => {
+    expect(() => selfWorkflowSource({ GITHUB_ACTIONS: "true" })).toThrow(
+      /GITHUB_WORKFLOW_REF/,
+    );
+  });
+});
+
+describe("loadGitHubWorkflowJobs", () => {
+  const NOW = Date.UTC(2026, 8, 5, 10, 40, 0);
+  const iso = (ms: number) => new Date(ms).toISOString();
+
+  const FILES = [
+    {
+      path: ".github/workflows/job-watchdog.yml",
+      contents: 'name: Job Watchdog\non:\n  schedule:\n    - cron: "20 6 * * *"\n',
+    },
+    {
+      path: ".github/workflows/health-checks.yml",
+      contents:
+        'name: Third Party Health\non:\n  schedule:\n    - cron: "0 15 * * *"\n',
+    },
+  ];
+
+  /**
+   * GitHub as it actually behaved on the day. Both workflows were dispatched
+   * two hours ago; the watchdog's last SUCCESSFUL scheduled run was three days
+   * back, because it has been failing on its own reading of itself ever since.
+   */
+  function fakeApi() {
+    const calls: string[] = [];
+    const api = async <T,>(path: string): Promise<T> => {
+      calls.push(path);
+      const succeeded = path.includes("status=success");
+      const isWatchdog = path.includes("job-watchdog.yml");
+      const at =
+        isWatchdog && succeeded ? NOW - 3 * DAY : NOW - 2 * HOUR;
+      return { workflow_runs: [{ updated_at: iso(at) }] } as T;
+    };
+    return { api, calls };
+  }
+
+  it("judges the watchdog's own schedule by whether it fired, not by whether it passed", async () => {
+    const { api } = fakeApi();
+    const jobs = await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: "job-watchdog.yml",
+    });
+
+    const result = evaluateScheduledJobs({ jobs, now: NOW });
+    expect(result.overdue).toEqual([]);
+    expect(result.checked).toBe(2);
+  });
+
+  /**
+   * The same fixture with nothing treated as self. This is what shipped, and
+   * it has to still reproduce the latch, or the test above passes for a reason
+   * unrelated to the fix (L159).
+   */
+  it("reproduces the latch when no entry is treated as its own", async () => {
+    const { api } = fakeApi();
+    const jobs = await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: null,
+    });
+
+    const result = evaluateScheduledJobs({ jobs, now: NOW });
+    expect(result.overdue.map((j) => j.source)).toEqual(["job-watchdog.yml"]);
+  });
+
+  it("still judges every other workflow by its last SUCCESSFUL scheduled run", async () => {
+    const { api, calls } = fakeApi();
+    await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: "job-watchdog.yml",
+    });
+
+    const others = calls.filter((p) => !p.includes("job-watchdog.yml"));
+    expect(others.length).toBeGreaterThan(0);
+    for (const path of others) expect(path).toContain("status=success");
+
+    const own = calls.filter((p) => p.includes("job-watchdog.yml"));
+    expect(own.length).toBeGreaterThan(0);
+    for (const path of own) expect(path).not.toContain("status=success");
+  });
+
+  /**
+   * A run somebody started by hand proves the job still works, not that GitHub
+   * is still firing it, and a schedule GitHub has disabled is the whole thing
+   * this exists to catch. That holds for the relaxed self reading too.
+   */
+  it("asks only about scheduled runs, including its own", async () => {
+    const { api, calls } = fakeApi();
+    await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: "job-watchdog.yml",
+    });
+    for (const path of calls) expect(path).toContain("event=schedule");
+  });
+
+  it("says it was last dispatched, not that it succeeded, when its own schedule has stopped", () => {
+    const report = formatWatchdogReport(
+      evaluateScheduledJobs({
+        jobs: [
+          {
+            name: "Job Watchdog",
+            source: "job-watchdog.yml",
+            crons: ["20 6 * * *"],
+            lastSuccessAt: iso(NOW - 5 * DAY),
+            measuredBy: "dispatch",
+          },
+        ],
+        now: NOW,
+      }),
+    );
+    expect(report).toContain("was last dispatched");
+    expect(report).not.toContain("Job Watchdog (job-watchdog.yml) last succeeded");
   });
 });
