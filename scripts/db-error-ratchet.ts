@@ -1,24 +1,27 @@
 /**
- * Hold the number of discarded database errors where it is, for the length of
- * milestone 35, and fail when it rises.
+ * The ledger of written exemptions from `local/require-db-error-check`.
  *
- * `local/require-db-error-check` ships at `warn` rather than `error` because
- * 283 sites already break it (measured 4 September 2026). A warning nothing
- * counts is a warning nobody reads, and a rule that lands at the END of a
- * sweep leaves the whole sweep as the window in which somebody writes number
- * 284. So the count is recorded per file, and CI fails on any difference.
+ * This began as a ratchet. The rule shipped at `warn` on the FIRST day of the
+ * milestone 35 sweep rather than the last, because a rule that lands at the end
+ * leaves the whole sweep as the window in which somebody writes number 284, and
+ * a warning nothing counts is a warning nobody reads. It held the count per
+ * file and failed CI on any difference in EITHER direction, so each conversion
+ * phase recorded its own progress in the same commit and a baseline left
+ * recording 16 where the tree held 2 could not quietly re-admit 14 (L182).
  *
- * ANY difference, in both directions. A ratchet left recording 16 where the
- * tree now holds 2 quietly re-admits 14 instances to that file, and the number
- * stops being a measurement of anything (L182). Each conversion phase records
- * its own progress in the same commit, so the baseline diff IS the record of
- * what the sweep did.
+ * The count is zero now and the rule is at `error`, so ESLint refuses a new
+ * instance on its own. What this still does is the half ESLint cannot: an
+ * inline `eslint-disable` is invisible to a rule at `error` too, and it is the
+ * only way left to discard a result. Every one is recorded here, so adding a
+ * sixth is a diff somebody has to justify rather than one fewer warning (#992).
  *
- * Disables are counted separately and a new one also fails, because #992 wants
- * an exemption to be a written decision with a reason, not one fewer warning.
+ * It deliberately still holds the zero. If discarded results ever come back,
+ * that is a rule that stopped firing rather than a tree that got worse, and
+ * this says so while `npm run lint` stays green. The other half of that check
+ * is the SHAPES table in eslint-rules/require-db-error-check.test.mjs.
  *
  *   npx tsx scripts/db-error-ratchet.ts            check
- *   npx tsx scripts/db-error-ratchet.ts --update   re-record after a conversion
+ *   npx tsx scripts/db-error-ratchet.ts --update   re-record after a change
  */
 import { ESLint } from "eslint";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -163,8 +166,8 @@ async function main(): Promise<void> {
   const verdict = compareToBaseline(actual, readBaseline());
   if (verdict.ok) {
     console.log(
-      `Discarded database results: ${total}, matching the recorded baseline ` +
-        `(${exemptions} written exemptions). Milestone 35 drives this to zero.`,
+      `Discarded database results: ${total}, matching the recorded baseline, ` +
+        `with ${exemptions} written exemptions.`,
     );
     return;
   }
@@ -173,7 +176,9 @@ async function main(): Promise<void> {
     "The discarded-database-error count does not match scripts/db-error-baseline.json." +
       describe(
         verdict.risen,
-        "Gained (a database result whose error is dropped, #847):",
+        "Gained (a database result whose error is dropped, #847). The rule is " +
+          "at `error`, so if lint is GREEN and this is not, the rule has " +
+          "stopped firing rather than the tree getting worse:",
       ) +
       describe(
         verdict.fallen,

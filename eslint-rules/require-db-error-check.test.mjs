@@ -279,3 +279,100 @@ describe("a raw result handed to something that is not a helper", () => {
     );
   });
 });
+
+// #992. The rule is at `error` over a tree with zero instances, and a count
+// driven to zero stops being read as a measurement: it starts being read as
+// proof the class cannot occur, and nobody re-examines it (L182). A rule that
+// quietly stopped matching a shape would look exactly the same.
+//
+// So the shapes are enumerated and counted here. Each one is a real shape found
+// in this repo during the milestone 35 sweep, with the file it came from named,
+// and the recorded total means a shape cannot be dropped from the rule without
+// this failing.
+const SHAPES = [
+  {
+    name: "a destructure that omits error",
+    from: "src/lib/subscriptions/queries.ts, the #845 defect",
+    code: `const { data } = await supabase.from("t").select("x"); return data;`,
+  },
+  {
+    name: "a bare awaited write",
+    from: "src/lib/admin/account-actions.ts, the unwritten ban in #982",
+    code: `await supabase.from("t").delete().eq("id", id);`,
+  },
+  {
+    name: "data read straight off the awaited result",
+    from: "src/lib/hires/queries.ts",
+    code: `return (await supabase.from("t").select("x")).data;`,
+  },
+  {
+    name: "a result held in a variable whose error is never read",
+    from: "src/lib/blog/queries.ts, the paged archives",
+    code: `const res = await supabase.from("t").select("x"); return res.data ?? [];`,
+  },
+  {
+    name: "a query built up across statements",
+    from: "src/lib/admin/queries.ts, the account search",
+    code: `let q = supabase.from("t").select("x");
+           if (id) q = q.eq("id", id);
+           const { data } = await q;
+           return data;`,
+  },
+  {
+    name: "a query assigned once and awaited later",
+    from: "src/lib/blog/slug.ts",
+    code: `const query = supabase.from("t").select("slug").like("slug", "a%");
+           const { data } = await query;
+           return data;`,
+  },
+  {
+    name: "a fire and forget write",
+    from: "src/lib/nurses/search-gap.ts",
+    code: `void supabase.from("page_views").insert({ id }); return true;`,
+  },
+  {
+    name: "a voided rpc call",
+    from: 'src/app/(public)/nurses/[slug]/page.tsx, now an exemption',
+    code: `void supabase.rpc("increment_views", { id });`,
+  },
+  {
+    name: "a storage removal",
+    from: "src/lib/profile/photos.ts",
+    code: `await supabase.storage.from("photos").remove(["a.jpg"]);`,
+  },
+  {
+    name: "an unchecked element of a Promise.all",
+    from: "src/lib/admin/analytics.ts, the sixteen dashboard counts",
+    code: `const [a] = await Promise.all([
+             supabase.from("a").select("*", { count: "exact", head: true }),
+           ]);
+           return a.count ?? 0;`,
+  },
+  {
+    name: "a raw result handed to something that is not a helper",
+    from: "the shape that would carry a result past every check",
+    code: `return summarise(await supabase.from("t").select("x"));`,
+  },
+];
+
+// Bump this deliberately, in the same commit that adds the shape.
+const SHAPES_COVERED = 11;
+
+describe("the shapes this rule is accountable for", () => {
+  it("still catches every one of them", () => {
+    const missed = SHAPES.filter(
+      (shape) =>
+        !lint(fn(shape.code)).some(
+          (m) => m.ruleId === "local/require-db-error-check",
+        ),
+    ).map((shape) => `${shape.name} (${shape.from})`);
+
+    expect(missed).toEqual([]);
+  });
+
+  it("names as many shapes as it is recorded as covering", () => {
+    // A shape deleted from the list would leave the assertion above passing
+    // over a smaller set, which is the zero problem one level up.
+    expect(SHAPES).toHaveLength(SHAPES_COVERED);
+  });
+});
