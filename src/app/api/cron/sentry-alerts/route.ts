@@ -5,6 +5,10 @@ import { withCronAlerting } from "@/lib/cron/alerting";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getIssuesNeedingReview } from "@/lib/sentry/issues";
 import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
+import {
+  planAlertLogCleanup,
+  ALERT_LOG_PAGE,
+} from "@/lib/sentry/alert-log-cleanup";
 
 import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
 export const runtime = "nodejs";
@@ -23,7 +27,12 @@ export const maxDuration = 60;
  * instead of the alert being silently lost forever.
  *
  * A dedup row is cleared once its issue no longer needs review, so if it
- * later regresses it alerts again instead of staying suppressed.
+ * later regresses it alerts again instead of staying suppressed. That clearing
+ * refuses a fetch it cannot trust rather than acting on it (#984): the read is
+ * an external call, and one that comes back SHORT makes every recorded issue
+ * look resolved, which empties the log and re-alerts everything on the next
+ * run. Deleting nothing is always safe here; deleting wrongly costs the
+ * channel.
  */
 const handleSentryAlerts = withCronAlerting(
   "sentry-alerts",
@@ -34,13 +43,25 @@ const handleSentryAlerts = withCronAlerting(
     // A failed read is NOT "nothing has been alerted yet" (#847). It empties
     // the dedup set, so every issue already reported is reported again, and
     // the stale-cleanup below then deletes rows it should have kept.
-    const loggedRows = await unwrapOrThrow(
-      supabase.from("sentry_issue_alert_log").select("issue_id"),
-      "the Sentry issues already alerted on",
-    );
-    const alreadyAlertedIds = new Set(
-      (loggedRows ?? []).map((row) => row.issue_id as string),
-    );
+    // Paged, and only when the whole log arrived. PostgREST caps a select at
+    // 1,000 rows and returns a healthy looking prefix, so an unbounded read
+    // would treat every row past the first page as an issue never alerted on,
+    // re-alert it, and then hand the cleanup below a set that is missing them.
+    const loggedIds: string[] = [];
+    for (let from = 0; ; from += ALERT_LOG_PAGE) {
+      const page = await unwrapOrThrow(
+        supabase
+          .from("sentry_issue_alert_log")
+          .select("issue_id")
+          .order("alerted_at", { ascending: true })
+          .range(from, from + ALERT_LOG_PAGE - 1),
+        "the Sentry issues already alerted on",
+      );
+      const rows = page ?? [];
+      loggedIds.push(...rows.map((row) => row.issue_id as string));
+      if (rows.length < ALERT_LOG_PAGE) break;
+    }
+    const alreadyAlertedIds = new Set(loggedIds);
 
     let alerted = 0;
     let failed = 0;
@@ -73,15 +94,30 @@ const handleSentryAlerts = withCronAlerting(
       }
     }
 
-    const currentIds = new Set(issues.map((issue) => issue.id));
-    const staleIds = [...alreadyAlertedIds].filter((id) => !currentIds.has(id));
-    if (staleIds.length > 0) {
+    const cleanup = planAlertLogCleanup({
+      logged: loggedIds,
+      current: issues.map((issue) => issue.id),
+    });
+
+    if (cleanup.deleting.length > 0) {
       await assertNoWriteError(
         supabase
           .from("sentry_issue_alert_log")
           .delete()
-          .in("issue_id", staleIds),
+          .in("issue_id", cleanup.deleting),
         "the cleanup of alert log entries for resolved issues",
+      );
+    }
+
+    if (cleanup.skipped) {
+      // Loud, not silent. A refused cleanup that recurs means the fetch is
+      // persistently seeing less than reality, and a run that skipped and one
+      // with nothing to clear are otherwise the same output (L11). It reaches
+      // last_result on the admin jobs page either way.
+      console.warn("[cron sentry-alerts] cleanup skipped:", cleanup.skipped);
+      Sentry.captureMessage(
+        `[cron sentry-alerts] alert log cleanup skipped: ${cleanup.skipped}`,
+        "warning",
       );
     }
 
@@ -89,7 +125,8 @@ const handleSentryAlerts = withCronAlerting(
       success: true,
       alerted,
       failed,
-      cleared: staleIds.length,
+      cleared: cleanup.deleting.length,
+      cleanupSkipped: cleanup.skipped,
     });
   },
 );
