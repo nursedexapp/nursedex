@@ -219,8 +219,20 @@ export async function confirmNewsletter(token: string): Promise<ConfirmResult> {
 
 export interface SendIssueResult {
   success: boolean;
-  error?: "invalid" | "unknown";
+  // "send_failed" is distinct from "unknown" on purpose (#422): the issue was
+  // valid and the recipients were read, and what failed was the sending. That
+  // is the one outcome the admin can act on, by trying again.
+  error?: "invalid" | "unknown" | "send_failed";
   sent?: number;
+  /**
+   * Subscribers a batch could not be delivered to.
+   *
+   * Reported rather than dropped. Each batch says whether it went, and the
+   * loop used to count only the ones that did, so an issue that reached
+   * nobody returned success with a count of zero and the admin's toast read
+   * "Sent to 0 subscribers" in a success colour (L10).
+   */
+  failed?: number;
   fieldErrors?: Record<string, string>;
 }
 
@@ -247,14 +259,32 @@ export async function sendNewsletterIssue(
   const { subject, body } = parsed.data;
 
   const recipients = await getConfirmedSubscribers();
-  if (recipients.length === 0) return { success: true, sent: 0 };
+  // An empty list is a real state and a different one from a failed send, so
+  // it reports no failures rather than none reached.
+  if (recipients.length === 0) return { success: true, sent: 0, failed: 0 };
 
   let sent = 0;
+  let failed = 0;
   for (const batch of chunk(recipients, NEWSLETTER_BATCH_SIZE)) {
     const ok = await sendNewsletterBatch(subject, body, batch);
-    if (ok) sent += batch.length;
+    if (ok) {
+      sent += batch.length;
+      continue;
+    }
+    // The batch sender reports its own failure to Sentry (#977), so this
+    // counts rather than logs: what is missing at this level is the NUMBER,
+    // because the admin is standing in front of the screen waiting to be told
+    // whether the thing they just sent went out.
+    failed += batch.length;
   }
-  return { success: true, sent };
+
+  // Nothing reached anybody, out of a real list. Reporting success here is
+  // what put "Sent to 0 subscribers" on screen in a success colour.
+  if (sent === 0) {
+    return { success: false, error: "send_failed", sent, failed };
+  }
+
+  return { success: true, sent, failed };
 }
 
 // "unavailable" is distinct from "invalid" (#847): "invalid" is a claim about

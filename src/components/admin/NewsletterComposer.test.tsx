@@ -11,11 +11,14 @@ import {
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/newsletter/actions", () => ({ sendNewsletterIssue: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
+}));
 
 import { NewsletterComposer } from "./NewsletterComposer";
 import { STALL_MS } from "@/components/ui/pending-button";
 import { sendNewsletterIssue } from "@/lib/newsletter/actions";
+import { toast } from "sonner";
 
 // Phase 4 of #443. The single most expensive button in the app to fire twice: it
 // emails every confirmed subscriber. `wait` mode is not a preference here, it is
@@ -132,5 +135,83 @@ describe("sending a newsletter issue", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByText("Required")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send to 412/i })).toBeEnabled();
+  });
+});
+
+/**
+ * #422. Each batch reports whether it went, and the screen only ever showed
+ * the number that did. An issue that reached nobody produced "Sent to 0
+ * subscribers" in a success colour, which is the one thing this screen must
+ * not do: the admin has no other way to learn it, and the subscribers who
+ * missed it are invisible (L10).
+ *
+ * Driven through the same confirmation dialog as every other case here, so
+ * these exercise the real path rather than the handler in isolation.
+ */
+describe("when some subscribers could not be reached", () => {
+  it("does not call a partial send a success", async () => {
+    vi.mocked(sendNewsletterIssue).mockResolvedValue({
+      success: true,
+      sent: 100,
+      failed: 50,
+    });
+
+    await send();
+
+    expect(toast.warning).toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    const text = vi.mocked(toast.warning).mock.calls[0][0] as string;
+    expect(text).toContain("100");
+    expect(text).toContain("50");
+  });
+
+  it("says a second send would double up, rather than offering a retry", async () => {
+    // Sending again delivers a second copy to everyone who already got it,
+    // and there is no per issue send record yet to prevent that (#422).
+    vi.mocked(sendNewsletterIssue).mockResolvedValue({
+      success: true,
+      sent: 10,
+      failed: 2,
+    });
+
+    await send();
+
+    expect(vi.mocked(toast.warning).mock.calls[0][0]).toMatch(/second copy/i);
+  });
+
+  it("says nothing went out when nothing did, and that a retry is safe", async () => {
+    // Nobody received it, so trying again cannot double up, and that is the
+    // one thing the admin needs to know to act.
+    vi.mocked(sendNewsletterIssue).mockResolvedValue({
+      success: false,
+      error: "send_failed",
+      sent: 0,
+      failed: 30,
+    });
+
+    await send();
+
+    expect(toast.error).toHaveBeenCalled();
+    const text = vi.mocked(toast.error).mock.calls[0][0] as string;
+    expect(text).toMatch(/nothing was sent/i);
+    expect(text).toMatch(/safe to try again/i);
+    // Not the validation message: the fields are fine, and pointing the admin
+    // at highlighted fields would send them looking for an error that is not
+    // there.
+    expect(text).not.toMatch(/highlighted fields/i);
+  });
+
+  it("still shows a plain success when everyone was reached", async () => {
+    // The positive control for all three above.
+    vi.mocked(sendNewsletterIssue).mockResolvedValue({
+      success: true,
+      sent: 150,
+      failed: 0,
+    });
+
+    await send();
+
+    expect(toast.success).toHaveBeenCalled();
+    expect(toast.warning).not.toHaveBeenCalled();
   });
 });

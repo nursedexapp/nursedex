@@ -11,6 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { sendNewsletterIssue } from "@/lib/newsletter/actions";
 
+/** "1 subscriber" against "2 subscribers", in one place rather than four. */
+function people(n: number | undefined): string {
+  return n === 1 ? "subscriber" : "subscribers";
+}
+
 export function NewsletterComposer({
   subscriberCount,
 }: {
@@ -41,6 +46,16 @@ export function NewsletterComposer({
     startTransition(async () => {
       const res = await sendNewsletterIssue({ subject, body });
       if (!res.success) {
+        // A send that reached nobody is not a validation problem, and the
+        // fields are fine: saying "fix the highlighted fields" would send the
+        // admin to look for an error that is not there (#422).
+        if (res.error === "send_failed") {
+          setOpen(false);
+          toast.error(
+            `Nothing was sent. All ${res.failed} ${people(res.failed)} failed. Nobody has received this, so it is safe to try again.`,
+          );
+          return;
+        }
         if (res.fieldErrors) setErrors(res.fieldErrors);
         // Close on a validation failure: the fields it is complaining about sit
         // behind the dialog, so leaving it up points the admin at errors they
@@ -49,9 +64,18 @@ export function NewsletterComposer({
         toast.error("Please fix the highlighted fields.");
         return;
       }
-      toast.success(
-        `Sent to ${res.sent} ${res.sent === 1 ? "subscriber" : "subscribers"}.`,
-      );
+      if (res.failed && res.failed > 0) {
+        // Partly sent. Not a success toast: some real people did not get this,
+        // and the admin is the only one who can notice (L10). Deliberately
+        // does not offer a retry, because sending again would deliver a second
+        // copy to everybody who already got it, and the fix for that needs a
+        // per issue send record (#422 is still open for it).
+        toast.warning(
+          `Sent to ${res.sent} ${people(res.sent)}, but ${res.failed} ${people(res.failed)} could not be reached. Sending again would send a second copy to everyone who did get it.`,
+        );
+      } else {
+        toast.success(`Sent to ${res.sent} ${people(res.sent)}.`);
+      }
       setSubject("");
       setBody("");
       setOpen(false);
