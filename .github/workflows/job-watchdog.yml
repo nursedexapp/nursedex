@@ -31,10 +31,39 @@ name: Job Watchdog
 on:
   # Daily, and deliberately not weekly: the jobs it watches include daily ones,
   # and a watcher slower than the thing it watches turns every real outage into
-  # a week of silence. 06:20 UTC keeps it away from the 13:00 cluster, so an
-  # overdue job is reported before the next day's runs muddy the picture.
+  # a week of silence.
+  #
+  # This schedule is now the BACKSTOP rather than the main trigger (#967).
+  # GitHub dispatches every scheduled workflow here hours after its declared
+  # time, and not by the same amount: measured over the last 100 scheduled runs
+  # of each on 2026-09-04, this one landed at ~11:20 UTC while the checks it
+  # watches landed at ~15:38 to ~17:07. So on any given day it was judging the
+  # PREVIOUS day's runs, and a job that failed today could not be reported
+  # until tomorrow. Third Party Health failed at 15:37 on 2026-09-03 and the
+  # earliest this could speak was 11:22 the next day, 20 hours later.
+  #
+  # Declaring a later cron would not fix it, because the declared time is not
+  # what GitHub honours, and ordering two jobs by arithmetic between their
+  # crons is exactly what went wrong (L386).
   schedule:
     - cron: "20 6 * * *"
+
+  # The real ordering. Production Smoke is the last of the daily checks to be
+  # dispatched, so its completion is the moment all of today's runs have
+  # happened. Chaining on it makes "after the checks" a dependency rather than
+  # an assumption, and halves the worst case detection delay: a failure today
+  # is reported today.
+  #
+  # The cron above stays, and is not redundant. If Production Smoke's own
+  # schedule is disabled, nothing would ever fire this chain again, and a
+  # watchdog that goes silent because the thing it watches went silent is the
+  # exact failure it exists to report (L98).
+  workflow_run:
+    workflows: ["Production Smoke"]
+    # Completed, not success: a failed check is precisely when this reading
+    # matters, so waiting for a green run would go quiet at the worst moment.
+    types: [completed]
+
   workflow_dispatch:
 
 # Read-only, listed rather than granted wholesale: an over-broad permission is
@@ -51,6 +80,14 @@ concurrency:
 jobs:
   watchdog:
     name: Check every scheduled job still runs
+    # Production Smoke also runs on every push to main. Without this the
+    # watchdog would run on every merge, and a job that is genuinely overdue
+    # would be announced to Slack once per merge until somebody fixed it, which
+    # is how an alert stops being read (L36). Only its SCHEDULED runs mean "the
+    # day's checks have now happened".
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.event == 'schedule'
     runs-on: ubuntu-latest
     # A handful of small API calls, one or two per scheduled workflow. Five
     # minutes is far more than it needs and far less than the six hour default,

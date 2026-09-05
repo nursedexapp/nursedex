@@ -73,3 +73,61 @@ describe("job watchdog workflow", () => {
     expect(EXECUTABLE).not.toMatch(/actions:\s*write/);
   });
 });
+
+/**
+ * #967. GitHub dispatches every scheduled workflow in this repo hours after
+ * its declared cron, and not by the same amount: measured over the last 100
+ * scheduled runs of each on 2026-09-04, this one landed about 5 hours late at
+ * ~11:20 UTC while the checks it watches landed at ~15:38 to ~17:07. So it was
+ * judging the PREVIOUS day's run, every day, and a job that failed today could
+ * not be reported until tomorrow.
+ *
+ * Declaring a later cron does not fix that, because the declared time is not
+ * what GitHub honours, and ordering two jobs by arithmetic between their crons
+ * is the thing that broke here in the first place (L386). The ordering has to
+ * be a real dependency.
+ */
+describe("the watchdog runs after the checks it judges", () => {
+  /**
+   * The chained name is READ from the workflow it names, not restated here. A
+   * `workflow_run` trigger matches by display name, and a name that matches
+   * nothing fires nothing and reports no error, so a rename would silently
+   * return the watchdog to judging yesterday (L100). Restating the string in
+   * this test would only prove the test and the workflow agree with each
+   * other, never that either agrees with the workflow being chained (L70).
+   */
+  const CHAINED_FROM = readFileSync(
+    join(process.cwd(), ".github/workflows/prod-smoke.yml"),
+    "utf8",
+  ).match(/^name:\s*(.+)$/m)?.[1];
+
+  it("is triggered by the completion of the last daily check", () => {
+    expect(CHAINED_FROM).toBeTruthy();
+    expect(EXECUTABLE).toMatch(/workflow_run:/);
+    expect(EXECUTABLE).toContain(`workflows: ["${CHAINED_FROM}"]`);
+  });
+
+  it("fires on a completion whatever its conclusion", () => {
+    // A failed check is exactly when the watchdog's reading matters, so
+    // waiting for a success would go quiet at the worst moment.
+    expect(EXECUTABLE).toMatch(/types:\s*\[completed\]/);
+  });
+
+  it("keeps its own schedule as well, so it survives the check it chains from", () => {
+    // The chain alone would make the watchdog depend on the very kind of
+    // failure it exists to report: if Production Smoke's schedule is disabled,
+    // nothing would ever trigger the watchdog again and the silence would be
+    // total (L98).
+    expect(parseCronSchedules(WORKFLOW).length).toBeGreaterThan(0);
+  });
+
+  it("ignores the chained workflow's push-triggered runs", () => {
+    // Production Smoke also runs on every push to main. Without this the
+    // watchdog would run on every merge, and a standing overdue job would be
+    // announced to Slack once per merge, which is how an alert stops being
+    // read (L36).
+    expect(EXECUTABLE).toMatch(
+      /github\.event\.workflow_run\.event\s*==\s*'schedule'/,
+    );
+  });
+});
