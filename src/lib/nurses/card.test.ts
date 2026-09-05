@@ -24,6 +24,7 @@ import {
   shapeNurseCard,
   shapeNurseCards,
   toPublicNurseCard,
+  PUBLIC_NURSE_CARD_KEYS,
 } from "./card";
 
 // A row exactly as PostgREST returns it for NURSE_CARD_COLUMNS.
@@ -224,6 +225,54 @@ describe("toPublicNurseCard", () => {
     );
     expect("photos" in card).toBe(false);
     expect(JSON.stringify(card)).not.toContain("nurse-1/1.jpg");
+  });
+
+  // #968. The card used to be built by SUBTRACTING the internal fields, so the
+  // rule was "remember to add your field to that destructure" and nothing
+  // enforced it. The result is serialised into the RSC payload every visitor
+  // downloads, and InternalNurseCard exists precisely to carry things the
+  // public one should not, which makes it the natural place to put something
+  // that must never be sent. Built by inclusion, a field added to the internal
+  // card is absent until somebody adds it deliberately.
+  it("carries only the fields the public card declares", () => {
+    const internal = shapeNurseCard(rawRow(), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+
+    const card = toPublicNurseCard(internal);
+
+    expect(Object.keys(card).sort()).toEqual(
+      [...PUBLIC_NURSE_CARD_KEYS].filter((k) => k !== "revealed").sort(),
+    );
+  });
+
+  it("leaves behind a field added to the internal card and nowhere else", () => {
+    const internal = shapeNurseCard(rawRow(), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+    // Stands in for the next internal-only field. Under the old subtracting
+    // build this reached the browser; there was nothing to add it to.
+    (internal as unknown as Record<string, unknown>).admin_note =
+      "she called about her licence";
+
+    const card = toPublicNurseCard(internal);
+
+    expect("admin_note" in card).toBe(false);
+    expect(JSON.stringify(card)).not.toContain("licence");
+  });
+
+  it("carries an optional field only when the internal card has one", () => {
+    const internal = shapeNurseCard(rawRow(), {
+      canSeeIdentity: true,
+      canSeeDetails: true,
+    });
+
+    expect("revealed" in toPublicNurseCard(internal)).toBe(false);
+    expect(toPublicNurseCard({ ...internal, revealed: true }).revealed).toBe(
+      true,
+    );
   });
 });
 
