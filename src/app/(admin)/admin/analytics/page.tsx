@@ -13,6 +13,10 @@ import { requireSuperAdmin } from "@/lib/auth/helpers";
 import { Card, CardContent } from "@/components/ui/card";
 import { getAnalyticsTotals } from "@/lib/admin/analytics";
 import { subscriptionPipelineLabel } from "@/lib/admin/subscription-health";
+import {
+  isOptOutShareConcerning,
+  optOutNoteText,
+} from "@/lib/admin/analytics-opt-out-share";
 import { PRICING } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -72,6 +76,26 @@ export default async function AnalyticsPage() {
             value={t.newSignupsLast30d}
           />
         </div>
+        {/*
+          How many of those accounts PostHog cannot see (#910). Placed with the
+          signups rather than on its own, because the number it changes how to
+          read is the funnel built on this same population, and a figure on a
+          separate screen is a figure nobody holds in mind while reading one.
+        */}
+        <p
+          className={
+            isOptOutShareConcerning(t.analyticsOptOutShare)
+              ? "mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+              : "text-soft-black-light mt-3 text-sm"
+          }
+          role={
+            isOptOutShareConcerning(t.analyticsOptOutShare)
+              ? "alert"
+              : undefined
+          }
+        >
+          {optOutNoteText(t.analyticsOptOuts, t.analyticsOptOutShare)}
+        </p>
       </Section>
 
       <Section title="Revenue">
@@ -95,7 +119,10 @@ export default async function AnalyticsPage() {
             icon={<CreditCard className="size-4" />}
             label="Subscription records"
             value={t.totalSubscriptions}
-            sub={subscriptionPipelineLabel(t.lastSubscriptionSyncAt, Date.now())}
+            sub={subscriptionPipelineLabel(
+              t.lastSubscriptionSyncAt,
+              Date.now(),
+            )}
           />
         </div>
       </Section>

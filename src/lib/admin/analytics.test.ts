@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
 
 // #847 / #991. Sixteen count queries share one Promise.all here, and every one
 // of them was read as `count ?? 0`. During a database problem the dashboard
@@ -84,5 +85,47 @@ describe("getAnalyticsTotals", () => {
     h.state.count = null;
 
     await expect(getAnalyticsTotals()).rejects.toThrow(/did not ask for one/);
+  });
+});
+
+/**
+ * #910. An opted out account is fully present here and entirely absent from
+ * PostHog, so every funnel on that side silently excludes it. Nothing counted
+ * them, and the failure that arrives later looks like something else: a funnel
+ * reading low resembles people dropping out of a flow rather than people never
+ * having been measured.
+ */
+describe("accounts missing from the funnel", () => {
+  it("counts them, and says what share of the roster they are", async () => {
+    // Every count in the shared mock answers the same number, so nurses,
+    // families and opt-outs all read 4: the share is then 4 over 8.
+    h.state.count = 4;
+
+    const totals = await getAnalyticsTotals();
+
+    expect(totals.analyticsOptOuts).toBe(4);
+    expect(totals.analyticsOptOutShare).toBeCloseTo(0.5);
+  });
+
+  it("reads the opt-out count over the same population as the signups", async () => {
+    // A count read over a different set (seeded demo accounts, removed
+    // accounts) would make the share a proportion of two different things,
+    // and nothing on the page could be judged against it.
+    const source = readFileSync("src/lib/admin/analytics.ts", "utf8");
+    const optOutQuery = source.slice(
+      source.indexOf('.eq("analytics_opt_out", true)'),
+      source.indexOf("the count of accounts that opted out"),
+    );
+
+    expect(optOutQuery).toContain('.eq("is_deleted", false)');
+    expect(optOutQuery).toContain("SEED_EMAIL_PATTERN");
+  });
+
+  it("reports a failed opt-out count as a failure, not as nobody opting out", async () => {
+    // Zero opt-outs is a real and reassuring answer, which is exactly why a
+    // failed read must not produce it (L90).
+    h.state.error = { message: "permission denied" };
+
+    await expect(getAnalyticsTotals()).rejects.toThrow();
   });
 });
