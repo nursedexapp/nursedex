@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PRICING } from "@/lib/constants";
 import { SEED_EMAIL_PATTERN } from "./seed";
+import { optOutShare } from "./analytics-opt-out-share";
 
 import { unwrapOrThrow, unwrapCountOrThrow } from "@/lib/db/results";
 export interface AnalyticsTotals {
@@ -30,6 +31,19 @@ export interface AnalyticsTotals {
   totalReviewsApproved: number;
   pendingVerifications: number;
   totalHires: number;
+  /**
+   * Accounts that asked not to be measured (#910). They are fully present here
+   * and entirely absent from PostHog, so every funnel on that side silently
+   * excludes them. Counted over the same population as `signups.total`, so the
+   * share below is a share of something.
+   */
+  analyticsOptOuts: number;
+  /**
+   * That count as a proportion of total signups, or null when there is nobody
+   * to be a proportion of. See analytics-opt-out-share.ts for why null rather
+   * than zero.
+   */
+  analyticsOptOutShare: number | null;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -71,6 +85,7 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
     approvedReviews,
     pendingVerifications,
     totalHires,
+    analyticsOptOuts,
   ] = await Promise.all([
     unwrapCountOrThrow(
       supabase
@@ -186,6 +201,19 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
       supabase.from("hires").select("id", { count: "exact", head: true }),
       "the count of hires",
     ),
+    // The same filters as the signup counts, so the share below divides one
+    // population by itself rather than two populations by each other (#910).
+    // A count read over a different set would produce a share nothing on this
+    // page could be judged against.
+    unwrapCountOrThrow(
+      supabase
+        .from("users")
+        .select("id", { count: "exact", head: true })
+        .eq("analytics_opt_out", true)
+        .eq("is_deleted", false)
+        .not("email", "ilike", SEED_EMAIL_PATTERN),
+      "the count of accounts that opted out of analytics",
+    ),
   ]);
 
   const featured = activeFeatured;
@@ -218,6 +246,11 @@ export async function getAnalyticsTotals(): Promise<AnalyticsTotals> {
     totalReviewsApproved: approvedReviews,
     pendingVerifications: pendingVerifications,
     totalHires: totalHires,
+    analyticsOptOuts,
+    analyticsOptOutShare: optOutShare(
+      analyticsOptOuts,
+      nurseCount + familyCount,
+    ),
   };
 }
 
