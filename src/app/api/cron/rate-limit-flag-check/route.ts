@@ -7,6 +7,7 @@ import { sendRateLimitFlaggedAdminEmail } from "@/lib/email/send";
 import { RATE_LIMITS } from "@/lib/constants";
 import { flaggedSinceDate } from "@/lib/rate-limit/flagged";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
@@ -27,12 +28,21 @@ const handleRateLimitFlagCheck = withCronAlerting(
     // The rows stay in the table forever, so without the window this counted
     // every family ever flagged and mailed that count daily, whether or not
     // anybody was still doing it (#425).
-    const { data: rows } = await supabase
-      .from("rate_limit_reveals")
-      .select("family_user_id, consecutive_captcha_days, date")
-      .gte("consecutive_captcha_days", RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG)
-      .gte("date", flaggedSinceDate(new Date()))
-      .order("date", { ascending: false });
+    // A failed read is NOT "nobody is flagged" (#847). It made the job return
+    // success with reason "none_flagged", which is a watcher reporting that
+    // everything is fine because it could not look (L98).
+    const rows = await unwrapOrThrow(
+      supabase
+        .from("rate_limit_reveals")
+        .select("family_user_id, consecutive_captcha_days, date")
+        .gte(
+          "consecutive_captcha_days",
+          RATE_LIMITS.CONSECUTIVE_CAPTCHA_DAYS_FLAG,
+        )
+        .gte("date", flaggedSinceDate(new Date()))
+        .order("date", { ascending: false }),
+      "the families flagged for repeated captcha days",
+    );
 
     type Row = {
       family_user_id: string;
@@ -55,11 +65,18 @@ const handleRateLimitFlagCheck = withCronAlerting(
       });
     }
 
-    const { data: admins } = await supabase
-      .from("users")
-      .select("id, email")
-      .in("role", ["admin", "super_admin"])
-      .eq("is_deleted", false);
+    // A failed read is NOT "there are no admins" (#847). It delivers the alert
+    // to nobody while the job reports success, which is the fan-out failure in
+    // L120: a newly added recipient, or a read that fell over, is silently
+    // delivered to no one down a path that looks healthy.
+    const admins = await unwrapOrThrow(
+      supabase
+        .from("users")
+        .select("id, email")
+        .in("role", ["admin", "super_admin"])
+        .eq("is_deleted", false),
+      "the admins to alert about flagged families",
+    );
 
     type AdminRow = { id: string; email: string };
 

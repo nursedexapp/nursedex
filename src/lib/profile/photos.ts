@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PHOTO_UPLOAD } from "@/lib/constants";
 
+import { toTypedFailure } from "@/lib/db/results";
 const BUCKET = "nurse-photos";
 
 // Magic bytes for allowed image types
@@ -112,8 +113,10 @@ export async function validateUploadedPhoto(
   const buffer = new Uint8Array(await data.arrayBuffer());
 
   if (buffer.length > PHOTO_UPLOAD.MAX_SIZE_BYTES) {
-    // Clean up oversized file
-    await supabase.storage.from(BUCKET).remove([path]);
+    // Clean up oversized file. Checked: the row is rejected below, so an
+    // unchecked failure leaves the object paid for and unreferenced in the
+    // bucket forever, with nothing anywhere naming it (#847).
+    await reportStorageRemoval(supabase, path, "an oversized upload");
     return { valid: false, error: "File exceeds the 5MB size limit" };
   }
 
@@ -123,8 +126,12 @@ export async function validateUploadedPhoto(
   );
 
   if (!isValid) {
-    // Clean up invalid file
-    await supabase.storage.from(BUCKET).remove([path]);
+    // Clean up invalid file, same as above.
+    await reportStorageRemoval(
+      supabase,
+      path,
+      "an upload that is not an image",
+    );
     return {
       valid: false,
       error: "File is not a valid image (JPG, PNG, or WebP)",
@@ -144,5 +151,27 @@ export async function validateUploadedPhoto(
  */
 export async function removePhoto(path: string): Promise<void> {
   const supabase = await createClient();
-  await supabase.storage.from(BUCKET).remove([path]);
+  await reportStorageRemoval(supabase, path, "a photo the nurse deleted");
+}
+
+/**
+ * Remove one object from the photo bucket, and say so when it does not go.
+ *
+ * A storage `.remove()` resolves to `{ data, error }` exactly like a table
+ * write, so all three call sites discarded a failure in silence (#847). The
+ * OUTCOME stays the same at each of them: none can undo what has already
+ * happened, and failing a nurse's photo deletion because the object survived
+ * would leave them looking at a photo they asked to remove. What was missing
+ * is the report, and an orphaned object in a paid bucket is exactly the kind
+ * of cost nothing else would ever mention.
+ */
+async function reportStorageRemoval(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  path: string,
+  what: string,
+): Promise<void> {
+  await toTypedFailure(
+    supabase.storage.from(BUCKET).remove([path]),
+    `the storage object behind ${what}`,
+  );
 }

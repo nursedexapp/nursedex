@@ -58,17 +58,32 @@ describe("RLS policies - anon user", () => {
   });
 
   it("cannot read nurse_profiles as anon (only verified profiles visible to authenticated)", async () => {
-    const { data } = await anon.from("nurse_profiles").select("id").limit(1);
+    // Anon has had no grant on users since #387, and the nurse_profiles policy
+    // reads users to decide who may see a profile, so this read is refused at
+    // the grant layer with "permission denied for table users" rather than
+    // coming back as an RLS filtered empty array.
+    //
+    // The refusal IS the assertion here, so it cannot go through
+    // unwrapOrThrow: that helper throws on exactly the error this test exists
+    // to prove. The body before this one destructured only `data` and asserted
+    // it was defined, which null satisfies, so it passed whether or not anon
+    // could read the table.
+    const { data, error } = await anon
+      .from("nurse_profiles")
+      .select("id")
+      .limit(1);
 
-    // Anon should see nothing (RLS requires auth for profile views)
-    // or only see verified profiles if the policy allows anon
-    expect(data).toBeDefined();
+    expect(error).not.toBeNull();
+    expect(data).toBeNull();
   });
 
   it("cannot read admin_actions (admin only)", async () => {
     // Since #387, anon has no grant on this table at all: permission denied,
     // not an RLS-filtered empty array.
-    const { data, error } = await anon.from("admin_actions").select("id").limit(1);
+    const { data, error } = await anon
+      .from("admin_actions")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
@@ -80,19 +95,28 @@ describe("RLS policies - anon user", () => {
   });
 
   it("cannot read blocked_emails (admin only)", async () => {
-    const { data, error } = await anon.from("blocked_emails").select("id").limit(1);
+    const { data, error } = await anon
+      .from("blocked_emails")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
 
   it("cannot read family_profiles (requires auth)", async () => {
-    const { data, error } = await anon.from("family_profiles").select("id").limit(1);
+    const { data, error } = await anon
+      .from("family_profiles")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
 
   it("cannot read subscriptions (requires auth)", async () => {
-    const { data, error } = await anon.from("subscriptions").select("id").limit(1);
+    const { data, error } = await anon
+      .from("subscriptions")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
@@ -124,7 +148,10 @@ describe("RLS policies - anon user", () => {
   });
 
   it("cannot read search_gap_log (admin only)", async () => {
-    const { data, error } = await anon.from("search_gap_log").select("id").limit(1);
+    const { data, error } = await anon
+      .from("search_gap_log")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });

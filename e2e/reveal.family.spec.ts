@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { serviceClient } from "./helpers/provision";
 
+import { assertNoWriteError, unwrapOrThrow } from "@/lib/db/results";
 // The reveal, end to end, in a real browser (#691, #669).
 //
 // This is the money path: it spends one of the family's capped daily reveals and
@@ -36,12 +37,21 @@ test.beforeEach(async () => {
   const { familyId, nurseId } = fixture();
   const db = service();
 
-  await db
-    .from("reveals")
-    .delete()
-    .eq("family_user_id", familyId)
-    .eq("nurse_user_id", nurseId);
-  await db.from("rate_limit_reveals").delete().eq("family_user_id", familyId);
+  // A fixture write that silently fails makes the test that follows it pass
+  // while testing nothing, which is the same defect as #847 wearing a green
+  // tick, so these are checked too.
+  await assertNoWriteError(
+    db
+      .from("reveals")
+      .delete()
+      .eq("family_user_id", familyId)
+      .eq("nurse_user_id", nurseId),
+    "the clearing of this family's fixture reveals",
+  );
+  await assertNoWriteError(
+    db.from("rate_limit_reveals").delete().eq("family_user_id", familyId),
+    "the clearing of this family's fixture reveal quota",
+  );
 });
 
 /**
@@ -58,23 +68,29 @@ async function revealRow(
   familyId: string,
   nurseId: string,
 ): Promise<{ access_expires_at: string | null } | null> {
-  const { data } = await service()
-    .from("reveals")
-    .select("access_expires_at")
-    .eq("family_user_id", familyId)
-    .eq("nurse_user_id", nurseId)
-    .maybeSingle();
+  const data = await unwrapOrThrow(
+    service()
+      .from("reveals")
+      .select("access_expires_at")
+      .eq("family_user_id", familyId)
+      .eq("nurse_user_id", nurseId)
+      .maybeSingle(),
+    "the reveal row this assertion is about",
+  );
   return data as { access_expires_at: string | null } | null;
 }
 
 /** How many of today's capped daily reveals this family has spent. */
 async function slotsSpent(familyId: string): Promise<number> {
-  const { data } = await service()
-    .from("rate_limit_reveals")
-    .select("reveal_count")
-    .eq("family_user_id", familyId)
-    .eq("date", new Date().toISOString().slice(0, 10))
-    .maybeSingle();
+  const data = await unwrapOrThrow(
+    service()
+      .from("rate_limit_reveals")
+      .select("reveal_count")
+      .eq("family_user_id", familyId)
+      .eq("date", new Date().toISOString().slice(0, 10))
+      .maybeSingle(),
+    "the daily reveal quota row this assertion is about",
+  );
   return (data as { reveal_count: number } | null)?.reveal_count ?? 0;
 }
 

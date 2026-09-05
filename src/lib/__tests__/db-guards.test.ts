@@ -7,6 +7,11 @@ import {
 } from "./helpers/live-supabase";
 import { RATE_LIMITS } from "@/lib/constants";
 
+import {
+  unwrapOrThrow,
+  assertNoWriteError,
+  unwrapCountOrThrow,
+} from "@/lib/db/results";
 // Behavioural guards for the two correctness rules that now live inside the
 // database rather than in application code:
 //
@@ -77,12 +82,15 @@ async function setRevealCount(familyId: string, count: number): Promise<void> {
 }
 
 async function readRevealCount(familyId: string): Promise<number | null> {
-  const { data } = await service
-    .from("rate_limit_reveals")
-    .select("reveal_count")
-    .eq("family_user_id", familyId)
-    .eq("date", today())
-    .maybeSingle();
+  const data = await unwrapOrThrow(
+    service
+      .from("rate_limit_reveals")
+      .select("reveal_count")
+      .eq("family_user_id", familyId)
+      .eq("date", today())
+      .maybeSingle(),
+    "rate_limit_reveals, a fixture read in db-guards",
+  );
   return data ? data.reveal_count : null;
 }
 
@@ -125,11 +133,14 @@ describe("consume_reveal_rate_limit (migration 054, issue #563)", () => {
   });
 
   beforeEach(async () => {
-    await service
-      .from("rate_limit_reveals")
-      .delete()
-      .eq("family_user_id", family)
-      .eq("date", today());
+    await assertNoWriteError(
+      service
+        .from("rate_limit_reveals")
+        .delete()
+        .eq("family_user_id", family)
+        .eq("date", today()),
+      "rate_limit_reveals, a fixture write in db-guards",
+    );
   });
 
   it("creates the day's row and counts the first reveal", async () => {
@@ -223,12 +234,15 @@ describe("consume_reveal_rate_limit (migration 054, issue #563)", () => {
   it("starts the consecutive-captcha streak at 1 when yesterday had no trigger", async () => {
     const res = await consume(family, true);
     expect(res.allowed).toBe(true);
-    const { data } = await service
-      .from("rate_limit_reveals")
-      .select("captcha_triggered, consecutive_captcha_days")
-      .eq("family_user_id", family)
-      .eq("date", today())
-      .single();
+    const data = await unwrapOrThrow(
+      service
+        .from("rate_limit_reveals")
+        .select("captcha_triggered, consecutive_captcha_days")
+        .eq("family_user_id", family)
+        .eq("date", today())
+        .single(),
+      "rate_limit_reveals, a fixture read in db-guards",
+    );
     expect(data!.captcha_triggered).toBe(true);
     expect(data!.consecutive_captcha_days).toBe(1);
   });
@@ -250,45 +264,57 @@ describe("consume_reveal_rate_limit (migration 054, issue #563)", () => {
 
     await consume(family, true);
 
-    const { data } = await service
-      .from("rate_limit_reveals")
-      .select("consecutive_captcha_days")
-      .eq("family_user_id", family)
-      .eq("date", today())
-      .single();
+    const data = await unwrapOrThrow(
+      service
+        .from("rate_limit_reveals")
+        .select("consecutive_captcha_days")
+        .eq("family_user_id", family)
+        .eq("date", today())
+        .single(),
+      "rate_limit_reveals, a fixture read in db-guards",
+    );
     expect(data!.consecutive_captcha_days).toBe(3);
 
-    await service
-      .from("rate_limit_reveals")
-      .delete()
-      .eq("family_user_id", family)
-      .eq("date", yesterday.toISOString().slice(0, 10));
+    await assertNoWriteError(
+      service
+        .from("rate_limit_reveals")
+        .delete()
+        .eq("family_user_id", family)
+        .eq("date", yesterday.toISOString().slice(0, 10)),
+      "rate_limit_reveals, a fixture write in db-guards",
+    );
   });
 
   it("does not re-bump the streak on a second captcha reveal the same day", async () => {
     // The ON CONFLICT DO UPDATE path increments reveal_count but deliberately
     // leaves consecutive_captcha_days alone, so a single day counts once toward
     // the streak no matter how many captcha reveals happen within it.
-    await service.from("rate_limit_reveals").upsert(
-      {
-        family_user_id: family,
-        date: today(),
-        reveal_count: 5,
-        captcha_triggered: true,
-        consecutive_captcha_days: 2,
-      },
-      { onConflict: "family_user_id,date" },
+    await assertNoWriteError(
+      service.from("rate_limit_reveals").upsert(
+        {
+          family_user_id: family,
+          date: today(),
+          reveal_count: 5,
+          captcha_triggered: true,
+          consecutive_captcha_days: 2,
+        },
+        { onConflict: "family_user_id,date" },
+      ),
+      "rate_limit_reveals, a fixture write in db-guards",
     );
 
     const res = await consume(family, true);
     expect(res.current_count).toBe(6);
 
-    const { data } = await service
-      .from("rate_limit_reveals")
-      .select("consecutive_captcha_days")
-      .eq("family_user_id", family)
-      .eq("date", today())
-      .single();
+    const data = await unwrapOrThrow(
+      service
+        .from("rate_limit_reveals")
+        .select("consecutive_captcha_days")
+        .eq("family_user_id", family)
+        .eq("date", today())
+        .single(),
+      "rate_limit_reveals, a fixture read in db-guards",
+    );
     // Still 2, not re-bumped to 3, even though this reveal also triggered captcha.
     expect(data!.consecutive_captcha_days).toBe(2);
   });
@@ -314,19 +340,25 @@ describe("consume_reveal_rate_limit (migration 054, issue #563)", () => {
 
     await consume(family, true);
 
-    const { data } = await service
-      .from("rate_limit_reveals")
-      .select("consecutive_captcha_days")
-      .eq("family_user_id", family)
-      .eq("date", today())
-      .single();
+    const data = await unwrapOrThrow(
+      service
+        .from("rate_limit_reveals")
+        .select("consecutive_captcha_days")
+        .eq("family_user_id", family)
+        .eq("date", today())
+        .single(),
+      "rate_limit_reveals, a fixture read in db-guards",
+    );
     expect(data!.consecutive_captcha_days).toBe(1);
 
-    await service
-      .from("rate_limit_reveals")
-      .delete()
-      .eq("family_user_id", family)
-      .eq("date", yDate);
+    await assertNoWriteError(
+      service
+        .from("rate_limit_reveals")
+        .delete()
+        .eq("family_user_id", family)
+        .eq("date", yDate),
+      "rate_limit_reveals, a fixture write in db-guards",
+    );
   });
 });
 
@@ -370,19 +402,25 @@ describe("apply_subscription_event (migration 055, issue #528)", () => {
   }
 
   async function readLastEventAt(): Promise<string | null> {
-    const { data } = await service
-      .from("subscriptions")
-      .select("last_event_at")
-      .eq("stripe_subscription_id", subId)
-      .maybeSingle();
+    const data = await unwrapOrThrow(
+      service
+        .from("subscriptions")
+        .select("last_event_at")
+        .eq("stripe_subscription_id", subId)
+        .maybeSingle(),
+      "subscriptions, a fixture read in db-guards",
+    );
     return data ? data.last_event_at : null;
   }
 
   afterAll(async () => {
-    await service
-      .from("subscriptions")
-      .delete()
-      .like("stripe_subscription_id", `sub_guard_${stamp}_%`);
+    await assertNoWriteError(
+      service
+        .from("subscriptions")
+        .delete()
+        .like("stripe_subscription_id", `sub_guard_${stamp}_%`),
+      "subscriptions, a fixture write in db-guards",
+    );
   });
 
   it("inserts the row on the first event", async () => {
@@ -418,11 +456,14 @@ describe("apply_subscription_event (migration 055, issue #528)", () => {
     expect(await applyEvent(T3, "cancelled")).toBe(true);
     expect(await applyEvent(T2, "active")).toBe(false);
 
-    const { data } = await service
-      .from("subscriptions")
-      .select("status")
-      .eq("stripe_subscription_id", subId)
-      .single();
+    const data = await unwrapOrThrow(
+      service
+        .from("subscriptions")
+        .select("status")
+        .eq("stripe_subscription_id", subId)
+        .single(),
+      "subscriptions, a fixture read in db-guards",
+    );
     expect(data!.status).toBe("cancelled");
   });
 
@@ -504,12 +545,18 @@ describe("reveal_nurse (migration 059, issue #691)", () => {
   });
 
   beforeEach(async () => {
-    await service
-      .from("rate_limit_reveals")
-      .delete()
-      .eq("family_user_id", family)
-      .eq("date", today());
-    await service.from("reveals").delete().eq("family_user_id", family);
+    await assertNoWriteError(
+      service
+        .from("rate_limit_reveals")
+        .delete()
+        .eq("family_user_id", family)
+        .eq("date", today()),
+      "rate_limit_reveals, a fixture write in db-guards",
+    );
+    await assertNoWriteError(
+      service.from("reveals").delete().eq("family_user_id", family),
+      "reveals, a fixture write in db-guards",
+    );
   });
 
   it("spends one slot for a first reveal", async () => {
@@ -549,11 +596,14 @@ describe("reveal_nurse (migration 059, issue #691)", () => {
     ).toHaveLength(1);
     expect(await readRevealCount(family)).toBe(1);
 
-    const { count } = await service
-      .from("reveals")
-      .select("id", { count: "exact", head: true })
-      .eq("family_user_id", family)
-      .eq("nurse_user_id", nurse);
+    const count = await unwrapCountOrThrow(
+      service
+        .from("reveals")
+        .select("id", { count: "exact", head: true })
+        .eq("family_user_id", family)
+        .eq("nurse_user_id", nurse),
+      "reveals, a fixture count in db-guards",
+    );
     expect(count).toBe(1);
   });
 
@@ -628,11 +678,14 @@ describe("uniq_email_log_dedup (migration 062, issue #663)", () => {
     const won = results.filter((r) => !r.error);
     expect(won).toHaveLength(1);
 
-    const { data } = await service
-      .from("email_log")
-      .select("id")
-      .eq("recipient_user_id", recipient)
-      .eq("dedup_key", key);
+    const data = await unwrapOrThrow(
+      service
+        .from("email_log")
+        .select("id")
+        .eq("recipient_user_id", recipient)
+        .eq("dedup_key", key),
+      "email_log, a fixture read in db-guards",
+    );
     expect(data).toHaveLength(1);
   });
 
@@ -666,10 +719,13 @@ describe("complete_consulting_request (migration 062, issue #663)", () => {
   }
 
   async function billedEntries(requestId: number): Promise<number[]> {
-    const { data } = await service
-      .from("consulting_time_entries")
-      .select("billed_min")
-      .eq("request_id", requestId);
+    const data = await unwrapOrThrow(
+      service
+        .from("consulting_time_entries")
+        .select("billed_min")
+        .eq("request_id", requestId),
+      "consulting_time_entries, a fixture read in db-guards",
+    );
     return (data ?? []).map((e) => e.billed_min as number);
   }
 
@@ -729,11 +785,14 @@ describe("complete_consulting_request (migration 062, issue #663)", () => {
     expect(error).not.toBeNull();
     expect(await billedEntries(id)).toEqual([]);
 
-    const { data: req } = await service
-      .from("consulting_requests")
-      .select("status")
-      .eq("id", id)
-      .single();
+    const req = await unwrapOrThrow(
+      service
+        .from("consulting_requests")
+        .select("status")
+        .eq("id", id)
+        .single(),
+      "consulting_requests, a fixture read in db-guards",
+    );
     expect(req?.status).toBe("approved");
   });
 });
@@ -766,10 +825,10 @@ describe("client-minted ids make a repeat collide (issue #708)", () => {
 
     expect(results.filter((r) => !r.error)).toHaveLength(1);
 
-    const { data } = await service
-      .from("contact_submissions")
-      .select("id")
-      .eq("id", submissionId);
+    const data = await unwrapOrThrow(
+      service.from("contact_submissions").select("id").eq("id", submissionId),
+      "contact_submissions, a fixture read in db-guards",
+    );
     expect(data).toHaveLength(1);
   });
 

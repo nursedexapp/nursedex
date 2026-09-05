@@ -7,6 +7,7 @@ import {
   signInThroughUI,
 } from "./helpers/provision";
 
+import { assertNoWriteError } from "@/lib/db/results";
 // Provisions the world the family journeys need, and signs in as the family.
 //
 // A reveal is the money path: it spends one of the family's capped daily
@@ -123,7 +124,13 @@ setup(
     const periodEnd = new Date();
     periodEnd.setFullYear(periodEnd.getFullYear() + 1);
 
-    await service.from("subscriptions").delete().eq("user_id", familyId);
+    // A fixture write that silently fails makes the test that follows it pass
+    // while testing nothing, which is the same defect as #847 wearing a green
+    // tick, so these are checked too.
+    await assertNoWriteError(
+      service.from("subscriptions").delete().eq("user_id", familyId),
+      "the clearing of this family's fixture subscriptions",
+    );
     const { error: subErr } = await service.from("subscriptions").insert({
       user_id: familyId,
       plan_type: "family_access",

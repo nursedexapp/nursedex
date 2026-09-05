@@ -6,6 +6,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getIssuesNeedingReview } from "@/lib/sentry/issues";
 import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
 
+import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -30,9 +31,13 @@ const handleSentryAlerts = withCronAlerting(
     const issues = await getIssuesNeedingReview();
     const supabase = createServiceRoleClient();
 
-    const { data: loggedRows } = await supabase
-      .from("sentry_issue_alert_log")
-      .select("issue_id");
+    // A failed read is NOT "nothing has been alerted yet" (#847). It empties
+    // the dedup set, so every issue already reported is reported again, and
+    // the stale-cleanup below then deletes rows it should have kept.
+    const loggedRows = await unwrapOrThrow(
+      supabase.from("sentry_issue_alert_log").select("issue_id"),
+      "the Sentry issues already alerted on",
+    );
     const alreadyAlertedIds = new Set(
       (loggedRows ?? []).map((row) => row.issue_id as string),
     );
@@ -46,13 +51,22 @@ const handleSentryAlerts = withCronAlerting(
           channel: ALERTS_CHANNEL_ID,
           text: `Sentry issue needs review: [${issue.shortId}] ${issue.title}\n${issue.culprit}\n${issue.permalink}`,
         });
-        await supabase
-          .from("sentry_issue_alert_log")
-          .insert({ issue_id: issue.id });
+        // This row IS the dedup. Written unchecked, a failure means the same
+        // issue is alerted again on every run of this job.
+        await assertNoWriteError(
+          supabase
+            .from("sentry_issue_alert_log")
+            .insert({ issue_id: issue.id }),
+          "the alert log entry for a Sentry issue",
+        );
         alerted++;
       } catch (err) {
         failed++;
-        console.error("[cron sentry-alerts] failed to alert issue", issue.id, err);
+        console.error(
+          "[cron sentry-alerts] failed to alert issue",
+          issue.id,
+          err,
+        );
         Sentry.captureException(err, {
           tags: { action: "sentry-alert-relay", issue_id: issue.id },
         });
@@ -62,10 +76,13 @@ const handleSentryAlerts = withCronAlerting(
     const currentIds = new Set(issues.map((issue) => issue.id));
     const staleIds = [...alreadyAlertedIds].filter((id) => !currentIds.has(id));
     if (staleIds.length > 0) {
-      await supabase
-        .from("sentry_issue_alert_log")
-        .delete()
-        .in("issue_id", staleIds);
+      await assertNoWriteError(
+        supabase
+          .from("sentry_issue_alert_log")
+          .delete()
+          .in("issue_id", staleIds),
+        "the cleanup of alert log entries for resolved issues",
+      );
     }
 
     return NextResponse.json({

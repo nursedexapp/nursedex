@@ -6,6 +6,7 @@ import {
   createTestUser as createLiveTestUser,
 } from "./helpers/live-supabase";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 // Regression guard for issue #387: migration 042 granted anon/authenticated
 // ALL privileges on every public table, so RLS was the *only* thing standing
 // between a role and a write it shouldn't have. These tests create throwaway
@@ -13,7 +14,11 @@ import {
 // grants migration is meant to close off at the grant layer (independent of
 // RLS), so they must NEVER run against anything but a local/CI throwaway
 // stack.
-const { url: SUPABASE_URL, anonKey: ANON_KEY, serviceKey: SERVICE_KEY } = getLiveSupabaseEnv();
+const {
+  url: SUPABASE_URL,
+  anonKey: ANON_KEY,
+  serviceKey: SERVICE_KEY,
+} = getLiveSupabaseEnv();
 
 assertLocalSupabaseUrl(SUPABASE_URL, "Data API grants tests");
 
@@ -56,7 +61,9 @@ describe("waitlist keeps its anon/authenticated INSERT after the #387 grant tigh
   it("anon can still insert into the waitlist (pre-launch signup)", async () => {
     const email = `grants-waitlist-${stamp}@example.com`;
 
-    const { error } = await anon.from("waitlist").insert({ email, role: "family" });
+    const { error } = await anon
+      .from("waitlist")
+      .insert({ email, role: "family" });
 
     expect(error).toBeNull();
   });
@@ -72,28 +79,39 @@ describe("#387: newsletter_subscribers is not reachable via the Data API", () =>
   it("anon cannot insert despite the table's own RLS policy allowing it", async () => {
     const email = `grants-newsletter-${stamp}@example.com`;
 
-    const { error } = await anon.from("newsletter_subscribers").insert({ email });
+    const { error } = await anon
+      .from("newsletter_subscribers")
+      .insert({ email });
 
     expect(error).not.toBeNull();
 
-    const { data: row } = await service
-      .from("newsletter_subscribers")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
+    const row = await unwrapOrThrow(
+      service
+        .from("newsletter_subscribers")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle(),
+      "newsletter_subscribers, a fixture read in data-api-grants",
+    );
     expect(row).toBeNull();
   });
 });
 
 describe("#387: fully-locked-out tables fail closed at the grant layer, not silently via RLS", () => {
   it("anon reading subscriptions returns a permission error, not an empty array", async () => {
-    const { data, error } = await anon.from("subscriptions").select("id").limit(1);
+    const { data, error } = await anon
+      .from("subscriptions")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
 
   it("anon reading admin_actions returns a permission error, not an empty array", async () => {
-    const { data, error } = await anon.from("admin_actions").select("id").limit(1);
+    const { data, error } = await anon
+      .from("admin_actions")
+      .select("id")
+      .limit(1);
     expect(error).not.toBeNull();
     expect(data).toBeNull();
   });
@@ -127,7 +145,10 @@ describe("#387: blog_posts stays admin-only through the Data API grant tightenin
       .eq("id", created!.id);
     expect(updateErr).toBeNull();
 
-    const { error: deleteErr } = await client.from("blog_posts").delete().eq("id", created!.id);
+    const { error: deleteErr } = await client
+      .from("blog_posts")
+      .delete()
+      .eq("id", created!.id);
     expect(deleteErr).toBeNull();
   });
 
@@ -152,7 +173,10 @@ describe("#387: blog_posts stays admin-only through the Data API grant tightenin
 
 describe("#387: admin_actions accepts the real admin write path, blocks everyone else", () => {
   it("an authenticated admin can insert an admin action for their own user", async () => {
-    const { id: adminId, client } = await createTestUser("admin", "action-writer");
+    const { id: adminId, client } = await createTestUser(
+      "admin",
+      "action-writer",
+    );
 
     const { error } = await client.from("admin_actions").insert({
       admin_user_id: adminId,
@@ -163,7 +187,10 @@ describe("#387: admin_actions accepts the real admin write path, blocks everyone
   });
 
   it("a non-admin authenticated user cannot insert an admin action", async () => {
-    const { id: familyId, client } = await createTestUser("family", "action-nonadmin");
+    const { id: familyId, client } = await createTestUser(
+      "family",
+      "action-nonadmin",
+    );
 
     const { error } = await client.from("admin_actions").insert({
       admin_user_id: familyId,

@@ -36,6 +36,7 @@ import {
   type LicenceBacklogRow,
 } from "../src/lib/admin/licence-backfill";
 
+import { assertNoWriteError } from "@/lib/db/results";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -208,12 +209,18 @@ async function apply() {
       console.error(
         `  ${row.user_id}: email FAILED, ${(err as Error).message}`,
       );
-      await db
-        .from("email_log")
-        .delete()
-        .eq("recipient_user_id", row.user_id)
-        .eq("email_type", LICENCE_NEEDED_EMAIL_TYPE)
-        .eq("dedup_key", LICENCE_NEEDED_DEDUP_KEY);
+      // The compensating delete that releases the dedup claim so a later run
+      // retries this nurse. Unchecked, a failure leaves the claim held for an
+      // email that never went, and nobody ever chases it (#847).
+      await assertNoWriteError(
+        db
+          .from("email_log")
+          .delete()
+          .eq("recipient_user_id", row.user_id)
+          .eq("email_type", LICENCE_NEEDED_EMAIL_TYPE)
+          .eq("dedup_key", LICENCE_NEEDED_DEDUP_KEY),
+        "the release of a dedup claim after a failed send",
+      );
     }
   }
 

@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import path from "path";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -73,19 +74,25 @@ describe("calculate_distance function", () => {
   });
 
   it("is symmetric (A to B equals B to A)", async () => {
-    const { data: d1 } = await supabase.rpc("calculate_distance", {
-      lat1: 40.7128,
-      lon1: -74.006,
-      lat2: 40.8112,
-      lon2: -73.1151,
-    });
+    const d1 = await unwrapOrThrow(
+      supabase.rpc("calculate_distance", {
+        lat1: 40.7128,
+        lon1: -74.006,
+        lat2: 40.8112,
+        lon2: -73.1151,
+      }),
+      "calculate_distance, a fixture read in distance-function",
+    );
 
-    const { data: d2 } = await supabase.rpc("calculate_distance", {
-      lat1: 40.8112,
-      lon1: -73.1151,
-      lat2: 40.7128,
-      lon2: -74.006,
-    });
+    const d2 = await unwrapOrThrow(
+      supabase.rpc("calculate_distance", {
+        lat1: 40.8112,
+        lon1: -73.1151,
+        lat2: 40.7128,
+        lon2: -74.006,
+      }),
+      "calculate_distance, a fixture read in distance-function",
+    );
 
     expect(d1).toBeCloseTo(d2!, 5);
   });

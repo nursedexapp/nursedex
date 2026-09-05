@@ -6,6 +6,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { applyVisibleNurseFilter } from "@/lib/nurses/visibility";
 import { sendFeaturedAnalyticsEmail } from "@/lib/email/send";
 
+import { unwrapOrThrow } from "@/lib/db/results";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
@@ -118,7 +119,11 @@ const handleFeaturedAnalytics = withCronAlerting(
 
     if (sent === 0 && failed > 0) {
       return NextResponse.json(
-        { error: "Every featured analytics email failed to send", skipped, failed },
+        {
+          error: "Every featured analytics email failed to send",
+          skipped,
+          failed,
+        },
         { status: 500 },
       );
     }
@@ -139,12 +144,19 @@ async function sumAnalytics(
   start: Date,
   end: Date,
 ): Promise<WeekSums> {
-  const { data } = await supabase
-    .from("nurse_analytics")
-    .select("profile_views, saves, reveals")
-    .eq("nurse_user_id", nurseUserId)
-    .gte("date", start.toISOString().slice(0, 10))
-    .lt("date", end.toISOString().slice(0, 10));
+  // A failed read is NOT "no activity that week" (#847). These sums go into
+  // an email telling a Featured nurse how her profile did, so an empty answer
+  // reports a week of nothing to somebody who paid for the placement, and the
+  // week-on-week comparison beside it is computed from the same zero.
+  const data = await unwrapOrThrow(
+    supabase
+      .from("nurse_analytics")
+      .select("profile_views, saves, reveals")
+      .eq("nurse_user_id", nurseUserId)
+      .gte("date", start.toISOString().slice(0, 10))
+      .lt("date", end.toISOString().slice(0, 10)),
+    "one week of a nurse's analytics",
+  );
 
   const sum = { profileViews: 0, saves: 0, reveals: 0 };
   for (const r of (data ?? []) as Array<{
