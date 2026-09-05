@@ -424,3 +424,74 @@ describe("when a read or write the profile path depends on fails", () => {
     );
   });
 });
+
+// #963. Both writers validated with the zod schema and then wrote the RAW
+// submitted object, so every transform, trim and default the schema applies
+// existed only in the type system. These assert on the payload that reaches
+// nurse_profiles, which is the only place the difference shows.
+describe("the values that reach the database are the validated ones", () => {
+  beforeEach(() => {
+    h.state.singles = [];
+    h.calls.profileUpdates.length = 0;
+  });
+
+  it("stores the bio the schema trimmed, not the one submitted", async () => {
+    const res = await saveOnboardingStep(4, {
+      bio: "   Seven years on overnight shifts.   ",
+      photos: ["a.jpg"],
+      photo_focal_x: 30,
+      photo_focal_y: 70,
+    });
+
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      bio: "Seven years on overnight shifts.",
+    });
+  });
+
+  it("stores the middle of the photo when no focal point was sent", async () => {
+    // focalCoordinate defaults to 50. Writing the raw input stores undefined,
+    // which PostgREST drops, so the column keeps whatever it held before.
+    const res = await saveOnboardingStep(4, {
+      bio: "Seven years on overnight shifts.",
+      photos: ["a.jpg"],
+    });
+
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      photo_focal_x: 50,
+      photo_focal_y: 50,
+    });
+  });
+
+  it("stores the step 3 defaults for the fields a form need not send", async () => {
+    const res = await saveOnboardingStep(3, {
+      skills: ["medication_management"],
+      availability_commitment: ["part_time"],
+      time_slots: ["weekdays"],
+      rate_min: null,
+      rate_max: null,
+    });
+
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      has_transportation: false,
+      covid_vaccinated: null,
+      care_philosophy: null,
+      additional_certs: [],
+    });
+  });
+
+  it("stores the trimmed bio on the profile edit form's save too", async () => {
+    seedSingles("verified");
+    const res = await updateNurseProfile({
+      ...editData,
+      bio: "  A bio long enough to pass.  ",
+    });
+
+    expect(res.success).toBeTruthy();
+    expect(h.calls.profileUpdates[0]).toMatchObject({
+      bio: "A bio long enough to pass.",
+    });
+  });
+});
