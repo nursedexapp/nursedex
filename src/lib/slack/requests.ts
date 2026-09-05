@@ -9,7 +9,7 @@ import {
   type RequestView,
 } from "./views";
 
-import { assertNoWriteError } from "@/lib/db/results";
+import { assertNoWriteError, unwrapOrThrow } from "@/lib/db/results";
 const ROW_FIELDS =
   "id,title,description,urgency,deadline,links,requested_by,type,rate,estimate_hours,status,approved_by,github_issue_number,github_issue_url,suggested_estimate_hours,suggested_type,suggested_rationale,suggested_labels,slack_channel,slack_thread_ts";
 
@@ -21,15 +21,14 @@ export interface RequestRow extends RequestView {
 /** Load a single consulting request row, or null if it is missing. */
 export async function getRequest(id: number): Promise<RequestRow | null> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("consulting_requests")
-    .select(ROW_FIELDS)
-    .eq("id", id)
-    .single();
-  if (error) {
-    console.error(`getRequest(${id}) failed:`, error);
-    return null;
-  }
+  const data = await unwrapOrThrow(
+    supabase
+      .from("consulting_requests")
+      .select(ROW_FIELDS)
+      .eq("id", id)
+      .single(),
+    "the consulting request behind this Slack action",
+  );
   return data as RequestRow;
 }
 

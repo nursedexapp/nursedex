@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PHOTO_UPLOAD } from "@/lib/constants";
 
-import { toTypedFailure } from "@/lib/db/results";
+import { reportDbFailure, toTypedFailure } from "@/lib/db/results";
 const BUCKET = "nurse-photos";
 
 // Magic bytes for allowed image types
@@ -78,8 +78,11 @@ export async function getSignedPhotoUrl(path: string): Promise<string | null> {
     .from(BUCKET)
     .createSignedUrl(path, PHOTO_UPLOAD.SIGNED_URL_TTL_SECONDS);
 
+  // The null stays: every caller treats it as "no preview yet" and re-signs on
+  // the next render, so throwing would fail a whole profile over one image.
+  // What was missing is that the console was the only place this went (#1000).
   if (error) {
-    console.error("Signed photo URL error:", error.message);
+    reportDbFailure("a signed URL for a nurse's photo", error);
     return null;
   }
 

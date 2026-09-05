@@ -1,6 +1,7 @@
 import { nursePhotoUrl } from "@/lib/profile/photos";
 import { createClient } from "@/lib/supabase/server";
 
+import { reportDbFailure } from "@/lib/db/results";
 /**
  * One shaper for the nurse card, shared by every producer of it.
  *
@@ -448,8 +449,15 @@ export async function lookupZips(
     .select("zip, city, state, latitude, longitude")
     .in("zip", capped);
 
+  // The empty map stays: a card without its town or its distance is still a
+  // usable card, and throwing would take the whole directory down over an
+  // enrichment. What was missing is that the console was the only place this
+  // went (#1000).
   if (error) {
-    console.error("zip_codes lookup failed:", error.message);
+    reportDbFailure(
+      "the towns and coordinates for a page of nurse cards",
+      error,
+    );
     return new Map();
   }
 

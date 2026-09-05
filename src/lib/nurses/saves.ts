@@ -12,7 +12,7 @@ import {
   type NurseSearchCard,
 } from "./card";
 
-import { unwrapOrThrow } from "@/lib/db/results";
+import { reportDbFailure, unwrapOrThrow } from "@/lib/db/results";
 /**
  * The most saved nurses one family can have and still be read in one request.
  * Comfortably above any real list; it exists so that passing it is a loud
@@ -84,8 +84,12 @@ export async function getAllSavedNurseIds(
   // Two distinct causes, two messages, one answer: the page's remedy is the
   // same either way, but nobody diagnosing this should have to guess which
   // happened.
+  // The null stays: it is a documented THIRD answer, distinct from an empty
+  // set, and the page says the filter was not applied rather than silently
+  // widening a "Saved only" search to every nurse in the state. What was
+  // missing is that the console was the only place this went (#1000).
   if (error) {
-    console.error("Could not read a family's saved nurses:", error.message);
+    reportDbFailure("a family's saved nurses", error);
     return null;
   }
 

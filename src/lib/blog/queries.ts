@@ -22,16 +22,14 @@ export async function getAuthorName(
 ): Promise<string | null> {
   if (!authorId) return null;
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("users")
-    .select("first_name, last_name")
-    .eq("id", authorId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[blog] getAuthorName failed:", error.message);
-    return null;
-  }
+  const data = await unwrapOrThrow(
+    supabase
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", authorId)
+      .maybeSingle(),
+    "the author of a blog post",
+  );
   return authorDisplayName(
     data as { first_name: string | null; last_name: string | null } | null,
   );
@@ -66,18 +64,20 @@ export async function getPublishedPostsPage(
   const to = from + pageSize - 1;
 
   const supabase = createServiceRoleClient();
-  const { data, error, count } = await supabase
+  const pageResult = await supabase
     .from("blog_posts")
     .select("*", { count: "exact" })
     .eq("status", "published")
     .order("pinned", { ascending: false })
     .order("publish_at", { ascending: false })
     .range(from, to);
-
-  if (error) {
-    console.error("[blog] getPublishedPostsPage failed:", error.message);
-    return { posts: [], total: 0, page: safePage, pageSize, totalPages: 0 };
-  }
+  // Both halves come off one result, so it is held and handed to the
+  // helper rather than destructured (#1000).
+  const data = await unwrapOrThrow(
+    pageResult,
+    "one page of the published blog posts",
+  );
+  const count = pageResult.count;
 
   const total = count ?? 0;
   return {
@@ -104,7 +104,7 @@ export async function searchPublishedPosts(
   const from = (safePage - 1) * pageSize;
 
   const supabase = createServiceRoleClient();
-  const { data, error, count } = await supabase
+  const pageResult = await supabase
     .from("blog_posts")
     .select("*", { count: "exact" })
     .eq("status", "published")
@@ -114,11 +114,13 @@ export async function searchPublishedPosts(
     })
     .order("publish_at", { ascending: false })
     .range(from, from + pageSize - 1);
-
-  if (error) {
-    console.error("[blog] searchPublishedPosts failed:", error.message);
-    return { posts: [], total: 0, page: safePage, pageSize, totalPages: 0 };
-  }
+  // Both halves come off one result, so it is held and handed to the
+  // helper rather than destructured (#1000).
+  const data = await unwrapOrThrow(
+    pageResult,
+    "one page of blog search results",
+  );
+  const count = pageResult.count;
 
   const total = count ?? 0;
   return {
@@ -135,17 +137,15 @@ export async function getPublishedPostBySlug(
   slug: string,
 ): Promise<BlogPost | null> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("blog_posts")
-    .select("*")
-    .eq("slug", slug)
-    .eq("status", "published")
-    .maybeSingle();
-
-  if (error) {
-    console.error("[blog] getPublishedPostBySlug failed:", error.message);
-    return null;
-  }
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_posts")
+      .select("*")
+      .eq("slug", slug)
+      .eq("status", "published")
+      .maybeSingle(),
+    "the published blog post at this slug",
+  );
   return (data as BlogPost | null) ?? null;
 }
 
@@ -156,31 +156,23 @@ export async function getPublishedPostBySlug(
  */
 export async function getAllPostsForAdmin(): Promise<BlogPost[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("blog_posts")
-    .select("*")
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    console.error("[blog] getAllPostsForAdmin failed:", error.message);
-    return [];
-  }
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_posts")
+      .select("*")
+      .order("updated_at", { ascending: false }),
+    "every blog post, for the admin list",
+  );
   return (data ?? []) as BlogPost[];
 }
 
 /** A single post by id for the admin editor (any status). */
 export async function getPostById(id: string): Promise<BlogPost | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("blog_posts")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) {
-    console.error("[blog] getPostById failed:", error.message);
-    return null;
-  }
+  const data = await unwrapOrThrow(
+    supabase.from("blog_posts").select("*").eq("id", id).maybeSingle(),
+    "the blog post being edited",
+  );
   return (data as BlogPost | null) ?? null;
 }
 
@@ -189,28 +181,20 @@ export async function getPostById(id: string): Promise<BlogPost | null> {
 /** All categories, alphabetical. Service role: public, sessionless read. */
 export async function getCategories(): Promise<BlogCategory[]> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("blog_categories")
-    .select("*")
-    .order("name");
-  if (error) {
-    console.error("[blog] getCategories failed:", error.message);
-    return [];
-  }
+  const data = await unwrapOrThrow(
+    supabase.from("blog_categories").select("*").order("name"),
+    "the blog categories",
+  );
   return (data ?? []) as BlogCategory[];
 }
 
 /** All tags, alphabetical. */
 export async function getTags(): Promise<BlogTag[]> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("blog_tags")
-    .select("*")
-    .order("name");
-  if (error) {
-    console.error("[blog] getTags failed:", error.message);
-    return [];
-  }
+  const data = await unwrapOrThrow(
+    supabase.from("blog_tags").select("*").order("name"),
+    "the blog tags",
+  );
   return (data ?? []) as BlogTag[];
 }
 
@@ -352,14 +336,13 @@ export async function getCategoryById(
 /** Tags attached to a post, alphabetical. */
 export async function getTagsForPost(postId: string): Promise<BlogTag[]> {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("blog_post_tags")
-    .select("blog_tags(*)")
-    .eq("post_id", postId);
-  if (error) {
-    console.error("[blog] getTagsForPost failed:", error.message);
-    return [];
-  }
+  const data = await unwrapOrThrow(
+    supabase
+      .from("blog_post_tags")
+      .select("blog_tags(*)")
+      .eq("post_id", postId),
+    "the tags on this blog post",
+  );
   const rows = (data ?? []) as unknown as { blog_tags: BlogTag | null }[];
   return rows
     .map((r) => r.blog_tags)

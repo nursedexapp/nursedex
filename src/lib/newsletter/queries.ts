@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
-import { unwrapCountOrThrow } from "@/lib/db/results";
+import { unwrapCountOrThrow, unwrapOrThrow } from "@/lib/db/results";
 export interface NewsletterRecipient {
   email: string;
   unsubscribe_token: string;
@@ -12,18 +12,17 @@ export async function getConfirmedSubscribers(): Promise<
   NewsletterRecipient[]
 > {
   const supabase = createServiceRoleClient();
-  const { data, error } = await supabase
-    .from("newsletter_subscribers")
-    .select("email, unsubscribe_token")
-    .not("confirmed_at", "is", null)
-    .is("unsubscribed_at", null);
-  if (error) {
-    console.error(
-      "[newsletter] getConfirmedSubscribers failed:",
-      error.message,
-    );
-    return [];
-  }
+  // A failed read is NOT "nobody is subscribed" (#1000). It hands the send an
+  // empty recipient list, so the newsletter is delivered to nobody while the
+  // job reports success, which is the fan-out failure in L120.
+  const data = await unwrapOrThrow(
+    supabase
+      .from("newsletter_subscribers")
+      .select("email, unsubscribe_token")
+      .not("confirmed_at", "is", null)
+      .is("unsubscribed_at", null),
+    "the confirmed newsletter subscribers",
+  );
   return (data ?? []) as NewsletterRecipient[];
 }
 
