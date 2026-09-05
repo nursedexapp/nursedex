@@ -13,6 +13,10 @@ import {
   type AttemptResult,
   type ProbeRunResult,
   PROBE_EVENT,
+  outcomeBody,
+  retryRateQueryBody,
+  readRetryRate,
+  judgeRetryRate,
 } from "@/lib/analytics/ingestion-probe";
 
 dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
@@ -84,96 +88,182 @@ const DEADLINE_MS = 360_000;
 const POLL_EVERY_MS = 3_000;
 const MAX_ATTEMPTS = 2;
 
+/**
+ * How often the first probe may time out before the deadline itself is the
+ * problem rather than PostHog having a slow afternoon (#961).
+ *
+ * A NUMBER NOBODY HAS MEASURED YET, deliberately, and stated as such: this
+ * check has never recorded its own outcomes, so there is no distribution to
+ * calibrate against. What is known is the shape of the healthy case, 35 to 55
+ * seconds against a 360 second deadline, so a first attempt timing out on more
+ * than a third of days is not a slow window any more.
+ *
+ * Re-measure it once the window has real history, which is #887.
+ *
+ * The floor guards the SAMPLE, never the fraction. Fourteen days of a daily
+ * job is a full window; seven is the least that says anything, which is a week
+ * after this ships. Below that the verdict is "not enough history yet", said
+ * out loud, rather than a pass.
+ */
+const RETRY_RATE_WINDOW_DAYS = 14;
+const RETRY_RATE_MINIMUM_RUNS = 7;
+const RETRY_RATE_MAX_FRACTION = 1 / 3;
+
 describe("PostHog ingestion", () => {
-  it("records an event sent through the app's own capture endpoint", async () => {
-    const configured = readProbeConfig(process.env);
+  it(
+    "records an event sent through the app's own capture endpoint",
+    async () => {
+      const configured = readProbeConfig(process.env);
 
-    // Deliberately a FAILURE, never a skip. A check that quietly stands down
-    // when it is not configured reports healthy while measuring nothing, which
-    // is worse than not having the check at all.
-    expect(
-      configured.ok,
-      configured.ok
-        ? ""
-        : `Cannot verify PostHog ingestion: ${(configured as { missing: string[] }).missing.join(", ")} ` +
-          "is not set. Create a personal API key in PostHog (Settings, personal " +
-          "API keys) with query read access, then set it and POSTHOG_PROJECT_ID " +
-          "in .env.local and as repository secrets. Until then nothing is " +
-          "checking that events are being recorded at all.",
-    ).toBe(true);
-    if (!configured.ok) return;
+      // Deliberately a FAILURE, never a skip. A check that quietly stands down
+      // when it is not configured reports healthy while measuring nothing, which
+      // is worse than not having the check at all.
+      expect(
+        configured.ok,
+        configured.ok
+          ? ""
+          : `Cannot verify PostHog ingestion: ${(configured as { missing: string[] }).missing.join(", ")} ` +
+              "is not set. Create a personal API key in PostHog (Settings, personal " +
+              "API keys) with query read access, then set it and POSTHOG_PROJECT_ID " +
+              "in .env.local and as repository secrets. Until then nothing is " +
+              "checking that events are being recorded at all.",
+      ).toBe(true);
+      if (!configured.ok) return;
 
-    const { config } = configured;
+      const { config } = configured;
 
-    /** One whole round trip: send a uniquely identified probe, wait for it. */
-    async function attemptOnce(): Promise<AttemptResult> {
-      const probeId = newProbeId(new Date(), Math.random);
+      /** One whole round trip: send a uniquely identified probe, wait for it. */
+      async function attemptOnce(): Promise<AttemptResult> {
+        const probeId = newProbeId(new Date(), Math.random);
 
-      const sent = await fetch(captureUrl(config.host), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(captureBody(config, probeId, new Date())),
-      });
-      if (!sent.ok) {
-        return { state: "capture_rejected", status: sent.status };
+        const sent = await fetch(captureUrl(config.host), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(captureBody(config, probeId, new Date())),
+        });
+        if (!sent.ok) {
+          return { state: "capture_rejected", status: sent.status };
+        }
+
+        // The loop itself lives in ingestion-probe.ts behind an injected clock
+        // and sleep, so its deadline and its three failure branches are tested
+        // there instantly rather than only ever exercised against a live
+        // service.
+        return await pollForProbe({
+          runQuery: async () => {
+            const res = await fetch(queryUrl(config), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${config.personalApiKey}`,
+              },
+              body: JSON.stringify(queryBody(probeId)),
+            });
+            return {
+              ok: res.ok,
+              status: res.status,
+              body: res.ok ? await res.json() : null,
+            };
+          },
+          now: () => Date.now(),
+          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+          deadlineMs: DEADLINE_MS,
+          pollEveryMs: POLL_EVERY_MS,
+        });
       }
 
-      // The loop itself lives in ingestion-probe.ts behind an injected clock
-      // and sleep, so its deadline and its three failure branches are tested
-      // there instantly rather than only ever exercised against a live
-      // service.
-      return await pollForProbe({
-        runQuery: async () => {
-          const res = await fetch(queryUrl(config), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${config.personalApiKey}`,
-            },
-            body: JSON.stringify(queryBody(probeId)),
-          });
-          return {
-            ok: res.ok,
-            status: res.status,
-            body: res.ok ? await res.json() : null,
-          };
-        },
-        now: () => Date.now(),
-        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-        deadlineMs: DEADLINE_MS,
-        pollEveryMs: POLL_EVERY_MS,
+      // A fresh probe on a timeout, and only on a timeout. The retry rule and
+      // every outcome it does NOT retry are tested in ingestion-probe.test.ts.
+      const run = await runIngestionProbe({
+        attempt: attemptOnce,
+        maxAttempts: MAX_ATTEMPTS,
       });
-    }
 
-    // A fresh probe on a timeout, and only on a timeout. The retry rule and
-    // every outcome it does NOT retry are tested in ingestion-probe.test.ts.
-    const run = await runIngestionProbe({
-      attempt: attemptOnce,
-      maxAttempts: MAX_ATTEMPTS,
-    });
+      expect(run.final.state, explain(run)).toBe("found");
 
-    // A retry that succeeded must not pass in silence (L77). The check going
-    // green is the right outcome for one slow window, but a window that is
-    // slow EVERY day would then be invisible: the run would pass forever while
-    // the latency this deadline was set from crept up underneath it. So a used
-    // retry is said out loud, in the run log, with what it waited.
-    //
-    // This is a line in the log rather than a counted rate, which is the
-    // weaker half of L77 and is tracked in #961. It is enough to make a
-    // recurring retry visible to anybody reading a green run.
-    for (const [index, timedOut] of run.timedOut.entries()) {
-      console.warn(
-        `[posthog-ingestion] probe ${index + 1} of ${MAX_ATTEMPTS} timed out ` +
-          `after ${Math.round(timedOut.waitedMs / 1000)}s and ` +
-          `${timedOut.attempts} polls, so another was sent. A healthy probe ` +
-          "becomes queryable in 35 to 55 seconds (measured 4 September 2026). " +
-          "One of these is a slow window at PostHog. Several in a row means " +
-          "the deadline needs re-measuring, not retrying.",
-      );
-    }
+      // A retry that succeeded must not pass in silence (L77). The check going
+      // green is the right outcome for one slow window, but a window that is
+      // slow EVERY day would then be invisible: the run would pass forever while
+      // the latency this deadline was set from crept up underneath it. So a used
+      // retry is said out loud, in the run log, with what it waited.
+      //
+      // This is a line in the log rather than a counted rate, which is the
+      // weaker half of L77 and is tracked in #961. It is enough to make a
+      // recurring retry visible to anybody reading a green run.
+      for (const [index, timedOut] of run.timedOut.entries()) {
+        console.warn(
+          `[posthog-ingestion] probe ${index + 1} of ${MAX_ATTEMPTS} timed out ` +
+            `after ${Math.round(timedOut.waitedMs / 1000)}s and ` +
+            `${timedOut.attempts} polls, so another was sent. A healthy probe ` +
+            "becomes queryable in 35 to 55 seconds (measured 4 September 2026). " +
+            "One of these is a slow window at PostHog. Several in a row means " +
+            "the deadline needs re-measuring, not retrying.",
+        );
+      }
 
-    expect(run.final.state, explain(run)).toBe("found");
-  }, DEADLINE_MS * MAX_ATTEMPTS + 60_000);
+      // What this run cost, recorded before the assertion below, so a run that
+      // FAILS is counted too. A rate assembled only from runs that got as far as
+      // passing would be biased downwards exactly when it matters (L540).
+      const recorded = await fetch(captureUrl(config.host), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(outcomeBody(config, run, new Date())),
+      });
+      if (!recorded.ok) {
+        // Not a failure of ingestion, and not silent either: the rate below is
+        // computed from these, so one that stopped being written would make the
+        // window look quieter and quieter with nothing saying why.
+        console.warn(
+          `[posthog-ingestion] this run's outcome was not recorded (HTTP ` +
+            `${recorded.status}), so it is missing from the retry rate.`,
+        );
+      }
+
+      // A retry that succeeded must not pass in silence (L77). The check going
+      // green is the right outcome for one slow window, but a window that is
+      // slow EVERY day would otherwise be invisible: the run would pass forever
+      // while the latency this deadline was set from crept up underneath it. The
+      // log line below says it happened; this is what makes it countable.
+      const rateAnswer = await fetch(queryUrl(config), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.personalApiKey}`,
+        },
+        body: JSON.stringify(retryRateQueryBody(RETRY_RATE_WINDOW_DAYS)),
+      });
+      const reading = rateAnswer.ok
+        ? readRetryRate(await rateAnswer.json())
+        : ({
+            state: "unreadable",
+            because: `HTTP ${rateAnswer.status}`,
+          } as const);
+
+      // An unreadable rate is reported, never treated as zero: a reader that
+      // answers empty when its own accessor fails is indistinguishable from a
+      // correct reader of an empty set (L215). It does not fail the check,
+      // because the round trip asserted above is the thing this check is named
+      // for and a broken history query says nothing about it.
+      if (reading.state === "unreadable") {
+        console.warn(
+          `[posthog-ingestion] could not read how often the first probe times ` +
+            `out (${reading.because}), so that rate is unjudged today.`,
+        );
+      } else {
+        const verdict = judgeRetryRate({
+          runs: reading.runs,
+          retried: reading.retried,
+          minimumRuns: RETRY_RATE_MINIMUM_RUNS,
+          maxRetriedFraction: RETRY_RATE_MAX_FRACTION,
+        });
+        // Said on every outcome, including the healthy one, so a green run
+        // carries the number rather than only the runs that fail.
+        console.log(`[posthog-ingestion] ${verdict.message}`);
+        expect(verdict.acceptable, verdict.message).toBe(true);
+      }
+    },
+    DEADLINE_MS * MAX_ATTEMPTS + 60_000,
+  );
 });
 
 /**
@@ -209,7 +299,9 @@ function explain(run: ProbeRunResult): string {
       // from one, and the difference is what separates a slow window from
       // ingestion actually being down.
       const waits = run.timedOut
-        .map((t) => `${Math.round(t.waitedMs / 1000)}s over ${t.attempts} polls`)
+        .map(
+          (t) => `${Math.round(t.waitedMs / 1000)}s over ${t.attempts} polls`,
+        )
         .join(", then ");
       return (
         `${run.attemptsUsed} separate ${PROBE_EVENT} events were accepted by ` +

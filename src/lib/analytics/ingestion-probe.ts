@@ -252,3 +252,177 @@ export async function runIngestionProbe(deps: {
 
   return { final, attemptsUsed: deps.maxAttempts, timedOut };
 }
+
+// ── How often the first probe times out ───────────────────────
+
+/**
+ * The event that records what one run of the check cost (#961).
+ *
+ * #960 made a timed-out probe send a second one, which is right for a single
+ * slow window at PostHog and is also how a DAILY slow window becomes
+ * invisible: the run goes green, and the 35 to 55 second figure the deadline
+ * was calibrated from could drift a long way with nothing saying so. An error
+ * deliberately classified as expected must still be counted against a RATE,
+ * because the code waving it through has no notion of volume, so one benign
+ * instance and a systemic slowdown arrive on the same path (L77).
+ *
+ * Its own name, not a property on PROBE_EVENT: a retried run sends TWO probe
+ * captures, so counting retries by filtering those would read one slow run as
+ * two runs. One outcome event per RUN is the unit the rate is over.
+ *
+ * PostHog is the store because it is the only durable one this check already
+ * reaches. The alternative considered was job_heartbeats.last_result, which
+ * the admin jobs page renders; that table is written by the service-role
+ * client from Vercel crons, and this check runs in GitHub Actions with only
+ * the anon key, so taking it would have meant a new write route, a new
+ * repository secret, and widening a table scoped to Vercel's crons.
+ */
+export const PROBE_OUTCOME_EVENT = "health_check_probe_outcome";
+
+/**
+ * What the run cost, as a capture payload.
+ *
+ * Every run is recorded, including the one that failed outright. A run where
+ * both attempts timed out is the strongest evidence the deadline is wrong, so
+ * leaving it out would bias the rate downwards exactly when it matters.
+ */
+export function outcomeBody(
+  config: ProbeConfig,
+  run: ProbeRunResult,
+  now: Date,
+) {
+  return {
+    api_key: config.projectApiKey,
+    event: PROBE_OUTCOME_EVENT,
+    distinct_id: "posthog-ingestion-health-check",
+    properties: {
+      attempts_used: run.attemptsUsed,
+      first_attempt_timed_out: run.timedOut.length > 0,
+      final_state: run.final.state,
+      waited_ms:
+        "waitedMs" in run.final
+          ? run.final.waitedMs
+          : (run.timedOut.at(-1)?.waitedMs ?? null),
+    },
+    timestamp: now.toISOString(),
+  };
+}
+
+/**
+ * How many runs there were in the window, and how many needed a retry.
+ *
+ * `refresh` for the same reason the per-probe query has it: PostHog caches an
+ * answer against the TEXT of the query, and this text is identical on every
+ * run, so without it the first day's answer would be re-read forever.
+ */
+export function retryRateQueryBody(days: number) {
+  return {
+    refresh: "force_blocking",
+    query: {
+      kind: "HogQLQuery",
+      query:
+        "SELECT count() AS runs, " +
+        "countIf(properties.first_attempt_timed_out) AS retried " +
+        "FROM events " +
+        `WHERE event = '${PROBE_OUTCOME_EVENT}' ` +
+        `AND timestamp >= now() - INTERVAL ${Math.trunc(days)} DAY`,
+    },
+  };
+}
+
+export type RetryRateReading =
+  | { state: "read"; runs: number; retried: number }
+  | { state: "unreadable"; because: string };
+
+/**
+ * Reads the two counts.
+ *
+ * An unreadable answer is its own outcome, never zero. Zero retries out of
+ * zero runs and "the query API changed shape" are the same number and
+ * completely different situations, and a reader that answers with an empty
+ * result when its own accessor fails is indistinguishable from a correct
+ * reader of an empty set (L215).
+ */
+export function readRetryRate(payload: unknown): RetryRateReading {
+  if (!payload || typeof payload !== "object") {
+    return { state: "unreadable", because: "response was not an object" };
+  }
+  const results = (payload as { results?: unknown }).results;
+  if (!Array.isArray(results)) {
+    return { state: "unreadable", because: "response had no results array" };
+  }
+  if (results.length === 0) {
+    return { state: "unreadable", because: "results array was empty" };
+  }
+  const first = results[0];
+  if (
+    !Array.isArray(first) ||
+    typeof first[0] !== "number" ||
+    typeof first[1] !== "number"
+  ) {
+    return { state: "unreadable", because: "first row held no pair of counts" };
+  }
+  return { state: "read", runs: first[0], retried: first[1] };
+}
+
+export type RetryRateVerdict = {
+  state: "not_enough_history" | "within_limit" | "too_often";
+  acceptable: boolean;
+  message: string;
+};
+
+/**
+ * Decides whether the first probe times out too often to still call it a
+ * transient slow window.
+ *
+ * `minimumRuns` guards the SAMPLE, never the fraction. A volume floor applied
+ * to the fraction would silence the saturation case, because a proportion
+ * cannot tell one bad out of two from every run out of every run (L139), and
+ * every run needing a retry is the loudest possible version of this defect.
+ *
+ * "Not enough history" is its own verdict rather than a pass. This check is
+ * new, so for its first week the window genuinely holds too little to say
+ * anything, and a window that reports healthy while measuring nothing is
+ * exactly the failure being fixed (L98).
+ */
+export function judgeRetryRate(args: {
+  runs: number;
+  retried: number;
+  minimumRuns: number;
+  maxRetriedFraction: number;
+}): RetryRateVerdict {
+  const { runs, retried, minimumRuns, maxRetriedFraction } = args;
+
+  if (runs < minimumRuns) {
+    return {
+      state: "not_enough_history",
+      acceptable: true,
+      message:
+        `Only ${runs} recorded run(s) in the window, and ${minimumRuns} are ` +
+        "needed before the retry rate says anything. Nothing is being judged " +
+        "here yet.",
+    };
+  }
+
+  if (retried / runs > maxRetriedFraction) {
+    return {
+      state: "too_often",
+      acceptable: false,
+      message:
+        `The first ingestion probe timed out on ${retried} of ${runs} runs ` +
+        `in the window, over the ${Math.round(maxRetriedFraction * 100)}% ` +
+        "this tolerates. That is no longer a slow window at PostHog: the " +
+        "deadline needs re-measuring against real ingestion latency, not " +
+        "retrying. Re-measure with the query cache bypassed before changing " +
+        "it.",
+    };
+  }
+
+  return {
+    state: "within_limit",
+    acceptable: true,
+    message:
+      `The first ingestion probe timed out on ${retried} of ${runs} runs in ` +
+      "the window.",
+  };
+}

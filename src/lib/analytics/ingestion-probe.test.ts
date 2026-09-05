@@ -12,6 +12,11 @@ import {
   pollForProbe,
   runIngestionProbe,
   type AttemptResult,
+  PROBE_OUTCOME_EVENT,
+  outcomeBody,
+  retryRateQueryBody,
+  readRetryRate,
+  judgeRetryRate,
 } from "./ingestion-probe";
 
 /**
@@ -55,7 +60,10 @@ describe("readProbeConfig", () => {
       ...CONFIGURED,
       POSTHOG_PERSONAL_API_KEY: "",
     });
-    expect(result).toEqual({ ok: false, missing: ["POSTHOG_PERSONAL_API_KEY"] });
+    expect(result).toEqual({
+      ok: false,
+      missing: ["POSTHOG_PERSONAL_API_KEY"],
+    });
   });
 });
 
@@ -81,7 +89,11 @@ describe("the requests it sends", () => {
   });
 
   it("sends the probe id as a property so the read back can find this one event", () => {
-    const body = captureBody(config, "probe-123", new Date("2026-09-02T12:00:00.000Z"));
+    const body = captureBody(
+      config,
+      "probe-123",
+      new Date("2026-09-02T12:00:00.000Z"),
+    );
     expect(body.event).toBe(PROBE_EVENT);
     expect(body.properties.probe_id).toBe("probe-123");
     expect(body.api_key).toBe("phc_abc");
@@ -120,7 +132,9 @@ describe("the requests it sends", () => {
 
 describe("interpretQueryResult", () => {
   it("reports found when the count is positive", () => {
-    expect(interpretQueryResult({ results: [[1]] })).toEqual({ state: "found" });
+    expect(interpretQueryResult({ results: [[1]] })).toEqual({
+      state: "found",
+    });
   });
 
   it("reports not yet when the event genuinely has not landed", () => {
@@ -131,9 +145,17 @@ describe("interpretQueryResult", () => {
 
   it.each([
     ["a null response", null, "response was not an object"],
-    ["a response with no results", { error: "nope" }, "response had no results array"],
+    [
+      "a response with no results",
+      { error: "nope" },
+      "response had no results array",
+    ],
     ["an empty results array", { results: [] }, "results array was empty"],
-    ["a row holding no count", { results: [["nope"]] }, "first row held no count"],
+    [
+      "a row holding no count",
+      { results: [["nope"]] },
+      "first row held no count",
+    ],
   ])(
     "does not mistake %s for the event not having arrived",
     (_label, payload, because) => {
@@ -244,7 +266,11 @@ describe("runIngestionProbe", () => {
     };
   }
 
-  const FOUND: AttemptResult = { state: "found", waitedMs: 40_000, attempts: 14 };
+  const FOUND: AttemptResult = {
+    state: "found",
+    waitedMs: 40_000,
+    attempts: 14,
+  };
   const TIMED_OUT: AttemptResult = {
     state: "timed_out",
     waitedMs: 360_000,
@@ -253,7 +279,10 @@ describe("runIngestionProbe", () => {
 
   it("stops at the first attempt when the event lands", async () => {
     const a = attempts(FOUND);
-    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+    const result = await runIngestionProbe({
+      attempt: a.attempt,
+      maxAttempts: 2,
+    });
 
     expect(result.final.state).toBe("found");
     expect(result.attemptsUsed).toBe(1);
@@ -262,7 +291,10 @@ describe("runIngestionProbe", () => {
 
   it("sends a second probe when the first times out, and passes if that lands", async () => {
     const a = attempts(TIMED_OUT, FOUND);
-    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+    const result = await runIngestionProbe({
+      attempt: a.attempt,
+      maxAttempts: 2,
+    });
 
     expect(result.final.state).toBe("found");
     expect(result.attemptsUsed).toBe(2);
@@ -271,7 +303,10 @@ describe("runIngestionProbe", () => {
 
   it("fails when every attempt times out, and keeps what each one waited", async () => {
     const a = attempts(TIMED_OUT, TIMED_OUT);
-    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+    const result = await runIngestionProbe({
+      attempt: a.attempt,
+      maxAttempts: 2,
+    });
 
     expect(result.final.state).toBe("timed_out");
     expect(result.attemptsUsed).toBe(2);
@@ -285,7 +320,10 @@ describe("runIngestionProbe", () => {
   // configuration fault as a slow one.
   it("does not retry a rejected query", async () => {
     const a = attempts({ state: "query_rejected", status: 401 }, FOUND);
-    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+    const result = await runIngestionProbe({
+      attempt: a.attempt,
+      maxAttempts: 2,
+    });
 
     expect(result.final.state).toBe("query_rejected");
     expect(result.attemptsUsed).toBe(1);
@@ -297,7 +335,10 @@ describe("runIngestionProbe", () => {
       { state: "unreadable", because: "first row held no count" },
       FOUND,
     );
-    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+    const result = await runIngestionProbe({
+      attempt: a.attempt,
+      maxAttempts: 2,
+    });
 
     expect(result.final.state).toBe("unreadable");
     expect(result.attemptsUsed).toBe(1);
@@ -305,7 +346,10 @@ describe("runIngestionProbe", () => {
 
   it("does not retry a refused capture, which is not slowness either", async () => {
     const a = attempts({ state: "capture_rejected", status: 400 }, FOUND);
-    const result = await runIngestionProbe({ attempt: a.attempt, maxAttempts: 2 });
+    const result = await runIngestionProbe({
+      attempt: a.attempt,
+      maxAttempts: 2,
+    });
 
     expect(result.final.state).toBe("capture_rejected");
     expect(result.attemptsUsed).toBe(1);
@@ -317,5 +361,165 @@ describe("runIngestionProbe", () => {
       runIngestionProbe({ attempt: a.attempt, maxAttempts: 0 }),
     ).rejects.toThrow(/at least one/i);
     expect(a.seen).toEqual([]);
+  });
+});
+
+/**
+ * #961. #960 made a timed-out probe send a second one, which is right for a
+ * single slow window at PostHog and is also how a DAILY slow window becomes
+ * invisible: the run goes green, and the 35 to 55 second figure the deadline
+ * was set from could drift a long way with nothing saying so. An error
+ * deliberately classified as expected must still be counted against a rate,
+ * because the code waving it through has no notion of volume (L77).
+ *
+ * The count lives in PostHog, alongside the probes themselves, because that is
+ * the only durable store this check already reaches.
+ */
+describe("recording what the run cost", () => {
+  const config = {
+    projectApiKey: "phc_abc",
+    host: "https://us.i.posthog.com",
+    personalApiKey: "phx_secret",
+    projectId: "358871",
+  };
+
+  it("names the outcome event apart from the probe itself", () => {
+    // Counting retries by filtering the probe events would count the capture
+    // that a retry ALSO sends, so one slow run would look like two runs.
+    expect(PROBE_OUTCOME_EVENT).not.toBe(PROBE_EVENT);
+  });
+
+  it("records that the first attempt got through", () => {
+    const body = outcomeBody(
+      config,
+      {
+        final: { state: "found", waitedMs: 41_000, attempts: 14 },
+        attemptsUsed: 1,
+        timedOut: [],
+      },
+      new Date("2026-09-05T00:00:00Z"),
+    );
+
+    expect(body.event).toBe(PROBE_OUTCOME_EVENT);
+    expect(body.properties).toMatchObject({
+      attempts_used: 1,
+      first_attempt_timed_out: false,
+      final_state: "found",
+      waited_ms: 41_000,
+    });
+  });
+
+  it("records that a retry was needed", () => {
+    const body = outcomeBody(
+      config,
+      {
+        final: { state: "found", waitedMs: 38_000, attempts: 13 },
+        attemptsUsed: 2,
+        timedOut: [{ waitedMs: 360_000, attempts: 120 }],
+      },
+      new Date("2026-09-05T00:00:00Z"),
+    );
+
+    expect(body.properties).toMatchObject({
+      attempts_used: 2,
+      first_attempt_timed_out: true,
+      final_state: "found",
+    });
+  });
+
+  it("records the run that failed outright, not only the ones that recovered", () => {
+    // A run where BOTH attempts timed out is the strongest evidence the
+    // deadline is wrong, so leaving it out would bias the rate downwards
+    // exactly when it matters.
+    const body = outcomeBody(
+      config,
+      {
+        final: { state: "timed_out", waitedMs: 360_000, attempts: 120 },
+        attemptsUsed: 2,
+        timedOut: [
+          { waitedMs: 360_000, attempts: 120 },
+          { waitedMs: 360_000, attempts: 120 },
+        ],
+      },
+      new Date("2026-09-05T00:00:00Z"),
+    );
+
+    expect(body.properties).toMatchObject({
+      first_attempt_timed_out: true,
+      final_state: "timed_out",
+    });
+  });
+});
+
+describe("reading how often the first probe times out", () => {
+  it("asks over a window of whole days", () => {
+    const body = retryRateQueryBody(14);
+    expect(body.query.query).toContain("INTERVAL 14 DAY");
+    expect(body.query.query).toContain(PROBE_OUTCOME_EVENT);
+    // Same reason the per-probe query forces a refresh: PostHog caches an
+    // answer against the TEXT of the query, and this text never changes, so a
+    // cached answer would be re-read every day forever.
+    expect(body.refresh).toBe("force_blocking");
+  });
+
+  it("reads the two counts", () => {
+    expect(readRetryRate({ results: [[10, 3]] })).toEqual({
+      state: "read",
+      runs: 10,
+      retried: 3,
+    });
+  });
+
+  it("refuses an answer it cannot read rather than calling it zero", () => {
+    // Zero retries out of zero runs and "the query API changed shape" are the
+    // same number and completely different situations (L215).
+    for (const payload of [null, {}, { results: [] }, { results: [["a"]] }]) {
+      expect(readRetryRate(payload).state).toBe("unreadable");
+    }
+  });
+});
+
+describe("judging that rate", () => {
+  const LIMITS = { minimumRuns: 7, maxRetriedFraction: 1 / 3 };
+
+  it("says so when there is not enough history to judge yet", () => {
+    // Distinct from a pass. This check is new, so for its first week the
+    // window genuinely holds too little to say anything, and reporting that as
+    // healthy is the failure the whole issue is about (L98).
+    const verdict = judgeRetryRate({ runs: 3, retried: 0, ...LIMITS });
+    expect(verdict.state).toBe("not_enough_history");
+    expect(verdict.acceptable).toBe(true);
+  });
+
+  it("passes a rate inside the limit", () => {
+    const verdict = judgeRetryRate({ runs: 14, retried: 2, ...LIMITS });
+    expect(verdict.state).toBe("within_limit");
+    expect(verdict.acceptable).toBe(true);
+  });
+
+  it("refuses a rate over the limit", () => {
+    const verdict = judgeRetryRate({ runs: 14, retried: 7, ...LIMITS });
+    expect(verdict.state).toBe("too_often");
+    expect(verdict.acceptable).toBe(false);
+    expect(verdict.message).toContain("7 of 14");
+  });
+
+  it("refuses every run needing a retry even at the smallest judgeable sample", () => {
+    // A floor added so a small sample is not noisy also silences the
+    // SATURATION case if it is applied to the fraction rather than the sample
+    // (L139). Seven out of seven has to fire.
+    const verdict = judgeRetryRate({ runs: 7, retried: 7, ...LIMITS });
+    expect(verdict.state).toBe("too_often");
+    expect(verdict.acceptable).toBe(false);
+  });
+
+  it("treats the limit as a ceiling, not a threshold to exceed twice", () => {
+    // Exactly at the fraction is acceptable; the first run past it is not.
+    expect(judgeRetryRate({ runs: 9, retried: 3, ...LIMITS }).acceptable).toBe(
+      true,
+    );
+    expect(judgeRetryRate({ runs: 9, retried: 4, ...LIMITS }).acceptable).toBe(
+      false,
+    );
   });
 });
