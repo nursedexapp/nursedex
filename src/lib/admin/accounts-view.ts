@@ -1,12 +1,7 @@
 // Pure helpers for the admin Accounts page tabs. Kept out of the page
 // component so the tab -> query mapping is unit-testable.
 
-export type AccountsTab =
-  | "all"
-  | "nurses"
-  | "families"
-  | "removed"
-  | "flagged";
+export type AccountsTab = "all" | "nurses" | "families" | "removed" | "flagged";
 
 export const ACCOUNT_TABS: Array<{
   key: AccountsTab;

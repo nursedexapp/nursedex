@@ -33,6 +33,7 @@ import { sendProfileSetupEmail } from "@/lib/email/send";
 import { shouldShowFeaturedUpsell, markUpsellShown } from "./upsell";
 import { cancelActiveStripeSubscriptions } from "@/lib/stripe/cancel-subscriptions";
 
+import { toTypedFailure, assertNoWriteError } from "@/lib/db/results";
 export type ProfileActionResult = {
   error?: string;
   success?: string;
@@ -76,13 +77,22 @@ function firstValidationError(error: ZodError): string {
 async function getNurseTier(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
-): Promise<NurseTier> {
-  const { data } = await supabase
-    .from("nurse_profiles")
-    .select("tier")
-    .eq("user_id", userId)
-    .single();
-  return (data?.tier as NurseTier | undefined) ?? NurseTier.FREE;
+): Promise<NurseTier | null> {
+  // Null rather than FREE on a failure (#847). The tier picks which schema
+  // validates the form, and FREE is the STRICTER one, so a failed read
+  // silently rejects a Featured nurse's own bio, care types and photos as
+  // being over a limit they do not have. A row that genuinely has no tier
+  // still falls back to FREE, because that is a real answer.
+  const read = await toTypedFailure(
+    supabase
+      .from("nurse_profiles")
+      .select("tier")
+      .eq("user_id", userId)
+      .single(),
+    "this nurse's tier, which decides the form limits",
+  );
+  if (!read.ok) return null;
+  return (read.data?.tier as NurseTier | undefined) ?? NurseTier.FREE;
 }
 
 // ── Fetch nurse profile for the current user ────────────────
@@ -114,11 +124,16 @@ export async function saveOnboardingStep(
   // a public entry point, so the form rules (including the credential-aware
   // license number requirement) must be enforced here too, not just client side.
   if (step >= 1 && step <= 5) {
+    let tier: NurseTier | null = null;
+    if (step === 2 || step === 4) {
+      tier = await getNurseTier(supabase, user.id);
+      if (tier === null) {
+        return { error: "We could not save that just now. Please try again." };
+      }
+    }
     const schema =
       step === 2 || step === 4
-        ? (step === 2 ? step2Schema : step4Schema)(
-            await getNurseTier(supabase, user.id),
-          )
+        ? (step === 2 ? step2Schema : step4Schema)(tier as NurseTier)
         : step === 1
           ? step1Schema
           : step === 3
@@ -282,17 +297,25 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
   const supabase = await createClient();
 
   // Fetch the current profile and user data
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select("*")
-    .eq("user_id", user.id)
-    .single();
+  const profileRead = await toTypedFailure(
+    supabase.from("nurse_profiles").select("*").eq("user_id", user.id).single(),
+    "nurse_profiles (completeOnboarding)",
+  );
+  if (!profileRead.ok)
+    return { error: "We could not save that just now. Please try again." };
+  const profile = profileRead.data;
 
-  const { data: userData } = await supabase
-    .from("users")
-    .select("first_name, last_name, email")
-    .eq("id", user.id)
-    .single();
+  const userDataRead = await toTypedFailure(
+    supabase
+      .from("users")
+      .select("first_name, last_name, email")
+      .eq("id", user.id)
+      .single(),
+    "users (completeOnboarding)",
+  );
+  if (!userDataRead.ok)
+    return { error: "We could not save that just now. Please try again." };
+  const userData = userDataRead.data;
 
   if (!profile || !userData) {
     return { error: "Profile not found" };
@@ -363,11 +386,17 @@ export async function updateNurseProfile(
   const supabase = await createClient();
 
   // Fetch current profile for comparison
-  const { data: currentProfile } = await supabase
-    .from("nurse_profiles")
-    .select("slug, credential, verification_status, tier")
-    .eq("user_id", user.id)
-    .single();
+  const currentProfileRead = await toTypedFailure(
+    supabase
+      .from("nurse_profiles")
+      .select("slug, credential, verification_status, tier")
+      .eq("user_id", user.id)
+      .single(),
+    "nurse_profiles (updateNurseProfile)",
+  );
+  if (!currentProfileRead.ok)
+    return { error: "We could not save that just now. Please try again." };
+  const currentProfile = currentProfileRead.data;
 
   if (!currentProfile) {
     return { error: "Profile not found" };
@@ -404,11 +433,17 @@ export async function updateNurseProfile(
 
   // Name change is detected by the users table trigger, but we
   // also need to regenerate the slug
-  const { data: freshUser } = await supabase
-    .from("users")
-    .select("first_name, last_name")
-    .eq("id", user.id)
-    .single();
+  const freshUserRead = await toTypedFailure(
+    supabase
+      .from("users")
+      .select("first_name, last_name")
+      .eq("id", user.id)
+      .single(),
+    "users (updateNurseProfile)",
+  );
+  if (!freshUserRead.ok)
+    return { error: "We could not save that just now. Please try again." };
+  const freshUser = freshUserRead.data;
 
   let needsNewSlug = false;
   if (freshUser) {
@@ -511,26 +546,39 @@ export async function updateNurseProfile(
   }
 
   // Recalculate completeness + read the upsell-gate fields in one round trip
-  const { data: updatedProfile } = await supabase
-    .from("nurse_profiles")
-    // Written out rather than composed from COMPLETENESS_COLUMNS: the Supabase
-    // client parses this string at the TYPE level to give the row its shape,
-    // and a template literal defeats that, costing the type safety on every
-    // field below. completeness-columns.test.ts holds it to the same list
-    // instead.
-    .select(
-      "photos, bio, skills, care_philosophy, availability_commitment, time_slots, rate_min, rate_max, has_transportation, covid_vaccinated, additional_certs, travel_radius_miles, languages, tier, verification_status, save_count_for_upsell, last_upsell_shown_at",
-    )
-    .eq("user_id", user.id)
-    .single();
+  const updatedProfileRead = await toTypedFailure(
+    supabase
+      .from("nurse_profiles")
+      // Written out rather than composed from COMPLETENESS_COLUMNS: the Supabase
+      // client parses this string at the TYPE level to give the row its shape,
+      // and a template literal defeats that, costing the type safety on every
+      // field below. completeness-columns.test.ts holds it to the same list
+      // instead.
+      .select(
+        "photos, bio, skills, care_philosophy, availability_commitment, time_slots, rate_min, rate_max, has_transportation, covid_vaccinated, additional_certs, travel_radius_miles, languages, tier, verification_status, save_count_for_upsell, last_upsell_shown_at",
+      )
+      .eq("user_id", user.id)
+      .single(),
+    "nurse_profiles (updateNurseProfile)",
+  );
+  if (!updatedProfileRead.ok)
+    return { error: "We could not save that just now. Please try again." };
+  const updatedProfile = updatedProfileRead.data;
 
   let upsellHint = false;
   if (updatedProfile) {
     const { score } = calculateCompleteness(updatedProfile);
-    await supabase
-      .from("nurse_profiles")
-      .update({ profile_completeness: score })
-      .eq("user_id", user.id);
+    // Reported, not refused. The profile save above has already landed, so
+    // returning a failure here would tell the nurse their edit did not happen
+    // when it did. What a failed write costs is a stale completeness score
+    // until the next save, and toTypedFailure files it either way.
+    await toTypedFailure(
+      supabase
+        .from("nurse_profiles")
+        .update({ profile_completeness: score })
+        .eq("user_id", user.id),
+      "the recalculated profile completeness score",
+    );
 
     if (shouldShowFeaturedUpsell(updatedProfile)) {
       upsellHint = true;
@@ -587,7 +635,18 @@ export async function softDeleteAccount(): Promise<void> {
   // Cancel Stripe first so a deleted account never keeps billing (#413).
   await cancelActiveStripeSubscriptions(supabase, user.id);
 
-  await supabase.from("users").update({ is_deleted: true }).eq("id", user.id);
+  // Throws rather than returns, which is the one deliberate exception to the
+  // "use server returns" rule in #990, because the caller's own comment in
+  // SettingsForm records that decision: "softDeleteAccount redirects on
+  // success, and a genuine failure throws, which Sentry sees. Swallowing it
+  // into a done state would be the worse bug." Unchecked, this reported a
+  // deletion that never happened: Stripe was already cancelled above and the
+  // person was signed out, so they believed they were gone while their
+  // profile stayed public and their subscription stayed cancelled.
+  await assertNoWriteError(
+    supabase.from("users").update({ is_deleted: true }).eq("id", user.id),
+    "the account deletion this person asked for",
+  );
 
   await supabase.auth.signOut();
   // Bust the client Router Cache so no stale authed pages (rendered before the
@@ -628,11 +687,17 @@ export async function deletePhoto(path: string): Promise<ProfileActionResult> {
   // credit in search for a photo she no longer has and the two screens
   // disagree about her (#727). One write rather than two, because a second
   // round trip leaves a window where the photo is gone and the score counts it.
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select(COMPLETENESS_COLUMNS)
-    .eq("user_id", user.id)
-    .single<CompletenessInput>();
+  const profileRead = await toTypedFailure(
+    supabase
+      .from("nurse_profiles")
+      .select(COMPLETENESS_COLUMNS)
+      .eq("user_id", user.id)
+      .single<CompletenessInput>(),
+    "nurse_profiles (deletePhoto)",
+  );
+  if (!profileRead.ok)
+    return { error: "We could not save that just now. Please try again." };
+  const profile = profileRead.data;
 
   if (profile) {
     const updatedPhotos = profile.photos.filter((p: string) => p !== path);
@@ -640,14 +705,24 @@ export async function deletePhoto(path: string): Promise<ProfileActionResult> {
       ...profile,
       photos: updatedPhotos,
     });
-    await supabase
-      .from("nurse_profiles")
-      .update({
-        photos: updatedPhotos,
-        has_photo: updatedPhotos.length > 0,
-        profile_completeness: score,
-      })
-      .eq("user_id", user.id);
+    // Checked: this row is what the profile and the search index both read,
+    // so an unchecked failure leaves the photo gone from storage and still
+    // listed on the nurse, which is the two-screens-disagree defect #727 was
+    // about.
+    const write = await toTypedFailure(
+      supabase
+        .from("nurse_profiles")
+        .update({
+          photos: updatedPhotos,
+          has_photo: updatedPhotos.length > 0,
+          profile_completeness: score,
+        })
+        .eq("user_id", user.id),
+      "the nurse's photo list after a deletion",
+    );
+    if (!write.ok) {
+      return { error: "We could not save that just now. Please try again." };
+    }
   }
 
   return { success: "Photo removed" };

@@ -61,6 +61,11 @@ const h = vi.hoisted(() => {
     } as Record<string, unknown> | null,
     /** false = a concurrent caller already applied the transition. */
     updateMatches: true,
+    // #847. The pre-flight read and the audit write both discarded their
+    // error, so a failed read came back as not_found and a failed audit write
+    // came back as a completed decision with no record of it.
+    readError: null as { message: string } | null,
+    auditWriteError: null as { message: string } | null,
   };
 
   const calls = {
@@ -145,14 +150,20 @@ function builder(table: string) {
       : b;
   b.eq = () => b;
   b.in = () => b;
-  b.maybeSingle = async () => ({ data: rowFor(), error: null });
+  b.maybeSingle = async () =>
+    h.state.readError
+      ? { data: null, error: h.state.readError }
+      : { data: rowFor(), error: null };
   b.update = () => {
     updating = true;
     return b;
   };
   b.insert = async (payload: unknown) => {
-    if (table === "admin_actions") h.calls.adminActions.push(payload);
-    return { error: null };
+    if (table === "admin_actions") {
+      h.calls.adminActions.push(payload);
+      return { data: null, error: h.state.auditWriteError };
+    }
+    return { data: null, error: null };
   };
   b.upsert = async (payload: unknown) => {
     if (table === "blocked_emails") h.calls.blockedEmails.push(payload);
@@ -183,6 +194,8 @@ const UUID = "11111111-1111-4111-8111-111111111111";
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.updateMatches = true;
+  h.state.readError = null;
+  h.state.auditWriteError = null;
   // Tests below flip review.status to drive the dispute path, so reset it here
   // or the next test inherits it.
   if (h.state.review) h.state.review.status = "pending";
@@ -200,7 +213,6 @@ beforeEach(() => {
 describe("approveVerification cannot be applied twice", () => {
   it("emails the nurse and writes one audit row when it wins the race", async () => {
     const { approveVerification } = await import("./verification-actions");
-
     const res = await approveVerification({ user_id: UUID });
 
     expect(res.success).toBe(true);
@@ -213,7 +225,6 @@ describe("approveVerification cannot be applied twice", () => {
     // wrote, and Jane got told twice that she had been approved.
     h.state.updateMatches = false;
     const { approveVerification } = await import("./verification-actions");
-
     const res = await approveVerification({ user_id: UUID });
 
     expect(res).toEqual({ success: false, error: "wrong_state" });
@@ -226,7 +237,6 @@ describe("adminApproveReview cannot be applied twice", () => {
   it("writes no audit row when a concurrent admin already resolved it", async () => {
     h.state.updateMatches = false;
     const { adminApproveReview } = await import("./review-actions");
-
     const res = await adminApproveReview({ review_id: UUID });
 
     expect(res).toEqual({ success: false, error: "wrong_state" });
@@ -318,5 +328,70 @@ describe("adminResolveDispute cannot be applied twice", () => {
     expect(res).toEqual({ success: false, error: "wrong_state" });
     expect(h.calls.disputeEmail).toHaveLength(0);
     expect(h.calls.adminActions).toHaveLength(0);
+  });
+});
+
+// #847 / #990. A `"use server"` module returns a typed failure rather than
+// throwing, because a throwing server action does not render the admin error
+// boundary: it rejects at the client and Next.js redacts the message to a
+// digest, so the admin sees a control that did nothing and presses it again,
+// on a moderation decision.
+//
+// What each of these must NOT do is answer a failed database call with a claim
+// about the data.
+describe("when the read an admin decision depends on fails", () => {
+  it("does not tell the admin the review does not exist", async () => {
+    h.state.readError = { message: "connection reset" };
+
+    const { adminApproveReview } = await import("./review-actions");
+    const res = await adminApproveReview({ review_id: UUID });
+
+    expect(res).toEqual({ success: false, error: "lookup_failed" });
+    expect(h.calls.adminActions).toHaveLength(0);
+  });
+
+  it("still says not_found when the review genuinely is not there", async () => {
+    // The positive control: an absent row has to stay an answer.
+    const kept = h.state.review;
+    h.state.review = null;
+
+    const { adminApproveReview } = await import("./review-actions");
+    const res = await adminApproveReview({ review_id: UUID });
+
+    expect(res).toEqual({ success: false, error: "not_found" });
+    h.state.review = kept;
+  });
+
+  it("does not tell the admin the nurse does not exist", async () => {
+    h.state.readError = { message: "connection reset" };
+
+    const { approveVerification } = await import("./verification-actions");
+    const res = await approveVerification({ user_id: UUID });
+
+    expect(res).toEqual({ success: false, error: "lookup_failed" });
+    expect(h.calls.approvedEmail).toHaveLength(0);
+  });
+});
+
+describe("when the audit row cannot be written", () => {
+  it("does not report the decision complete", async () => {
+    h.state.auditWriteError = { message: "permission denied" };
+
+    const { adminApproveReview } = await import("./review-actions");
+    const res = await adminApproveReview({ review_id: UUID });
+
+    expect(res).toEqual({ success: false, error: "audit_unwritten" });
+  });
+
+  it("still finishes the decision, so the admin screen is not left stale", async () => {
+    // The approval has already applied by the time the audit row is written.
+    // Returning early would skip the revalidation and any notification, so the
+    // admin would be looking at a stale screen for a change that did happen.
+    h.state.auditWriteError = { message: "permission denied" };
+
+    const { approveVerification } = await import("./verification-actions");
+    await approveVerification({ user_id: UUID });
+
+    expect(h.calls.approvedEmail).toHaveLength(1);
   });
 });

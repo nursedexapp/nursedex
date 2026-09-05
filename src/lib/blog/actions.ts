@@ -23,6 +23,7 @@ import { toDraft, toPublished, toArchived, toScheduled } from "./transitions";
 import type { StatusPatch } from "./transitions";
 import type { TiptapDoc } from "@/types/database";
 
+import { toTypedFailure } from "@/lib/db/results";
 export interface BlogActionResult {
   success: boolean;
   error?: string;
@@ -109,11 +110,20 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
   if (input.id) {
     // Read the current slug/status first so we can record a redirect if a
     // published post's public URL is about to change.
-    const { data: prev } = await supabase
-      .from("blog_posts")
-      .select("slug, status")
-      .eq("id", input.id)
-      .maybeSingle();
+    const prevRead = await toTypedFailure(
+      supabase
+        .from("blog_posts")
+        .select("slug, status")
+        .eq("id", input.id)
+        .maybeSingle(),
+      "blog_posts (savePost)",
+    );
+    if (!prevRead.ok)
+      return {
+        success: false,
+        error: "We could not save that just now. Please try again.",
+      };
+    const prev = prevRead.data;
 
     const { error } = await supabase
       .from("blog_posts")
@@ -150,7 +160,9 @@ export async function savePost(raw: unknown): Promise<BlogActionResult> {
       return { success: false, error: "unknown" };
     }
     if (created.outcome === "not_owner") {
-      console.error("[blog] create collided with a post this user does not own");
+      console.error(
+        "[blog] create collided with a post this user does not own",
+      );
       return { success: false, error: "unknown" };
     }
 
@@ -190,11 +202,20 @@ export async function restoreRevision(
 
   // Snapshot the current content first (it may include un-snapshotted
   // autosave changes) so restoring never loses the present version.
-  const { data: current } = await supabase
-    .from("blog_posts")
-    .select("title, excerpt, content")
-    .eq("id", rev.post_id)
-    .maybeSingle();
+  const currentRead = await toTypedFailure(
+    supabase
+      .from("blog_posts")
+      .select("title, excerpt, content")
+      .eq("id", rev.post_id)
+      .maybeSingle(),
+    "blog_posts (restoreRevision)",
+  );
+  if (!currentRead.ok)
+    return {
+      success: false,
+      error: "We could not save that just now. Please try again.",
+    };
+  const current = currentRead.data;
   if (current) {
     await snapshotRevision(
       rev.post_id,
@@ -359,11 +380,16 @@ export async function archivePost(id: string): Promise<BlogActionResult> {
 export async function togglePinned(id: string): Promise<BlogActionResult> {
   await requireAdmin();
   const supabase = await createClient();
-  const { data: current } = await supabase
-    .from("blog_posts")
-    .select("pinned")
-    .eq("id", id)
-    .maybeSingle();
+  const currentRead = await toTypedFailure(
+    supabase.from("blog_posts").select("pinned").eq("id", id).maybeSingle(),
+    "blog_posts (togglePinned)",
+  );
+  if (!currentRead.ok)
+    return {
+      success: false,
+      error: "We could not save that just now. Please try again.",
+    };
+  const current = currentRead.data;
 
   const { data, error } = await supabase
     .from("blog_posts")
@@ -386,11 +412,20 @@ export async function deletePost(id: string): Promise<BlogActionResult> {
 
   // Capture the post's images before deleting the row so we can clean up
   // storage. The GC cron is the backstop, but this frees them immediately.
-  const { data: existing } = await supabase
-    .from("blog_posts")
-    .select("cover_image_url, content")
-    .eq("id", id)
-    .maybeSingle();
+  const existingRead = await toTypedFailure(
+    supabase
+      .from("blog_posts")
+      .select("cover_image_url, content")
+      .eq("id", id)
+      .maybeSingle(),
+    "blog_posts (deletePost)",
+  );
+  if (!existingRead.ok)
+    return {
+      success: false,
+      error: "We could not save that just now. Please try again.",
+    };
+  const existing = existingRead.data;
 
   const { error } = await supabase.from("blog_posts").delete().eq("id", id);
   if (error) {

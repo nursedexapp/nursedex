@@ -11,6 +11,7 @@ import {
   sendCommentApprovedEmail,
 } from "@/lib/email/send";
 
+import { toTypedFailure } from "@/lib/db/results";
 export interface CommentResult {
   success: boolean;
   error?: "invalid" | "unknown";
@@ -25,12 +26,23 @@ async function revalidatePostById(
   postId: string,
 ): Promise<{ slug: string; title: string } | null> {
   const supabase = createServiceRoleClient();
-  const { data } = await supabase
-    .from("blog_posts")
-    .select("slug, title")
-    .eq("id", postId)
-    .maybeSingle();
-  const row = data as { slug: string; title: string } | null;
+  // Reported, not refused. This runs AFTER the moderation decision has been
+  // written, and its only jobs are busting the post's cache and giving the
+  // commenter a link back. Returning a failure would tell the admin their
+  // decision did not happen when it did; the null it already returns for a
+  // missing post is the same shape, and toTypedFailure files the failure.
+  const read = await toTypedFailure(
+    supabase
+      .from("blog_posts")
+      .select("slug, title")
+      .eq("id", postId)
+      .maybeSingle(),
+    "the post a moderated comment belongs to",
+  );
+  const row = (read.ok ? read.data : null) as {
+    slug: string;
+    title: string;
+  } | null;
   if (row?.slug) revalidatePath(`/blog/${row.slug}`);
   return row ?? null;
 }
@@ -57,11 +69,16 @@ export async function submitComment(raw: unknown): Promise<CommentResult> {
   const supabase = createServiceRoleClient();
 
   // Only accept comments on a published post.
-  const { data: post } = await supabase
-    .from("blog_posts")
-    .select("status, title")
-    .eq("id", input.post_id)
-    .maybeSingle();
+  const postRead = await toTypedFailure(
+    supabase
+      .from("blog_posts")
+      .select("status, title")
+      .eq("id", input.post_id)
+      .maybeSingle(),
+    "blog_posts (submitComment)",
+  );
+  if (!postRead.ok) return { success: false, error: "unknown" };
+  const post = postRead.data;
   const postRow = post as { status: string; title: string } | null;
   if (postRow?.status !== "published") {
     return { success: false, error: "invalid" };

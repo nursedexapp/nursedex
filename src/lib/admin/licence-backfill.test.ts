@@ -107,6 +107,8 @@ describe("the reason she reads", () => {
     // number to check.
     expect(LICENCE_NEEDED_REASON).toMatch(/license number/i);
     expect(LICENCE_NEEDED_REASON).toMatch(/add it/i);
-    expect(LICENCE_NEEDED_REASON).not.toMatch(/could not verify|expired|invalid/i);
+    expect(LICENCE_NEEDED_REASON).not.toMatch(
+      /could not verify|expired|invalid/i,
+    );
   });
 });

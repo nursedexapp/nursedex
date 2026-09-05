@@ -21,11 +21,18 @@ import {
 } from "@/lib/profile/onboarding-status";
 import type { NurseProfile, User } from "@/types/database";
 
+import { toTypedFailure } from "@/lib/db/results";
 export type VerifyActionError =
   | "invalid"
   | "not_found"
   | "wrong_state"
   | "incomplete"
+  // The database could not be read, so nothing is known either way (#847).
+  // Distinct from not_found, which is a claim about the row.
+  | "lookup_failed"
+  // The action applied but was not recorded in the admin log (#982). Retrying
+  // cannot help, which is why it says something different.
+  | "audit_unwritten"
   | "unknown";
 
 export interface VerifyActionResult {
@@ -57,16 +64,21 @@ export async function approveVerification(
   // could be granted to a profile with nothing in it: 29 of the 32 verified
   // HHAs have no licence number, which is the one field onboarding requires
   // of an HHA and the one the check is supposed to rest on.
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select(
-      `user_id, slug, verification_status, years_experience, languages,
-       credential, license_number, care_types, skills,
-       availability_commitment, time_slots, bio, photos, travel_radius_miles,
-       users!inner(first_name, last_name, email, zip_code)`,
-    )
-    .eq("user_id", input.user_id)
-    .maybeSingle();
+  const profileRead = await toTypedFailure(
+    supabase
+      .from("nurse_profiles")
+      .select(
+        `user_id, slug, verification_status, years_experience, languages,
+         credential, license_number, care_types, skills,
+         availability_commitment, time_slots, bio, photos, travel_radius_miles,
+         users!inner(first_name, last_name, email, zip_code)`,
+      )
+      .eq("user_id", input.user_id)
+      .maybeSingle(),
+    "nurse_profiles (approveVerification)",
+  );
+  if (!profileRead.ok) return { success: false, error: "lookup_failed" };
+  const profile = profileRead.data;
 
   type ProfileRow = {
     user_id: string;
@@ -129,11 +141,21 @@ export async function approveVerification(
     return { success: false, error: "wrong_state" };
   }
 
-  await supabase.from("admin_actions").insert({
-    admin_user_id: admin.id,
-    action_type: "verify_nurse",
-    target_user_id: input.user_id,
-  });
+  // The audit row. Discarded, this leaves no record that the action happened,
+  // which is the one question an audit trail exists to answer (#847, #982).
+  //
+  // Checked but NOT returned on here: by this point the decision is applied,
+  // and returning early would skip the revalidation and any notification that
+  // follows, so the admin would be looking at a stale screen for a change that
+  // did happen. The work finishes and the result says what is missing.
+  const audit = await toTypedFailure(
+    supabase.from("admin_actions").insert({
+      admin_user_id: admin.id,
+      action_type: "verify_nurse",
+      target_user_id: input.user_id,
+    }),
+    "the admin_actions record for this decision",
+  );
 
   const approvedUser = row.users;
   after(() =>
@@ -149,6 +171,7 @@ export async function approveVerification(
   revalidatePath("/admin");
   revalidatePath("/admin/verifications");
   revalidatePath(`/nurses/${row.slug}`);
+  if (!audit.ok) return { success: false, error: "audit_unwritten" };
   return { success: true };
 }
 
@@ -169,11 +192,16 @@ export async function rejectVerification(
   const admin = await requireAdmin();
   const supabase = await createClient();
 
-  const { data: profile } = await supabase
-    .from("nurse_profiles")
-    .select("user_id, slug, users!inner(first_name, email)")
-    .eq("user_id", input.user_id)
-    .maybeSingle();
+  const profileRead = await toTypedFailure(
+    supabase
+      .from("nurse_profiles")
+      .select("user_id, slug, users!inner(first_name, email)")
+      .eq("user_id", input.user_id)
+      .maybeSingle(),
+    "nurse_profiles (rejectVerification)",
+  );
+  if (!profileRead.ok) return { success: false, error: "lookup_failed" };
+  const profile = profileRead.data;
 
   type ProfileRow = {
     user_id: string;
@@ -212,12 +240,22 @@ export async function rejectVerification(
     return { success: false, error: "wrong_state" };
   }
 
-  await supabase.from("admin_actions").insert({
-    admin_user_id: admin.id,
-    action_type: "reject_nurse",
-    target_user_id: input.user_id,
-    details: reasonText,
-  });
+  // The audit row. Discarded, this leaves no record that the action happened,
+  // which is the one question an audit trail exists to answer (#847, #982).
+  //
+  // Checked but NOT returned on here: by this point the decision is applied,
+  // and returning early would skip the revalidation and any notification that
+  // follows, so the admin would be looking at a stale screen for a change that
+  // did happen. The work finishes and the result says what is missing.
+  const audit = await toTypedFailure(
+    supabase.from("admin_actions").insert({
+      admin_user_id: admin.id,
+      action_type: "reject_nurse",
+      target_user_id: input.user_id,
+      details: reasonText,
+    }),
+    "the admin_actions record for this decision",
+  );
 
   const rejectedUser = row.users;
   after(() =>
@@ -232,5 +270,6 @@ export async function rejectVerification(
 
   revalidatePath("/admin");
   revalidatePath("/admin/verifications");
+  if (!audit.ok) return { success: false, error: "audit_unwritten" };
   return { success: true };
 }

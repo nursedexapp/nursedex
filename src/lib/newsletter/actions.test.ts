@@ -5,7 +5,11 @@ import { createQueryBuilder } from "../../../test/supabase-mock";
 const h = vi.hoisted(() => {
   const state = {
     row: null as unknown, // maybeSingle result
-    count: 0, // rate-limit count
+    count: 0 as number | null, // rate-limit count
+    // #847. The rate limit read `count !== null`, so a failed count read as
+    // under the limit; the reads behind the token links answered "invalid";
+    // and the unsubscribe writes reported success on a write that never landed.
+    readError: null as { message: string } | null,
     upsertError: null as unknown,
     updateError: null as unknown,
     // Rows the guarded UPDATE matches (#663). One row = this caller won and may
@@ -26,7 +30,10 @@ const h = vi.hoisted(() => {
 
 function builder() {
   return createQueryBuilder({
-    maybeSingle: () => ({ data: h.state.row }),
+    maybeSingle: () =>
+      h.state.readError
+        ? { data: null, error: h.state.readError }
+        : { data: h.state.row, error: null },
     upsert: (payload) => {
       h.calls.upsert.push(payload);
       return { error: h.state.upsertError };
@@ -38,11 +45,14 @@ function builder() {
     // Awaited directly by the count query and by the guarded updates; each
     // destructures the field it needs. `data` is what the updates' terminal
     // .select("id") hands back, which is how a caller learns it lost the race.
-    then: () => ({
-      count: h.state.count,
-      data: h.state.updateRows,
-      error: h.state.updateError,
-    }),
+    then: () =>
+      h.state.readError
+        ? { count: null, data: null, error: h.state.readError }
+        : {
+            count: h.state.count,
+            data: h.state.updateRows,
+            error: h.state.updateError,
+          },
   });
 }
 
@@ -76,6 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.state.row = null;
   h.state.count = 0;
+  h.state.readError = null;
   h.state.upsertError = null;
   h.state.updateError = null;
   h.state.updateRows = [{ id: "s1" }];
@@ -290,5 +301,60 @@ describe("unsubscribeByEmail", () => {
     expect(res.success).toBe(false);
     expect(res.error).toBe("invalid");
     expect(h.calls.update).toHaveLength(0);
+  });
+});
+
+// #847 / #990. Every one of these answered a failed database call with a claim,
+// and two of them were gates that failed OPEN.
+describe("when the database cannot be read or written", () => {
+  it("does not let the subscription rate limit open", async () => {
+    // The `count !== null` test read a missing count as under the limit, which
+    // is the one gate stopping this endpoint being used to blast confirmation
+    // emails at many addresses. A gate that opens when it cannot be read is
+    // not a gate.
+    h.state.readError = { message: "connection reset" };
+
+    const res = await subscribeNewsletter({ email: "reader@example.com" });
+
+    expect(res).toEqual({ success: false, error: "unknown" });
+    expect(h.sendConfirm).not.toHaveBeenCalled();
+    expect(h.calls.upsert).toHaveLength(0);
+  });
+
+  it("still subscribes when the rate limit genuinely reads under the cap", async () => {
+    // The positive control for the refusal above.
+    h.state.count = 0;
+
+    const res = await subscribeNewsletter({ email: "reader@example.com" });
+
+    expect(res.success).toBe(true);
+  });
+
+  it("does not tell somebody their confirmation link is invalid", async () => {
+    // "invalid" is a claim about the token in their email, and it is the only
+    // thing they have.
+    h.state.readError = { message: "connection reset" };
+
+    await expect(confirmNewsletter("tok")).resolves.toBe("unavailable");
+  });
+
+  it("does not tell somebody their unsubscribe link is invalid", async () => {
+    h.state.readError = { message: "connection reset" };
+
+    await expect(unsubscribeNewsletter("tok")).resolves.toBe("unavailable");
+  });
+
+  it("still says invalid for a token that genuinely matches nothing", async () => {
+    h.state.row = null;
+
+    await expect(unsubscribeNewsletter("tok")).resolves.toBe("invalid");
+  });
+
+  it("does not tell somebody they are unsubscribed when the write failed", async () => {
+    h.state.readError = { message: "connection reset" };
+
+    const res = await unsubscribeByEmail({ email: "reader@example.com" });
+
+    expect(res).toEqual({ success: false, error: "unknown" });
   });
 });

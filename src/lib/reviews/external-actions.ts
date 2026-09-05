@@ -12,6 +12,7 @@ import {
 } from "@/lib/schemas/review";
 import { sendVerifyReviewEmail, sendNewReviewEmail } from "@/lib/email/send";
 
+import { toTypedFailure } from "@/lib/db/results";
 const VERIFICATION_TTL_DAYS = 7;
 
 export interface ReviewLinkRow {
@@ -30,11 +31,17 @@ export async function getOrCreateReviewLink(): Promise<{
   const user = await requireRole(UserRole.NURSE);
   const supabase = await createClient();
 
-  const { data: existing } = await supabase
-    .from("nurse_review_links")
-    .select("token, last_regenerated_at")
-    .eq("nurse_user_id", user.id)
-    .maybeSingle();
+  const existingRead = await toTypedFailure(
+    supabase
+      .from("nurse_review_links")
+      .select("token, last_regenerated_at")
+      .eq("nurse_user_id", user.id)
+      .maybeSingle(),
+    "nurse_review_links (getOrCreateReviewLink)",
+  );
+  if (!existingRead.ok)
+    return { error: "We could not check that just now. Please try again." };
+  const existing = existingRead.data;
 
   if (existing) return { link: existing as ReviewLinkRow };
 

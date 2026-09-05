@@ -7,6 +7,7 @@ import { slugify } from "./slug";
 import { tagRelinkPostIds } from "./taxonomy";
 import { saveTaxonomyRedirect } from "./taxonomy-redirects";
 
+import { toTypedFailure } from "@/lib/db/results";
 export interface TaxonomyResult {
   success: boolean;
   error?: "invalid" | "duplicate" | "unknown";
@@ -39,20 +40,26 @@ async function rename(
   if (!trimmed || !slug) return { success: false, error: "invalid" };
 
   const supabase = createServiceRoleClient();
-  const { data: clash } = await supabase
-    .from(TABLE[kind])
-    .select("id")
-    .eq("slug", slug)
-    .neq("id", id)
-    .maybeSingle();
+  const clashRead = await toTypedFailure(
+    supabase
+      .from(TABLE[kind])
+      .select("id")
+      .eq("slug", slug)
+      .neq("id", id)
+      .maybeSingle(),
+    "the database (rename)",
+  );
+  if (!clashRead.ok) return { success: false, error: "unknown" };
+  const clash = clashRead.data;
   if (clash) return { success: false, error: "duplicate" };
 
   // Remember the old slug so we can record a redirect if it changes.
-  const { data: before } = await supabase
-    .from(TABLE[kind])
-    .select("slug")
-    .eq("id", id)
-    .maybeSingle();
+  const beforeRead = await toTypedFailure(
+    supabase.from(TABLE[kind]).select("slug").eq("id", id).maybeSingle(),
+    "the database (rename)",
+  );
+  if (!beforeRead.ok) return { success: false, error: "unknown" };
+  const before = beforeRead.data;
   const oldSlug = (before as { slug: string } | null)?.slug;
 
   const { error } = await supabase
@@ -107,10 +114,15 @@ export async function mergeCategory(
   if (sourceId === targetId) return { success: false, error: "invalid" };
   const supabase = createServiceRoleClient();
 
-  const { data: rows } = await supabase
-    .from("blog_categories")
-    .select("id, slug")
-    .in("id", [sourceId, targetId]);
+  const rowsRead = await toTypedFailure(
+    supabase
+      .from("blog_categories")
+      .select("id, slug")
+      .in("id", [sourceId, targetId]),
+    "blog_categories (mergeCategory)",
+  );
+  if (!rowsRead.ok) return { success: false, error: "unknown" };
+  const rows = rowsRead.data;
   const slugs = (rows ?? []) as { id: string; slug: string }[];
   const sourceSlug = slugs.find((s) => s.id === sourceId)?.slug;
   const targetSlug = slugs.find((s) => s.id === targetId)?.slug;
@@ -123,7 +135,14 @@ export async function mergeCategory(
     console.error("[blog] mergeCategory repoint failed:", upErr.message);
     return { success: false, error: "unknown" };
   }
-  await supabase.from("blog_categories").delete().eq("id", sourceId);
+  // Checked: the posts have already been repointed at the target above, so an
+  // unchecked failure here leaves the source category standing with nothing in
+  // it, and the merge reports success (#847).
+  const deleteSource = await toTypedFailure(
+    supabase.from("blog_categories").delete().eq("id", sourceId),
+    "the removal of the merged category",
+  );
+  if (!deleteSource.ok) return { success: false, error: "unknown" };
   if (sourceSlug && targetSlug) {
     await saveTaxonomyRedirect("category", sourceSlug, targetSlug);
   }
@@ -140,18 +159,34 @@ export async function mergeTag(
   if (sourceId === targetId) return { success: false, error: "invalid" };
   const supabase = createServiceRoleClient();
 
-  const { data: tagRows } = await supabase
-    .from("blog_tags")
-    .select("id, slug")
-    .in("id", [sourceId, targetId]);
+  const tagRowsRead = await toTypedFailure(
+    supabase
+      .from("blog_tags")
+      .select("id, slug")
+      .in("id", [sourceId, targetId]),
+    "blog_tags (mergeTag)",
+  );
+  if (!tagRowsRead.ok) return { success: false, error: "unknown" };
+  const tagRows = tagRowsRead.data;
   const tagSlugs = (tagRows ?? []) as { id: string; slug: string }[];
   const sourceSlug = tagSlugs.find((s) => s.id === sourceId)?.slug;
   const targetSlug = tagSlugs.find((s) => s.id === targetId)?.slug;
 
+  // Wrapped INSIDE the Promise.all: an element of one has no destructuring for
+  // any rule to inspect, and `?? []` below reads a failed read as "this tag is
+  // on no posts", which would silently drop every post the source tag carried
+  // rather than relinking it to the target (#847, #991).
   const [src, tgt] = await Promise.all([
-    supabase.from("blog_post_tags").select("post_id").eq("tag_id", sourceId),
-    supabase.from("blog_post_tags").select("post_id").eq("tag_id", targetId),
+    toTypedFailure(
+      supabase.from("blog_post_tags").select("post_id").eq("tag_id", sourceId),
+      "the posts carrying the tag being merged away",
+    ),
+    toTypedFailure(
+      supabase.from("blog_post_tags").select("post_id").eq("tag_id", targetId),
+      "the posts already carrying the target tag",
+    ),
   ]);
+  if (!src.ok || !tgt.ok) return { success: false, error: "unknown" };
   const toAdd = tagRelinkPostIds(
     ((src.data ?? []) as { post_id: string }[]).map((r) => r.post_id),
     ((tgt.data ?? []) as { post_id: string }[]).map((r) => r.post_id),
@@ -166,7 +201,14 @@ export async function mergeTag(
     }
   }
   // Deleting the source tag cascades its now-redundant post links.
-  await supabase.from("blog_tags").delete().eq("id", sourceId);
+  // Checked: the posts have already been repointed at the target above, so an
+  // unchecked failure here leaves the source tag standing with nothing in
+  // it, and the merge reports success (#847).
+  const deleteSource = await toTypedFailure(
+    supabase.from("blog_tags").delete().eq("id", sourceId),
+    "the removal of the merged tag",
+  );
+  if (!deleteSource.ok) return { success: false, error: "unknown" };
   if (sourceSlug && targetSlug) {
     await saveTaxonomyRedirect("tag", sourceSlug, targetSlug);
   }

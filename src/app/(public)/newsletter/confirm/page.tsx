@@ -26,6 +26,14 @@ const COPY = {
     heading: "This link is not valid",
     body: "The confirmation link is invalid or has expired. Try subscribing again from the blog.",
   },
+  // Distinct from invalid on purpose (#847). The link may be perfectly good;
+  // what failed is us, and telling somebody their link has expired sends them
+  // to subscribe again for no reason.
+  unavailable: {
+    ok: false,
+    heading: "We could not confirm that just now",
+    body: "Something went wrong on our end. Open the link from your email again in a few minutes.",
+  },
 } as const;
 
 interface ConfirmPageProps {

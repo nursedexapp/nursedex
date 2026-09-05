@@ -52,7 +52,9 @@ describe("getJobHealth", () => {
 
     expect(health.rows).toHaveLength(scheduledCrons().length);
     expect(health.rows.map((r) => r.name).sort()).toEqual(
-      scheduledCrons().map((c) => c.name).sort(),
+      scheduledCrons()
+        .map((c) => c.name)
+        .sort(),
     );
   });
 

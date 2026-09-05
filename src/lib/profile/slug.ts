@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
 /**
  * Generate a URL-safe slug from a nurse's name and credential.
  * Format: first-last-credential (e.g. "jane-doe-rn")
@@ -38,11 +39,17 @@ export async function generateSlug(
 
     if (!data) {
       // Also check slug_redirects to avoid conflicts with old slugs
-      const { data: redirect } = await supabase
-        .from("slug_redirects")
-        .select("id")
-        .eq("old_slug", candidate)
-        .maybeSingle();
+      // A failed read is NOT "no redirect claims this slug" (#847). Breaking
+      // out on it hands back a candidate an old profile URL still points at,
+      // so following that URL would land on a different nurse.
+      const redirect = await unwrapOrThrow(
+        supabase
+          .from("slug_redirects")
+          .select("id")
+          .eq("old_slug", candidate)
+          .maybeSingle(),
+        "an existing redirect claiming this slug",
+      );
 
       if (!redirect) break;
     }
@@ -108,12 +115,18 @@ export async function saveSlugRedirect(
 ): Promise<void> {
   if (oldSlug === newSlug) return;
 
-  await supabase.from("slug_redirects").upsert(
-    {
-      old_slug: oldSlug,
-      new_slug: newSlug,
-      nurse_user_id: nurseUserId,
-    },
-    { onConflict: "old_slug" },
+  // Checked: this row is the ONLY thing that keeps an old profile URL working
+  // after a nurse's slug changes. Unchecked, every link anybody had already
+  // shared silently becomes a 404 (#847).
+  await assertNoWriteError(
+    supabase.from("slug_redirects").upsert(
+      {
+        old_slug: oldSlug,
+        new_slug: newSlug,
+        nurse_user_id: nurseUserId,
+      },
+      { onConflict: "old_slug" },
+    ),
+    "the redirect from a nurse's old profile link",
   );
 }
