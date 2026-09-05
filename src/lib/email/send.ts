@@ -500,24 +500,8 @@ interface SendSubscriptionConfirmedArgs {
 }
 export async function sendSubscriptionConfirmedEmail(
   args: SendSubscriptionConfirmedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/subscription-confirmed`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Subscription confirmed email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail("subscription-confirmed", args, "Subscription confirmed");
 }
 
 interface SendRenewalSuccessArgs {
@@ -529,20 +513,8 @@ interface SendRenewalSuccessArgs {
 }
 export async function sendRenewalSuccessEmail(
   args: SendRenewalSuccessArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/renewal-success`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Renewal success email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("renewal-success", args, "Renewal success");
 }
 
 interface SendCancellationConfirmationArgs {
@@ -554,24 +526,12 @@ interface SendCancellationConfirmationArgs {
 }
 export async function sendCancellationConfirmationEmail(
   args: SendCancellationConfirmationArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/cancellation-confirmation`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Cancellation confirmation email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail(
+    "cancellation-confirmation",
+    args,
+    "Cancellation confirmation",
+  );
 }
 
 interface SendRenewalReminderArgs {

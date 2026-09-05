@@ -6,13 +6,20 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { GRACE_PERIODS } from "@/lib/constants";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { captureServerEvent } from "@/lib/analytics/server";
-import { shouldSendOnce } from "@/lib/cron/email-log";
+// sendOnce, not shouldSendOnce: it claims the dedup row, sends, and RELEASES
+// the claim when the send did not land, so a failure can be retried rather
+// than spending the one send forever (#998, #415).
+import { sendOnce } from "@/lib/cron/email-log";
 // A Supabase write returning {error} does not throw, so an unchecked write
 // failure here would return {received:true} 200 and Stripe would never retry,
 // silently diverging billing state from the DB. Throwing sends the error
 // through POST's catch, which returns 500 so Stripe retries. This was five
 // uses of a private copy of the helper until #986 moved it to be shared.
-import { assertNoWriteError, unwrapOrThrow, toTypedFailure } from "@/lib/db/results";
+import {
+  assertNoWriteError,
+  unwrapOrThrow,
+  toTypedFailure,
+} from "@/lib/db/results";
 import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
 import {
   sendSubscriptionConfirmedEmail,
@@ -256,8 +263,7 @@ async function handleSubscriptionDeleted(
   // Fall back to the event's own metadata when no row exists yet (e.g. a
   // delete delivered before its create), so cleanup can proceed regardless
   // of event order rather than silently skipping (#428).
-  const userId =
-    row?.user_id ?? (sub.metadata?.user_id as string | undefined);
+  const userId = row?.user_id ?? (sub.metadata?.user_id as string | undefined);
   const planType =
     row?.plan_type ??
     (sub.metadata?.plan_type as "nurse_featured" | "family_access" | undefined);
@@ -287,7 +293,10 @@ async function handleSubscriptionDeleted(
       .eq("stripe_subscription_id", sub.id)
       .or(`last_event_at.is.null,last_event_at.lte.${incoming}`)
       .select("id");
-    await assertNoWriteError(result, "subscriptions update (subscription deleted)");
+    await assertNoWriteError(
+      result,
+      "subscriptions update (subscription deleted)",
+    );
     if (!result.data || result.data.length === 0) return;
   }
   // No row at all (a delete delivered before its create) falls through to the
@@ -328,7 +337,10 @@ async function handleSubscriptionDeleted(
   });
 }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice, eventCreated: number) {
+async function handleInvoicePaid(
+  invoice: Stripe.Invoice,
+  eventCreated: number,
+) {
   const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
   const supabase = createServiceRoleClient();
@@ -354,13 +366,18 @@ async function handleInvoicePaid(invoice: Stripe.Invoice, eventCreated: number) 
       current_period_start: new Date(
         item.current_period_start * 1000,
       ).toISOString(),
-      current_period_end: new Date(item.current_period_end * 1000).toISOString(),
+      current_period_end: new Date(
+        item.current_period_end * 1000,
+      ).toISOString(),
       last_event_at: incoming,
     })
     .eq("stripe_subscription_id", subId)
     .or(`last_event_at.is.null,last_event_at.lte.${incoming}`)
     .select("id");
-  await assertNoWriteError(paidResult, "subscriptions status update (invoice paid)");
+  await assertNoWriteError(
+    paidResult,
+    "subscriptions status update (invoice paid)",
+  );
 
   // Zero rows: a newer event already superseded this one. Its renewal email (if
   // any) belongs to that newer state, so this one must not send.
@@ -501,7 +518,10 @@ async function upsertSubscription(
     const tier =
       status === "active" || status === "past_due" ? "featured" : "free";
     await assertNoWriteError(
-      await supabase.from("nurse_profiles").update({ tier }).eq("user_id", userId),
+      await supabase
+        .from("nurse_profiles")
+        .update({ tier })
+        .eq("user_id", userId),
       "nurse_profiles tier sync",
     );
   }
@@ -574,18 +594,10 @@ async function maybeNotifyConfirmed({
   subscription,
 }: NotifyArgs): Promise<void> {
   const supabase = createServiceRoleClient();
-  const ok = await shouldSendOnce(supabase, {
-    recipientUserId: userId,
-    emailType: "subscription_confirmed",
-    dedupKey: subscription.id,
-  });
-  if (!ok) return;
-
-  // A failed read is NOT "this user has no email address" (#847). shouldSendOnce
-  // above has ALREADY claimed the dedup key, so returning here spends the one
-  // send and the email never goes at all, with nothing reporting it. Throwing
-  // at least returns 500 and files the failure. It does not recover the send:
-  // the retry finds the key already claimed. That ordering is #998.
+  // The address is read BEFORE the claim (#998). Claiming first and reading
+  // second spends the dedup key on a read that fell over: the retry finds the
+  // key held and the email is never sent at all. Read first, and a failed read
+  // refuses before anything is claimed, so the retry can still send it.
   const user = await unwrapOrThrow(
     supabase
       .from("users")
@@ -596,31 +608,32 @@ async function maybeNotifyConfirmed({
   );
   if (!user?.email) return;
 
-  await sendSubscriptionConfirmedEmail({
-    to: user.email,
-    firstName: user.first_name ?? undefined,
-    planType,
-    amount: planAmount(subscription),
-    nextRenewalLabel: nextRenewalLabel(subscription),
-  });
+  await sendOnce(
+    supabase,
+    {
+      recipientUserId: userId,
+      emailType: "subscription_confirmed",
+      dedupKey: subscription.id,
+    },
+    () =>
+      sendSubscriptionConfirmedEmail({
+        to: user.email as string,
+        firstName: user.first_name ?? undefined,
+        planType,
+        amount: planAmount(subscription),
+        nextRenewalLabel: nextRenewalLabel(subscription),
+      }),
+  );
 }
 
 async function maybeNotifyRenewal(
   args: NotifyArgs & { invoiceId: string },
 ): Promise<void> {
   const supabase = createServiceRoleClient();
-  const ok = await shouldSendOnce(supabase, {
-    recipientUserId: args.userId,
-    emailType: "renewal_success",
-    dedupKey: args.invoiceId,
-  });
-  if (!ok) return;
-
-  // A failed read is NOT "this user has no email address" (#847). shouldSendOnce
-  // above has ALREADY claimed the dedup key, so returning here spends the one
-  // send and the email never goes at all, with nothing reporting it. Throwing
-  // at least returns 500 and files the failure. It does not recover the send:
-  // the retry finds the key already claimed. That ordering is #998.
+  // The address is read BEFORE the claim (#998). Claiming first and reading
+  // second spends the dedup key on a read that fell over: the retry finds the
+  // key held and the email is never sent at all. Read first, and a failed read
+  // refuses before anything is claimed, so the retry can still send it.
   const user = await unwrapOrThrow(
     supabase
       .from("users")
@@ -631,13 +644,22 @@ async function maybeNotifyRenewal(
   );
   if (!user?.email) return;
 
-  await sendRenewalSuccessEmail({
-    to: user.email,
-    firstName: user.first_name ?? undefined,
-    planLabel: planLabel(args.planType),
-    amount: planAmount(args.subscription),
-    nextRenewalLabel: nextRenewalLabel(args.subscription),
-  });
+  await sendOnce(
+    supabase,
+    {
+      recipientUserId: args.userId,
+      emailType: "renewal_success",
+      dedupKey: args.invoiceId,
+    },
+    () =>
+      sendRenewalSuccessEmail({
+        to: user.email as string,
+        firstName: user.first_name ?? undefined,
+        planLabel: planLabel(args.planType),
+        amount: planAmount(args.subscription),
+        nextRenewalLabel: nextRenewalLabel(args.subscription),
+      }),
+  );
 }
 
 async function maybeNotifyCancellation({
@@ -650,18 +672,10 @@ async function maybeNotifyCancellation({
   // future period correctly sends a fresh confirmation.
   const item = subscription.items.data[0];
   const dedupKey = `${subscription.id}:${item.current_period_end}`;
-  const ok = await shouldSendOnce(supabase, {
-    recipientUserId: userId,
-    emailType: "cancellation_confirmation",
-    dedupKey,
-  });
-  if (!ok) return;
-
-  // A failed read is NOT "this user has no email address" (#847). shouldSendOnce
-  // above has ALREADY claimed the dedup key, so returning here spends the one
-  // send and the email never goes at all, with nothing reporting it. Throwing
-  // at least returns 500 and files the failure. It does not recover the send:
-  // the retry finds the key already claimed. That ordering is #998.
+  // The address is read BEFORE the claim (#998). Claiming first and reading
+  // second spends the dedup key on a read that fell over: the retry finds the
+  // key held and the email is never sent at all. Read first, and a failed read
+  // refuses before anything is claimed, so the retry can still send it.
   const user = await unwrapOrThrow(
     supabase
       .from("users")
@@ -672,11 +686,20 @@ async function maybeNotifyCancellation({
   );
   if (!user?.email) return;
 
-  await sendCancellationConfirmationEmail({
-    to: user.email,
-    firstName: user.first_name ?? undefined,
-    planLabel: planLabel(planType),
-    accessUntilLabel: nextRenewalLabel(subscription),
-    isFamily: planType === "family_access",
-  });
+  await sendOnce(
+    supabase,
+    {
+      recipientUserId: userId,
+      emailType: "cancellation_confirmation",
+      dedupKey,
+    },
+    () =>
+      sendCancellationConfirmationEmail({
+        to: user.email as string,
+        firstName: user.first_name ?? undefined,
+        planLabel: planLabel(planType),
+        accessUntilLabel: nextRenewalLabel(subscription),
+        isFamily: planType === "family_access",
+      }),
+  );
 }
