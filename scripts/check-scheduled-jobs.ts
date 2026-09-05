@@ -24,11 +24,12 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   attachHeartbeats,
-  collectScheduledWorkflows,
   collectVercelCronJobs,
   fetchHeartbeatRows,
+  loadGitHubWorkflowJobs,
   parseMaxDurationSeconds,
   runScheduledJobCheck,
+  selfWorkflowSource,
   type ScheduledJob,
 } from "./scheduled-jobs";
 import { announce } from "./slack-alert";
@@ -37,14 +38,6 @@ const WORKFLOW_DIR = join(".github", "workflows");
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "";
 const TOKEN = process.env.GITHUB_TOKEN ?? "";
-
-interface WorkflowRunsResponse {
-  workflow_runs?: Array<{ updated_at?: string; run_started_at?: string }>;
-}
-
-interface WorkflowResponse {
-  created_at?: string;
-}
 
 async function api<T>(path: string): Promise<T> {
   const response = await fetch(`https://api.github.com${path}`, {
@@ -65,11 +58,11 @@ async function api<T>(path: string): Promise<T> {
 }
 
 /**
- * Every scheduled workflow, with when its schedule last succeeded.
+ * Every scheduled workflow plus every Vercel cron, ready to be judged.
  *
- * A workflow the API cannot answer for throws rather than arriving as "never
- * ran": an unreadable answer and a dead job are different things, and only one
- * of them is fixed by re-enabling a schedule (L11).
+ * The reading itself lives in scripts/scheduled-jobs.ts, where it can be
+ * tested without a network. This is only the wiring: the repository, the
+ * files on disk, a real GitHub GET, and which entry is this workflow itself.
  */
 async function loadJobs(): Promise<ScheduledJob[]> {
   if (!REPO) throw new Error("GITHUB_REPOSITORY is not set");
@@ -82,31 +75,12 @@ async function loadJobs(): Promise<ScheduledJob[]> {
       contents: readFileSync(join(WORKFLOW_DIR, f), "utf8"),
     }));
 
-  const scheduled = collectScheduledWorkflows(files);
-
-  const workflows = await Promise.all(
-    scheduled.map(async (job): Promise<ScheduledJob> => {
-      const runs = await api<WorkflowRunsResponse>(
-        `/repos/${REPO}/actions/workflows/${job.source}/runs` +
-          `?event=schedule&status=success&per_page=1`,
-      );
-      const latest = runs.workflow_runs?.[0];
-
-      // A workflow with no scheduled run yet is judged from when it was
-      // created, so adding one does not alert before its first firing.
-      const workflow = latest
-        ? null
-        : await api<WorkflowResponse>(
-            `/repos/${REPO}/actions/workflows/${job.source}`,
-          );
-
-      return {
-        ...job,
-        lastSuccessAt: latest?.updated_at ?? latest?.run_started_at ?? null,
-        firstSeenAt: workflow?.created_at ?? null,
-      };
-    }),
-  );
+  const workflows = await loadGitHubWorkflowJobs({
+    repo: REPO,
+    files,
+    api,
+    selfSource: selfWorkflowSource(process.env),
+  });
 
   return [...workflows, ...(await loadVercelCronJobs())];
 }

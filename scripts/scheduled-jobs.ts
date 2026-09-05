@@ -76,9 +76,18 @@ export function formatWatchdogReport(result: WatchdogResult): string {
   ];
 
   for (const job of result.overdue) {
+    // The wording follows what was actually measured. A line claiming a job
+    // has not SUCCEEDED, when what was read is whether it was dispatched at
+    // all, sends the reader to look for a failing run that does not exist
+    // (L11).
+    const dispatch = job.measuredBy === "dispatch";
     const age = job.neverRan
-      ? "has never completed successfully"
-      : `last succeeded ${humanize(job.ageMs)} ago`;
+      ? dispatch
+        ? "has never been dispatched on its schedule"
+        : "has never completed successfully"
+      : dispatch
+        ? `was last dispatched ${humanize(job.ageMs)} ago`
+        : `last succeeded ${humanize(job.ageMs)} ago`;
     lines.push(
       `${job.name} (${job.source}) ${age}, against an expected interval of ${humanize(
         job.intervalMs,
@@ -96,6 +105,20 @@ export function formatWatchdogReport(result: WatchdogResult): string {
       "dispatched just as quietly. Check the Actions tab, or Vercel's cron log, " +
       "and re-run the job by hand to confirm it still works.",
   );
+
+  // The watchdog's own entry is the exception, and saying so matters: on that
+  // line "dispatched" is the whole claim, and the reader should not go hunting
+  // for a failing run to explain it.
+  if (result.overdue.some((job) => job.measuredBy === "dispatch")) {
+    lines.push(
+      "",
+      "The one line above that says DISPATCHED is the watchdog reading itself, " +
+        "and it is judged only on whether its own schedule still fires. A run " +
+        "of it that fired and failed already alerts through its own red run, " +
+        "so judging itself on success instead would latch it red permanently " +
+        "after the first job it correctly reported.",
+    );
+  }
 
   if (budgetLines.length > 0) lines.push("", ...budgetLines);
 
@@ -125,6 +148,112 @@ export function collectScheduledWorkflows(
   }
 
   return jobs;
+}
+
+/**
+ * The workflow file this process is itself running as, or null off CI.
+ *
+ * The watchdog watches every scheduled workflow in the repository, itself
+ * included, and that self entry has to be measured differently (see
+ * ScheduledJob.measuredBy). Which file that is comes from GitHub rather than
+ * from a constant here: a hardcoded name would go on reading as correct after
+ * a rename while silently un-exempting the entry, and the latch would come
+ * back with no symptom for two days (L15).
+ *
+ * Absent inside CI it throws. Falling back to "nothing is self" is the exact
+ * shape of the original defect, and it would be invisible: every test still
+ * passes, and the only evidence is a permanently red watchdog days later
+ * (L289, L93).
+ */
+export function selfWorkflowSource(
+  env: Record<string, string | undefined>,
+): string | null {
+  const ref = env.GITHUB_WORKFLOW_REF;
+  if (ref) return ref.split("@")[0].split("/").pop() ?? null;
+
+  if (env.GITHUB_ACTIONS === "true") {
+    throw new Error(
+      "GITHUB_WORKFLOW_REF is not set, so the watchdog cannot tell which entry " +
+        "is itself. It judges its own entry on whether its schedule fired and " +
+        "every other entry on success, and without that it would judge itself " +
+        "on success and latch red after the first job it correctly reports.",
+    );
+  }
+
+  return null;
+}
+
+/** The slice of GitHub's workflow runs response this needs. */
+interface WorkflowRunsResponse {
+  workflow_runs?: Array<{ updated_at?: string; run_started_at?: string }>;
+}
+
+interface WorkflowResponse {
+  created_at?: string;
+}
+
+export interface LoadWorkflowJobsOptions {
+  /** owner/name. */
+  repo: string;
+  /** The workflow files on disk, read by the caller. */
+  files: Array<{ path: string; contents: string }>;
+  /** A GET against the GitHub API, injected so this is testable without one. */
+  api: <T>(path: string) => Promise<T>;
+  /** The entry that is this watchdog, from selfWorkflowSource. */
+  selfSource: string | null;
+}
+
+/**
+ * Every scheduled workflow, with the timestamp each one is judged against.
+ *
+ * `event=schedule` throughout, self entry included: a run somebody started by
+ * hand proves the job still works, not that GitHub is still firing it, and a
+ * schedule GitHub has disabled is precisely what this exists to catch.
+ *
+ * `status=success` for every entry EXCEPT this workflow's own. The reasoning
+ * is on ScheduledJob.measuredBy; in short, a watchdog judged on its own
+ * success cannot recover from correctly reporting anything.
+ *
+ * A workflow the API cannot answer for throws rather than arriving as "never
+ * ran": an unreadable answer and a dead job are different things, and only one
+ * of them is fixed by re-enabling a schedule (L11).
+ */
+export async function loadGitHubWorkflowJobs({
+  repo,
+  files,
+  api,
+  selfSource,
+}: LoadWorkflowJobsOptions): Promise<ScheduledJob[]> {
+  const scheduled = collectScheduledWorkflows(files);
+
+  return Promise.all(
+    scheduled.map(async (job): Promise<ScheduledJob> => {
+      const isSelf = selfSource !== null && job.source === selfSource;
+      const query = isSelf
+        ? "?event=schedule&per_page=1"
+        : "?event=schedule&status=success&per_page=1";
+
+      const runs = await api<WorkflowRunsResponse>(
+        `/repos/${repo}/actions/workflows/${job.source}/runs${query}`,
+      );
+      const latest = runs.workflow_runs?.[0];
+
+      // A workflow with no scheduled run yet is judged from when it was
+      // created, so adding one does not alert before its first firing.
+      const workflow = latest
+        ? null
+        : await api<WorkflowResponse>(
+            `/repos/${repo}/actions/workflows/${job.source}`,
+          );
+
+      return {
+        ...job,
+        lastSuccessAt: latest?.updated_at ?? latest?.run_started_at ?? null,
+        firstSeenAt: workflow?.created_at ?? null,
+        measuredBy: isSelf ? "dispatch" : "success",
+      };
+    }),
+  );
 }
 
 /** The alert call, narrowed to what this check needs (see scripts/slack-alert.ts). */

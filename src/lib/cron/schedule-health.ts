@@ -52,6 +52,20 @@ export interface ScheduledJob {
   /** When it last completed successfully, or null if it never has. */
   lastSuccessAt: string | null;
   /**
+   * Which question lastSuccessAt answers.
+   *
+   * "success" for everything, and "dispatch" for the one entry that is the
+   * watchdog itself. A watchdog judged on its own success latches: its first
+   * correct failure about some other job stops its own success clock, so the
+   * next run finds itself overdue, fails for that reason, and pushes the clock
+   * a further interval out, forever, with the original problem long fixed
+   * (#1039). What only it can detect about itself is its schedule no longer
+   * firing; a run that fired and failed is already alerting through its own
+   * red run. The wording of every message follows this field, because a
+   * message may claim only what its check measured (L11).
+   */
+  measuredBy?: "success" | "dispatch";
+  /**
    * When this job was first observed, used only when it has never succeeded.
    * A job gets one whole interval from first sight before it is accused, so
    * adding a job does not fire an alert before its first scheduled run.
@@ -69,6 +83,8 @@ export interface OverdueJob {
   ageMs: number;
   intervalMs: number;
   neverRan: boolean;
+  /** Carried through from the job, so the report can say what it measured. */
+  measuredBy: "success" | "dispatch";
 }
 
 export interface NearBudgetJob {
@@ -314,6 +330,7 @@ export function evaluateScheduledJobs({
         ageMs: Number.POSITIVE_INFINITY,
         intervalMs,
         neverRan: true,
+        measuredBy: job.measuredBy ?? "success",
       });
       continue;
     }
@@ -338,6 +355,7 @@ export function evaluateScheduledJobs({
         ageMs,
         intervalMs,
         neverRan,
+        measuredBy: job.measuredBy ?? "success",
       });
     }
   }
