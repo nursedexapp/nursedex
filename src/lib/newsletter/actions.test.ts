@@ -21,8 +21,11 @@ const h = vi.hoisted(() => {
   return {
     state,
     calls,
-    sendConfirm: vi.fn(),
-    sendWelcome: vi.fn(),
+    // The senders report whether the email actually went out (#977), so the
+    // stub has to answer as one: a bare vi.fn() answers undefined, which reads
+    // as "it did not go" and would make every happy path here a failure.
+    sendConfirm: vi.fn(async () => true),
+    sendWelcome: vi.fn(async () => true),
     sendBatch: vi.fn(),
     getConfirmed: vi.fn(),
   };
@@ -95,6 +98,8 @@ beforeEach(() => {
   h.calls.upsert = [];
   h.calls.update = [];
   h.sendBatch.mockResolvedValue(true);
+  h.sendConfirm.mockResolvedValue(true);
+  h.sendWelcome.mockResolvedValue(true);
 });
 
 describe("subscribeNewsletter", () => {
@@ -361,5 +366,54 @@ describe("when the database cannot be read or written", () => {
     const res = await unsubscribeByEmail({ email: "reader@example.com" });
 
     expect(res).toEqual({ success: false, error: "unknown" });
+  });
+});
+
+/**
+ * #977. Subscribing writes the row and then sends the confirmation email. When
+ * that send fails the row exists, the token is live, and the screen says "check
+ * your email" for an email that is not coming, which is the one answer the
+ * person cannot act on.
+ */
+describe("when the confirmation email does not go out", () => {
+  it("reports the failure rather than telling them to check their inbox", async () => {
+    h.state.row = null;
+    h.sendConfirm.mockResolvedValue(false);
+
+    const res = await subscribeNewsletter({
+      email: "reader@example.com",
+      source: "blog",
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.error).toBe("email_unsent");
+  });
+
+  it("reports it on the resubscribe path too", async () => {
+    // An address that had unsubscribed takes the guarded-update branch, which
+    // has its own send call, so it needs its own coverage.
+    h.state.row = {
+      id: "s1",
+      confirmed_at: null,
+      unsubscribed_at: "2026-01-01T00:00:00Z",
+    };
+    h.sendConfirm.mockResolvedValue(false);
+
+    const res = await subscribeNewsletter({
+      email: "reader@example.com",
+      source: "blog",
+    });
+
+    expect(res.success).toBe(false);
+    expect(res.error).toBe("email_unsent");
+  });
+
+  it("still confirms when only the welcome email fails", async () => {
+    // They are confirmed either way; the welcome is a courtesy, and the sender
+    // reports its own failure.
+    h.state.row = { id: "s1", confirmed_at: null, email: "reader@example.com" };
+    h.sendWelcome.mockResolvedValue(false);
+
+    await expect(confirmNewsletter("tok")).resolves.toBe("confirmed");
   });
 });

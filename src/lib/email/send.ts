@@ -5,6 +5,7 @@
  * resolution issues with `resend` and `@react-email/components`.
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
 import type { ListingGap } from "@/lib/nurses/listing";
 
@@ -46,9 +47,12 @@ export async function postEmail(
   payload: unknown,
   label: string,
 ): Promise<boolean> {
-  const baseUrl = await getBaseUrl();
-
   try {
+    // Inside the try, not before it: reading the request host throws outside a
+    // request scope, and a sender that can still throw forces every caller to
+    // keep a catch of its own, which is the duplication this helper removes.
+    const baseUrl = await getBaseUrl();
+
     const res = await fetch(`${baseUrl}/api/email/${path}`, {
       method: "POST",
       headers: {
@@ -61,35 +65,41 @@ export async function postEmail(
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       console.error(`[email] ${label} email failed:`, res.status, body);
+      reportUnsent(label, `rejected with ${res.status}`);
       return false;
     }
     return true;
   } catch (err) {
     console.error(`[email] ${label} email could not be sent:`, err);
+    reportUnsent(label, err instanceof Error ? err.message : String(err));
     return false;
   }
+}
+
+/**
+ * Say, somewhere a person will see it, that an email did not go out (#977).
+ *
+ * Most of these sends happen inside `after()`, so the response has already
+ * gone and there is nobody left to tell. A console line in a serverless log
+ * nobody reads is not a report, which is how a swallowed failure stays
+ * invisible for as long as it lasts. Reporting here rather than at each call
+ * site is deliberate: a rule that every caller must remember is a rule that
+ * one of them will not.
+ *
+ * `sendOnce` reports separately and says something different (the dedup claim
+ * was released, so a later run will try again). This one says only that the
+ * attempt failed, which is true whether or not anything will retry.
+ */
+function reportUnsent(label: string, cause: string): void {
+  Sentry.captureMessage(`[email] ${label} did not go out: ${cause}`, "warning");
 }
 
 export async function sendProfileSetupEmail(
   to: string,
   firstName: string | undefined,
   slug: string,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-
-  const res = await fetch(`${baseUrl}/api/email/profile-setup`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify({ to, firstName, slug }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Profile setup email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("profile-setup", { to, firstName, slug }, "Profile setup");
 }
 
 interface SendCommentSubmittedArgs {
@@ -126,23 +136,13 @@ export async function sendNotListedNudgeEmail(args: {
 
 export async function sendCommentSubmittedEmail(
   args: SendCommentSubmittedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
+): Promise<boolean> {
   const moderateUrl = `${getSiteUrl()}/admin/blog/comments`;
-
-  const res = await fetch(`${baseUrl}/api/email/comment-submitted`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify({ ...args, moderateUrl }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Comment submitted email failed:", res.status, body);
-  }
+  return postEmail(
+    "comment-submitted",
+    { ...args, moderateUrl },
+    "Comment submitted",
+  );
 }
 
 interface SendCommentApprovedArgs {
@@ -154,23 +154,13 @@ interface SendCommentApprovedArgs {
 /** Notifies a commenter that their comment was approved and is now live. */
 export async function sendCommentApprovedEmail(
   args: SendCommentApprovedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
+): Promise<boolean> {
   const postUrl = `${getSiteUrl()}/blog/${args.slug}`;
-
-  const res = await fetch(`${baseUrl}/api/email/comment-approved`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify({ to: args.to, postTitle: args.postTitle, postUrl }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Comment approved email failed:", res.status, body);
-  }
+  return postEmail(
+    "comment-approved",
+    { to: args.to, postTitle: args.postTitle, postUrl },
+    "Comment approved",
+  );
 }
 
 interface BatchRecipient {
@@ -187,14 +177,9 @@ export async function sendNewsletterBatch(
   body: string,
   recipients: BatchRecipient[],
 ): Promise<boolean> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/newsletter-batch`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify({
+  return postEmail(
+    "newsletter-batch",
+    {
       subject,
       body,
       recipients: recipients.map((r) => {
@@ -207,14 +192,9 @@ export async function sendNewsletterBatch(
           listUnsubscribeUrl: `${getSiteUrl()}/api/newsletter/unsubscribe?token=${token}`,
         };
       }),
-    }),
-  });
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    console.error("[email] Newsletter batch failed:", res.status, errBody);
-    return false;
-  }
-  return true;
+    },
+    "Newsletter batch",
+  );
 }
 
 /**
@@ -224,42 +204,18 @@ export async function sendNewsletterBatch(
 export async function sendNewsletterConfirmEmail(
   to: string,
   token: string,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
+): Promise<boolean> {
   const confirmUrl = `${getSiteUrl()}/newsletter/confirm?token=${encodeURIComponent(token)}`;
-
-  const res = await fetch(`${baseUrl}/api/email/newsletter-confirm`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify({ to, confirmUrl }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Newsletter confirm email failed:", res.status, body);
-  }
+  return postEmail(
+    "newsletter-confirm",
+    { to, confirmUrl },
+    "Newsletter confirm",
+  );
 }
 
 /** Sends the welcome email once a newsletter subscriber confirms. */
-export async function sendNewsletterWelcomeEmail(to: string): Promise<void> {
-  const baseUrl = await getBaseUrl();
-
-  const res = await fetch(`${baseUrl}/api/email/newsletter-welcome`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify({ to }),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Newsletter welcome email failed:", res.status, body);
-  }
+export async function sendNewsletterWelcomeEmail(to: string): Promise<boolean> {
+  return postEmail("newsletter-welcome", { to }, "Newsletter welcome");
 }
 
 interface SendAccountExistsNoticeArgs {
@@ -275,26 +231,8 @@ interface SendAccountExistsNoticeArgs {
  */
 export async function sendAccountExistsNoticeEmail(
   args: SendAccountExistsNoticeArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-
-  const res = await fetch(`${baseUrl}/api/email/account-exists-notice`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Account exists notice email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail("account-exists-notice", args, "Account exists notice");
 }
 
 interface SendNewReviewArgs {
@@ -305,22 +243,8 @@ interface SendNewReviewArgs {
 
 export async function sendNewReviewEmail(
   args: SendNewReviewArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-
-  const res = await fetch(`${baseUrl}/api/email/new-review`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] New review email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("new-review", args, "New review");
 }
 
 interface SendVerificationApprovedArgs {
@@ -331,24 +255,8 @@ interface SendVerificationApprovedArgs {
 
 export async function sendVerificationApprovedEmail(
   args: SendVerificationApprovedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/verification-approved`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Verification approved email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail("verification-approved", args, "Verification approved");
 }
 
 /**
@@ -376,24 +284,8 @@ interface SendVerificationRejectedArgs {
 
 export async function sendVerificationRejectedEmail(
   args: SendVerificationRejectedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/verification-rejected`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Verification rejected email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail("verification-rejected", args, "Verification rejected");
 }
 
 interface SendAccountSuspendedArgs {
@@ -402,20 +294,8 @@ interface SendAccountSuspendedArgs {
 }
 export async function sendAccountSuspendedEmail(
   args: SendAccountSuspendedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/account-suspended`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Account suspended email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("account-suspended", args, "Account suspended");
 }
 
 interface SendAccountRemovedArgs {
@@ -425,20 +305,8 @@ interface SendAccountRemovedArgs {
 }
 export async function sendAccountRemovedEmail(
   args: SendAccountRemovedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/account-removed`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Account removed email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("account-removed", args, "Account removed");
 }
 
 interface SendPaymentFailureWarningArgs {
@@ -597,20 +465,8 @@ interface SendContactReceivedArgs {
  */
 export async function sendContactReceivedEmail(
   args: SendContactReceivedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/contact-received`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Contact received email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("contact-received", args, "Contact received");
 }
 
 interface SendReviewInviteArgs {
@@ -642,24 +498,8 @@ interface SendHireConfirmRequestArgs {
 }
 export async function sendHireConfirmRequestEmail(
   args: SendHireConfirmRequestArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/hire-confirm-request`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error(
-      "[email] Hire confirm request email failed:",
-      res.status,
-      body,
-    );
-  }
+): Promise<boolean> {
+  return postEmail("hire-confirm-request", args, "Hire confirm request");
 }
 
 interface SendHireConfirmedArgs {
@@ -669,20 +509,8 @@ interface SendHireConfirmedArgs {
 }
 export async function sendHireConfirmedEmail(
   args: SendHireConfirmedArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/hire-confirmed`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Hire confirmed email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("hire-confirmed", args, "Hire confirmed");
 }
 
 interface SendDisputeDecisionArgs {
@@ -697,20 +525,8 @@ interface SendDisputeDecisionArgs {
 
 export async function sendDisputeDecisionEmail(
   args: SendDisputeDecisionArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/email/dispute-decision`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Dispute decision email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("dispute-decision", args, "Dispute decision");
 }
 
 interface SendVerifyReviewArgs {
@@ -721,20 +537,6 @@ interface SendVerifyReviewArgs {
 
 export async function sendVerifyReviewEmail(
   args: SendVerifyReviewArgs,
-): Promise<void> {
-  const baseUrl = await getBaseUrl();
-
-  const res = await fetch(`${baseUrl}/api/email/verify-review`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-    },
-    body: JSON.stringify(args),
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    console.error("[email] Verify review email failed:", res.status, body);
-  }
+): Promise<boolean> {
+  return postEmail("verify-review", args, "Verify review");
 }

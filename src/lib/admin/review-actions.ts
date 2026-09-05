@@ -357,9 +357,7 @@ export async function adminResolveDispute(
         rating: r.rating,
         reviewerName: r.reviewer_name,
         notes,
-      }).catch((err) =>
-        console.error("[email] dispute decision (nurse) failed:", err),
-      ),
+      }),
     );
   }
 
@@ -375,9 +373,7 @@ export async function adminResolveDispute(
         rating: r.rating,
         reviewerName: r.reviewer_name,
         notes,
-      }).catch((err) =>
-        console.error("[email] dispute decision (reviewer) failed:", err),
-      ),
+      }),
     );
   }
 

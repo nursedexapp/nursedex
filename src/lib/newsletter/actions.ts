@@ -20,7 +20,11 @@ import {
 import { toTypedFailure, toTypedCount } from "@/lib/db/results";
 export interface NewsletterResult {
   success: boolean;
-  error?: "invalid" | "unknown" | "rate_limited";
+  // "email_unsent" is distinct from "unknown" on purpose (#977): the row was
+  // written and only the confirmation email failed, so the person can act on
+  // it by submitting again, and the screen can say what actually went wrong
+  // rather than "check your email" for an email that is not coming.
+  error?: "invalid" | "unknown" | "rate_limited" | "email_unsent";
   fieldErrors?: Record<string, string>;
 }
 
@@ -119,7 +123,12 @@ export async function subscribeNewsletter(
     // token. Sending a second one would invalidate theirs.
     if (!claimed || claimed.length === 0) return { success: true };
 
-    await sendNewsletterConfirmEmail(input.email, token);
+    // Telling somebody to check their inbox for an email that did not go out
+    // is the one answer they cannot act on (#977). A retry re-issues a fresh
+    // token through the branch below, so saying so is safe as well as honest.
+    if (!(await sendNewsletterConfirmEmail(input.email, token))) {
+      return { success: false, error: "email_unsent" };
+    }
     return { success: true };
   }
   if (ex?.confirmed_at) {
@@ -144,7 +153,9 @@ export async function subscribeNewsletter(
     return { success: false, error: "unknown" };
   }
 
-  await sendNewsletterConfirmEmail(input.email, token);
+  if (!(await sendNewsletterConfirmEmail(input.email, token))) {
+    return { success: false, error: "email_unsent" };
+  }
   return { success: true };
 }
 
@@ -200,6 +211,8 @@ export async function confirmNewsletter(token: string): Promise<ConfirmResult> {
   // already sent the welcome.
   if (!claimed || claimed.length === 0) return "already";
 
+  // The welcome is a courtesy and they are already confirmed, so a failure
+  // does not change what this reports. The sender says so itself (#977).
   await sendNewsletterWelcomeEmail(row.email);
   return "confirmed";
 }

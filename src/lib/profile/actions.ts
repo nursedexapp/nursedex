@@ -391,11 +391,11 @@ export async function completeOnboarding(): Promise<ProfileActionResult> {
     await saveSlugRedirect(slugDb, profile.slug, newSlug, user.id);
   }
 
-  // Fire-and-forget: don't block onboarding completion on email delivery
+  // Fire-and-forget: don't block onboarding completion on email delivery.
+  // The sender reports its own failure (#977); there is nobody left to tell
+  // by the time after() runs, so the report is the whole remedy.
   after(() =>
-    sendProfileSetupEmail(userData.email, userData.first_name, newSlug).catch(
-      (err) => console.error("[email] Profile setup email error:", err),
-    ),
+    sendProfileSetupEmail(userData.email, userData.first_name, newSlug),
   );
 
   return { success: "Profile saved. Verification next." };
