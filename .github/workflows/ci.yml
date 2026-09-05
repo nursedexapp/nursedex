@@ -128,7 +128,7 @@ jobs:
       # about. Restored on a partial key too: a stale ordering is still a
       # better guess than none, and vitest rebuilds the store as it goes.
       - name: Cache the vitest results store
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .vitest-cache
           key: vitest-${{ runner.os }}-${{ hashFiles('package-lock.json', 'vitest.config.ts') }}
