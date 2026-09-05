@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   zipsNeedingCorrection,
   summariseZips,
   readAllZips,
+  readReference,
   applyCorrections,
 } from "./zip-coordinates-drift";
 
@@ -151,6 +155,41 @@ describe("readAllZips", () => {
     ).rejects.toThrow(/no count|partial/i);
   });
 
+  /**
+   * The header can be present and still say nothing usable. PostgREST answers
+   * "*" when it did not count, and a value parsed straight into a comparison
+   * lands on the permissive side when the parse fails: "*" and a non-numeric
+   * count both become NaN, which compares unequal to the row count, and 0
+   * would make an empty read look complete (L50).
+   *
+   * Both reads here now go through one parser, so these cases and the profile
+   * read's cannot answer differently.
+   */
+  it.each([
+    ["a count of *", "*"],
+    ["a count that is not a number", "many"],
+    ["a fractional count", "2.5"],
+  ])("refuses %s rather than reading it as complete", async (_label, total) => {
+    await expect(
+      readAllZips({
+        fetchFn: pagedFetch([[zip("a")]], total),
+        url: "https://db.test",
+        headers: {},
+        pageSize: 2,
+      }),
+    ).rejects.toThrow(/no count|partial/i);
+  });
+
+  it("accepts a count that does match, so the refusals above are not blanket", async () => {
+    const rows = await readAllZips({
+      fetchFn: pagedFetch([[zip("a")]], "1"),
+      url: "https://db.test",
+      headers: {},
+      pageSize: 2,
+    });
+    expect(rows).toHaveLength(1);
+  });
+
   it("refuses a failed read rather than treating it as an empty list", async () => {
     const failing = (async () =>
       new Response("nope", { status: 500 })) as FetchLike;
@@ -166,7 +205,12 @@ describe("readAllZips", () => {
 });
 
 describe("applyCorrections", () => {
-  const correction = { zip: "11775", latitude: 40.8, longitude: -73.4, miles: 41.6 };
+  const correction = {
+    zip: "11775",
+    latitude: 40.8,
+    longitude: -73.4,
+    miles: 41.6,
+  };
 
   it("reports how many it moved", async () => {
     const ok = (async () => new Response("{}", { status: 200 })) as FetchLike;
@@ -192,5 +236,48 @@ describe("applyCorrections", () => {
       corrections: [correction, { ...correction, zip: "11707" }],
     });
     expect(moved).toBe(1);
+  });
+});
+
+/**
+ * A coordinate that will not parse becomes NaN, the distance to it is NaN, and
+ * NaN compares false against the threshold, so the zip would be silently
+ * declared fine and never reported. The failure lands on the permissive side
+ * with nothing raised (L50), which is the one direction this check cannot
+ * afford, so the reference read refuses it.
+ */
+describe("a reference row whose coordinates are not numbers", () => {
+  const write = (body: string) => {
+    const file = join(tmpdir(), `zip-ref-${Math.random().toString(36)}.csv`);
+    writeFileSync(file, body);
+    return file;
+  };
+
+  it("is refused rather than stored as NaN", () => {
+    const file = write(
+      "zip,latitude,longitude\n10001,40.75,-73.99\n10002,not-a-number,-73.98\n",
+    );
+
+    expect(() => readReference(file)).toThrow(/not numbers/i);
+  });
+
+  it("names the line and the zip, so the row can be found", () => {
+    const file = write(
+      "zip,latitude,longitude\n10001,40.75,-73.99\n10002,,-73.98\n",
+    );
+
+    expect(() => readReference(file)).toThrow(/10002/);
+  });
+
+  it("reads a well formed list", () => {
+    // The positive control: without it the refusal above could be satisfied by
+    // a reader that throws on everything.
+    const file = write("zip,latitude,longitude\n10001,40.75,-73.99\n");
+
+    expect(readReference(file).get("10001")).toEqual({
+      zip: "10001",
+      latitude: 40.75,
+      longitude: -73.99,
+    });
   });
 });
