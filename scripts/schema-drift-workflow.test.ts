@@ -120,3 +120,26 @@ describe("the shape query", () => {
     expect(SHAPE_QUERY.trimStart().startsWith("/*")).toBe(true);
   });
 });
+
+describe("what it costs", () => {
+  it("does not start a Supabase on every merge", () => {
+    // This job pulls container images and costs minutes rather than seconds,
+    // and the workflow it lives in runs on every push to main. On a free
+    // public repository the runner concurrency limit IS the budget, so a ten
+    // minute job on every merge is paid for by every other job queued behind
+    // it (L307). Daily plus on demand is the right cadence: a migration that
+    // ran and did something other than its file does not appear at a
+    // particular merge.
+    expect(EXECUTABLE).toMatch(/if:\s*github\.event_name\s*!=\s*'push'/);
+  });
+
+  it("leaves the cheap version comparison running on every push", () => {
+    // That one is seconds, and a forgotten migration DOES show up at a
+    // particular merge, which is exactly when it is worth catching.
+    const drift = EXECUTABLE.slice(
+      EXECUTABLE.indexOf("  drift:"),
+      EXECUTABLE.indexOf("  contents:"),
+    );
+    expect(drift).not.toMatch(/event_name\s*!=\s*'push'/);
+  });
+});

@@ -104,6 +104,18 @@ jobs:
   # cannot drift.
   contents:
     name: Compare production's schema against the migrations
+    # NOT on every push to main. This job starts a whole local Supabase, which
+    # pulls container images and costs minutes rather than seconds, and the
+    # workflow above runs on every merge. On a free public repository the
+    # runner concurrency limit is the budget, so a ten minute job on every
+    # merge is paid for by every other job waiting behind it (L307).
+    #
+    # The version comparison beside it is the cheap one and stays on every
+    # push, which is where a forgotten migration actually shows up. A schema
+    # that ran and did something different from its file does not appear at a
+    # particular merge, so daily is the right cadence for it, and
+    # workflow_dispatch is there for the moment somebody wants to know now.
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     # Dominated by `supabase start`, which pulls container images. The e2e job
     # budgets 30 for a run that also builds the app and drives a browser; this
