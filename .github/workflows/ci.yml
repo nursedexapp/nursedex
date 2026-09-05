@@ -70,7 +70,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # The guard mutation step diffs this branch against its base to work
           # out which guards it has to re-prove, which needs real history.
@@ -128,7 +128,7 @@ jobs:
       # about. Restored on a partial key too: a stale ordering is still a
       # better guess than none, and vitest rebuilds the store as it goes.
       - name: Cache the vitest results store
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .vitest-cache
           key: vitest-${{ runner.os }}-${{ hashFiles('package-lock.json', 'vitest.config.ts') }}

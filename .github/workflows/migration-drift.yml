@@ -43,7 +43,7 @@ jobs:
       # is the safe order for a migration live code depends on (#908). A
       # shallow checkout has no other branches to look at, and the lookup then
       # answers "could not tell" and keeps failing, which is the old behaviour.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -55,7 +55,7 @@ jobs:
         uses: ./.github/actions/setup-tsx
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: latest
           # Resolving "latest" hits the GitHub API; without a token it uses the
