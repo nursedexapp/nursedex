@@ -8,6 +8,7 @@ const AUTH = process.env.E2E_AUTH === "1";
 const ADMIN_STATE = "e2e/.auth/admin.json";
 const FAMILY_STATE = "e2e/.auth/family.json";
 const NURSE_STATE = "e2e/.auth/nurse.json";
+const FEATURED_STATE = "e2e/.auth/featured.json";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -51,6 +52,8 @@ export default defineConfig({
         "**/*.family.spec.ts",
         "**/nurse.setup.ts",
         "**/*.nurse.spec.ts",
+        "**/featured.setup.ts",
+        "**/*.featured.spec.ts",
       ],
     },
     ...(AUTH
@@ -92,6 +95,21 @@ export default defineConfig({
               storageState: NURSE_STATE,
             },
             dependencies: ["setup", "nurse-setup"],
+          },
+          // A fourth session: a VERIFIED nurse on the FREE tier, which is the
+          // only person the Featured offer is shown to. The onboarding nurse
+          // above cannot stand in, because she is deliberately pre-onboarding,
+          // and a spec that waited for that journey to verify her would depend
+          // on another spec's state while Playwright runs both in parallel.
+          { name: "featured-setup", testMatch: /featured\.setup\.ts/ },
+          {
+            name: "featured",
+            testMatch: /.*\.featured\.spec\.ts/,
+            use: {
+              ...devices["Desktop Chrome"],
+              storageState: FEATURED_STATE,
+            },
+            dependencies: ["featured-setup"],
           },
         ]
       : []),
