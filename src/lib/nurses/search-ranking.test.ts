@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   RANKING_CRITERIA,
   DISTANCE_RANKING_CRITERIA,
+  DEFAULT_FEATURED_RANGE_MILES,
   rankNurses,
   orderNurses,
   type RankableNurse,
@@ -94,8 +95,52 @@ describe("RANKING_CRITERIA", () => {
     expect(RANKING_CRITERIA.filter((c) => c.conditional)).toHaveLength(2);
   });
 
-  it("describes the zip order as closest first", () => {
-    expect(DISTANCE_RANKING_CRITERIA[0].phrase).toContain("closest");
+  // #966: this used to assert "closest" at index 0, which is what the copy
+  // said and not what the code did. A Featured nurse anywhere inside the paid
+  // radius has outranked a closer free one since #723, and that is the paid
+  // placement working: /pricing sells Featured on "Top placement in search
+  // results". So the copy was the wrong half and it moved.
+  //
+  // Asserting the ORDER RUN rather than the phrase at index 0 is what keeps
+  // the two from drifting apart again: a literal can be edited to match a
+  // sentence somebody liked, but this fails unless the ranking really does
+  // put the criterion the caption names first (L63).
+  it("names first, in the zip order, whatever the ranking actually puts first", () => {
+    const nearby = nurse({ user_id: "free-2-miles", distance_miles: 2 });
+    const featuredFurther = nurse({
+      user_id: "featured-20-miles",
+      tier: "featured",
+      distance_miles: 20,
+    });
+
+    const ranked = rankNurses([nearby, featuredFurther], null, {
+      originResolved: true,
+      featuredRangeMiles: DEFAULT_FEATURED_RANGE_MILES,
+    });
+
+    expect(ranked[0].user_id).toBe("featured-20-miles");
+    expect(DISTANCE_RANKING_CRITERIA[0].phrase).toContain("featured");
+  });
+
+  it("still names distance, which decides everything Featured does not", () => {
+    const phrases = DISTANCE_RANKING_CRITERIA.map((c) => c.phrase).join(" ");
+    expect(phrases).toContain("closest");
+  });
+
+  it("keeps the paid placement inside its radius, so near you means near you", () => {
+    const nearby = nurse({ user_id: "free-2-miles", distance_miles: 2 });
+    const featuredFarAway = nurse({
+      user_id: "featured-300-miles",
+      tier: "featured",
+      distance_miles: 300,
+    });
+
+    const ranked = rankNurses([featuredFarAway, nearby], null, {
+      originResolved: true,
+      featuredRangeMiles: DEFAULT_FEATURED_RANGE_MILES,
+    });
+
+    expect(ranked[0].user_id).toBe("free-2-miles");
   });
 });
 
