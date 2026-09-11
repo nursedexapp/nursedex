@@ -65,6 +65,28 @@ describe("when the fetch cannot be trusted", () => {
     expect(plan.skipped).toMatch(/no issues/i);
   });
 
+  it("drains a small log the fetch returned nothing for, so a quiet project clears", () => {
+    // #1057. "No issues need review" is this project's ordinary healthy state,
+    // so the empty-fetch refusal above fires on every run and the log can never
+    // be cleared. The small-log allowance already says the whole of a log this
+    // size going stale is not evidence of anything; an empty fetch is not
+    // evidence either, at this size.
+    const plan = planAlertLogCleanup({ logged: ["only"], current: [] });
+
+    expect(plan.skipped).toBeNull();
+    expect(plan.deleting).toEqual(["only"]);
+  });
+
+  it("still refuses an empty fetch once the log is past the small-log size", () => {
+    // The negative half of the pair above: the refusal has to survive for the
+    // population it was written for, or #984 is undone rather than narrowed.
+    const logged = ids(CLEANUP_SMALL_LOG + 1);
+    const plan = planAlertLogCleanup({ logged, current: [] });
+
+    expect(plan.deleting).toEqual([]);
+    expect(plan.skipped).toMatch(/no issues/i);
+  });
+
   it("refuses when it would delete most of a log that is not small", () => {
     // Between two runs fifteen minutes apart, a few issues go stale. Most of
     // the log going stale at once is a read that saw less than reality.
