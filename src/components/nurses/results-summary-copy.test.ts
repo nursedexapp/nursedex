@@ -133,8 +133,17 @@ describe("the order caption", () => {
     expect(orderSentence(false)).toMatch(/^Featured nurses first/);
   });
 
+  // #966: this asserted "The closest nurses first", which is not the order the
+  // code runs. Featured within the paid radius has led the zip order since
+  // #723, so a family told the closest come first could be shown a nurse 20
+  // miles away above one 2 miles away. The ranking is the paid product working
+  // as sold; the sentence was the untrue half.
   it("names what actually comes first once a zip is placed", () => {
-    expect(orderSentence(true)).toMatch(/^The closest nurses first/);
+    expect(orderSentence(true)).toMatch(/^Featured nurses near you first/);
+  });
+
+  it("still tells a family that distance decides the rest", () => {
+    expect(orderSentence(true)).toContain("closest");
   });
 
   it("never says completeness comes first", () => {
