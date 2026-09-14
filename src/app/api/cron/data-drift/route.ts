@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyCronAuth } from "@/lib/cron/auth";
 import { withCronAlerting } from "@/lib/cron/alerting";
 import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import {
   readScoredProfiles,
   rowsNeedingRepair,
@@ -64,7 +65,11 @@ const handleDataDrift = withCronAlerting(
     // Both readers refuse a short read rather than reporting on a prefix, and
     // both throw on a failed one, so an unreachable database fails the run
     // instead of reading as no drift.
-    const profiles = await readScoredProfiles({ fetchFn: fetch, url, headers });
+    // Only the nurses the directory lists: the stored score orders nothing
+    // else, so an unfinished signup is not a finding for a person.
+    const profiles = await readScoredProfiles({
+      client: createServiceRoleClient(),
+    });
     const scoreDrift = rowsNeedingRepair(profiles);
 
     const storedZips = await readAllZips({ fetchFn: fetch, url, headers });
@@ -85,7 +90,7 @@ const handleDataDrift = withCronAlerting(
     const findings: string[] = [];
     if (scoreDrift.length > 0) {
       findings.push(
-        `*Profile completeness* (${scoreDrift.length} of ${profiles.length})\n` +
+        `*Profile completeness* (${scoreDrift.length} of ${profiles.length} listed nurses)\n` +
           `${summarise(scoreDrift)}\n` +
           "Repair with `npx tsx scripts/completeness-drift.ts --apply`.",
       );
