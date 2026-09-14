@@ -11,6 +11,10 @@ import { captureServerEventAfterResponse } from "@/lib/analytics/server";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { PASSWORD, PASSWORD_RECOVERY } from "@/lib/constants";
 import { toTypedFailure } from "@/lib/db/results";
+import {
+  calculateCompleteness,
+  NEW_PROFILE_COMPLETENESS_INPUT,
+} from "@/lib/profile/completeness";
 
 export type AuthResult = {
   error?: string;
@@ -495,6 +499,11 @@ export async function selectRole(
         user_id: user.id,
         slug: `${baseName}-${Date.now().toString(36)}`,
         credential: "hha", // placeholder, updated during onboarding
+        // The score an empty profile already earns, not the column default
+        // of 0, so a nurse who stops here is not drift (#1063).
+        profile_completeness: calculateCompleteness(
+          NEW_PROFILE_COMPLETENESS_INPUT,
+        ).score,
       }),
       "the nurse profile row for a new nurse",
     );
