@@ -163,7 +163,14 @@ describe("the e2e specs", () => {
   // A spec that skips itself when its environment is absent reports a pass.
   // That is fine for one that genuinely cannot run outside the e2e job, but it
   // has to be a deliberate, named exception rather than a habit.
-  const SELF_SKIPPING = ["e2e/data-api.spec.ts"];
+  const SELF_SKIPPING = [
+    "e2e/data-api.spec.ts",
+    // Two cases, and each environment can measure exactly one: with no Stripe
+    // credentials the checkout can only refuse, with them it creates a real
+    // session. Each skips with its reason where it cannot be measured, so the
+    // report names which one ran. CI has no credentials until #1056.
+    "e2e/featured-checkout.featured.spec.ts",
+  ];
 
   it.each(
     readdirSync("e2e")
