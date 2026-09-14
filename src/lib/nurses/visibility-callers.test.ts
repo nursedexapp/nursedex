@@ -47,6 +47,11 @@ const SURFACES: Array<{ file: string; filter: FilterName; what: string }> = [
     what: "whether the nurses told families cannot see them have since become listed (#947), which has to be the same question the directory answers or the readout reassures somebody about a population the directory does not show",
   },
   {
+    file: "src/lib/data-drift/completeness.ts",
+    filter: "applyListedNurseFilter",
+    what: "the weekly completeness drift check and its repair, because the stored score only orders the directory, so a score on a nurse it does not list affects nobody and alerting on one sends a person to look at an unfinished signup",
+  },
+  {
     file: "src/lib/nurses/saves.ts",
     filter: "applyVisibleNurseFilter",
     what: "a family's saved nurses, which she chose herself",
