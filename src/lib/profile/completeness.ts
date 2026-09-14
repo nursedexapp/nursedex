@@ -44,6 +44,31 @@ export type CompletenessInput = Pick<
 >;
 
 /**
+ * What a freshly inserted nurse profile holds in every scored column: the
+ * column defaults in the schema.
+ *
+ * The rule credits points before anything is filled in, so a new row earns
+ * more than the column default of 0. Inserting without a score left every
+ * nurse who stopped before finishing onboarding scored below what she earns,
+ * which the weekly drift check then reported each Monday (#1063). The insert
+ * scores these instead, and select-role-completeness.test.ts holds them to
+ * the migration.
+ */
+export const NEW_PROFILE_COMPLETENESS_INPUT: CompletenessInput = {
+  photos: [],
+  bio: null,
+  skills: [],
+  care_philosophy: null,
+  availability_commitment: [],
+  time_slots: [],
+  rate_min: null,
+  rate_max: null,
+  has_transportation: false,
+  covid_vaccinated: null,
+  travel_radius_miles: null,
+};
+
+/**
  * Calculate profile completeness from 0-100 based on optional fields.
  * Required fields (name, credential, license, care types, contact) are
  * not counted here since the onboarding wizard enforces them.
