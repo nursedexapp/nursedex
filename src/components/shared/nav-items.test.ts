@@ -40,6 +40,12 @@ describe("primaryNavItems", () => {
     }
   });
 
+  it("offers Pricing to every viewer, so the page that sells Featured can be found without signing in (#1042)", () => {
+    for (const role of EVERY_VIEWER) {
+      expect(primaryNavItems(role).map((i) => i.href)).toContain("/pricing");
+    }
+  });
+
   it("labels every item, so no link renders empty", () => {
     for (const role of EVERY_VIEWER) {
       for (const item of primaryNavItems(role)) {
