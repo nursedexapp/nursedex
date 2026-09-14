@@ -194,15 +194,16 @@ describe("why this cannot read useFormStatus itself", () => {
   // proof, kept so we find out if React ever changes it.
   //
   // A bare component calling useFormStatus DOES go pending on submit (the
-  // red-team claim that form actions do not work under happy-dom is false). But
-  // add a single useState plus an effect keyed on pending, which is exactly what
-  // holding a phase requires, and the hook reports idle again while the action is
-  // still in flight. The state update re-renders the component outside the form's
-  // transition and the pending signal is lost.
+  // red-team claim that form actions do not work under happy-dom is false). Up
+  // to React 19.2, adding a single useState plus an effect keyed on pending,
+  // which is exactly what holding a phase requires, made the hook report idle
+  // again while the action was still in flight.
   //
-  // Consequence beyond this component: the signup page's SubmitButton has this
-  // exact shape today.
-  it("loses the pending signal as soon as the component holds any state", async () => {
+  // React 19.3 changed that, and this test caught it the way it was kept to
+  // (#1062): the same component now stays pending. It asserts the new behaviour
+  // so a regression back to the trap is caught too. The component still takes
+  // `pending` from its caller; moving it onto the hook is a separate decision.
+  it("keeps the pending signal while the component holds state (React 19.3 and later)", async () => {
     function Stateful() {
       const { pending } = useFormStatus();
       const [phase, setPhase] = useState("idle");
@@ -228,8 +229,9 @@ describe("why this cannot read useFormStatus itself", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
 
-    // The action IS in flight, and the button still says idle. That is the trap.
-    expect(screen.getByRole("button")).toHaveTextContent("idle:idle");
+    // The action IS in flight, and both the hook and the held phase say so.
+    // Under React 19.2 this read "idle:idle", which was the trap.
+    expect(screen.getByRole("button")).toHaveTextContent("pending:working");
   });
 });
 

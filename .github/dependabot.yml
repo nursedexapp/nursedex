@@ -19,6 +19,18 @@ updates:
         update-types:
           - minor
           - patch
+    # Held back on purpose, because each one breaks something its issue names.
+    # A grouped PR otherwise carries them in with twenty routine bumps, where
+    # nothing says why they were ever held (#1062). Remove an entry in the same
+    # change that fixes its issue. The scheduled npm audit still reports a
+    # vulnerability in any of them.
+    ignore:
+      # #1014: moves the Stripe API version every live payment call sends.
+      - dependency-name: "stripe"
+      # #1015: 14 component test files fail to load, which reads as green.
+      - dependency-name: "@sentry/nextjs"
+      # #1016: a cancelled confirm dialog stays in the DOM.
+      - dependency-name: "happy-dom"
     labels:
       - dependencies
 

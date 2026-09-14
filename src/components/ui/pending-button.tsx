@@ -100,12 +100,13 @@ export function usePendingPhase({
 
 // WHY THIS TAKES `pending` RATHER THAN READING useFormStatus ITSELF
 //
-// It cannot read it. useFormStatus reports pending only while the component is
-// rendering inside the form's transition, and ANY local state update in that
-// component knocks it out: a bare component with the hook goes pending on submit,
-// but add one useState plus an effect keyed on pending and the hook reports idle
-// again, mid-flight. Verified directly (#655). Since this component's whole job
-// is to hold phase state, it can never be the one calling the hook.
+// Up to React 19.2 it could not: useFormStatus reported pending only while the
+// component rendered inside the form's transition, and ANY local state update in
+// that component knocked it out, so one useState plus an effect keyed on pending
+// made the hook report idle again mid-flight (#655). React 19.3 no longer does
+// this, which pending-button.test.tsx now pins (#1062). Reading the hook here is
+// therefore possible again, but it is a change to every caller rather than a
+// dependency bump, so it has not been made.
 //
 // So callers own the pending signal (useTransition, or a local flag). The auth
 // screens already pass a client function to `action`, so they never worked
