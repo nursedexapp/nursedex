@@ -29,6 +29,7 @@ import {
   humanize,
   parseCronSchedules,
   decideAnnouncement,
+  parseAnnouncedState,
   type ScheduledJob,
   type LastDispatch,
   type OverdueJob,
@@ -46,6 +47,7 @@ export {
   evaluateScheduledJobs,
   parseCronSchedules,
   decideAnnouncement,
+  parseAnnouncedState,
 };
 export type {
   ScheduledJob,

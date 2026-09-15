@@ -189,6 +189,31 @@ function fingerprint(job: OverdueJob): string {
 }
 
 /**
+ * The stored record, or a refusal saying why it could not be used (#1078).
+ *
+ * JSON.parse succeeds on "null", "3" and "[]", so a corrupt file would arrive
+ * at the decision as a non object and throw on the first property read, past
+ * the try that guards the read. A corrupt cache would then kill the watchdog
+ * outright, and nothing would be watching anything while the symptom looked
+ * nothing like its cause.
+ *
+ * It THROWS rather than answering {}, because the caller logs the reason and
+ * announces, where a silent empty record would read as a clean read of a
+ * repository with nothing outstanding (L215, L11).
+ */
+export function parseAnnouncedState(text: string): AnnouncedState {
+  const parsed: unknown = JSON.parse(text);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      "The record of what was already announced is not a record " +
+        `(parsed as ${Array.isArray(parsed) ? "an array" : typeof parsed}), ` +
+        "so nothing can be read from it.",
+    );
+  }
+  return parsed as AnnouncedState;
+}
+
+/**
  * Whether this reading is worth sending, and what to remember about it.
  *
  * The watchdog fires on a daily cron AND on every completion of Production

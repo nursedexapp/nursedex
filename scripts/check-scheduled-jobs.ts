@@ -36,6 +36,7 @@ import {
   runScheduledJobCheck,
   selfWorkflowSource,
   type ScheduledJob,
+  parseAnnouncedState,
   type AnnouncedState,
 } from "./scheduled-jobs";
 import { announce } from "./slack-alert";
@@ -145,7 +146,7 @@ async function readAnnounced(): Promise<AnnouncedState> {
   // than being read as an empty record, because runScheduledJobCheck logs that
   // and announces, where a silent {} here would look like a clean read (L215).
   if (!existsSync(ANNOUNCED_PATH)) return {};
-  return JSON.parse(readFileSync(ANNOUNCED_PATH, "utf8")) as AnnouncedState;
+  return parseAnnouncedState(readFileSync(ANNOUNCED_PATH, "utf8"));
 }
 
 async function writeAnnounced(state: AnnouncedState): Promise<void> {

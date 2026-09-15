@@ -32,6 +32,7 @@ import {
   type OverdueJob,
   type AnnouncedState,
   decideAnnouncement,
+  parseAnnouncedState,
 } from "./scheduled-jobs";
 
 const HOUR = 60 * 60 * 1000;
@@ -1418,5 +1419,29 @@ describe("runScheduledJobCheck with a record of what was already said", () => {
     }
 
     expect(posted).toHaveLength(2);
+  });
+});
+
+/**
+ * #1078. JSON.parse SUCCEEDS on "null", "3" and "[]", so a corrupt record
+ * would reach the decision as a non object and throw on the first property
+ * read, outside the try that guards the read. A corrupt cache would then kill
+ * the watchdog outright, which is the one failure it must never have: nothing
+ * would be watching anything, and the cause would look nothing like the cache.
+ */
+describe("a record that parsed but is not a record", () => {
+  it("refuses a parsed value that is not an object", () => {
+    for (const bad of ["null", "3", '"text"', "[]"]) {
+      expect(() => parseAnnouncedState(bad)).toThrow(/record/i);
+    }
+  });
+
+  it("accepts an ordinary record, and an empty one", () => {
+    expect(parseAnnouncedState("{}")).toEqual({});
+    expect(
+      parseAnnouncedState(
+        '{"a.yml":{"key":"k","announcedAt":"2026-09-15T00:00:00Z","intervalMs":1}}',
+      ),
+    ).toHaveProperty("a.yml");
   });
 });
