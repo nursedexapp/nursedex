@@ -42,6 +42,45 @@ const SAMPLE_START = Date.UTC(2026, 0, 1, 0, 0, 0);
 /** Derived intervals, keyed by the schedule they came from. */
 const INTERVAL_CACHE = new Map<string, number>();
 
+/**
+ * The last run GitHub dispatched on a job's schedule, whatever its conclusion.
+ *
+ * Read so the report can say WHICH failure an overdue job is in (#1041). What
+ * the check is judged on is still the last SUCCESSFUL run; this is read beside
+ * it, purely so the message can name a cause rather than list possibilities.
+ */
+export interface LastDispatch {
+  /** GitHub's conclusion for the run: "failure", "cancelled", and so on. */
+  conclusion: string | null;
+  /** When it finished, for the message. */
+  at: string | null;
+  /**
+   * Whether any step of the job actually executed.
+   *
+   * False is its own state, and the one that cost a week. GitHub accepted the
+   * schedule, dispatched the run, and refused to start the job, which it does
+   * for a failed payment or an exhausted spending limit. A refused run is
+   * indistinguishable from a failed one in every list (L276), so this is the
+   * distinction the Actions tab cannot make for the reader.
+   *
+   * NULL is a third value and it is load bearing: the read that answers this
+   * fell over. It must never collapse into true or false, because the message
+   * is built from it and a message may claim only what its check actually
+   * measured (L11). Guessing true asserts the steps ran and sends the reader
+   * to a log that may not exist; guessing false accuses the billing account of
+   * a refusal nothing observed.
+   */
+  ranAnySteps: boolean | null;
+  /**
+   * GitHub's own annotation on a refused run, quoted verbatim into the alert.
+   *
+   * Quoted rather than paraphrased because the remedy lives in the sentence:
+   * it names billing or a spending limit, which is nowhere near the job and is
+   * the last place a reader sent to "check the Actions tab" would look.
+   */
+  refusal: string | null;
+}
+
 export interface ScheduledJob {
   /** Display name, as it appears in the Actions tab or in vercel.json. */
   name: string;
@@ -71,6 +110,17 @@ export interface ScheduledJob {
    * adding a job does not fire an alert before its first scheduled run.
    */
   firstSeenAt?: string | null;
+  /**
+   * The last run dispatched on its schedule, whatever its conclusion (#1041).
+   *
+   * Three values, three meanings, and the difference between the last two is
+   * the whole point (L11). `undefined` means nothing looked, which is the
+   * honest state for a Vercel cron, where there are no runs to read; the
+   * report falls back to naming both possibilities there. `null` means it
+   * looked and GitHub has dispatched nothing on this schedule. An object means
+   * it looked and found a run.
+   */
+  lastDispatch?: LastDispatch | null;
   /** How long its last successful run took, when the job records that. */
   lastDurationMs?: number | null;
   /** The budget that run had, from the route's own maxDuration export. */
@@ -85,6 +135,8 @@ export interface OverdueJob {
   neverRan: boolean;
   /** Carried through from the job, so the report can say what it measured. */
   measuredBy: "success" | "dispatch";
+  /** Carried through so the report can name which failure this is (#1041). */
+  lastDispatch?: LastDispatch | null;
 }
 
 export interface NearBudgetJob {
@@ -331,6 +383,7 @@ export function evaluateScheduledJobs({
         intervalMs,
         neverRan: true,
         measuredBy: job.measuredBy ?? "success",
+        lastDispatch: job.lastDispatch,
       });
       continue;
     }
@@ -356,6 +409,7 @@ export function evaluateScheduledJobs({
         intervalMs,
         neverRan,
         measuredBy: job.measuredBy ?? "success",
+        lastDispatch: job.lastDispatch,
       });
     }
   }
