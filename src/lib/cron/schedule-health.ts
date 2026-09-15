@@ -153,6 +153,154 @@ export interface WatchdogResult {
 }
 
 /**
+ * What was already said about one job, so a repeat can be held (#1078).
+ *
+ * Keyed by source, because that is what identifies a job across runs.
+ */
+export interface AnnouncedFinding {
+  /** The finding itself, so a CHANGE in it is not mistaken for a repeat. */
+  key: string;
+  /** When it was last announced, for the floor below. */
+  announcedAt: string;
+  /** The job's own interval, which is that floor. */
+  intervalMs: number;
+}
+
+export type AnnouncedState = Record<string, AnnouncedFinding>;
+
+/**
+ * What a finding IS, for the purpose of asking whether it is the same one.
+ *
+ * Everything a reader would act on differently belongs in here and nothing
+ * else does. The age deliberately does not: an overdue job gets older on every
+ * single run, so including it would make every finding new and hold nothing.
+ */
+function fingerprint(job: OverdueJob): string {
+  const last = job.lastDispatch;
+  const dispatch =
+    last === undefined
+      ? "unread"
+      : last === null
+        ? "none"
+        : `${last.conclusion ?? "?"}/${
+            last.ranAnySteps === null ? "unknown" : last.ranAnySteps
+          }`;
+  return `${job.neverRan ? "never" : "late"}|${job.measuredBy}|${dispatch}`;
+}
+
+/**
+ * The stored record, or a refusal saying why it could not be used (#1078).
+ *
+ * JSON.parse succeeds on "null", "3" and "[]", so a corrupt file would arrive
+ * at the decision as a non object and throw on the first property read, past
+ * the try that guards the read. A corrupt cache would then kill the watchdog
+ * outright, and nothing would be watching anything while the symptom looked
+ * nothing like its cause.
+ *
+ * It THROWS rather than answering {}, because the caller logs the reason and
+ * announces, where a silent empty record would read as a clean read of a
+ * repository with nothing outstanding (L215, L11).
+ */
+export function parseAnnouncedState(text: string): AnnouncedState {
+  const parsed: unknown = JSON.parse(text);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      "The record of what was already announced is not a record " +
+        `(parsed as ${Array.isArray(parsed) ? "an array" : typeof parsed}), ` +
+        "so nothing can be read from it.",
+    );
+  }
+  return parsed as AnnouncedState;
+}
+
+/**
+ * Whether this reading is worth sending, and what to remember about it.
+ *
+ * The watchdog fires on a daily cron AND on every completion of Production
+ * Smoke, which runs on every push to main. An overdue finding stays true until
+ * the watched job's next scheduled run succeeds, so before this the identical
+ * message went to Slack once per merge for up to six days, and the only thing
+ * rate limiting it was how often somebody pushed (#1078, L36).
+ *
+ * Three things make it speak, and they are the three a reader would act on:
+ * a finding nothing has reported before, a finding whose fingerprint changed
+ * under it, and a finding that has stood for a whole interval of the job it is
+ * about.
+ *
+ * That last one is the expiry, and a suppression without one is the defect
+ * (L523). It is derived from the job's own interval rather than a constant, so
+ * a weekly job is re-reported weekly and a daily one daily, from the same
+ * number the overdue verdict itself uses (L401). It cannot become permanent,
+ * because the window always passes.
+ *
+ * Nothing here suppresses the READING. The full report is still computed and
+ * still printed to the run log every time; what is held is only its delivery
+ * to Slack. And an absent record reads as "say it": a lost cache costs one
+ * duplicate message, never a silence, which is the direction this has to fail.
+ */
+export function decideAnnouncement({
+  result,
+  previous,
+  now,
+}: {
+  result: WatchdogResult;
+  previous: AnnouncedState;
+  now: number;
+}): { announce: boolean; state: AnnouncedState } {
+  const state: AnnouncedState = {};
+  let announce = false;
+
+  // A near budget finding rides in the same message, so it is fingerprinted
+  // the same way. Without this a brand new budget warning would be swallowed
+  // by an unchanged overdue one it happened to travel with (L582).
+  const findings: Array<{ source: string; key: string; intervalMs: number }> = [
+    ...result.overdue.map((job) => ({
+      source: job.source,
+      key: fingerprint(job),
+      intervalMs: job.intervalMs,
+    })),
+    ...result.nearBudget.map((job) => ({
+      source: `${job.source}#budget`,
+      key: `budget|${Math.round(job.lastDurationMs / 1000)}|${Math.round(
+        job.maxDurationMs / 1000,
+      )}`,
+      // A budget warning has no interval of its own to expire against, so it
+      // takes a day, which is the cadence of the watchdog's own backstop cron.
+      intervalMs: 24 * 60 * 60 * 1000,
+    })),
+  ];
+
+  for (const finding of findings) {
+    const before = previous[finding.source];
+    const said = before ? new Date(before.announcedAt).getTime() : NaN;
+
+    // An unreadable timestamp is not a recent announcement. NaN compares false
+    // against every threshold, so without this it would land on the quiet side
+    // and hold the finding forever (L50).
+    const stale = !Number.isFinite(said) || now - said >= finding.intervalMs;
+    const isNew = !before || before.key !== finding.key;
+
+    if (isNew || stale) {
+      announce = true;
+      state[finding.source] = {
+        key: finding.key,
+        announcedAt: new Date(now).toISOString(),
+        intervalMs: finding.intervalMs,
+      };
+    } else {
+      // Held, and the ORIGINAL announcement time is kept. Refreshing it here
+      // would push the expiry out on every run, which is how a floor stops
+      // being a floor and the suppression becomes permanent after all.
+      state[finding.source] = before;
+    }
+  }
+
+  // Anything not in findings has recovered and is deliberately dropped, so a
+  // relapse reads as new rather than as a repeat of something long settled.
+  return { announce, state };
+}
+
+/**
  * How much of its budget a run may use before it is worth saying so.
  *
  * These crons send emails one at a time inside a fixed maxDuration, and a run

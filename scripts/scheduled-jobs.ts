@@ -28,11 +28,15 @@ import {
   evaluateScheduledJobs,
   humanize,
   parseCronSchedules,
+  decideAnnouncement,
+  parseAnnouncedState,
   type ScheduledJob,
   type LastDispatch,
   type OverdueJob,
   type NearBudgetJob,
   type WatchdogResult,
+  type AnnouncedState,
+  type AnnouncedFinding,
 } from "../src/lib/cron/schedule-health";
 
 // Re-exported so every existing caller and test keeps importing from here.
@@ -42,10 +46,14 @@ export {
   expectedIntervalMs,
   evaluateScheduledJobs,
   parseCronSchedules,
+  decideAnnouncement,
+  parseAnnouncedState,
 };
 export type {
   ScheduledJob,
   LastDispatch,
+  AnnouncedState,
+  AnnouncedFinding,
   OverdueJob,
   NearBudgetJob,
   WatchdogResult,
@@ -470,6 +478,17 @@ type AnnounceFn = (args: {
 
 export interface WatchdogRunOptions {
   loadJobs: () => Promise<ScheduledJob[]>;
+  /**
+   * What was already said, so an unchanged finding is not sent again (#1078).
+   *
+   * Optional, and a caller that omits it announces every time, which is the
+   * behaviour before this existed. A read that THROWS is treated the same as
+   * no record: the alert goes out. Losing the record must cost a duplicate
+   * message and never a silence.
+   */
+  readAnnounced?: () => Promise<AnnouncedState>;
+  /** Where to put the updated record. Failure to save is logged, not fatal. */
+  writeAnnounced?: (state: AnnouncedState) => Promise<void>;
   announceImpl: AnnounceFn;
   token: string | undefined;
   log: (message: string) => void;
@@ -491,6 +510,8 @@ export async function runScheduledJobCheck({
   token,
   log,
   now,
+  readAnnounced,
+  writeAnnounced,
 }: WatchdogRunOptions): Promise<number> {
   const alert = async (title: string, report: string): Promise<void> => {
     await announceImpl({ title, report, token }).catch((err: unknown) => {
@@ -516,18 +537,65 @@ export async function runScheduledJobCheck({
     return 1;
   }
 
+  // Unconditional, and deliberately ahead of any decision about Slack. What
+  // is held below is the DELIVERY of a repeated message, never the reading:
+  // the full report is in this run's log whether or not anybody is told again.
   const report = formatWatchdogReport(result);
   log(report);
 
+  // An absent or unreadable record reads as "nothing has been said", so the
+  // alert goes out. A lost cache costs one duplicate message; the other way
+  // round it would cost the alert, which is the whole point of the job.
+  let previous: AnnouncedState = {};
+  if (readAnnounced) {
+    try {
+      previous = await readAnnounced();
+    } catch (err: unknown) {
+      log(
+        `Could not read what was already announced, so this will be sent as ` +
+          `new: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  const decision = decideAnnouncement({ result, previous, now });
+
+  if (writeAnnounced) {
+    await writeAnnounced(decision.state).catch((err: unknown) => {
+      // Not fatal, and it fails in the safe direction: the record simply does
+      // not advance, so the next run announces rather than staying quiet.
+      log(
+        `Could not save what was announced: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    });
+  }
+
   if (result.overdue.length > 0) {
-    await alert("Scheduled jobs are not completing", report);
+    // The exit code does NOT follow the announcement. The finding is still
+    // true on a held run, so the job still goes red and the run log still
+    // carries the report; what was held is one repeated Slack message.
+    if (decision.announce) {
+      await alert("Scheduled jobs are not completing", report);
+    } else {
+      log(
+        "Slack was not told again: every finding above is unchanged since it " +
+          "was last announced, and none has stood for a whole interval of the " +
+          "job it is about (#1078).",
+      );
+    }
     return 1;
   }
 
   // A job that is still running but nearly out of time is a different finding
   // with a different remedy, so it does not borrow the wording above (L11).
   if (result.nearBudget.length > 0) {
-    await alert("A scheduled job is close to its time budget", report);
+    if (decision.announce) {
+      await alert("A scheduled job is close to its time budget", report);
+    } else {
+      log("Slack was not told again: the budget finding above is unchanged.");
+    }
     return 1;
   }
 

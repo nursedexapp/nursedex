@@ -29,6 +29,10 @@ import {
   loadGitHubWorkflowJobs,
   type ScheduledJob,
   type WatchdogResult,
+  type OverdueJob,
+  type AnnouncedState,
+  decideAnnouncement,
+  parseAnnouncedState,
 } from "./scheduled-jobs";
 
 const HOUR = 60 * 60 * 1000;
@@ -1100,5 +1104,344 @@ describe("reading which state an overdue workflow is in", () => {
     expect(report).not.toMatch(/refused to start/i);
     expect(report).toMatch(/could not be read/i);
     expect(report).toMatch(/log/i);
+  });
+});
+
+/**
+ * #1078. The watchdog fires on a daily backstop cron AND on every completion
+ * of Production Smoke, which runs on every push to main. An overdue finding
+ * stays true until the watched job's next scheduled run succeeds, which for a
+ * weekly job is up to six days, so the identical Slack message went out once
+ * per merge for most of a week. Nothing rate limited it but how often the repo
+ * was pushed to. L36 asks for deduped repeats.
+ */
+describe("holding a finding that has not changed", () => {
+  const NOW = Date.UTC(2026, 8, 15, 12, 0, 0);
+  const WEEK = 7 * DAY;
+
+  const overdue = (over: Partial<OverdueJob> = {}): OverdueJob => ({
+    name: "Stale Pull Requests",
+    source: "stale-prs.yml",
+    ageMs: 30 * DAY,
+    intervalMs: WEEK,
+    neverRan: true,
+    measuredBy: "success",
+    ...over,
+  });
+
+  const seen = (jobs: OverdueJob[]): WatchdogResult => ({
+    checked: 2,
+    overdue: jobs,
+    nearBudget: [],
+  });
+
+  it("announces a finding nothing has said before", () => {
+    const decision = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    expect(decision.announce).toBe(true);
+    expect(decision.state["stale-prs.yml"]).toBeDefined();
+  });
+
+  it("holds the identical finding on the next run", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const second = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: first.state,
+      now: NOW + 5 * 60 * 1000,
+    });
+
+    expect(second.announce).toBe(false);
+  });
+
+  it("speaks again when the job's state changes under it", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue({ lastDispatch: null })]),
+      previous: {},
+      now: NOW,
+    });
+
+    // GitHub started dispatching again, and now the job itself is failing.
+    // That is a different problem with a different remedy, so it is not the
+    // same finding and must not be held (L11).
+    const second = decideAnnouncement({
+      result: seen([
+        overdue({
+          lastDispatch: {
+            conclusion: "failure",
+            at: new Date(NOW).toISOString(),
+            ranAnySteps: true,
+            refusal: null,
+          },
+        }),
+      ]),
+      previous: first.state,
+      now: NOW + HOUR,
+    });
+
+    expect(second.announce).toBe(true);
+  });
+
+  /**
+   * A suppression that cannot expire is the defect (L523). The floor comes
+   * from the job's OWN interval rather than a constant, so a weekly job is
+   * re-reported weekly and a daily one daily, derived from the same number the
+   * overdue verdict uses (L401). It can never become permanent, because the
+   * window always passes.
+   */
+  it("speaks again once the job's own window has passed with no fix", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const justBefore = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: first.state,
+      now: NOW + WEEK - HOUR,
+    });
+    expect(justBefore.announce).toBe(false);
+
+    const justAfter = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: first.state,
+      now: NOW + WEEK + HOUR,
+    });
+    expect(justAfter.announce).toBe(true);
+  });
+
+  it("forgets a job that recovered, so a relapse is announced", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const healthy = decideAnnouncement({
+      result: seen([]),
+      previous: first.state,
+      now: NOW + HOUR,
+    });
+    expect(healthy.state["stale-prs.yml"]).toBeUndefined();
+
+    const relapse = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: healthy.state,
+      now: NOW + 2 * HOUR,
+    });
+    expect(relapse.announce).toBe(true);
+  });
+
+  /**
+   * Losing the record must never lose the alert. An empty previous state is
+   * exactly what a cache miss looks like, and it has to read as "say it",
+   * never as "already said".
+   */
+  it("announces when the record is missing entirely", () => {
+    expect(
+      decideAnnouncement({
+        result: seen([overdue()]),
+        previous: {},
+        now: NOW,
+      }).announce,
+    ).toBe(true);
+  });
+
+  it("does not hold a second job because a first one was already reported", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const second = decideAnnouncement({
+      result: seen([
+        overdue(),
+        overdue({ name: "Third Party Health", source: "health-checks.yml" }),
+      ]),
+      previous: first.state,
+      now: NOW + HOUR,
+    });
+
+    expect(second.announce).toBe(true);
+  });
+
+  /**
+   * A near budget finding travels in the same message, so it must get the same
+   * treatment. Fingerprinting only the overdue list would let a brand new
+   * budget warning be swallowed by an unchanged overdue one (L582).
+   */
+  it("speaks again when a near budget finding appears beside an unchanged one", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const second = decideAnnouncement({
+      result: {
+        checked: 2,
+        overdue: [overdue()],
+        nearBudget: [
+          {
+            name: "Weekly Digest",
+            source: "digest.yml",
+            lastDurationMs: 50_000,
+            maxDurationMs: 60_000,
+          },
+        ],
+      },
+      previous: first.state,
+      now: NOW + HOUR,
+    });
+
+    expect(second.announce).toBe(true);
+  });
+});
+
+/**
+ * #1078, the wiring. Holding the Slack delivery must not hold the READING or
+ * the exit code: the finding is still true, the run log still carries the full
+ * report, and the job still goes red. Only the repeated message is held.
+ */
+describe("runScheduledJobCheck with a record of what was already said", () => {
+  const NOW = Date.UTC(2026, 8, 15, 12, 0, 0);
+
+  const silentJob = () => ({
+    name: "Stale Pull Requests",
+    source: "stale-prs.yml",
+    crons: ["0 7 * * 1"],
+    lastSuccessAt: new Date(NOW - 40 * DAY).toISOString(),
+  });
+
+  function harness(previous: AnnouncedState) {
+    const posted: string[] = [];
+    const logged: string[] = [];
+    let saved: AnnouncedState | null = null;
+    return {
+      posted,
+      logged,
+      saved: () => saved,
+      run: () =>
+        runScheduledJobCheck({
+          loadJobs: async () => [silentJob()],
+          announceImpl: async ({ title }) => {
+            posted.push(title);
+          },
+          token: "xoxb-test",
+          log: (m) => logged.push(m),
+          now: NOW,
+          readAnnounced: async () => previous,
+          writeAnnounced: async (next) => {
+            saved = next;
+          },
+        }),
+    };
+  }
+
+  it("posts, records it, and exits non zero the first time", async () => {
+    const h = harness({});
+
+    expect(await h.run()).toBe(1);
+    expect(h.posted).toHaveLength(1);
+    expect(h.saved()?.["stale-prs.yml"]).toBeDefined();
+  });
+
+  it("holds the Slack post the second time, and still logs and still fails", async () => {
+    const first = harness({});
+    await first.run();
+    const recorded = first.saved();
+    expect(recorded).not.toBeNull();
+
+    const second = harness(recorded as AnnouncedState);
+    const code = await second.run();
+
+    // The delivery is held. The measurement is not.
+    expect(second.posted).toEqual([]);
+    expect(second.logged.join("\n")).toContain("Stale Pull Requests");
+    expect(code).toBe(1);
+  });
+
+  /**
+   * A cache miss must never read as "already said". Losing the record costs
+   * one duplicate message; treating absence as silence loses the alert.
+   */
+  it("posts when the record cannot be read at all", async () => {
+    const posted: string[] = [];
+    const code = await runScheduledJobCheck({
+      loadJobs: async () => [silentJob()],
+      announceImpl: async ({ title }) => {
+        posted.push(title);
+      },
+      token: "xoxb-test",
+      log: () => {},
+      now: NOW,
+      readAnnounced: async () => {
+        throw new Error("cache unavailable");
+      },
+      writeAnnounced: async () => {},
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(code).toBe(1);
+  });
+
+  /**
+   * The watchdog failing to RUN is not a finding about a job, and it has no
+   * fingerprint to hold. It must always speak: it is the state in which
+   * nothing at all is being watched.
+   */
+  it("never holds the could not run alert", async () => {
+    const posted: string[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      await runScheduledJobCheck({
+        loadJobs: async () => {
+          throw new Error("GitHub API 502");
+        },
+        announceImpl: async ({ title }) => {
+          posted.push(title);
+        },
+        token: "xoxb-test",
+        log: () => {},
+        now: NOW,
+        readAnnounced: async () => ({}),
+        writeAnnounced: async () => {},
+      });
+    }
+
+    expect(posted).toHaveLength(2);
+  });
+});
+
+/**
+ * #1078. JSON.parse SUCCEEDS on "null", "3" and "[]", so a corrupt record
+ * would reach the decision as a non object and throw on the first property
+ * read, outside the try that guards the read. A corrupt cache would then kill
+ * the watchdog outright, which is the one failure it must never have: nothing
+ * would be watching anything, and the cause would look nothing like the cache.
+ */
+describe("a record that parsed but is not a record", () => {
+  it("refuses a parsed value that is not an object", () => {
+    for (const bad of ["null", "3", '"text"', "[]"]) {
+      expect(() => parseAnnouncedState(bad)).toThrow(/record/i);
+    }
+  });
+
+  it("accepts an ordinary record, and an empty one", () => {
+    expect(parseAnnouncedState("{}")).toEqual({});
+    expect(
+      parseAnnouncedState(
+        '{"a.yml":{"key":"k","announcedAt":"2026-09-15T00:00:00Z","intervalMs":1}}',
+      ),
+    ).toHaveProperty("a.yml");
   });
 });
