@@ -53,9 +53,14 @@ describe("Sentry wiring (#394, #395, #400)", () => {
     }
   });
 
-  it("ignores the Android in-app-browser bridge teardown error (NURSEDEX-SITE-5)", () => {
+  // Whether those errors are actually discarded is asserted against Sentry's
+  // own filter in src/lib/sentry/ignored-browser-errors.test.ts. This only
+  // checks the list reaches the SDK, which is all a source read can establish.
+  it("hands the in-app browser ignore list to Sentry (NURSEDEX-SITE-5, NURSEDEX-SITE-Y)", () => {
     const source = read("src/instrumentation-client.ts");
-    expect(source).toMatch(/ignoreErrors/);
-    expect(source).toMatch(/Java object is gone/);
+    expect(source).toMatch(/ignoreErrors:\s*IGNORED_BROWSER_ERRORS/);
+    expect(source).toMatch(
+      /import\s*\{\s*IGNORED_BROWSER_ERRORS\s*\}\s*from\s*"@\/lib\/sentry\/ignored-browser-errors"/,
+    );
   });
 });
