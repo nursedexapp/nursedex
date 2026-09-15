@@ -29,6 +29,7 @@ import {
   humanize,
   parseCronSchedules,
   type ScheduledJob,
+  type LastDispatch,
   type OverdueJob,
   type NearBudgetJob,
   type WatchdogResult,
@@ -42,7 +43,57 @@ export {
   evaluateScheduledJobs,
   parseCronSchedules,
 };
-export type { ScheduledJob, OverdueJob, NearBudgetJob, WatchdogResult };
+export type {
+  ScheduledJob,
+  LastDispatch,
+  OverdueJob,
+  NearBudgetJob,
+  WatchdogResult,
+};
+
+/**
+ * Which dispatch state an overdue job is in, as one sentence, or null when
+ * nothing read it (#1041).
+ *
+ * Three states, three remedies, and the middle and last are the pair the
+ * Actions tab cannot tell apart: a refused run and a failed one look identical
+ * in every list (L276). On 2026-09-15 Stale Pull Requests was in the third
+ * state and the alert described the first two, which cost a reading of the
+ * Actions tab, the job JSON and the check run annotations to establish.
+ */
+function describeDispatch(
+  last: LastDispatch | null | undefined,
+): string | null {
+  if (last === undefined) return null;
+
+  if (last === null) {
+    return (
+      "Nothing has been dispatched on its schedule at all, so this is the " +
+      "schedule having stopped rather than the job failing."
+    );
+  }
+
+  const when = last.at ? `The run on ${last.at.slice(0, 10)}` : "The last run";
+
+  if (!last.ranAnySteps) {
+    // No steps executed means GitHub refused to start the job. There is no log
+    // to read, so the reader must not be sent to one.
+    const quoted = last.refusal
+      ? ` GitHub said: "${last.refusal}".`
+      : " GitHub gave no reason on the run.";
+    return (
+      `${when} was dispatched, and GitHub refused to start the job before any ` +
+      `step ran.${quoted} The remedy is on the account, usually billing or a ` +
+      "spending limit, and not in the job."
+    );
+  }
+
+  return (
+    `${when} was dispatched and its steps executed, and it did not succeed ` +
+    `(${last.conclusion ?? "no conclusion recorded"}). The schedule is still ` +
+    "firing and the job itself is broken, so read that run's log."
+  );
+}
 
 /** The message a person reads, healthy or not. */
 export function formatWatchdogReport(result: WatchdogResult): string {
@@ -93,17 +144,44 @@ export function formatWatchdogReport(result: WatchdogResult): string {
         job.intervalMs,
       )}.`,
     );
+
+    // Which of the three states this job is in, when it was read (#1041).
+    // Saying it here, on the job's own line, is the difference between a
+    // message that names a cause and one that lists possibilities.
+    const state = describeDispatch(job.lastDispatch);
+    if (state) lines.push(`  ${state}`);
   }
 
+  // The fallback paragraph, and ONLY for jobs whose dispatch state nothing
+  // read. A Vercel cron has no runs to look at, so both possibilities are
+  // genuinely still open there, and a message may claim only what its check
+  // measured (L11). Where the state IS known it is on the job's own line
+  // above, and repeating the guesswork underneath would undo the point.
+  if (result.overdue.some((job) => job.lastDispatch === undefined)) {
+    lines.push(
+      "",
+      "What is measured is the last SUCCESSFUL run, and for the jobs above " +
+        "with no dispatch state named, that is either not being dispatched at " +
+        "all or failing every time. The second case is already alerting on its " +
+        "own; the first produces no error and no log, which is why this exists. " +
+        "GitHub disables a scheduled workflow after 60 days without repository " +
+        "activity, and a Vercel cron can stop being dispatched just as quietly. " +
+        "Check the Actions tab, or Vercel's cron log.",
+    );
+  }
+
+  // #1077. This used to end "re-run the job by hand to confirm it still
+  // works", which is advice that cannot settle the thing being reported: every
+  // entry is queried with event=schedule, deliberately, because a hand run
+  // proves the script works and not that GitHub is still firing it. A reader
+  // who followed it saw a green run and got the identical alert next time.
+  // Suggesting it is still right, saying what it settles is the fix (L36).
   lines.push(
     "",
-    "What is measured is the last SUCCESSFUL run, so each of these is either " +
-      "not being dispatched at all or failing every time. The second case is " +
-      "already alerting on its own; the first produces no error and no log, " +
-      "which is why this exists. GitHub disables a scheduled workflow after 60 " +
-      "days without repository activity, and a Vercel cron can stop being " +
-      "dispatched just as quietly. Check the Actions tab, or Vercel's cron log, " +
-      "and re-run the job by hand to confirm it still works.",
+    "Running one of these by hand is worth doing, because it proves the " +
+      "script still works before the next scheduled window. It will not clear " +
+      "this alert: only runs GitHub dispatched on the schedule are counted " +
+      "here, so what clears it is the job's next scheduled run succeeding.",
   );
 
   // The watchdog's own entry is the exception, and saying so matters: on that
@@ -185,11 +263,35 @@ export function selfWorkflowSource(
 
 /** The slice of GitHub's workflow runs response this needs. */
 interface WorkflowRunsResponse {
-  workflow_runs?: Array<{ updated_at?: string; run_started_at?: string }>;
+  workflow_runs?: Array<{
+    id?: number;
+    conclusion?: string | null;
+    updated_at?: string;
+    run_started_at?: string;
+  }>;
 }
 
 interface WorkflowResponse {
   created_at?: string;
+}
+
+/**
+ * The slice of the jobs response that says whether anything actually ran.
+ *
+ * An EMPTY steps list is the signal: GitHub dispatched the run and refused to
+ * start the job (#1041, L276).
+ */
+interface WorkflowJobsResponse {
+  jobs?: Array<{
+    id?: number;
+    conclusion?: string | null;
+    steps?: unknown[];
+  }>;
+}
+
+/** GitHub's own note on a refused run, quoted into the alert verbatim. */
+interface AnnotationResponse {
+  message?: string;
 }
 
 export interface LoadWorkflowJobsOptions {
@@ -246,14 +348,93 @@ export async function loadGitHubWorkflowJobs({
             `/repos/${repo}/actions/workflows/${job.source}`,
           );
 
+      // The last run on this schedule WHATEVER its conclusion, read beside
+      // the successful one so the report can name which failure this is
+      // (#1041). One extra call per workflow, and two more only when that run
+      // did not succeed, so a healthy repository pays one call per workflow
+      // and nothing else.
+      const lastDispatch = isSelf
+        ? undefined
+        : await readLastDispatch(api, repo, job.source);
+
       return {
         ...job,
         lastSuccessAt: latest?.updated_at ?? latest?.run_started_at ?? null,
         firstSeenAt: workflow?.created_at ?? null,
         measuredBy: isSelf ? "dispatch" : "success",
+        lastDispatch,
       };
     }),
   );
+}
+
+/**
+ * The last run dispatched on a workflow's schedule, whatever it concluded.
+ *
+ * Read so the alert can say which of three states an overdue job is in, rather
+ * than listing two possibilities and choosing neither (#1041).
+ *
+ * A run whose job executed NO steps is GitHub refusing to start it, which it
+ * does for a failed payment or an exhausted spending limit. That refusal is
+ * indistinguishable from an ordinary failure in every list (L276), and it is
+ * what both scheduled runs of Stale Pull Requests were on 2026-09-07 and
+ * 2026-09-14, so the annotation carrying GitHub's reason is quoted into the
+ * message.
+ *
+ * Nothing here may turn a FAILED READ into a finding. Every call past the run
+ * list is allowed to fall over without taking the state with it: what is lost
+ * then is the detail of whether steps ran, so `ranAnySteps` stays true, which
+ * is the reading that sends the reader to the run log. A log that turns out to
+ * be empty costs one click; asserting a billing refusal that did not happen
+ * sends them to the billing page instead (L11, L93).
+ */
+async function readLastDispatch(
+  api: <T>(path: string) => Promise<T>,
+  repo: string,
+  source: string,
+): Promise<LastDispatch | null> {
+  const runs = await api<WorkflowRunsResponse>(
+    `/repos/${repo}/actions/workflows/${source}/runs?event=schedule&per_page=1`,
+  );
+  const run = runs.workflow_runs?.[0];
+  if (!run) return null;
+
+  const at = run.updated_at ?? run.run_started_at ?? null;
+  const conclusion = run.conclusion ?? null;
+
+  // A run that succeeded is not a failure to explain, and its steps are not
+  // worth two more calls.
+  if (conclusion === "success" || run.id === undefined) {
+    return { conclusion, at, ranAnySteps: true, refusal: null };
+  }
+
+  let ranAnySteps = true;
+  let refusal: string | null = null;
+  try {
+    const jobs = await api<WorkflowJobsResponse>(
+      `/repos/${repo}/actions/runs/${run.id}/jobs`,
+    );
+    const first = jobs.jobs?.[0];
+    if (first && (first.steps?.length ?? 0) === 0) {
+      ranAnySteps = false;
+      try {
+        const notes = await api<AnnotationResponse[]>(
+          `/repos/${repo}/check-runs/${first.id}/annotations`,
+        );
+        refusal = notes?.find((n) => n.message)?.message ?? null;
+      } catch {
+        // The refusal stands without its quote. Saying a job was refused and
+        // not why is still the right diagnosis; inventing a reason is not.
+        refusal = null;
+      }
+    }
+  } catch {
+    // Could not read the steps. The run and its conclusion are still known,
+    // and the reader is sent to the log, which is where they would go anyway.
+    ranAnySteps = true;
+  }
+
+  return { conclusion, at, ranAnySteps, refusal };
 }
 
 /** The alert call, narrowed to what this check needs (see scripts/slack-alert.ts). */

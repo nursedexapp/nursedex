@@ -27,6 +27,8 @@ import {
   fetchHeartbeatRows,
   selfWorkflowSource,
   loadGitHubWorkflowJobs,
+  type ScheduledJob,
+  type WatchdogResult,
 } from "./scheduled-jobs";
 
 const HOUR = 60 * 60 * 1000;
@@ -808,9 +810,12 @@ describe("loadGitHubWorkflowJobs", () => {
       selfSource: "job-watchdog.yml",
     });
 
+    // The JUDGING call, not every call: since #1041 each non-self workflow
+    // also gets a supplementary read of its last run whatever the conclusion,
+    // which deliberately carries no status filter. What this asserts is that
+    // the timestamp the check is judged on still comes from a successful run.
     const others = calls.filter((p) => !p.includes("job-watchdog.yml"));
-    expect(others.length).toBeGreaterThan(0);
-    for (const path of others) expect(path).toContain("status=success");
+    expect(others.filter((p) => p.includes("status=success")).length).toBe(1);
 
     const own = calls.filter((p) => p.includes("job-watchdog.yml"));
     expect(own.length).toBeGreaterThan(0);
@@ -850,5 +855,239 @@ describe("loadGitHubWorkflowJobs", () => {
     );
     expect(report).toContain("was last dispatched");
     expect(report).not.toContain("Job Watchdog (job-watchdog.yml) last succeeded");
+  });
+});
+
+/**
+ * #1041 and #1077. The overdue message used to offer the reader two
+ * possibilities and decline to choose between them, then recommend a remedy
+ * that cannot settle either.
+ *
+ * On 2026-09-15 it reported that Stale Pull Requests had never completed
+ * successfully. The cause was a third case the message does not name: both
+ * scheduled runs ever dispatched started and completed inside two seconds
+ * having executed no steps at all, carrying GitHub's own annotation that the
+ * job was not started because account payments had failed. GitHub accepted the
+ * schedule, dispatched the run, and refused to start the job. That is neither
+ * "the schedule stopped" nor "the job is broken and already alerting
+ * elsewhere", because a workflow with no failure alerting of its own produces
+ * a red run nobody has a reason to open.
+ */
+describe("which of the dispatch states an overdue job is in", () => {
+  const NOW = new Date("2026-09-15T12:00:00Z").getTime();
+
+  const weekly = (lastDispatch: ScheduledJob["lastDispatch"]): WatchdogResult =>
+    evaluateScheduledJobs({
+      jobs: [
+        {
+          name: "Stale Pull Requests",
+          source: "stale-prs.yml",
+          crons: ["0 7 * * 1"],
+          lastSuccessAt: null,
+          firstSeenAt: new Date(NOW - 30 * DAY).toISOString(),
+          lastDispatch,
+        },
+      ],
+      now: NOW,
+    });
+
+  it("says the schedule has stopped when nothing was dispatched at all", () => {
+    const report = formatWatchdogReport(weekly(null));
+
+    expect(report).toMatch(/not been dispatched|nothing.*dispatched/i);
+    // It must NOT accuse the job of being broken: nothing ran to be broken.
+    expect(report).not.toMatch(/refused to start/i);
+  });
+
+  it("sends the reader to the run log when a run executed and failed", () => {
+    const report = formatWatchdogReport(
+      weekly({
+        conclusion: "failure",
+        at: new Date(NOW - 1 * DAY).toISOString(),
+        ranAnySteps: true,
+        refusal: null,
+      }),
+    );
+
+    // The three claims that matter: it ran, it did not succeed, and the log
+    // is where the answer is. Not one spelling of them (L103).
+    expect(report).toMatch(/steps executed/i);
+    expect(report).toContain("failure");
+    expect(report).toMatch(/read that run's log/i);
+    expect(report).not.toMatch(/refused to start/i);
+  });
+
+  /**
+   * The state that cost a week. A refused run is indistinguishable from a
+   * failed one in every list (L276), so the message has to make the
+   * distinction the list cannot, and quote GitHub's own words for it: the
+   * remedy is on the billing account and nowhere near the job.
+   */
+  it("names a refusal, and quotes it, when the run executed no steps", () => {
+    const report = formatWatchdogReport(
+      weekly({
+        conclusion: "failure",
+        at: new Date(NOW - 1 * DAY).toISOString(),
+        ranAnySteps: false,
+        refusal:
+          "The job was not started because recent account payments have failed",
+      }),
+    );
+
+    expect(report).toMatch(/refused to start/i);
+    expect(report).toContain("recent account payments have failed");
+    // The reader must not be sent to read a log: a refused run has none.
+    expect(report).not.toMatch(/read that run's log/i);
+  });
+});
+
+describe("what the alert tells the reader to do about it", () => {
+  const NOW = new Date("2026-09-15T12:00:00Z").getTime();
+
+  /**
+   * #1077. The message used to end "re-run the job by hand to confirm it still
+   * works". A hand run cannot satisfy this check: every entry is queried with
+   * event=schedule, deliberately, because a hand run proves the script works
+   * and not that GitHub is still firing it. So the reader does exactly what the
+   * alert says, sees a green run, and the next reading reports the identical
+   * finding. Confirmed on 2026-09-15 by dispatching stale-prs.yml by hand.
+   *
+   * L36: never embed canned remediation text that can steer a diagnosis wrong.
+   */
+  it("says a hand run will not clear the check, when it suggests one", () => {
+    const report = formatWatchdogReport(
+      evaluateScheduledJobs({
+        jobs: [
+          {
+            name: "Stale Pull Requests",
+            source: "stale-prs.yml",
+            crons: ["0 7 * * 1"],
+            lastSuccessAt: null,
+            firstSeenAt: new Date(NOW - 30 * DAY).toISOString(),
+            lastDispatch: null,
+          },
+        ],
+        now: NOW,
+      }),
+    );
+
+    expect(report).toMatch(/by hand/i);
+    // The claim that matters: it proves the script, it does not clear this.
+    expect(report).toMatch(/will not clear|does not clear|cannot clear/i);
+    expect(report).toMatch(/scheduled run/i);
+  });
+});
+
+/**
+ * #1041, the reading side. The report can only name a dispatch state if
+ * something puts one there, and a feature that is built but not wired is not
+ * a feature (L3).
+ */
+describe("reading which state an overdue workflow is in", () => {
+  const NOW = Date.UTC(2026, 8, 15, 12, 0, 0);
+  const iso = (ms: number) => new Date(ms).toISOString();
+
+  const FILES = [
+    {
+      path: ".github/workflows/stale-prs.yml",
+      contents:
+        'name: Stale Pull Requests\non:\n  schedule:\n    - cron: "0 7 * * 1"\n',
+    },
+  ];
+
+  /**
+   * GitHub as it actually answered on 2026-09-15. No successful scheduled run
+   * has ever existed; the last one GitHub dispatched completed in two seconds
+   * with an empty steps list and a billing annotation.
+   */
+  function refusedApi() {
+    const calls: string[] = [];
+    return {
+      calls,
+      api: async <T,>(path: string): Promise<T> => {
+        calls.push(path);
+        // Order matters: the jobs URL is /actions/runs/<id>/jobs, so it also
+        // contains "/runs". A double that selects what it intercepts by
+        // pattern becomes no double at all when the pattern is too loose, and
+        // the test then measures the wrong call (L143).
+        if (path.includes("status=success")) return { workflow_runs: [] } as T;
+        if (path.includes("/annotations"))
+          return [
+            {
+              annotation_level: "failure",
+              message:
+                "The job was not started because recent account payments have failed",
+            },
+          ] as T;
+        if (path.endsWith("/jobs"))
+          return {
+            jobs: [{ id: 103994245503, conclusion: "failure", steps: [] }],
+          } as T;
+        if (path.includes("/runs"))
+          return {
+            workflow_runs: [
+              {
+                id: 34849707548,
+                conclusion: "failure",
+                updated_at: iso(NOW - 1 * DAY),
+              },
+            ],
+          } as T;
+        return { created_at: iso(NOW - 40 * DAY) } as T;
+      },
+    };
+  }
+
+  it("carries the refusal through to the report, quoted", async () => {
+    const { api } = refusedApi();
+
+    const jobs = await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: null,
+    });
+
+    expect(jobs[0].lastDispatch).toMatchObject({
+      ranAnySteps: false,
+      conclusion: "failure",
+    });
+
+    const report = formatWatchdogReport(
+      evaluateScheduledJobs({ jobs, now: NOW }),
+    );
+    expect(report).toMatch(/refused to start/i);
+    expect(report).toContain("recent account payments have failed");
+  });
+
+  /**
+   * A read that FAILED must not arrive as "nothing was dispatched", which is a
+   * finding with its own remedy. An unreadable answer and a dead schedule are
+   * different things and only one is fixed by re-enabling a schedule (L11).
+   */
+  it("does not report a failed annotation read as a job that never ran", async () => {
+    const api = async <T,>(path: string): Promise<T> => {
+      if (path.includes("status=success")) return { workflow_runs: [] } as T;
+      if (path.endsWith("/jobs")) throw new Error("GitHub API 502");
+      if (path.includes("/runs"))
+        return {
+          workflow_runs: [
+            { id: 1, conclusion: "failure", updated_at: iso(NOW - DAY) },
+          ],
+        } as T;
+      return { created_at: iso(NOW - 40 * DAY) } as T;
+    };
+
+    const jobs = await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: null,
+    });
+
+    // It knows a run exists. What it could not read is whether steps ran, and
+    // it must not answer that question by guessing.
+    expect(jobs[0].lastDispatch).not.toBeNull();
+    expect(jobs[0].lastDispatch?.conclusion).toBe("failure");
   });
 });
