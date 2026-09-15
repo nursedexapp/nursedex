@@ -62,8 +62,15 @@ export interface LastDispatch {
    * for a failed payment or an exhausted spending limit. A refused run is
    * indistinguishable from a failed one in every list (L276), so this is the
    * distinction the Actions tab cannot make for the reader.
+   *
+   * NULL is a third value and it is load bearing: the read that answers this
+   * fell over. It must never collapse into true or false, because the message
+   * is built from it and a message may claim only what its check actually
+   * measured (L11). Guessing true asserts the steps ran and sends the reader
+   * to a log that may not exist; guessing false accuses the billing account of
+   * a refusal nothing observed.
    */
-  ranAnySteps: boolean;
+  ranAnySteps: boolean | null;
   /**
    * GitHub's own annotation on a refused run, quoted verbatim into the alert.
    *

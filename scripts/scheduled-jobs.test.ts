@@ -1086,8 +1086,19 @@ describe("reading which state an overdue workflow is in", () => {
     });
 
     // It knows a run exists. What it could not read is whether steps ran, and
-    // it must not answer that question by guessing.
+    // it must not answer that question by guessing in either direction.
     expect(jobs[0].lastDispatch).not.toBeNull();
     expect(jobs[0].lastDispatch?.conclusion).toBe("failure");
+    expect(jobs[0].lastDispatch?.ranAnySteps).toBeNull();
+
+    // And the message must not CLAIM steps ran, nor claim a refusal. It says
+    // it could not tell, and still sends the reader somewhere useful (L11).
+    const report = formatWatchdogReport(
+      evaluateScheduledJobs({ jobs, now: NOW }),
+    );
+    expect(report).not.toMatch(/steps executed/i);
+    expect(report).not.toMatch(/refused to start/i);
+    expect(report).toMatch(/could not be read/i);
+    expect(report).toMatch(/log/i);
   });
 });

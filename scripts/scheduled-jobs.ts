@@ -75,6 +75,16 @@ function describeDispatch(
 
   const when = last.at ? `The run on ${last.at.slice(0, 10)}` : "The last run";
 
+  if (last.ranAnySteps === null) {
+    return (
+      `${when} was dispatched and did not succeed ` +
+      `(${last.conclusion ?? "no conclusion recorded"}), but whether any step ` +
+      "ran could not be read, so this is either a broken job or GitHub " +
+      "refusing to start it. That run's log tells you which: a refused run " +
+      "has none, and its remedy is on the billing account."
+    );
+  }
+
   if (!last.ranAnySteps) {
     // No steps executed means GitHub refused to start the job. There is no log
     // to read, so the reader must not be sent to one.
@@ -404,18 +414,28 @@ async function readLastDispatch(
 
   // A run that succeeded is not a failure to explain, and its steps are not
   // worth two more calls.
-  if (conclusion === "success" || run.id === undefined) {
+  // A run that succeeded ran its steps by definition, so that one IS measured.
+  if (conclusion === "success") {
     return { conclusion, at, ranAnySteps: true, refusal: null };
   }
+  // No id means nothing further can be asked about it, which is not the same
+  // as having asked and found steps.
+  if (run.id === undefined) {
+    return { conclusion, at, ranAnySteps: null, refusal: null };
+  }
 
-  let ranAnySteps = true;
+  let ranAnySteps: boolean | null = null;
   let refusal: string | null = null;
   try {
     const jobs = await api<WorkflowJobsResponse>(
       `/repos/${repo}/actions/runs/${run.id}/jobs`,
     );
     const first = jobs.jobs?.[0];
-    if (first && (first.steps?.length ?? 0) === 0) {
+    if (!first) {
+      // The call answered, but with no job in it. Nothing was measured, so
+      // this stays null rather than becoming either verdict.
+      ranAnySteps = null;
+    } else if ((first.steps?.length ?? 0) === 0) {
       ranAnySteps = false;
       try {
         const notes = await api<AnnotationResponse[]>(
@@ -427,11 +447,15 @@ async function readLastDispatch(
         // not why is still the right diagnosis; inventing a reason is not.
         refusal = null;
       }
+    } else {
+      ranAnySteps = true;
     }
   } catch {
-    // Could not read the steps. The run and its conclusion are still known,
-    // and the reader is sent to the log, which is where they would go anyway.
-    ranAnySteps = true;
+    // Could not read the steps. The run and its conclusion are still known and
+    // still worth reporting, but WHY it failed was not measured, so this stays
+    // null and the message says so rather than picking the likelier story
+    // (L11). An unreadable answer and a measured one are different things.
+    ranAnySteps = null;
   }
 
   return { conclusion, at, ranAnySteps, refusal };
