@@ -74,6 +74,50 @@ describe("job watchdog workflow", () => {
    * permission is invisible because the code never attempts what it is not
    * meant to do (L503).
    */
+/**
+   * #1078. The record of what has already been announced survives between runs
+   * in the Actions cache, and this job EXITS NON ZERO whenever there is a
+   * finding, which is exactly the run whose record matters.
+   *
+   * So the save must be unconditional. A combined actions/cache step, or a
+   * save without always(), would write the file only after a run that found
+   * nothing, which has nothing to remember: the suppression would never once
+   * take effect and every unit test of it would still pass, because none of
+   * them can see this file (L3, L535).
+   */
+  it("saves the announcement record even when the run fails", () => {
+    const save = EXECUTABLE.slice(EXECUTABLE.indexOf("actions/cache/save"));
+    expect(save).toContain("actions/cache/save");
+
+    // always() must be on the save step, not merely present in the file.
+    const step = EXECUTABLE.slice(
+      EXECUTABLE.lastIndexOf("- name:", EXECUTABLE.indexOf("actions/cache/save")),
+      EXECUTABLE.indexOf("actions/cache/save") + 200,
+    );
+    expect(step).toMatch(/if:\s*always\(\)/);
+  });
+
+  it("restores the record before deciding whether to announce", () => {
+    expect(EXECUTABLE).toContain("actions/cache/restore");
+    // The restore has to come BEFORE the checker, or it reads nothing.
+    expect(EXECUTABLE.indexOf("actions/cache/restore")).toBeLessThan(
+      EXECUTABLE.indexOf("check-scheduled-jobs.ts"),
+    );
+    // And the save has to come after it, or it saves the pre-run file.
+    expect(EXECUTABLE.indexOf("actions/cache/save")).toBeGreaterThan(
+      EXECUTABLE.indexOf("check-scheduled-jobs.ts"),
+    );
+  });
+
+  /**
+   * A restore that only ever matched an exact key would miss every time, since
+   * the key carries this run's own id, and a permanent miss reads as a working
+   * suppression that simply never suppresses anything.
+   */
+  it("restores from a prefix, not only this run's own key", () => {
+    expect(EXECUTABLE).toContain("restore-keys:");
+  });
+
   it("grants nothing that writes", () => {
     expect(EXECUTABLE).not.toMatch(/contents:\s*write/);
     expect(EXECUTABLE).not.toMatch(/actions:\s*write/);

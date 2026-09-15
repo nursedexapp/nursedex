@@ -20,7 +20,12 @@
  * Usage:
  *   GITHUB_TOKEN=... GITHUB_REPOSITORY=owner/name npx tsx scripts/check-scheduled-jobs.ts
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import {
   attachHeartbeats,
@@ -31,6 +36,7 @@ import {
   runScheduledJobCheck,
   selfWorkflowSource,
   type ScheduledJob,
+  type AnnouncedState,
 } from "./scheduled-jobs";
 import { announce } from "./slack-alert";
 
@@ -119,6 +125,33 @@ async function loadVercelCronJobs(): Promise<ScheduledJob[]> {
   return attachHeartbeats(jobs, rows, budgets);
 }
 
+/**
+ * Where the record of what has already been announced lives (#1078).
+ *
+ * A plain file, restored and saved by actions/cache around this step. The
+ * cache was chosen over a stored row because it needs no new endpoint, no new
+ * secret and no new table, and because its failure mode is the right one: a
+ * miss means the alert is sent again, never that it is missed. The workflow
+ * runs daily at minimum, so the entry is read often enough never to be evicted
+ * for inactivity.
+ */
+const ANNOUNCED_PATH =
+  process.env.WATCHDOG_ANNOUNCED_PATH ?? ".watchdog-announced.json";
+
+async function readAnnounced(): Promise<AnnouncedState> {
+  // Absent is the ordinary first run and the ordinary cache miss, and it means
+  // nothing has been said, so the alert goes out. Only a file that EXISTS and
+  // cannot be parsed is worth complaining about, and it still throws rather
+  // than being read as an empty record, because runScheduledJobCheck logs that
+  // and announces, where a silent {} here would look like a clean read (L215).
+  if (!existsSync(ANNOUNCED_PATH)) return {};
+  return JSON.parse(readFileSync(ANNOUNCED_PATH, "utf8")) as AnnouncedState;
+}
+
+async function writeAnnounced(state: AnnouncedState): Promise<void> {
+  writeFileSync(ANNOUNCED_PATH, `${JSON.stringify(state, null, 2)}\n`);
+}
+
 async function main(): Promise<void> {
   const code = await runScheduledJobCheck({
     loadJobs,
@@ -126,6 +159,8 @@ async function main(): Promise<void> {
     token: process.env.SLACK_BOT_TOKEN,
     log: (message) => console.log(message),
     now: Date.now(),
+    readAnnounced,
+    writeAnnounced,
   });
 
   if (code !== 0) process.exit(code);

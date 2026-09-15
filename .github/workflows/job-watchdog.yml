@@ -120,6 +120,32 @@ jobs:
       - name: Install tsx
         uses: ./.github/actions/setup-tsx
 
+      # What was already announced, so an unchanged finding is not sent to
+      # Slack on every push to main (#1078). This fires on a daily cron AND on
+      # every completion of Production Smoke, which runs on every push, while
+      # an overdue finding stays true until the watched job's next scheduled
+      # run succeeds. For a weekly job that is up to six days of the identical
+      # message, rate limited by nothing but how often somebody pushed.
+      #
+      # restore and save are used SEPARATELY, rather than actions/cache, for
+      # one reason: this job exits non zero whenever there is a finding, which
+      # is exactly when there is something to remember. Relying on a combined
+      # action's own save-on-success behaviour would mean the record was only
+      # ever written on runs that found nothing, so the suppression would never
+      # once take effect while every test of it passed.
+      #
+      # A cache key is immutable, so each run writes its own and the prefix
+      # restores the newest. A miss restores nothing, which reads as "nothing
+      # has been said" and sends the alert: losing this costs one duplicate
+      # message and never a silence.
+      - name: Restore what has already been announced
+        uses: actions/cache/restore@v4
+        with:
+          path: .watchdog-announced.json
+          key: watchdog-announced-${{ github.run_id }}
+          restore-keys: |
+            watchdog-announced-
+
       # SLACK_BOT_TOKEN is optional and follows Production Smoke: without it the
       # failing job is the only signal, and the checker says so in the log
       # rather than skipping in silence.
@@ -132,3 +158,13 @@ jobs:
           # admin route: this reader needs to do nothing but read timestamps.
           HEARTBEAT_READ_SECRET: ${{ secrets.HEARTBEAT_READ_SECRET }}
         run: tsx scripts/check-scheduled-jobs.ts
+
+      # always(), because the step above exits 1 on a finding and that is the
+      # run whose record matters. Without this the file would be saved only
+      # after a clean run, which has nothing to remember.
+      - name: Save what has been announced
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .watchdog-announced.json
+          key: watchdog-announced-${{ github.run_id }}
