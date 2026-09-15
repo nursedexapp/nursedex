@@ -150,3 +150,31 @@ export function summariseStalePrs(stale: StalePr[], openCount: number): string {
     lines.join("\n\n")
   );
 }
+
+/**
+ * The Slack title for a reading, or null when Slack should not hear about it.
+ *
+ * #1079. This used to speak every week, quiet weeks included, so that silence
+ * could be told apart from the job having stopped. The Job Watchdog now
+ * answers that question for this workflow: it derives its watched set from the
+ * workflow files themselves rather than a hand kept list, so stale-prs.yml is
+ * covered without anybody adding it, and it is covered demonstrably, because
+ * on 2026-09-15 the watchdog was the thing that reported this job had never
+ * completed successfully on its schedule.
+ *
+ * It also answers it better. The watchdog knows this job's expected interval
+ * and speaks when it is late, where a weekly all clear relied on a person
+ * noticing an absence, which is not something people do.
+ *
+ * L98 is NOT being relaxed. L98 says a watcher that finds nothing must treat
+ * that as its own non success outcome rather than reporting green, and that is
+ * honoured where it matters: a failed read throws in check-stale-prs.ts, so
+ * "nothing stale" can never be said by a run that could not look. What goes is
+ * the announcement of a genuine quiet week, which is noise (L36). The full
+ * report is still printed to the run log on every run, so the reading itself
+ * is never suppressed, only its delivery to Slack.
+ */
+export function announcementTitle(staleCount: number): string | null {
+  if (staleCount === 0) return null;
+  return "Pull requests have been open for weeks";
+}

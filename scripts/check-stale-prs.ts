@@ -14,7 +14,12 @@
  *
  *   GITHUB_TOKEN=... GITHUB_REPOSITORY=owner/name npx tsx scripts/check-stale-prs.ts
  */
-import { selectStalePrs, summariseStalePrs, type PrRecord } from "./stale-prs";
+import {
+  selectStalePrs,
+  summariseStalePrs,
+  announcementTitle,
+  type PrRecord,
+} from "./stale-prs";
 import { announce } from "./slack-alert";
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "";
@@ -188,16 +193,18 @@ async function main(): Promise<void> {
   const stale = selectStalePrs(records, new Date());
   const report = summariseStalePrs(stale, pulls.length);
 
+  // Unconditional, so every run leaves its full reading in its own log even
+  // when Slack hears nothing. The suppression below is of the DELIVERY, never
+  // of the measurement.
   console.log(report);
 
-  // Said every week, including the weeks nothing is stale. A report that only
-  // speaks when it has something to say is indistinguishable from one that has
-  // stopped running (L98), and this one is cheap enough to be heard from.
+  // Null on a quiet week: the Job Watchdog is what reports this job having
+  // stopped, so an all clear here is noise (#1079). See announcementTitle.
+  const title = announcementTitle(stale.length);
+  if (title === null) return;
+
   await announce({
-    title:
-      stale.length === 0
-        ? "Open pull requests: nothing stale"
-        : "Pull requests have been open for weeks",
+    title,
     report,
     token: process.env.SLACK_BOT_TOKEN,
   });

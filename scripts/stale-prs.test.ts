@@ -5,6 +5,7 @@ import {
   classifyPr,
   selectStalePrs,
   summariseStalePrs,
+  announcementTitle,
   type PrRecord,
 } from "./stale-prs";
 
@@ -155,5 +156,27 @@ describe("a check that has not finished", () => {
     expect(running.failing).toBe(false);
     expect(running.note).toMatch(/still running/i);
     expect(running.note).not.toMatch(/passing/i);
+  });
+});
+
+describe("who hears about it", () => {
+  /**
+   * #1079. This used to post to Slack every week, quiet weeks included, so
+   * that silence could be told from the job having stopped. The Job Watchdog
+   * now answers that question for this workflow, deriving its watched set from
+   * the workflow files rather than a hand kept list, and it answers it better:
+   * it knows the expected interval and speaks when a job is late, where a
+   * weekly all clear relies on somebody noticing an absence.
+   *
+   * L98 is not what is being relaxed. A run that could not LOOK still fails,
+   * in check-stale-prs.ts, so "nothing stale" is never said by a read that
+   * fell over. What goes is the announcement of a genuine quiet week.
+   */
+  it("says nothing to Slack when no pull request is stale", () => {
+    expect(announcementTitle(0)).toBeNull();
+  });
+
+  it("speaks when at least one is stale", () => {
+    expect(announcementTitle(1)).toBe("Pull requests have been open for weeks");
   });
 });
