@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { IGNORED_BROWSER_ERRORS } from "@/lib/sentry/ignored-browser-errors";
 
 // Must be NEXT_PUBLIC_-prefixed to be inlined into the client bundle; a
 // bare SENTRY_DSN resolves to undefined in the browser and silently
@@ -14,10 +15,10 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
   integrations: [Sentry.replayIntegration()],
-  // These originate from the host app's own injected script (e.g. Instagram's
-  // in-app browser tearing down its native bridge on page unload), not our
-  // code, and aren't actionable (NURSEDEX-SITE-5).
-  ignoreErrors: [/Java object is gone/],
+  // Errors thrown by an in-app browser's own injected script, not our code.
+  // The list and the reasoning live beside it, with the behaviour asserted
+  // against Sentry's own filter.
+  ignoreErrors: IGNORED_BROWSER_ERRORS,
 });
 
 // Required by the SDK to instrument App Router navigations for tracing.
