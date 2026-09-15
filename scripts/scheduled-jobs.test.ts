@@ -1108,12 +1108,14 @@ describe("reading which state an overdue workflow is in", () => {
 });
 
 /**
- * #1078. The watchdog fires on a daily backstop cron AND on every completion
- * of Production Smoke, which runs on every push to main. An overdue finding
- * stays true until the watched job's next scheduled run succeeds, which for a
- * weekly job is up to six days, so the identical Slack message went out once
- * per merge for most of a week. Nothing rate limited it but how often the repo
- * was pushed to. L36 asks for deduped repeats.
+ * #1078. The watchdog reads about twice a day: its own backstop cron, and the
+ * completion of Production Smoke's SCHEDULED run. The push triggered ones are
+ * excluded by the job's own condition, added in #1024.
+ *
+ * An overdue finding stays true until the watched job's next scheduled run
+ * succeeds, which for a weekly job is up to six days, so one finding produced
+ * roughly a dozen identical Slack messages, none of them actionable any sooner
+ * than the first. L36 asks for deduped repeats.
  */
 describe("holding a finding that has not changed", () => {
   const NOW = Date.UTC(2026, 8, 15, 12, 0, 0);

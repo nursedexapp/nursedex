@@ -121,11 +121,12 @@ jobs:
         uses: ./.github/actions/setup-tsx
 
       # What was already announced, so an unchanged finding is not sent to
-      # Slack on every push to main (#1078). This fires on a daily cron AND on
-      # every completion of Production Smoke, which runs on every push, while
-      # an overdue finding stays true until the watched job's next scheduled
-      # run succeeds. For a weekly job that is up to six days of the identical
-      # message, rate limited by nothing but how often somebody pushed.
+      # Slack on every reading (#1078). This runs about twice a day: its own
+      # cron above, and the completion of Production Smoke's SCHEDULED run,
+      # the push triggered ones being excluded by the job condition above.
+      # An overdue finding stays true until the watched job's next scheduled
+      # run succeeds, which for a weekly job is up to six days, so roughly a
+      # dozen identical messages for one finding nobody can clear any sooner.
       #
       # restore and save are used SEPARATELY, rather than actions/cache, for
       # one reason: this job exits non zero whenever there is a finding, which

@@ -216,11 +216,11 @@ export function parseAnnouncedState(text: string): AnnouncedState {
 /**
  * Whether this reading is worth sending, and what to remember about it.
  *
- * The watchdog fires on a daily cron AND on every completion of Production
- * Smoke, which runs on every push to main. An overdue finding stays true until
- * the watched job's next scheduled run succeeds, so before this the identical
- * message went to Slack once per merge for up to six days, and the only thing
- * rate limiting it was how often somebody pushed (#1078, L36).
+ * The watchdog reads about twice a day: its own cron, and the completion of
+ * Production Smoke's SCHEDULED run. An overdue finding stays true until the
+ * watched job's next scheduled run succeeds, which for a weekly job is up to
+ * six days, so before this one finding produced roughly a dozen identical
+ * Slack messages, none of which anybody could act on any sooner (#1078, L36).
  *
  * Three things make it speak, and they are the three a reader would act on:
  * a finding nothing has reported before, a finding whose fingerprint changed
