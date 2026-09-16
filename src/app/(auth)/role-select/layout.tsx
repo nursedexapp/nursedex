@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireAuth } from "@/lib/auth/helpers";
 
 // role-select has no meaning for a signed-out visitor (it just picks the
@@ -9,6 +10,9 @@ export default async function RoleSelectLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireAuth();
+  const user = await requireAuth();
+  // A role cannot change once set, so for somebody who has one this screen
+  // can only fail (#1087). /dashboard routes every role onward from there.
+  if (user.role) redirect("/dashboard");
   return children;
 }
