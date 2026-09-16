@@ -11,6 +11,7 @@ import { captureServerEventAfterResponse } from "@/lib/analytics/server";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { PASSWORD, PASSWORD_RECOVERY } from "@/lib/constants";
 import { toTypedFailure } from "@/lib/db/results";
+import { isUniqueViolationOn } from "@/lib/db/postgres-errors";
 import {
   calculateCompleteness,
   NEW_PROFILE_COMPLETENESS_INPUT,
@@ -494,28 +495,42 @@ export async function selectRole(
     // Checked: the role is already written by now, so an unchecked failure
     // here leaves a nurse with a role and no profile row, and every screen
     // that reads the profile then behaves as though they do not exist.
-    const profileWrite = await toTypedFailure(
-      supabase.from("nurse_profiles").insert({
-        user_id: user.id,
-        slug: `${baseName}-${Date.now().toString(36)}`,
-        credential: "hha", // placeholder, updated during onboarding
-        // The score an empty profile already earns, not the column default
-        // of 0, so a nurse who stops here is not drift (#1063).
-        profile_completeness: calculateCompleteness(
-          NEW_PROFILE_COMPLETENESS_INPUT,
-        ).score,
-      }),
-      "the nurse profile row for a new nurse",
-    );
-    if (!profileWrite.ok) return { error: COULD_NOT_COMPLETE };
+    const profileInsert = await supabase.from("nurse_profiles").insert({
+      user_id: user.id,
+      slug: `${baseName}-${Date.now().toString(36)}`,
+      credential: "hha", // placeholder, updated during onboarding
+      // The score an empty profile already earns, not the column default
+      // of 0, so a nurse who stops here is not drift (#1063).
+      profile_completeness: calculateCompleteness(
+        NEW_PROFILE_COMPLETENESS_INPUT,
+      ).score,
+    });
+    // A duplicate on user_id means an earlier press already created the
+    // profile (the button offers a retry while the first is slow), so the
+    // work is done and the person carries on rather than seeing a failure.
+    if (
+      !isUniqueViolationOn(profileInsert.error, "nurse_profiles_user_id_key")
+    ) {
+      const profileWrite = await toTypedFailure(
+        profileInsert,
+        "the nurse profile row for a new nurse",
+      );
+      if (!profileWrite.ok) return { error: COULD_NOT_COMPLETE };
+    }
   } else {
-    const profileWrite = await toTypedFailure(
-      supabase.from("family_profiles").insert({
-        user_id: user.id,
-      }),
-      "the family profile row for a new family",
-    );
-    if (!profileWrite.ok) return { error: COULD_NOT_COMPLETE };
+    const profileInsert = await supabase.from("family_profiles").insert({
+      user_id: user.id,
+    });
+    // Same repeat as the nurse branch above.
+    if (
+      !isUniqueViolationOn(profileInsert.error, "family_profiles_user_id_key")
+    ) {
+      const profileWrite = await toTypedFailure(
+        profileInsert,
+        "the family profile row for a new family",
+      );
+      if (!profileWrite.ok) return { error: COULD_NOT_COMPLETE };
+    }
   }
 
   // Which of the two roles people pick is the single most useful fact the
