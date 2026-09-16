@@ -19,3 +19,18 @@ export function isUniqueViolation(
 ): boolean {
   return error?.code === UNIQUE_VIOLATION;
 }
+
+/**
+ * True when the duplicate was rejected by one NAMED constraint. A table can
+ * carry several unique keys, and only one of them may mean "already done":
+ * a nurse profile repeated on user_id is a repeat, one colliding on slug is not.
+ */
+export function isUniqueViolationOn(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+  constraint: string,
+): boolean {
+  return (
+    isUniqueViolation(error) &&
+    (error?.message ?? "").includes(`"${constraint}"`)
+  );
+}
