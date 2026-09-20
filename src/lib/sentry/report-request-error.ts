@@ -1,14 +1,19 @@
 export type RequestHeaders = NodeJS.Dict<string | string[]>;
 
 export type ReportDecision =
-  | { report: false; reason: string }
-  | { report: true; error: unknown };
+  { report: false; reason: string } | { report: true; error: unknown };
 
 /**
- * next@16.2.3 throws this for ANY multipart POST to ANY page route, not only
- * for a stale action id: `areAllActionIdsValid` returns false when the body
- * carries no `$ACTION_` field at all. Matched on the prefix because the rest
- * of the message is a docs link that can move between releases.
+ * next@16.3.4 throws this for ANY multipart POST to ANY page route, not only
+ * for a stale action id: `areAllActionIdsValid` (server/app-render/action-
+ * handler.js) returns `hasAtLeastOneAction`, false when the body carries no
+ * `$ACTION_` field at all, and both of its call sites throw on exactly that.
+ * Matched on the prefix because the rest of the message is a docs link that
+ * can move between releases.
+ *
+ * The browser side twin of this filter is IGNORED_BROWSER_ERRORS in
+ * ignored-browser-errors.ts, which cannot express this one: the discriminator
+ * here is a request header, which no browser event carries.
  */
 const ACTION_NOT_FOUND = "Failed to find Server Action";
 

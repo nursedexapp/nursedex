@@ -9,8 +9,8 @@ import { decideRequestErrorReport } from "./report-request-error";
  * sentry-alerts cron relayed to Slack at 10:45 PM.
  *
  * The error says deployment skew, and it is not: Skew Protection was on and
- * the release on every event was the build then live. next@16.2.3's
- * `areAllActionIdsValid` (server/app-render/action-handler.js:953) returns
+ * the release on every event was the build then live. next@16.3.4's
+ * `areAllActionIdsValid` (server/app-render/action-handler.js) returns
  * `hasAtLeastOneAction`, which is false when the body carries no `$ACTION_`
  * field at all, and its two call sites throw on exactly that. So ANY multipart
  * POST to ANY page route raises it, with no action id and nothing stale.
@@ -45,7 +45,7 @@ const forgedUpload = {
   "x-matched-path": "/",
 };
 
-// Verbatim from next@16.2.3, both throw sites.
+// Verbatim from next@16.3.4, both throw sites.
 const actionNotFound = () =>
   new Error(
     "Failed to find Server Action. This request might be from an older or newer deployment.\n" +
