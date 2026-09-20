@@ -27,6 +27,12 @@ import {
   fetchHeartbeatRows,
   selfWorkflowSource,
   loadGitHubWorkflowJobs,
+  type ScheduledJob,
+  type WatchdogResult,
+  type OverdueJob,
+  type AnnouncedState,
+  decideAnnouncement,
+  parseAnnouncedState,
 } from "./scheduled-jobs";
 
 const HOUR = 60 * 60 * 1000;
@@ -808,9 +814,12 @@ describe("loadGitHubWorkflowJobs", () => {
       selfSource: "job-watchdog.yml",
     });
 
+    // The JUDGING call, not every call: since #1041 each non-self workflow
+    // also gets a supplementary read of its last run whatever the conclusion,
+    // which deliberately carries no status filter. What this asserts is that
+    // the timestamp the check is judged on still comes from a successful run.
     const others = calls.filter((p) => !p.includes("job-watchdog.yml"));
-    expect(others.length).toBeGreaterThan(0);
-    for (const path of others) expect(path).toContain("status=success");
+    expect(others.filter((p) => p.includes("status=success")).length).toBe(1);
 
     const own = calls.filter((p) => p.includes("job-watchdog.yml"));
     expect(own.length).toBeGreaterThan(0);
@@ -850,5 +859,591 @@ describe("loadGitHubWorkflowJobs", () => {
     );
     expect(report).toContain("was last dispatched");
     expect(report).not.toContain("Job Watchdog (job-watchdog.yml) last succeeded");
+  });
+});
+
+/**
+ * #1041 and #1077. The overdue message used to offer the reader two
+ * possibilities and decline to choose between them, then recommend a remedy
+ * that cannot settle either.
+ *
+ * On 2026-09-15 it reported that Stale Pull Requests had never completed
+ * successfully. The cause was a third case the message does not name: both
+ * scheduled runs ever dispatched started and completed inside two seconds
+ * having executed no steps at all, carrying GitHub's own annotation that the
+ * job was not started because account payments had failed. GitHub accepted the
+ * schedule, dispatched the run, and refused to start the job. That is neither
+ * "the schedule stopped" nor "the job is broken and already alerting
+ * elsewhere", because a workflow with no failure alerting of its own produces
+ * a red run nobody has a reason to open.
+ */
+describe("which of the dispatch states an overdue job is in", () => {
+  const NOW = new Date("2026-09-15T12:00:00Z").getTime();
+
+  const weekly = (lastDispatch: ScheduledJob["lastDispatch"]): WatchdogResult =>
+    evaluateScheduledJobs({
+      jobs: [
+        {
+          name: "Stale Pull Requests",
+          source: "stale-prs.yml",
+          crons: ["0 7 * * 1"],
+          lastSuccessAt: null,
+          firstSeenAt: new Date(NOW - 30 * DAY).toISOString(),
+          lastDispatch,
+        },
+      ],
+      now: NOW,
+    });
+
+  it("says the schedule has stopped when nothing was dispatched at all", () => {
+    const report = formatWatchdogReport(weekly(null));
+
+    expect(report).toMatch(/not been dispatched|nothing.*dispatched/i);
+    // It must NOT accuse the job of being broken: nothing ran to be broken.
+    expect(report).not.toMatch(/refused to start/i);
+  });
+
+  it("sends the reader to the run log when a run executed and failed", () => {
+    const report = formatWatchdogReport(
+      weekly({
+        conclusion: "failure",
+        at: new Date(NOW - 1 * DAY).toISOString(),
+        ranAnySteps: true,
+        refusal: null,
+      }),
+    );
+
+    // The three claims that matter: it ran, it did not succeed, and the log
+    // is where the answer is. Not one spelling of them (L103).
+    expect(report).toMatch(/steps executed/i);
+    expect(report).toContain("failure");
+    expect(report).toMatch(/read that run's log/i);
+    expect(report).not.toMatch(/refused to start/i);
+  });
+
+  /**
+   * The state that cost a week. A refused run is indistinguishable from a
+   * failed one in every list (L276), so the message has to make the
+   * distinction the list cannot, and quote GitHub's own words for it: the
+   * remedy is on the billing account and nowhere near the job.
+   */
+  it("names a refusal, and quotes it, when the run executed no steps", () => {
+    const report = formatWatchdogReport(
+      weekly({
+        conclusion: "failure",
+        at: new Date(NOW - 1 * DAY).toISOString(),
+        ranAnySteps: false,
+        refusal:
+          "The job was not started because recent account payments have failed",
+      }),
+    );
+
+    expect(report).toMatch(/refused to start/i);
+    expect(report).toContain("recent account payments have failed");
+    // The reader must not be sent to read a log: a refused run has none.
+    expect(report).not.toMatch(/read that run's log/i);
+  });
+});
+
+describe("what the alert tells the reader to do about it", () => {
+  const NOW = new Date("2026-09-15T12:00:00Z").getTime();
+
+  /**
+   * #1077. The message used to end "re-run the job by hand to confirm it still
+   * works". A hand run cannot satisfy this check: every entry is queried with
+   * event=schedule, deliberately, because a hand run proves the script works
+   * and not that GitHub is still firing it. So the reader does exactly what the
+   * alert says, sees a green run, and the next reading reports the identical
+   * finding. Confirmed on 2026-09-15 by dispatching stale-prs.yml by hand.
+   *
+   * L36: never embed canned remediation text that can steer a diagnosis wrong.
+   */
+  it("says a hand run will not clear the check, when it suggests one", () => {
+    const report = formatWatchdogReport(
+      evaluateScheduledJobs({
+        jobs: [
+          {
+            name: "Stale Pull Requests",
+            source: "stale-prs.yml",
+            crons: ["0 7 * * 1"],
+            lastSuccessAt: null,
+            firstSeenAt: new Date(NOW - 30 * DAY).toISOString(),
+            lastDispatch: null,
+          },
+        ],
+        now: NOW,
+      }),
+    );
+
+    expect(report).toMatch(/by hand/i);
+    // The claim that matters: it proves the script, it does not clear this.
+    expect(report).toMatch(/will not clear|does not clear|cannot clear/i);
+    expect(report).toMatch(/scheduled run/i);
+  });
+});
+
+/**
+ * #1041, the reading side. The report can only name a dispatch state if
+ * something puts one there, and a feature that is built but not wired is not
+ * a feature (L3).
+ */
+describe("reading which state an overdue workflow is in", () => {
+  const NOW = Date.UTC(2026, 8, 15, 12, 0, 0);
+  const iso = (ms: number) => new Date(ms).toISOString();
+
+  const FILES = [
+    {
+      path: ".github/workflows/stale-prs.yml",
+      contents:
+        'name: Stale Pull Requests\non:\n  schedule:\n    - cron: "0 7 * * 1"\n',
+    },
+  ];
+
+  /**
+   * GitHub as it actually answered on 2026-09-15. No successful scheduled run
+   * has ever existed; the last one GitHub dispatched completed in two seconds
+   * with an empty steps list and a billing annotation.
+   */
+  function refusedApi() {
+    const calls: string[] = [];
+    return {
+      calls,
+      api: async <T,>(path: string): Promise<T> => {
+        calls.push(path);
+        // Order matters: the jobs URL is /actions/runs/<id>/jobs, so it also
+        // contains "/runs". A double that selects what it intercepts by
+        // pattern becomes no double at all when the pattern is too loose, and
+        // the test then measures the wrong call (L143).
+        if (path.includes("status=success")) return { workflow_runs: [] } as T;
+        if (path.includes("/annotations"))
+          return [
+            {
+              annotation_level: "failure",
+              message:
+                "The job was not started because recent account payments have failed",
+            },
+          ] as T;
+        if (path.endsWith("/jobs"))
+          return {
+            jobs: [{ id: 103994245503, conclusion: "failure", steps: [] }],
+          } as T;
+        if (path.includes("/runs"))
+          return {
+            workflow_runs: [
+              {
+                id: 34849707548,
+                conclusion: "failure",
+                updated_at: iso(NOW - 1 * DAY),
+              },
+            ],
+          } as T;
+        return { created_at: iso(NOW - 40 * DAY) } as T;
+      },
+    };
+  }
+
+  it("carries the refusal through to the report, quoted", async () => {
+    const { api } = refusedApi();
+
+    const jobs = await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: null,
+    });
+
+    expect(jobs[0].lastDispatch).toMatchObject({
+      ranAnySteps: false,
+      conclusion: "failure",
+    });
+
+    const report = formatWatchdogReport(
+      evaluateScheduledJobs({ jobs, now: NOW }),
+    );
+    expect(report).toMatch(/refused to start/i);
+    expect(report).toContain("recent account payments have failed");
+  });
+
+  /**
+   * A read that FAILED must not arrive as "nothing was dispatched", which is a
+   * finding with its own remedy. An unreadable answer and a dead schedule are
+   * different things and only one is fixed by re-enabling a schedule (L11).
+   */
+  it("does not report a failed annotation read as a job that never ran", async () => {
+    const api = async <T,>(path: string): Promise<T> => {
+      if (path.includes("status=success")) return { workflow_runs: [] } as T;
+      if (path.endsWith("/jobs")) throw new Error("GitHub API 502");
+      if (path.includes("/runs"))
+        return {
+          workflow_runs: [
+            { id: 1, conclusion: "failure", updated_at: iso(NOW - DAY) },
+          ],
+        } as T;
+      return { created_at: iso(NOW - 40 * DAY) } as T;
+    };
+
+    const jobs = await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: null,
+    });
+
+    // It knows a run exists. What it could not read is whether steps ran, and
+    // it must not answer that question by guessing in either direction.
+    expect(jobs[0].lastDispatch).not.toBeNull();
+    expect(jobs[0].lastDispatch?.conclusion).toBe("failure");
+    expect(jobs[0].lastDispatch?.ranAnySteps).toBeNull();
+
+    // And the message must not CLAIM steps ran, nor claim a refusal. It says
+    // it could not tell, and still sends the reader somewhere useful (L11).
+    const report = formatWatchdogReport(
+      evaluateScheduledJobs({ jobs, now: NOW }),
+    );
+    expect(report).not.toMatch(/steps executed/i);
+    expect(report).not.toMatch(/refused to start/i);
+    expect(report).toMatch(/could not be read/i);
+    expect(report).toMatch(/log/i);
+  });
+});
+
+/**
+ * #1078. The watchdog reads about twice a day: its own backstop cron, and the
+ * completion of Production Smoke's SCHEDULED run. The push triggered ones are
+ * excluded by the job's own condition, added in #1024.
+ *
+ * An overdue finding stays true until the watched job's next scheduled run
+ * succeeds, which for a weekly job is up to six days, so one finding produced
+ * roughly a dozen identical Slack messages, none of them actionable any sooner
+ * than the first. L36 asks for deduped repeats.
+ */
+describe("holding a finding that has not changed", () => {
+  const NOW = Date.UTC(2026, 8, 15, 12, 0, 0);
+  const WEEK = 7 * DAY;
+
+  const overdue = (over: Partial<OverdueJob> = {}): OverdueJob => ({
+    name: "Stale Pull Requests",
+    source: "stale-prs.yml",
+    ageMs: 30 * DAY,
+    intervalMs: WEEK,
+    neverRan: true,
+    measuredBy: "success",
+    ...over,
+  });
+
+  const seen = (jobs: OverdueJob[]): WatchdogResult => ({
+    checked: 2,
+    overdue: jobs,
+    nearBudget: [],
+  });
+
+  it("announces a finding nothing has said before", () => {
+    const decision = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    expect(decision.announce).toBe(true);
+    expect(decision.state["stale-prs.yml"]).toBeDefined();
+  });
+
+  it("holds the identical finding on the next run", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const second = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: first.state,
+      now: NOW + 5 * 60 * 1000,
+    });
+
+    expect(second.announce).toBe(false);
+  });
+
+  it("speaks again when the job's state changes under it", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue({ lastDispatch: null })]),
+      previous: {},
+      now: NOW,
+    });
+
+    // GitHub started dispatching again, and now the job itself is failing.
+    // That is a different problem with a different remedy, so it is not the
+    // same finding and must not be held (L11).
+    const second = decideAnnouncement({
+      result: seen([
+        overdue({
+          lastDispatch: {
+            conclusion: "failure",
+            at: new Date(NOW).toISOString(),
+            ranAnySteps: true,
+            refusal: null,
+          },
+        }),
+      ]),
+      previous: first.state,
+      now: NOW + HOUR,
+    });
+
+    expect(second.announce).toBe(true);
+  });
+
+  /**
+   * A suppression that cannot expire is the defect (L523). The floor comes
+   * from the job's OWN interval rather than a constant, so a weekly job is
+   * re-reported weekly and a daily one daily, derived from the same number the
+   * overdue verdict uses (L401). It can never become permanent, because the
+   * window always passes.
+   */
+  it("speaks again once the job's own window has passed with no fix", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const justBefore = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: first.state,
+      now: NOW + WEEK - HOUR,
+    });
+    expect(justBefore.announce).toBe(false);
+
+    const justAfter = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: first.state,
+      now: NOW + WEEK + HOUR,
+    });
+    expect(justAfter.announce).toBe(true);
+  });
+
+  it("forgets a job that recovered, so a relapse is announced", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const healthy = decideAnnouncement({
+      result: seen([]),
+      previous: first.state,
+      now: NOW + HOUR,
+    });
+    expect(healthy.state["stale-prs.yml"]).toBeUndefined();
+
+    const relapse = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: healthy.state,
+      now: NOW + 2 * HOUR,
+    });
+    expect(relapse.announce).toBe(true);
+  });
+
+  /**
+   * Losing the record must never lose the alert. An empty previous state is
+   * exactly what a cache miss looks like, and it has to read as "say it",
+   * never as "already said".
+   */
+  it("announces when the record is missing entirely", () => {
+    expect(
+      decideAnnouncement({
+        result: seen([overdue()]),
+        previous: {},
+        now: NOW,
+      }).announce,
+    ).toBe(true);
+  });
+
+  it("does not hold a second job because a first one was already reported", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const second = decideAnnouncement({
+      result: seen([
+        overdue(),
+        overdue({ name: "Third Party Health", source: "health-checks.yml" }),
+      ]),
+      previous: first.state,
+      now: NOW + HOUR,
+    });
+
+    expect(second.announce).toBe(true);
+  });
+
+  /**
+   * A near budget finding travels in the same message, so it must get the same
+   * treatment. Fingerprinting only the overdue list would let a brand new
+   * budget warning be swallowed by an unchanged overdue one (L582).
+   */
+  it("speaks again when a near budget finding appears beside an unchanged one", () => {
+    const first = decideAnnouncement({
+      result: seen([overdue()]),
+      previous: {},
+      now: NOW,
+    });
+
+    const second = decideAnnouncement({
+      result: {
+        checked: 2,
+        overdue: [overdue()],
+        nearBudget: [
+          {
+            name: "Weekly Digest",
+            source: "digest.yml",
+            lastDurationMs: 50_000,
+            maxDurationMs: 60_000,
+          },
+        ],
+      },
+      previous: first.state,
+      now: NOW + HOUR,
+    });
+
+    expect(second.announce).toBe(true);
+  });
+});
+
+/**
+ * #1078, the wiring. Holding the Slack delivery must not hold the READING or
+ * the exit code: the finding is still true, the run log still carries the full
+ * report, and the job still goes red. Only the repeated message is held.
+ */
+describe("runScheduledJobCheck with a record of what was already said", () => {
+  const NOW = Date.UTC(2026, 8, 15, 12, 0, 0);
+
+  const silentJob = () => ({
+    name: "Stale Pull Requests",
+    source: "stale-prs.yml",
+    crons: ["0 7 * * 1"],
+    lastSuccessAt: new Date(NOW - 40 * DAY).toISOString(),
+  });
+
+  function harness(previous: AnnouncedState) {
+    const posted: string[] = [];
+    const logged: string[] = [];
+    let saved: AnnouncedState | null = null;
+    return {
+      posted,
+      logged,
+      saved: () => saved,
+      run: () =>
+        runScheduledJobCheck({
+          loadJobs: async () => [silentJob()],
+          announceImpl: async ({ title }) => {
+            posted.push(title);
+          },
+          token: "xoxb-test",
+          log: (m) => logged.push(m),
+          now: NOW,
+          readAnnounced: async () => previous,
+          writeAnnounced: async (next) => {
+            saved = next;
+          },
+        }),
+    };
+  }
+
+  it("posts, records it, and exits non zero the first time", async () => {
+    const h = harness({});
+
+    expect(await h.run()).toBe(1);
+    expect(h.posted).toHaveLength(1);
+    expect(h.saved()?.["stale-prs.yml"]).toBeDefined();
+  });
+
+  it("holds the Slack post the second time, and still logs and still fails", async () => {
+    const first = harness({});
+    await first.run();
+    const recorded = first.saved();
+    expect(recorded).not.toBeNull();
+
+    const second = harness(recorded as AnnouncedState);
+    const code = await second.run();
+
+    // The delivery is held. The measurement is not.
+    expect(second.posted).toEqual([]);
+    expect(second.logged.join("\n")).toContain("Stale Pull Requests");
+    expect(code).toBe(1);
+  });
+
+  /**
+   * A cache miss must never read as "already said". Losing the record costs
+   * one duplicate message; treating absence as silence loses the alert.
+   */
+  it("posts when the record cannot be read at all", async () => {
+    const posted: string[] = [];
+    const code = await runScheduledJobCheck({
+      loadJobs: async () => [silentJob()],
+      announceImpl: async ({ title }) => {
+        posted.push(title);
+      },
+      token: "xoxb-test",
+      log: () => {},
+      now: NOW,
+      readAnnounced: async () => {
+        throw new Error("cache unavailable");
+      },
+      writeAnnounced: async () => {},
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(code).toBe(1);
+  });
+
+  /**
+   * The watchdog failing to RUN is not a finding about a job, and it has no
+   * fingerprint to hold. It must always speak: it is the state in which
+   * nothing at all is being watched.
+   */
+  it("never holds the could not run alert", async () => {
+    const posted: string[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      await runScheduledJobCheck({
+        loadJobs: async () => {
+          throw new Error("GitHub API 502");
+        },
+        announceImpl: async ({ title }) => {
+          posted.push(title);
+        },
+        token: "xoxb-test",
+        log: () => {},
+        now: NOW,
+        readAnnounced: async () => ({}),
+        writeAnnounced: async () => {},
+      });
+    }
+
+    expect(posted).toHaveLength(2);
+  });
+});
+
+/**
+ * #1078. JSON.parse SUCCEEDS on "null", "3" and "[]", so a corrupt record
+ * would reach the decision as a non object and throw on the first property
+ * read, outside the try that guards the read. A corrupt cache would then kill
+ * the watchdog outright, which is the one failure it must never have: nothing
+ * would be watching anything, and the cause would look nothing like the cache.
+ */
+describe("a record that parsed but is not a record", () => {
+  it("refuses a parsed value that is not an object", () => {
+    for (const bad of ["null", "3", '"text"', "[]"]) {
+      expect(() => parseAnnouncedState(bad)).toThrow(/record/i);
+    }
+  });
+
+  it("accepts an ordinary record, and an empty one", () => {
+    expect(parseAnnouncedState("{}")).toEqual({});
+    expect(
+      parseAnnouncedState(
+        '{"a.yml":{"key":"k","announcedAt":"2026-09-15T00:00:00Z","intervalMs":1}}',
+      ),
+    ).toHaveProperty("a.yml");
   });
 });

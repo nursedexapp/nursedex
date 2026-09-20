@@ -79,3 +79,7 @@ skills-lock.json
 # Vitest's transform and results caches. Set outside node_modules in #811 so
 # they survive npm ci; never committed.
 .vitest-cache/
+
+# The job watchdog record of what it has already announced (#1078). Lives in
+# the Actions cache between runs, never in the repository.
+.watchdog-announced.json

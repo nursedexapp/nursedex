@@ -62,6 +62,12 @@ jobs:
       # SLACK_BOT_TOKEN is optional and follows Production Smoke: without it the
       # run log is the only signal, and the checker says so rather than skipping
       # in silence.
+      #
+      # Slack hears from this ONLY when something is stale (#1079). The weekly
+      # all clear it used to post existed so silence could be told from the job
+      # having stopped, and the Job Watchdog now answers that, deriving its
+      # watched set from these workflow files rather than a hand kept list. The
+      # full report still goes to this run's log every time.
       - name: Report any pull request left waiting
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

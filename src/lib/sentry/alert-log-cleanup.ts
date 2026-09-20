@@ -75,13 +75,20 @@ export function planAlertLogCleanup(args: {
   // a healthy quiet run look like a refused one.
   if (logged.length === 0) return { deleting: [], skipped: null };
 
-  if (current.length === 0) {
+  // An empty fetch is the clearest signature of a read that saw less than
+  // reality, but only where an empty answer would be surprising. On a quiet
+  // project "nothing needs review" is the ordinary healthy state, so refusing
+  // it at every size made this branch fire on every run forever: the log could
+  // never be cleared, and the warning it raised could never clear either
+  // (#1057). The small-log allowance below already settles that question, and
+  // it settles it the same way here.
+  if (logged.length > CLEANUP_SMALL_LOG && current.length === 0) {
     return {
       deleting: [],
       skipped:
         `the fetch returned no issues at all while ${logged.length} are ` +
         "recorded, so every one of them would have looked resolved. An empty " +
-        "read cannot justify emptying the log.",
+        "read cannot justify emptying a log this size.",
     };
   }
 

@@ -19,6 +19,20 @@ updates:
         update-types:
           - minor
           - patch
+        # Held back on purpose, because each one breaks something its issue
+        # names. In the group they arrive hidden among twenty routine bumps,
+        # where nothing says why they were ever held (#1062). Kept OUT of the
+        # group rather than ignored: an ignore also suppresses Dependabot's
+        # security updates, and stripe is the payments library. Each now comes
+        # as its own PR, to close with a pointer to its issue. Remove an entry
+        # in the same change that fixes its issue.
+        exclude-patterns:
+          # #1014: moves the Stripe API version every live payment call sends.
+          - "stripe"
+          # #1015: 14 component test files fail to load, which reads as green.
+          - "@sentry/nextjs"
+          # #1016: a cancelled confirm dialog stays in the DOM.
+          - "happy-dom"
     labels:
       - dependencies
 

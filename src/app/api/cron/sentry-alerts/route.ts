@@ -33,6 +33,10 @@ export const maxDuration = 60;
  * look resolved, which empties the log and re-alerts everything on the next
  * run. Deleting nothing is always safe here; deleting wrongly costs the
  * channel.
+ *
+ * That refusal is bounded by size (#1057). On this project no issues needing
+ * review is the ordinary healthy state, so refusing every empty fetch meant a
+ * log that could never be cleared and a warning below that could never stop.
  */
 const handleSentryAlerts = withCronAlerting(
   "sentry-alerts",

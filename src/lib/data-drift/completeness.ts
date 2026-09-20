@@ -13,6 +13,8 @@
  * the monitor could then reassure somebody about a rule the repair does not
  * use.
  */
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { applyListedNurseFilter } from "@/lib/nurses/visibility";
 import {
   calculateCompleteness,
   COMPLETENESS_COLUMNS,
@@ -77,7 +79,8 @@ export function summarise(drift: DriftRow[]): string {
  * caller, because a value parsed straight into a comparison lands on the
  * permissive side when the parse fails: NaN compares unequal to everything,
  * and "*" or a missing header would otherwise become 0 and make an empty read
- * look complete.
+ * look complete. readAllZips reads through it; readScoredProfiles below takes
+ * the count from the client instead.
  */
 export function parseReportedTotal(contentRange: string | null): number | null {
   const total = contentRange?.split("/")[1];
@@ -87,23 +90,32 @@ export function parseReportedTotal(contentRange: string | null): number | null {
 }
 
 /**
- * Every scored profile, paged, and only when the whole roster arrived.
+ * Every nurse the directory lists, with her scored fields, paged, and only
+ * when the whole roster arrived.
+ *
+ * ONLY THE LISTED ONES. The stored score is read in one place, ordering the
+ * directory, so a nurse it does not list is ranked against nobody and a score
+ * on her that disagrees with the rule affects nobody. Judging every profile
+ * sent the weekly alert to a person for nurses who had simply not finished
+ * signing up (2026-09-14), which is expected and needs nobody. The population
+ * comes from applyListedNurseFilter itself, so this check and the directory
+ * cannot come to disagree about who is in it.
  *
  * PostgREST caps a select at a page and returns a healthy looking prefix, so
  * an unbounded read would judge the first page and silently ignore the rest.
  * A short page ends the loop, which is also exactly what a truncated read
  * looks like, so the total is checked against the count the server reports: a
  * monitor that quietly covered half the roster would report a clean result and
- * leave the other half wrong, which is the failure it exists to find.
+ * leave the other half wrong, which is the failure it exists to find. The
+ * order is fixed so a row cannot move between pages and be read twice or not
+ * at all.
  *
- * The fetch is an argument for the same reason it is in readAllZips: the part
- * that decides whether the list is complete is the part most worth testing,
- * and a function that builds its own client cannot be.
+ * The client is an argument: the part that decides whether the list is
+ * complete is the part most worth testing, and a function that builds its own
+ * client cannot be.
  */
 export async function readScoredProfiles(deps: {
-  fetchFn: typeof fetch;
-  url: string;
-  headers: Record<string, string>;
+  client: SupabaseClient;
   pageSize?: number;
 }): Promise<ScoredRow[]> {
   const pageSize = deps.pageSize ?? 500;
@@ -111,23 +123,33 @@ export async function readScoredProfiles(deps: {
   let reportedTotal: number | null = null;
 
   for (let from = 0; ; from += pageSize) {
-    const res = await deps.fetchFn(
-      `${deps.url}/rest/v1/nurse_profiles?select=user_id,profile_completeness,${encodeURIComponent(COMPLETENESS_COLUMNS)}`,
-      {
-        headers: {
-          ...deps.headers,
-          Range: `${from}-${from + pageSize - 1}`,
-          Prefer: "count=exact",
-        },
-      },
+    // Inner, because the owner conditions the listing rule applies live on
+    // the users row; a left embed would count a deleted or suspended owner.
+    const query = applyListedNurseFilter(
+      deps.client
+        .from("nurse_profiles")
+        .select(
+          `user_id, profile_completeness, ${COMPLETENESS_COLUMNS}, users!inner(is_deleted, is_suspended)`,
+          { count: "exact" },
+        ),
     );
-    if (!res.ok) {
-      throw new Error(`Read failed: ${res.status} ${await res.text()}`);
+    const { data, error, count } = await query
+      .order("user_id")
+      .range(from, from + pageSize - 1);
+
+    if (error) throw new Error(`Read failed: ${error.message}`);
+    // A read that succeeded without a count, or without rows, is an absence of
+    // measurement, and treating either as zero would read as a real answer.
+    if (count === null || count === undefined) {
+      throw new Error(
+        "The server did not report how many profiles there are, so a short read could not be told from a complete one.",
+      );
     }
-    if (reportedTotal === null) {
-      reportedTotal = parseReportedTotal(res.headers.get("content-range"));
+    if (!data) {
+      throw new Error("The read succeeded but returned no rows at all.");
     }
-    const page = (await res.json()) as ScoredRow[];
+    reportedTotal ??= count;
+    const page = data as unknown as ScoredRow[];
     rows.push(...page);
     if (page.length < pageSize) break;
   }

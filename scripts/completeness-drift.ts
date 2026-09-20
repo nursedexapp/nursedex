@@ -26,6 +26,7 @@ export {
   type DriftRow,
   type ScoredRow,
 } from "../src/lib/data-drift/completeness";
+import { createClient } from "@supabase/supabase-js";
 import {
   rowsNeedingRepair,
   summarise,
@@ -45,11 +46,13 @@ async function main(): Promise<void> {
 
   // Paged, and only when the whole roster arrived: the reader refuses a short
   // read rather than repairing a prefix. It lives in src alongside the rule,
-  // so the monitor and the repair cannot read different populations.
-  const rows = await readScoredProfiles({ fetchFn: fetch, url, headers });
+  // so the monitor and the repair cannot read different populations, and both
+  // judge only the nurses the directory lists.
+  const client = createClient(url, key, { auth: { persistSession: false } });
+  const rows = await readScoredProfiles({ client });
 
   const drift = rowsNeedingRepair(rows);
-  console.log(`Examined ${rows.length} profiles.`);
+  console.log(`Examined ${rows.length} listed nurses.`);
   console.log(summarise(drift));
 
   if (!apply) {

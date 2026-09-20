@@ -59,14 +59,26 @@ export const RANKING_CRITERIA = [
 ] as const;
 
 /**
- * The order once a family has entered a zip. Distance leads, and the paid
- * placement is protected only within range, so a Featured nurse three hours
- * away does not sit above a local one (#723).
+ * The order once a family has entered a zip.
+ *
+ * The paid placement leads, and it is protected only within range, so a
+ * Featured nurse three hours away does not sit above a local one (#723).
+ * Distance decides everything Featured does not.
+ *
+ * This list used to open with "the closest nurses", which is what a family was
+ * told and not what the code did: `rankingScore` has put a Featured nurse
+ * inside the radius above a closer free one since #723, so somebody promised
+ * nearest first could be shown a nurse 20 miles away above one 2 miles away
+ * (#966). The ranking is the paid product working exactly as /pricing sells
+ * it ("Top placement in search results"), so the sentence moved rather than
+ * the order. The list mirrors the tuple in `rankingScore`, in its order, and
+ * a test in this module's suite ranks two real nurses to prove the phrase
+ * named first is the criterion that actually wins.
  */
 export const DISTANCE_RANKING_CRITERIA = [
-  { phrase: "the closest nurses", conditional: false },
   { phrase: "featured nurses near you", conditional: false },
   { phrase: "nurses whose name matches your search", conditional: true },
+  { phrase: "the closest nurses", conditional: false },
   { phrase: "more complete profiles", conditional: false },
 ] as const;
 

@@ -60,6 +60,12 @@ vi.mock("@/lib/data-drift/zips", async (importOriginal) => ({
   },
 }));
 
+// The profile read is stood in for above; this only keeps `server-only` out of
+// the import graph, which vitest cannot resolve.
+vi.mock("@/lib/supabase/service-role", () => ({
+  createServiceRoleClient: vi.fn(() => ({})),
+}));
+
 vi.mock("@/lib/slack/client", () => ({
   ALERTS_CHANNEL_ID: "C-alerts",
   slackPost: h.slackPost,
@@ -167,6 +173,9 @@ describe("the data drift cron", () => {
     expect(body.completeness).toMatchObject({ examined: 2, drifted: 1 });
     expect(h.calls.slack).toHaveLength(1);
     expect(JSON.stringify(h.calls.slack[0])).toContain("scored above");
+    // The count is out of the listed nurses, not every profile, so the reader
+    // is not led to count unfinished signups it was never shown.
+    expect(JSON.stringify(h.calls.slack[0])).toContain("1 of 2 listed nurses");
   });
 
   it("alerts when a zip is far from where that zip really is", async () => {
