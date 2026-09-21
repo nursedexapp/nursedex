@@ -41,5 +41,20 @@ export const onRequestError: Instrumentation.onRequestError = (
     return;
   }
 
-  Sentry.captureRequestError(decision.error, request, context);
+  const { error: reported, level } = decision;
+
+  if (!level) {
+    Sentry.captureRequestError(reported, request, context);
+    return;
+  }
+
+  // Reported, but below the level src/lib/sentry/issues.ts selects on
+  // (`level:[error,fatal]`), so it lands in Sentry without paging anyone.
+  // captureRequestError forks the scope again internally; a forked scope
+  // inherits the level, which src/instrumentation-level.test.ts asserts on the
+  // finished event rather than on the call.
+  Sentry.withScope((scope) => {
+    scope.setLevel(level);
+    Sentry.captureRequestError(reported, request, context);
+  });
 };

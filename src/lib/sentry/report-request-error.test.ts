@@ -89,33 +89,20 @@ describe("a request that no browser on this site sent", () => {
   });
 });
 
-describe("a page on this site posting an action id the build no longer has", () => {
-  it("reports it, because that is real deployment skew", () => {
+// Renamed from "a page on this site posting an action id the build no longer
+// has". That framing was the reversed decision, not a passing detail: the
+// block below only ever established that the request carries a same-origin
+// Origin header, which the SITE-11 curl POSTs also carried. What it asserts is
+// that such a request is still REPORTED (at warning, asserted further down),
+// on every deployment shape.
+describe("an action POST whose Origin claims this site", () => {
+  it("reports it rather than dropping it", () => {
     const decision = decideRequestErrorReport(actionNotFound(), {
       ...forgedUpload,
       origin: "https://nursedex.com",
     });
 
     expect(decision.report).toBe(true);
-  });
-
-  it("reports it under a message that names the stale page rather than repeating Next's guess", () => {
-    const skew = actionNotFound();
-
-    const decision = decideRequestErrorReport(skew, {
-      ...forgedUpload,
-      origin: "https://nursedex.com",
-    });
-
-    // The Slack alert carries the issue title and nothing else, so the title
-    // is the only place this can be told apart from the forged case (L11).
-    const reported = decision.report === true ? decision.error : null;
-    expect(reported).toBeInstanceOf(Error);
-    expect((reported as Error).message).toMatch(
-      /loaded before the current deployment/i,
-    );
-    expect((reported as Error).message).not.toEqual(skew.message);
-    expect((reported as Error).cause).toBe(skew);
   });
 
   it("reports it on a preview deployment, which is not the canonical host", () => {
@@ -145,5 +132,77 @@ describe("a page on this site posting an action id the build no longer has", () 
     });
 
     expect(decision.report).toBe(true);
+  });
+});
+
+/**
+ * The Origin check above is not a check that a browser on our page sent the
+ * request. Origin is a request header, so it is one `curl -H` away, and on
+ * 2026-09-20 two multipart POSTs arrived at https://nursedex.com/?probe=... at
+ * 14:36 and 15:19 UTC carrying `Origin: https://nursedex.com` and
+ * `User-Agent: curl/8.7.1`. They were filed as NURSEDEX-SITE-11 under the
+ * title claiming a page of this site posted them, and relayed to Slack.
+ *
+ * Two things follow, both read from next@16.3.4's action-handler.js:
+ *
+ * 1. A stale tab with JavaScript never reaches this code. `isFetchAction`
+ *    requests go to `handleUnrecognizedFetchAction`, which console.warns, sets
+ *    NEXT_ACTION_NOT_FOUND_HEADER and returns a 404 the client router turns
+ *    into a reload. It does not throw, so it never reaches onRequestError.
+ *    Both throw sites (lines 589 and 743) sit in the `else` branch: a
+ *    multipart POST that is NOT a fetch action.
+ *
+ * 2. So the only genuine case left is a no-JS MPA form post from a page older
+ *    than the deployment, and NOTHING in an HTTP request separates that from a
+ *    forged one, because every byte of it is sender controlled.
+ *
+ * An error nobody can attribute and anybody can mint must not page us (L36),
+ * and the message may claim only what the check measured (L11). It is reported
+ * at `warning` instead: the sentry-alerts cron queries
+ * `is:for_review level:[error,fatal]`, so warning stays visible in Sentry and
+ * out of Slack.
+ */
+describe("a multipart POST naming no live Server Action", () => {
+  const sameOrigin = { ...forgedUpload, origin: "https://nursedex.com" };
+
+  it("reports it at warning, which the Slack alert query does not select", () => {
+    const decision = decideRequestErrorReport(actionNotFound(), sameOrigin);
+
+    expect(decision.report === true && decision.level).toBe("warning");
+  });
+
+  it("does not claim the poster was a page of this site, which Origin cannot show", () => {
+    const decision = decideRequestErrorReport(actionNotFound(), sameOrigin);
+
+    const message =
+      decision.report === true ? (decision.error as Error).message : "";
+    expect(message).not.toMatch(/posted by a page of this site/i);
+  });
+
+  it("names the forgeable header in the message, so the title carries its own caveat", () => {
+    const decision = decideRequestErrorReport(actionNotFound(), sameOrigin);
+
+    const message =
+      decision.report === true ? (decision.error as Error).message : "";
+    expect(message).toMatch(/origin/i);
+  });
+
+  it("keeps the original Next error as the cause", () => {
+    const skew = actionNotFound();
+
+    const decision = decideRequestErrorReport(skew, sameOrigin);
+
+    expect(decision.report === true && (decision.error as Error).cause).toBe(
+      skew,
+    );
+  });
+
+  it("leaves every other error at its default level, so real crashes still page us", () => {
+    const decision = decideRequestErrorReport(
+      new Error("Supabase read failed"),
+      sameOrigin,
+    );
+
+    expect(decision.report === true && decision.level).toBeUndefined();
   });
 });

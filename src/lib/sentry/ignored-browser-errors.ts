@@ -26,3 +26,26 @@ export const IGNORED_BROWSER_ERRORS: RegExp[] = [
   /window\.webkit\.messageHandlers/,
   /Java object is gone/,
 ];
+
+/**
+ * Frame locations that cannot be ours, matched against the URL the THROWING
+ * frame was loaded from rather than against the message.
+ *
+ * NURSEDEX-SITE-12 arrived as `SyntaxError: Unexpected end of input` with a
+ * one frame stack, `app://iab_inner_frame_ota:38:42`, from Facebook 578.0.0 on
+ * an Android Galaxy A14. "iab" is the in-app browser and `app://` is the
+ * scheme it serves its own injected frame from.
+ *
+ * This needs its own mechanism because IGNORED_BROWSER_ERRORS keys on the
+ * message and that message is one WE can legitimately produce: a JSON.parse of
+ * a truncated response says exactly this. Matching it by text would discard
+ * real crashes. Nothing we serve is on `app://` (our bundle, Cloudflare
+ * Turnstile and PostHog are all https), so the scheme separates them and the
+ * message never has to.
+ *
+ * Sentry reads this against the LAST valid frame (`_getLastValidUrl` in
+ * @sentry/core's eventFilters), which is the frame that threw. An error thrown
+ * by our code but CALLED from the host app's script therefore still reports,
+ * which is the side to err on (L648).
+ */
+export const IGNORED_BROWSER_FRAME_URLS: RegExp[] = [/^app:\/\//];

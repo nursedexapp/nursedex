@@ -1,7 +1,8 @@
 export type RequestHeaders = NodeJS.Dict<string | string[]>;
 
 export type ReportDecision =
-  { report: false; reason: string } | { report: true; error: unknown };
+  | { report: false; reason: string }
+  | { report: true; error: unknown; level?: "warning" };
 
 /**
  * next@16.3.4 throws this for ANY multipart POST to ANY page route, not only
@@ -48,16 +49,35 @@ function isSameOrigin(headers: RequestHeaders): boolean {
 /**
  * Whether a Next.js request error is worth reporting, and as what.
  *
- * The one class filtered here is the action-not-found error arriving from
- * something that is not a page of this site (NURSEDEX-SITE-10: seven forged
- * multipart POSTs at the homepage from a rented server, each one an unhandled
- * 500, a Sentry event and a Slack alert). Left unfiltered, anyone with curl
- * owns the alerts channel and the Sentry quota.
+ * The one class handled specially here is the action-not-found error, and
+ * NEITHER of its outcomes is "a real crash".
  *
- * The same error from our own page is the genuine article, a person whose tab
- * predates the running deployment, and it is reported. It is reported under a
- * message of our own because the Slack alert carries only the issue title, so
- * the title is the only place the two cases can be told apart (L11).
+ * A stale tab with JavaScript never reaches this code. In next@16.3.4 a fetch
+ * action whose id is gone goes to `handleUnrecognizedFetchAction`, which sets
+ * NEXT_ACTION_NOT_FOUND_HEADER and returns a 404 the client router turns into
+ * a reload, without throwing. Both throw sites for this message sit in the
+ * branch for a multipart POST that is NOT a fetch action. So what arrives here
+ * is either a no-JS form post from a page older than the deployment, or junk,
+ * and no header can separate them: every byte of a request is sender
+ * controlled.
+ *
+ * So:
+ *
+ * - No same-origin Origin header: dropped. NURSEDEX-SITE-10 was seven forged
+ *   multipart POSTs at the homepage from a rented server, each one an
+ *   unhandled 500, a Sentry event and a Slack alert. This still costs a
+ *   stranger nothing but one more curl flag, which is the point below.
+ *
+ * - Origin of this site: reported at `warning`, not error. NURSEDEX-SITE-11
+ *   was two curl POSTs to `/?probe=...` on 2026-09-20 that simply SET that
+ *   header, and were filed and relayed to Slack as genuine deployment skew.
+ *   The sentry-alerts cron selects `level:[error,fatal]`, so warning keeps the
+ *   volume visible in Sentry while taking the alert away from anyone with
+ *   curl (L36).
+ *
+ * The message says Origin claimed this site rather than asserting a stale page
+ * posted it, because the claim a check makes may not exceed what it measured
+ * (L11), and this one measures a header the sender chose.
  */
 export function decideRequestErrorReport(
   error: unknown,
@@ -78,8 +98,9 @@ export function decideRequestErrorReport(
 
   return {
     report: true,
+    level: "warning",
     error: new Error(
-      "Server Action id not found, posted by a page of this site that was loaded before the current deployment",
+      "Multipart POST naming no live Server Action, Origin claims this site (a forgeable header, so not proof of deployment skew)",
       { cause: error },
     ),
   };

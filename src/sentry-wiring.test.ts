@@ -23,9 +23,9 @@ describe("Sentry wiring (#394, #395, #400)", () => {
   });
 
   it("has an instrumentation-client.ts that reads a NEXT_PUBLIC Sentry DSN", () => {
-    expect(existsSync(path.resolve(root, "src/instrumentation-client.ts"))).toBe(
-      true,
-    );
+    expect(
+      existsSync(path.resolve(root, "src/instrumentation-client.ts")),
+    ).toBe(true);
     const source = read("src/instrumentation-client.ts");
     expect(source).toMatch(/NEXT_PUBLIC_SENTRY_DSN/);
   });
@@ -60,7 +60,15 @@ describe("Sentry wiring (#394, #395, #400)", () => {
     const source = read("src/instrumentation-client.ts");
     expect(source).toMatch(/ignoreErrors:\s*IGNORED_BROWSER_ERRORS/);
     expect(source).toMatch(
-      /import\s*\{\s*IGNORED_BROWSER_ERRORS\s*\}\s*from\s*"@\/lib\/sentry\/ignored-browser-errors"/,
+      /import\s*\{[^}]*\bIGNORED_BROWSER_ERRORS\b[^}]*\}\s*from\s*"@\/lib\/sentry\/ignored-browser-errors"/,
     );
+  });
+
+  // Same split as above: that the app:// frames are really discarded is
+  // asserted against Sentry's own filter in ignored-browser-errors.test.ts.
+  // A deny list that never reaches Sentry.init drops nothing (L3).
+  it("hands the in-app browser frame deny list to Sentry (NURSEDEX-SITE-12)", () => {
+    const source = read("src/instrumentation-client.ts");
+    expect(source).toMatch(/denyUrls:\s*IGNORED_BROWSER_FRAME_URLS/);
   });
 });
