@@ -38,8 +38,7 @@ describe("getIssuesNeedingReview", () => {
       "/api/0/projects/nursedex/nursedex-site/issues/",
     );
     expect(parsed.searchParams.get("query")).toBe(
-      "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook " +
-        "!action:unattributable-post",
+      "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook",
     );
     expect((init?.headers as Record<string, string>).Authorization).toBe(
       "Bearer test-token",

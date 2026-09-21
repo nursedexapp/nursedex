@@ -1,10 +1,7 @@
-import { UNATTRIBUTABLE_POST, type AlertTag } from "./alert-tags";
-
 export type RequestHeaders = NodeJS.Dict<string | string[]>;
 
 export type ReportDecision =
-  | { report: false; reason: string }
-  | { report: true; error: unknown; level?: "warning"; tag?: AlertTag };
+  { report: false; reason: string } | { report: true; error: unknown };
 
 /**
  * next@16.3.4 throws this for ANY multipart POST to ANY page route, not only
@@ -49,42 +46,34 @@ function isSameOrigin(headers: RequestHeaders): boolean {
 }
 
 /**
- * Whether a Next.js request error is worth reporting, and as what.
+ * Whether a Next.js request error is worth reporting.
  *
- * The one class handled specially here is the action-not-found error, and
- * NEITHER of its outcomes is "a real crash".
+ * One class is dropped: the action-not-found error. It is unattributable,
+ * unactionable, and anyone with curl can mint it, so it must never reach
+ * Sentry or the Slack relay (L36).
  *
- * A stale tab with JavaScript never reaches this code. In next@16.3.4 a fetch
- * action whose id is gone goes to `handleUnrecognizedFetchAction`, which sets
- * NEXT_ACTION_NOT_FOUND_HEADER and returns a 404 the client router turns into
- * a reload, without throwing. Both throw sites for this message sit in the
- * branch for a multipart POST that is NOT a fetch action. So what arrives here
- * is either a no-JS form post from a page older than the deployment, or junk,
- * and no header can separate them: every byte of a request is sender
- * controlled.
+ * Unattributable. A stale tab WITH JavaScript never reaches this code. In
+ * next@16.3.4 a fetch action whose id is gone goes to
+ * `handleUnrecognizedFetchAction`, which sets NEXT_ACTION_NOT_FOUND_HEADER and
+ * returns a 404 the client router turns into a reload, without throwing. Both
+ * throw sites for this message sit in the branch for a multipart POST that is
+ * NOT a fetch action. So what arrives is a no-JS form post from a page older
+ * than the deployment, or junk, and no header separates them: every byte of a
+ * request is chosen by the sender. The Origin header least of all, which
+ * NURSEDEX-SITE-11 demonstrated: two `curl/8.7.1` POSTs simply set it and were
+ * relayed to Slack as genuine deployment skew.
  *
- * So:
+ * Why it is DROPPED rather than reported quietly. #1098 lowered it to
+ * `warning`, because the sentry-alerts cron selects `level:[error,fatal]`.
+ * That did not work, measured at production on 2026-09-21: Sentry groups on
+ * the stack trace, so the warning event joined the existing issue, and
+ * Sentry's issue search matches a GROUP when ANY event in it carries the
+ * value. A group that has ever held an error answers `level:[error,fatal]` for
+ * ever, and rewording the message does not start a fresh group.
  *
- * - No same-origin Origin header: dropped. NURSEDEX-SITE-10 was seven forged
- *   multipart POSTs at the homepage from a rented server, each one an
- *   unhandled 500, a Sentry event and a Slack alert. This still costs a
- *   stranger nothing but one more curl flag, which is the point below.
- *
- * - Origin of this site: reported, but TAGGED so the sentry-alerts cron
- *   excludes it, and at `warning` because that is what it is.
- *   NURSEDEX-SITE-11 was two curl POSTs to `/?probe=...` on 2026-09-20 that
- *   simply SET that header, and were filed and relayed to Slack as genuine
- *   deployment skew. It stays visible in Sentry and pages nobody (L36).
- *
- *   The TAG is the load bearing half, not the level. A probe at production on
- *   2026-09-21 showed Sentry's issue search matches a GROUP when ANY event in
- *   it carries the value, so the SITE-11 group, holding error events from
- *   before this filter existed, answers `level:[error,fatal]` for ever.
- *   See alert-tags.ts.
- *
- * The message says Origin claimed this site rather than asserting a stale page
- * posted it, because the claim a check makes may not exceed what it measured
- * (L11), and this one measures a header the sender chose.
+ * The reason still names whether the sender claimed our Origin. It decides
+ * nothing here, and it is kept because it is the one thing worth counting
+ * about this traffic (#1091), not because it distinguishes a real case.
  */
 export function decideRequestErrorReport(
   error: unknown,
@@ -95,21 +84,10 @@ export function decideRequestErrorReport(
 
   if (!isActionNotFound) return { report: true, error };
 
-  if (!isSameOrigin(headers)) {
-    return {
-      report: false,
-      reason:
-        "a Server Action POST with no Origin of this site, which no browser on a page of ours sends",
-    };
-  }
-
   return {
-    report: true,
-    level: "warning",
-    tag: UNATTRIBUTABLE_POST,
-    error: new Error(
-      "Multipart POST naming no live Server Action, Origin claims this site (a forgeable header, so not proof of deployment skew)",
-      { cause: error },
-    ),
+    report: false,
+    reason: isSameOrigin(headers)
+      ? "a multipart POST naming no live Server Action, sent with an Origin of this site, which is forgeable and so is not evidence of deployment skew"
+      : "a multipart POST naming no live Server Action, sent with no Origin of this site",
   };
 }

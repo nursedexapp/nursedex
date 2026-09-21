@@ -1,14 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const scope = { setLevel: vi.fn(), setTag: vi.fn() };
-vi.mock("@sentry/nextjs", () => ({
-  captureRequestError: vi.fn(),
-  // Real in the SDK, so it must exist here or the level branch throws. What
-  // the level does to the finished event is asserted against the real SDK in
-  // src/instrumentation-level.test.ts; a mocked scope can only show the call.
-  withScope: vi.fn((run: (s: typeof scope) => void) => run(scope)),
-}));
+vi.mock("@sentry/nextjs", () => ({ captureRequestError: vi.fn() }));
 
 import * as Sentry from "@sentry/nextjs";
 import { onRequestError } from "./instrumentation";
@@ -49,8 +42,6 @@ const actionNotFound = () =>
 
 beforeEach(() => {
   captureRequestError.mockClear();
-  scope.setLevel.mockClear();
-  scope.setTag.mockClear();
 });
 
 describe("the Next.js request error hook", () => {
@@ -60,39 +51,14 @@ describe("the Next.js request error hook", () => {
     expect(captureRequestError).not.toHaveBeenCalled();
   });
 
-  it("sends the renamed error to Sentry when the Origin claims this site", () => {
-    const original = actionNotFound();
-
-    onRequestError(
-      original,
-      request({ ...forgedUpload, origin: "https://nursedex.com" }),
-      context,
-    );
-
-    expect(captureRequestError).toHaveBeenCalledTimes(1);
-    const [reported] = captureRequestError.mock.calls[0];
-    expect(reported).toBeInstanceOf(Error);
-    expect((reported as Error).cause).toBe(original);
-  });
-
-  it("lowers that one to warning, so it cannot reach the Slack relay", () => {
+  it("sends nothing to Sentry when the Origin claims this site either", () => {
     onRequestError(
       actionNotFound(),
       request({ ...forgedUpload, origin: "https://nursedex.com" }),
       context,
     );
 
-    expect(scope.setLevel).toHaveBeenCalledWith("warning");
-  });
-
-  it("does not lower an ordinary crash, which must still reach Slack", () => {
-    onRequestError(
-      new Error("Supabase read failed"),
-      request(forgedUpload),
-      context,
-    );
-
-    expect(scope.setLevel).not.toHaveBeenCalled();
+    expect(captureRequestError).not.toHaveBeenCalled();
   });
 
   it("passes every other error straight through, with its request and context", () => {

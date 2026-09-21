@@ -1,7 +1,5 @@
 import "server-only";
 
-import { UNATTRIBUTABLE_POST } from "./alert-tags";
-
 // Sentry's free plan has no native Slack/webhook alerting (that requires
 // the paid Team tier, confirmed by the "Alert Rule Action" toggle being
 // locked on a Custom Integration's webhook config on this account). This
@@ -11,11 +9,14 @@ import { UNATTRIBUTABLE_POST } from "./alert-tags";
 // shows up. Cron/Stripe-webhook failures already alert via
 // src/lib/cron/alerting.ts / the Stripe webhook route, so they're
 // excluded here by the same tags those call sites set.
+// If a class of event ever needs keeping out of this relay, exclude it by TAG
+// as cron and stripe-webhook are, never by level. Measured on 2026-09-21:
+// Sentry's issue search matches a GROUP when ANY event in it carries the
+// value, so an issue that has ever held an error answers `level:[error,fatal]`
+// for ever, and grouping keys on the stack trace, so rewording a message does
+// not start a fresh group either.
 export const NEEDS_REVIEW_QUERY =
-  "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook " +
-  // Built from the same constant the reporter tags the event with, so the two
-  // cannot drift apart (L41). Level alone cannot do this job: see alert-tags.ts.
-  `!${UNATTRIBUTABLE_POST.key}:${UNATTRIBUTABLE_POST.value}`;
+  "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook";
 
 const API = "https://sentry.io/api/0";
 
