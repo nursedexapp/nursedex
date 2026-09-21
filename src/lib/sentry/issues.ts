@@ -1,5 +1,7 @@
 import "server-only";
 
+import { UNATTRIBUTABLE_POST } from "./alert-tags";
+
 // Sentry's free plan has no native Slack/webhook alerting (that requires
 // the paid Team tier, confirmed by the "Alert Rule Action" toggle being
 // locked on a Custom Integration's webhook config on this account). This
@@ -9,8 +11,11 @@ import "server-only";
 // shows up. Cron/Stripe-webhook failures already alert via
 // src/lib/cron/alerting.ts / the Stripe webhook route, so they're
 // excluded here by the same tags those call sites set.
-const NEEDS_REVIEW_QUERY =
-  "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook";
+export const NEEDS_REVIEW_QUERY =
+  "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook " +
+  // Built from the same constant the reporter tags the event with, so the two
+  // cannot drift apart (L41). Level alone cannot do this job: see alert-tags.ts.
+  `!${UNATTRIBUTABLE_POST.key}:${UNATTRIBUTABLE_POST.value}`;
 
 const API = "https://sentry.io/api/0";
 

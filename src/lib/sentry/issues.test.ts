@@ -38,7 +38,8 @@ describe("getIssuesNeedingReview", () => {
       "/api/0/projects/nursedex/nursedex-site/issues/",
     );
     expect(parsed.searchParams.get("query")).toBe(
-      "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook",
+      "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook " +
+        "!action:unattributable-post",
     );
     expect((init?.headers as Record<string, string>).Authorization).toBe(
       "Bearer test-token",
@@ -131,8 +132,6 @@ describe("getIssuesNeedingReview", () => {
   it("throws if SENTRY_AUTH_TOKEN is missing", async () => {
     delete process.env.SENTRY_AUTH_TOKEN;
     const { getIssuesNeedingReview } = await import("./issues");
-    await expect(getIssuesNeedingReview()).rejects.toThrow(
-      /SENTRY_AUTH_TOKEN/,
-    );
+    await expect(getIssuesNeedingReview()).rejects.toThrow(/SENTRY_AUTH_TOKEN/);
   });
 });

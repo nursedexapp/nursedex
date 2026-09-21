@@ -1,8 +1,10 @@
+import { UNATTRIBUTABLE_POST, type AlertTag } from "./alert-tags";
+
 export type RequestHeaders = NodeJS.Dict<string | string[]>;
 
 export type ReportDecision =
   | { report: false; reason: string }
-  | { report: true; error: unknown; level?: "warning" };
+  | { report: true; error: unknown; level?: "warning"; tag?: AlertTag };
 
 /**
  * next@16.3.4 throws this for ANY multipart POST to ANY page route, not only
@@ -68,12 +70,17 @@ function isSameOrigin(headers: RequestHeaders): boolean {
  *   unhandled 500, a Sentry event and a Slack alert. This still costs a
  *   stranger nothing but one more curl flag, which is the point below.
  *
- * - Origin of this site: reported at `warning`, not error. NURSEDEX-SITE-11
- *   was two curl POSTs to `/?probe=...` on 2026-09-20 that simply SET that
- *   header, and were filed and relayed to Slack as genuine deployment skew.
- *   The sentry-alerts cron selects `level:[error,fatal]`, so warning keeps the
- *   volume visible in Sentry while taking the alert away from anyone with
- *   curl (L36).
+ * - Origin of this site: reported, but TAGGED so the sentry-alerts cron
+ *   excludes it, and at `warning` because that is what it is.
+ *   NURSEDEX-SITE-11 was two curl POSTs to `/?probe=...` on 2026-09-20 that
+ *   simply SET that header, and were filed and relayed to Slack as genuine
+ *   deployment skew. It stays visible in Sentry and pages nobody (L36).
+ *
+ *   The TAG is the load bearing half, not the level. A probe at production on
+ *   2026-09-21 showed Sentry's issue search matches a GROUP when ANY event in
+ *   it carries the value, so the SITE-11 group, holding error events from
+ *   before this filter existed, answers `level:[error,fatal]` for ever.
+ *   See alert-tags.ts.
  *
  * The message says Origin claimed this site rather than asserting a stale page
  * posted it, because the claim a check makes may not exceed what it measured
@@ -99,6 +106,7 @@ export function decideRequestErrorReport(
   return {
     report: true,
     level: "warning",
+    tag: UNATTRIBUTABLE_POST,
     error: new Error(
       "Multipart POST naming no live Server Action, Origin claims this site (a forgeable header, so not proof of deployment skew)",
       { cause: error },
