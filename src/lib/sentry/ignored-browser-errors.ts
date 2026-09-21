@@ -39,13 +39,20 @@ export const IGNORED_BROWSER_ERRORS: RegExp[] = [
  * This needs its own mechanism because IGNORED_BROWSER_ERRORS keys on the
  * message and that message is one WE can legitimately produce: a JSON.parse of
  * a truncated response says exactly this. Matching it by text would discard
- * real crashes. Nothing we serve is on `app://` (our bundle, Cloudflare
- * Turnstile and PostHog are all https), so the scheme separates them and the
- * message never has to.
+ * real crashes. Where the throwing frame was LOADED from separates them, and
+ * the message never has to.
  *
  * Sentry reads this against the LAST valid frame (`_getLastValidUrl` in
  * @sentry/core's eventFilters), which is the frame that threw. An error thrown
  * by our code but CALLED from the host app's script therefore still reports,
  * which is the side to err on (L648).
+ *
+ * The third slash is the whole rule. @sentry/nextjs installs
+ * nextjsClientStackFrameNormalizationIntegration by default, which turns
+ * `<origin>/<path>/_next/static/...` into `app:///_next/static/...`, so OUR
+ * OWN frames also wear an `app:` scheme. A plain `^app://` matches those too
+ * and would discard every client side crash we have, silently, while reading
+ * as a filter that works. `app://` with a HOST (`iab_inner_frame_ota`) is the
+ * in-app browser; `app://` with an EMPTY host is Sentry relabelling us.
  */
-export const IGNORED_BROWSER_FRAME_URLS: RegExp[] = [/^app:\/\//];
+export const IGNORED_BROWSER_FRAME_URLS: RegExp[] = [/^app:\/\/(?!\/)/];

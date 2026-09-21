@@ -130,6 +130,21 @@ describe("in-app browser injected frames (NURSEDEX-SITE-12)", () => {
     ).toBe(false);
   });
 
+  it("keeps our own bundle after @sentry/nextjs relabels it app:///_next", () => {
+    // The control this filter nearly shipped without. @sentry/nextjs installs
+    // nextjsClientStackFrameNormalizationIntegration by default, which turns
+    // `<origin>/<path>/_next/static/...` into `app:///_next/static/...`, so
+    // OUR OWN frames wear an app:// scheme too. A pattern of plain `^app://`
+    // matches those as readily as the in-app browser's, and would discard
+    // every client side crash we have while looking like it was working.
+    expect(
+      isDroppedByFrame(
+        "Unexpected end of input",
+        "app:///_next/static/chunks/main-app-abc123.js",
+      ),
+    ).toBe(false);
+  });
+
   it("keeps an error thrown by a third party script we deliberately load", () => {
     expect(
       isDroppedByFrame(
