@@ -8,6 +8,7 @@ import {
   type Event,
 } from "@sentry/nextjs";
 import { onRequestError } from "./instrumentation";
+import { UNATTRIBUTABLE_POST } from "@/lib/sentry/alert-tags";
 
 /**
  * A decision to report at `warning` is worth nothing until the event Sentry
@@ -86,6 +87,33 @@ describe("the level on the event Sentry actually sends", () => {
 
     expect(captured).toHaveLength(1);
     expect(captured[0].level).toBe("warning");
+  });
+
+  it("tags the action-not-found event so the alert query can exclude it", async () => {
+    // The level alone cannot keep this out of Slack. Sentry's issue search
+    // matches a group when ANY of its events carries the value, and the
+    // SITE-11 group already holds error level events from before #1098, so it
+    // answers `level:[error,fatal]` for ever. The tag is the working lever,
+    // and this asserts it reaches the finished event rather than the call.
+    onRequestError(actionNotFound(), request(curlWithOrigin), context);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].tags?.[UNATTRIBUTABLE_POST.key]).toBe(
+      UNATTRIBUTABLE_POST.value,
+    );
+  });
+
+  it("does not tag a real crash, which must still be relayed", async () => {
+    onRequestError(
+      new Error("Supabase read failed"),
+      request(curlWithOrigin),
+      context,
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].tags?.[UNATTRIBUTABLE_POST.key]).toBeUndefined();
   });
 
   it("still sends a real crash at error, so it is still relayed to Slack", async () => {

@@ -41,20 +41,23 @@ export const onRequestError: Instrumentation.onRequestError = (
     return;
   }
 
-  const { error: reported, level } = decision;
+  const { error: reported, level, tag } = decision;
 
-  if (!level) {
+  if (!level && !tag) {
     Sentry.captureRequestError(reported, request, context);
     return;
   }
 
-  // Reported, but below the level src/lib/sentry/issues.ts selects on
-  // (`level:[error,fatal]`), so it lands in Sentry without paging anyone.
-  // captureRequestError forks the scope again internally; a forked scope
-  // inherits the level, which src/instrumentation-level.test.ts asserts on the
+  // Reported, but marked so src/lib/sentry/issues.ts does not relay it: the
+  // TAG is what excludes it, because a group that has ever held an error event
+  // answers `level:[error,fatal]` for ever (see lib/sentry/alert-tags.ts). The
+  // level is set too because it is the honest one, not because it filters.
+  // captureRequestError forks the scope again internally and a forked scope
+  // inherits both, which src/instrumentation-level.test.ts asserts on the
   // finished event rather than on the call.
   Sentry.withScope((scope) => {
-    scope.setLevel(level);
+    if (level) scope.setLevel(level);
+    if (tag) scope.setTag(tag.key, tag.value);
     Sentry.captureRequestError(reported, request, context);
   });
 };

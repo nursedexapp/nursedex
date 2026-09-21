@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const scope = { setLevel: vi.fn() };
+const scope = { setLevel: vi.fn(), setTag: vi.fn() };
 vi.mock("@sentry/nextjs", () => ({
   captureRequestError: vi.fn(),
   // Real in the SDK, so it must exist here or the level branch throws. What
@@ -50,6 +50,7 @@ const actionNotFound = () =>
 beforeEach(() => {
   captureRequestError.mockClear();
   scope.setLevel.mockClear();
+  scope.setTag.mockClear();
 });
 
 describe("the Next.js request error hook", () => {
