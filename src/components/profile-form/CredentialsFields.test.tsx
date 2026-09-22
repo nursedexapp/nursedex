@@ -35,10 +35,16 @@ describe("CredentialsFields license/certification field", () => {
     ).toBeInTheDocument();
   });
 
-  it("labels the field 'Certification number' for CNAs", () => {
+  // Optional since 2026-09-22: the number is no longer required of a CNA, so
+  // a form that still presented it as required would ask for what we refuse
+  // to demand.
+  it("labels the field 'Certification number' and marks it optional for CNAs", () => {
     renderWith("cna");
     expect(screen.getByText("Certification number")).toBeInTheDocument();
-    expect(screen.queryByText("(optional)")).not.toBeInTheDocument();
+    expect(screen.getByText("(optional)")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Optional for Certified Nursing Assistants"),
+    ).toBeInTheDocument();
   });
 
   it("marks the field optional for HHAs", () => {

@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckboxGroup } from "./CheckboxGroup";
 import { TierLimitBanner } from "./TierLimitBanner";
+import { credentialNeedsLicenseNumber } from "@/lib/schemas/profile";
 import {
   CREDENTIAL_LABELS,
   CareType,
@@ -42,10 +43,12 @@ export function CredentialsFields({
   const atCareTypeLimit =
     maxCareTypes !== undefined && values.care_types.length >= maxCareTypes;
 
-  // HHAs don't carry a license or certification number, so the field is
-  // optional for them. CNAs hold a certification number; everyone else a
-  // license number.
+  // HHAs and CNAs are certified rather than licensed, so the number is
+  // optional for them. The rule is the schema's own, so the form cannot mark a
+  // field optional that the save then refuses, or the other way round.
   const isHHA = values.credential === Credential.HHA;
+  const isOptional =
+    !!values.credential && !credentialNeedsLicenseNumber(values.credential);
   const credentialNumberLabel =
     values.credential === Credential.CNA
       ? "Certification number"
@@ -96,15 +99,15 @@ export function CredentialsFields({
 
       {/* License/certification number, emphasized because incorrect numbers
           will fail verification, which is one of the few places this wizard
-          can fail in a way that's annoying to recover from. Optional for HHAs,
-          who don't carry a number. */}
+          can fail in a way that's annoying to recover from. Optional for HHAs
+          and CNAs, who are certified rather than licensed. */}
       <div className="border-warning/30 bg-warning/5 space-y-2 rounded-lg border-l-4 p-4">
         <Label
           htmlFor="license_number"
           className="text-soft-black text-sm font-semibold"
         >
           {credentialNumberLabel}
-          {isHHA && (
+          {isOptional && (
             <span className="text-muted-foreground ml-1 font-normal">
               (optional)
             </span>
@@ -113,15 +116,17 @@ export function CredentialsFields({
         <p className="text-soft-black-light text-xs">
           {isHHA
             ? "Home Health Aides don't have a license or certification number, so this is optional. If you have one, adding it helps families verify you."
-            : "Please double check this. We check it against New York State records, and a typo will hold up your profile going live."}
+            : isOptional
+              ? "This is optional. If you have one, adding it helps families verify you."
+              : "Please double check this. We check it against New York State records, and a typo will hold up your profile going live."}
         </p>
         <Input
           id="license_number"
           value={values.license_number}
           onChange={(e) => onChange("license_number", e.target.value)}
           placeholder={
-            isHHA
-              ? "Optional for Home Health Aides"
+            isOptional
+              ? `Optional for ${CREDENTIAL_LABELS[values.credential as Credential]}s`
               : "Your NY State license or certification number"
           }
           aria-invalid={errors.license_number ? true : undefined}
