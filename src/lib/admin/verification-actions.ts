@@ -61,9 +61,9 @@ export async function approveVerification(
 
   // Every field the onboarding floor reads comes back with the row (#912).
   // Verification is the product's promise that somebody checked her, and it
-  // could be granted to a profile with nothing in it: 29 of the 32 verified
-  // HHAs have no licence number, which is the one field onboarding requires
-  // of an HHA and the one the check is supposed to rest on.
+  // could be granted to a profile with nothing in it. A licence number is part
+  // of the floor for LPNs, RNs and NPs only: HHAs and CNAs are certified
+  // rather than licensed, and the floor once had that backwards.
   const profileRead = await toTypedFailure(
     supabase
       .from("nurse_profiles")

@@ -1,62 +1,19 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import {
-  needsLicenceNumber,
   wasSentBackByThisBackfill,
   LICENCE_NEEDED_REASON,
-  type LicenceBacklogRow,
 } from "./licence-backfill";
 
-/**
- * #912, the backlog half. This selects real nurses to take a badge away from
- * and email, so the predicate is worth more than the script that runs it.
- */
-function row(overrides: Partial<LicenceBacklogRow> = {}): LicenceBacklogRow {
-  return {
-    user_id: "nurse-1",
-    credential: "hha",
-    license_number: null,
-    verification_status: "verified",
-    is_hidden: false,
-    users: { is_deleted: false, is_suspended: false },
-    ...overrides,
-  };
-}
-
-describe("who gets sent back", () => {
-  it("a verified HHA with no licence number", () => {
-    expect(needsLicenceNumber(row())).toBe(true);
-  });
-
-  it("and one whose licence number is an empty string", () => {
-    // A stored "" is not a licence number, and it is the shape a form save
-    // leaves behind rather than null.
-    expect(needsLicenceNumber(row({ license_number: "" }))).toBe(true);
-  });
-});
-
-describe("who is left alone", () => {
-  it.each([
-    ["she has a licence number", { license_number: "HHA-99" }],
-    ["she is an RN, who needs no licence number", { credential: "rn" }],
-    ["she is not verified", { verification_status: "pending" }],
-    ["she was already rejected", { verification_status: "rejected" }],
-    ["her profile is hidden", { is_hidden: true }],
-  ])("%s", (_what, overrides) => {
-    expect(needsLicenceNumber(row(overrides))).toBe(false);
-  });
-
-  it.each([
-    ["her account is deleted", { is_deleted: true, is_suspended: false }],
-    ["her account is suspended", { is_deleted: false, is_suspended: true }],
-  ])("%s, so nothing is taken away and no email is sent", (_what, users) => {
-    expect(needsLicenceNumber(row({ users }))).toBe(false);
-  });
-
-  it("a row with no owner at all", () => {
-    // An inner join should make this impossible. If it ever happens, doing
-    // nothing is the safe answer, since there is nobody to tell.
-    expect(needsLicenceNumber(row({ users: null }))).toBe(false);
+// The send back mode asked 25 aides for a licence number HHAs do not hold
+// (2026-09-22). It is deleted, so nothing in the script can take a badge away.
+describe("the script", () => {
+  it("can only restore, never send anybody back", () => {
+    const source = readFileSync("scripts/licence-number-backfill.ts", "utf8");
+    expect(source).not.toMatch(/verification_status:\s*"rejected"/);
+    expect(source).not.toMatch(/email_log|\/api\/email\//);
+    expect(source).toMatch(/verification_status:\s*"verified"/);
   });
 });
 

@@ -1,19 +1,15 @@
 /**
- * The one-off correction for verified nurses with no licence number (#912).
+ * What is left of the one-off licence number correction (#912): the way back.
  *
- * Verification could be granted to a profile with nothing in it, and 29 of the
- * 32 verified HHAs came away with the badge and no licence number, which is
- * the one field onboarding requires of an HHA and the one the check is
- * supposed to rest on. Measured against production on 2026-09-03.
+ * On 2026-09-03, 25 verified HHAs with no licence number were moved to
+ * `rejected` and emailed to supply one. That rested on a misreading: the
+ * dashboard gate demanded a licence number of HHAs and only HHAs, which was
+ * the inverse of the wizard's rule, and the backfill took the gate at its
+ * word. HHAs and CNAs are certified rather than licensed and have no number to
+ * give, so not one of the 25 could act on it (found 2026-09-22).
  *
- * Dan's decision: send them back and ask. They land in the stored `rejected`
- * state, whose dashboard reads "Your verification needs a quick fix" and shows
- * the reason, rather than `pending`, whose dashboard promises an email the
- * moment her profile is live. Nothing would ever send that email, because
- * nothing happens until she supplies the number.
- *
- * The rule lives here rather than in the script so it can be tested, and so
- * the forward and reverse directions cannot drift apart.
+ * The send back mode is deleted rather than corrected, so it cannot be run
+ * again. The restore stays, keyed on the reason string below.
  */
 
 /**
@@ -27,37 +23,6 @@
  */
 export const LICENCE_NEEDED_REASON =
   "We need your Home Health Aide license number. Add it to your profile and we will check it against the New York State register.";
-
-/** The email_log type and key, so a re-run cannot email anybody twice. */
-export const LICENCE_NEEDED_EMAIL_TYPE = "licence_number_needed";
-export const LICENCE_NEEDED_DEDUP_KEY = "v1";
-
-export type LicenceBacklogRow = {
-  user_id: string;
-  credential: string;
-  license_number: string | null;
-  verification_status: string;
-  is_hidden: boolean;
-  users: { is_deleted: boolean; is_suspended: boolean } | null;
-};
-
-/**
- * Whether this row is one of the ones to send back.
- *
- * Deliberately narrow. It is only ever the HHAs, because a licence number is
- * required of an HHA and of nobody else, and only nurses who are actually
- * reachable: a deleted or suspended account is not shown to families and
- * emailing it would be wrong.
- */
-export function needsLicenceNumber(row: LicenceBacklogRow): boolean {
-  if (row.verification_status !== "verified") return false;
-  if (row.credential !== "hha") return false;
-  if ((row.license_number ?? "") !== "") return false;
-  if (row.is_hidden) return false;
-  if (!row.users) return false;
-  if (row.users.is_deleted || row.users.is_suspended) return false;
-  return true;
-}
 
 /**
  * Whether this row is one THIS backfill sent back, and so may be restored.

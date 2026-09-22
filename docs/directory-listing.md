@@ -65,16 +65,18 @@ there is one definition rather than a second one beside it, and the refusal
 names the step that is missing.
 
 This matters because the badge is the promise to a family that somebody checked
-her. Before that floor existed, 29 of the 32 verified HHAs held the badge with
-no licence number on file, which is the one field onboarding requires of an HHA
-and the one the check is supposed to rest on.
+her. A licence number is part of the floor for LPNs, RNs and NPs. HHAs and CNAs
+are certified rather than licensed, so it is optional for them; the one rule is
+`credentialNeedsLicenseNumber` in `src/lib/schemas/profile.ts`, and the wizard,
+the edit form, the dashboard gate and the approve button all read it.
 
-The 25 reachable nurses in that state were sent back on 3 September 2026 and
-emailed to ask for the number. They are in the `rejected` state, whose dashboard
-reads "Your verification needs a quick fix" and shows the reason.
-`scripts/licence-number-backfill.ts` did it, is a dry run unless `CONFIRM=1`,
-and `RESTORE=1 CONFIRM=1` puts them back. The undo is keyed on the exact reason
-string, so it can never restore a nurse an admin rejected for a real reason.
+The floor first shipped with that rule backwards: it demanded a number of HHAs
+and only HHAs. On 3 September 2026 a backfill took it at its word and sent 25
+verified HHAs back to `rejected`, emailing each to ask for a number she does
+not hold. Found on 22 September 2026, when five pending aides could not be
+approved. `scripts/licence-number-backfill.ts` now only restores them (a dry
+run unless `CONFIRM=1`), keyed on the exact reason string, so it can never
+restore a nurse an admin rejected for a real reason.
 
 When one of them fixes her profile, she returns to the review queue
 automatically, from the edit form or from the wizard. Both write the same

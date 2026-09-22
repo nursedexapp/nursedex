@@ -1,4 +1,5 @@
 import type { NurseProfile, User } from "@/types/database";
+import { credentialNeedsLicenseNumber } from "@/lib/schemas/profile";
 
 /**
  * The pages that refuse to render until onboarding is finished, and send the
@@ -26,8 +27,7 @@ export const ONBOARDING_STEP_LABELS: Record<1 | 2 | 3 | 4 | 5, string> = {
 };
 
 export type OnboardingStatus =
-  | { complete: true }
-  | { complete: false; nextStep: 1 | 2 | 3 | 4 | 5 };
+  { complete: true } | { complete: false; nextStep: 1 | 2 | 3 | 4 | 5 };
 
 /**
  * Determine where a nurse is in the onboarding wizard, based on what
@@ -42,7 +42,7 @@ export type OnboardingStatus =
  *
  * Steps map directly to the wizard's step indicator:
  *   1 Basics: name, gender, years_experience, languages
- *   2 Credentials: credential type, license# (HHA only), care types
+ *   2 Credentials: credential type, license# (LPN, RN, NP), care types
  *   3 Skills: skills, availability, time slots
  *   4 Bio and Photos: bio, at least one photo
  *   5 Contact: zip code, travel radius
@@ -62,7 +62,9 @@ export function getOnboardingStatus(
   }
 
   // Step 2: Credentials
-  const hasLicense = profile.credential !== "hha" || !!profile.license_number;
+  const hasLicense =
+    !credentialNeedsLicenseNumber(profile.credential) ||
+    !!profile.license_number?.trim();
   if (!profile.credential || !hasLicense || !profile.care_types?.length) {
     return { complete: false, nextStep: 2 };
   }

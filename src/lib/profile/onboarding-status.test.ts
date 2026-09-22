@@ -6,7 +6,11 @@ import {
   ONBOARDING_GATED_PAGES,
 } from "./onboarding-status";
 import { readFileSync } from "node:fs";
-import { step3Schema, fullProfileSchema } from "@/lib/schemas/profile";
+import {
+  step2Schema,
+  step3Schema,
+  fullProfileSchema,
+} from "@/lib/schemas/profile";
 import type { NurseProfile, User } from "@/types/database";
 import {
   Skill,
@@ -179,6 +183,60 @@ describe("step 3 has one definition", () => {
       const schema = fullProfileSchema(NurseTier.FREE);
       expect(schema.safeParse(full).success).toBe(true);
       expect(schema.safeParse({ ...full, [field]: [] }).success).toBe(false);
+    },
+  );
+});
+
+// The license rule has the same two ends. The wizard exempted HHAs from a
+// license number while the gate demanded one of HHAs and nobody else, so every
+// unlicensed aide who finished signup was still "unfinished" to the dashboard
+// and the approve button (reported 2026-09-22, five aides stuck pending).
+describe("the license rule has one definition", () => {
+  it.each(Object.values(Credential))(
+    "a %s with no license number is treated the same by the wizard and the gate",
+    (credential) => {
+      const profile = {
+        ...completeProfile(),
+        credential,
+        license_number: null,
+      } as unknown as NurseProfile;
+      const accepted = step2Schema(NurseTier.FREE).safeParse({
+        credential,
+        license_number: "",
+        care_types: profile.care_types,
+        primary_care_type: null,
+      }).success;
+      const status = getOnboardingStatus(profile, completeUser());
+      expect(status.complete).toBe(accepted);
+    },
+  );
+
+  it.each([Credential.HHA, Credential.CNA])(
+    "calls a %s with no license number finished",
+    (credential) => {
+      const profile = {
+        ...completeProfile(),
+        credential,
+        license_number: null,
+      } as unknown as NurseProfile;
+      expect(getOnboardingStatus(profile, completeUser())).toEqual({
+        complete: true,
+      });
+    },
+  );
+
+  it.each([Credential.LPN, Credential.RN, Credential.NP])(
+    "sends a %s with no license number back to step 2",
+    (credential) => {
+      const profile = {
+        ...completeProfile(),
+        credential,
+        license_number: null,
+      } as unknown as NurseProfile;
+      expect(getOnboardingStatus(profile, completeUser())).toEqual({
+        complete: false,
+        nextStep: 2,
+      });
     },
   );
 });

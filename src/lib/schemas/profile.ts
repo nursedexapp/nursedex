@@ -78,14 +78,29 @@ export function step2Schema(tier: NurseTier) {
     });
 }
 
-// HHAs don't carry a license or certification number, so the field is
-// optional for them and required for every other credential.
+/**
+ * Whether a credential needs a license number for her profile to count as
+ * finished. HHAs and CNAs are certified rather than licensed (Dan, 2026-09-22),
+ * so the number is optional for them and required of LPNs, RNs and NPs.
+ *
+ * The one definition of the rule. The wizard, the edit form, the dashboard
+ * gate and the approve button all read it: the gate once held its own copy,
+ * written as the inverse, and refused every unlicensed aide the wizard had let
+ * through.
+ */
+export function credentialNeedsLicenseNumber(
+  credential: string | null | undefined,
+): boolean {
+  return credential !== Credential.HHA && credential !== Credential.CNA;
+}
+
 function isLicenseNumberValid(data: {
   credential: Credential;
   license_number: string;
 }): boolean {
   return (
-    data.credential === Credential.HHA || data.license_number.trim().length > 0
+    !credentialNeedsLicenseNumber(data.credential) ||
+    data.license_number.trim().length > 0
   );
 }
 

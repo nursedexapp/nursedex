@@ -196,10 +196,22 @@ describe("step2Schema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("treats a whitespace-only license number as missing", () => {
+  // CNAs are certified, not licensed, the same as HHAs (Dan, 2026-09-22).
+  it("allows CNAs to omit the license number", () => {
     const schema = step2Schema(NurseTier.FREE);
     const result = schema.safeParse({
       credential: "cna",
+      license_number: "",
+      care_types: ["elderly"],
+      primary_care_type: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("treats a whitespace-only license number as missing", () => {
+    const schema = step2Schema(NurseTier.FREE);
+    const result = schema.safeParse({
+      credential: "rn",
       license_number: "   ",
       care_types: ["elderly"],
       primary_care_type: null,

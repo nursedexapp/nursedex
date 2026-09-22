@@ -7,10 +7,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * provided anything, so the badge meant "an admin pressed a button" rather
  * than "we checked her credentials".
  *
- * Measured against production on 2026-09-03: 121 verified profiles, 32 of them
- * HHAs, and 29 of those HHAs have no licence number at all. Onboarding
- * requires a licence number for HHA and only for HHA, so those 29 are missing
- * the one field the check is supposed to rest on.
+ * The floor first shipped demanding a licence number of HHAs and only HHAs,
+ * the inverse of the wizard, which exempts them. So it refused every
+ * unlicensed aide, and five sat pending with no way through (2026-09-22). HHAs
+ * and CNAs are certified rather than licensed; LPNs, RNs and NPs need one.
  *
  * Dan's call: the approve button refuses below the floor and says what is
  * missing, with no override. The floor is the wizard's own definition of a
@@ -125,11 +125,29 @@ describe("approving a finished profile", () => {
   });
 });
 
+// HHAs and CNAs are certified, not licensed, so an empty licence number is a
+// finished profile for them. The floor demanded one of HHAs and only HHAs, the
+// inverse of the wizard, and refused every unlicensed aide (2026-09-22).
+describe("approving an unlicensed aide", () => {
+  it.each(["hha", "cna"])(
+    "approves a %s with no licence number",
+    async (credential) => {
+      h.state.profile = completeProfile({ credential, license_number: null });
+
+      const result = await approveVerification({ user_id: NURSE_ID });
+
+      expect(result).toEqual({ success: true });
+      expect(h.calls.updates).toHaveLength(1);
+      expect(h.calls.approvedEmail).toHaveLength(1);
+    },
+  );
+});
+
 describe("approving an unfinished profile", () => {
   const CASES: Array<[string, Record<string, unknown>]> = [
     [
-      "an HHA with no licence number",
-      { credential: "hha", license_number: null },
+      "an RN with no licence number",
+      { credential: "rn", license_number: null },
     ],
     ["no care types", { care_types: [] }],
     ["no bio", { bio: null }],
@@ -161,7 +179,7 @@ describe("approving an unfinished profile", () => {
 
   it("names the step the admin has to wait for", async () => {
     h.state.profile = completeProfile({
-      credential: "hha",
+      credential: "rn",
       license_number: null,
     });
 
