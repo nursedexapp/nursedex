@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import * as Sentry from "@sentry/nextjs";
 
 interface ErrorProps {
   error: Error & { digest?: string };
@@ -10,6 +11,15 @@ interface ErrorProps {
 export default function DashboardError({ error }: ErrorProps) {
   useEffect(() => {
     console.error("[dashboard-error-boundary]", error);
+    try {
+      Sentry.captureException(error);
+    } catch (reportFailure) {
+      // A throw here would take down the one screen explaining the failure.
+      console.error(
+        "[dashboard-error-boundary] could not report to Sentry",
+        reportFailure,
+      );
+    }
   }, [error]);
 
   return (
