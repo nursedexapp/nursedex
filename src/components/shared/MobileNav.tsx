@@ -18,6 +18,13 @@ interface MobileNavProps {
   navItems: NavItem[];
 }
 
+// Shared by the next/link items and the plain links below, which must look
+// the same while navigating differently.
+const LINK_CLASS =
+  "font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors";
+const PRIMARY_LINK_CLASS =
+  "bg-teal font-body hover:bg-teal-dark mt-2 rounded-lg px-4 py-3 text-center text-sm font-medium text-white transition-colors";
+
 export function MobileNav({ isLoggedIn, navItems }: MobileNavProps) {
   const [open, setOpen] = useState(false);
 
@@ -40,21 +47,27 @@ export function MobileNav({ isLoggedIn, navItems }: MobileNavProps) {
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors"
+              className={LINK_CLASS}
             >
               {item.label}
             </Link>
           ))}
 
+          {/*
+            These three leave the public section, so they load the page with a
+            plain link rather than next/link. A client side navigation out of
+            the section, taken from this sheet while it is open or closing,
+            trips a React bug: the shell re-suspends in a loop until React
+            throws #482 ("An unknown Component is an async Client Component")
+            and the person lands on "We hit a snag" (NURSEDEX-SITE-13, still
+            present in Next 16.3.6). The sheet goes with the page, so nothing
+            needs to close it.
+          */}
           {isLoggedIn ? (
             <>
-              <Link
-                href="/dashboard"
-                onClick={() => setOpen(false)}
-                className="bg-teal font-body hover:bg-teal-dark mt-2 rounded-lg px-4 py-3 text-center text-sm font-medium text-white transition-colors"
-              >
+              <a href="/dashboard" className={PRIMARY_LINK_CLASS}>
                 Dashboard
-              </Link>
+              </a>
               <SignOutButton
                 className="mt-1"
                 onNavigate={() => setOpen(false)}
@@ -62,20 +75,12 @@ export function MobileNav({ isLoggedIn, navItems }: MobileNavProps) {
             </>
           ) : (
             <>
-              <Link
-                href="/login"
-                onClick={() => setOpen(false)}
-                className="font-body text-soft-black hover:bg-sage/10 rounded-lg px-4 py-3 text-sm transition-colors"
-              >
+              <a href="/login" className={LINK_CLASS}>
                 Log in
-              </Link>
-              <Link
-                href="/signup"
-                onClick={() => setOpen(false)}
-                className="bg-teal font-body hover:bg-teal-dark mt-2 rounded-lg px-4 py-3 text-center text-sm font-medium text-white transition-colors"
-              >
+              </a>
+              <a href="/signup" className={PRIMARY_LINK_CLASS}>
                 Sign up
-              </Link>
+              </a>
             </>
           )}
         </nav>
