@@ -83,6 +83,17 @@ function describeDispatch(
 
   const when = last.at ? `The run on ${last.at.slice(0, 10)}` : "The last run";
 
+  // Overdue although the last run it dispatched PASSED: the schedule stopped
+  // after a good run, which is what GitHub's inactivity disable looks like.
+  // There is no failure to read a log for (#1113).
+  if (last.conclusion === "success") {
+    return (
+      `${when} succeeded, and nothing has been dispatched since, so the ` +
+      "schedule has stopped firing rather than the job failing. Check whether " +
+      "GitHub has disabled the workflow in the Actions tab."
+    );
+  }
+
   if (last.ranAnySteps === null) {
     return (
       `${when} was dispatched and did not succeed ` +
@@ -150,7 +161,10 @@ export function formatWatchdogReport(result: WatchdogResult): string {
     // all, sends the reader to look for a failing run that does not exist
     // (L11).
     const dispatch = job.measuredBy === "dispatch";
-    const age = job.neverRan
+    const age = job.noSuccessInLastRuns
+      ? `has not succeeded in its last ${job.noSuccessInLastRuns} scheduled ` +
+        `runs, which go back ${humanize(job.ageMs)}`
+      : job.neverRan
       ? dispatch
         ? "has never been dispatched on its schedule"
         : "has never completed successfully"
@@ -279,14 +293,25 @@ export function selfWorkflowSource(
   return null;
 }
 
+/**
+ * How many scheduled runs are read per workflow, GitHub's maximum page.
+ *
+ * The most frequent GitHub schedule here is daily, so a page reaches back
+ * about three months, far past any interval a job is judged against.
+ */
+const RUNS_PAGE = 100;
+
+/** The slice of a workflow run this needs. */
+interface WorkflowRun {
+  id?: number;
+  conclusion?: string | null;
+  updated_at?: string;
+  run_started_at?: string;
+}
+
 /** The slice of GitHub's workflow runs response this needs. */
 interface WorkflowRunsResponse {
-  workflow_runs?: Array<{
-    id?: number;
-    conclusion?: string | null;
-    updated_at?: string;
-    run_started_at?: string;
-  }>;
+  workflow_runs?: WorkflowRun[];
 }
 
 interface WorkflowResponse {
@@ -330,9 +355,18 @@ export interface LoadWorkflowJobsOptions {
  * hand proves the job still works, not that GitHub is still firing it, and a
  * schedule GitHub has disabled is precisely what this exists to catch.
  *
- * `status=success` for every entry EXCEPT this workflow's own. The reasoning
- * is on ScheduledJob.measuredBy; in short, a watchdog judged on its own
- * success cannot recover from correctly reporting anything.
+ * Every entry is judged on its newest SUCCESSFUL scheduled run EXCEPT this
+ * workflow's own, which is judged on its newest dispatch. The reasoning is on
+ * ScheduledJob.measuredBy; in short, a watchdog judged on its own success
+ * cannot recover from correctly reporting anything.
+ *
+ * One list per workflow, filtered on `event=schedule` only, with the success
+ * picked out of it here. GitHub's combined `event=schedule&status=success`
+ * answered from an incomplete index on 2026-09-29, returning a newest success
+ * a month old for a job that had passed the day before, while each filter on
+ * its own was right on every call (#1113, L1014). Reading one list also means
+ * the success and the last dispatch come from one answer, so the report can
+ * no longer say a run failed while quoting its conclusion as success.
  *
  * A workflow the API cannot answer for throws rather than arriving as "never
  * ran": an unreadable answer and a dead job are different things, and only one
@@ -349,38 +383,46 @@ export async function loadGitHubWorkflowJobs({
   return Promise.all(
     scheduled.map(async (job): Promise<ScheduledJob> => {
       const isSelf = selfSource !== null && job.source === selfSource;
-      const query = isSelf
-        ? "?event=schedule&per_page=1"
-        : "?event=schedule&status=success&per_page=1";
 
-      const runs = await api<WorkflowRunsResponse>(
-        `/repos/${repo}/actions/workflows/${job.source}/runs${query}`,
+      const response = await api<WorkflowRunsResponse>(
+        `/repos/${repo}/actions/workflows/${job.source}/runs?event=schedule&per_page=${RUNS_PAGE}`,
       );
-      const latest = runs.workflow_runs?.[0];
+      const runs = response.workflow_runs ?? [];
 
-      // A workflow with no scheduled run yet is judged from when it was
+      const judged = isSelf
+        ? runs[0]
+        : runs.find((run) => run.conclusion === "success");
+
+      // No success anywhere in a FULL page says only that the last one is
+      // older than everything listed, not that there never was one. The
+      // oldest listed run is then the most recent it can have been, and the
+      // report says which it is (L11).
+      const beyondPage = !judged && !isSelf && runs.length >= RUNS_PAGE;
+      const judgedRun = beyondPage ? runs[runs.length - 1] : judged;
+
+      // A workflow with no success on record is judged from when it was
       // created, so adding one does not alert before its first firing.
-      const workflow = latest
+      const workflow = judgedRun
         ? null
         : await api<WorkflowResponse>(
             `/repos/${repo}/actions/workflows/${job.source}`,
           );
 
-      // The last run on this schedule WHATEVER its conclusion, read beside
-      // the successful one so the report can name which failure this is
-      // (#1041). One extra call per workflow, and two more only when that run
-      // did not succeed, so a healthy repository pays one call per workflow
-      // and nothing else.
+      // The last run on this schedule WHATEVER its conclusion, so the report
+      // can name which failure this is (#1041). It is the head of the same
+      // list, and two more calls are made only when it did not succeed, so a
+      // healthy repository pays one call per workflow and nothing else.
       const lastDispatch = isSelf
         ? undefined
-        : await readLastDispatch(api, repo, job.source);
+        : await describeLastDispatch(api, repo, runs[0]);
 
       return {
         ...job,
-        lastSuccessAt: latest?.updated_at ?? latest?.run_started_at ?? null,
+        lastSuccessAt: judgedRun?.updated_at ?? judgedRun?.run_started_at ?? null,
         firstSeenAt: workflow?.created_at ?? null,
         measuredBy: isSelf ? "dispatch" : "success",
         lastDispatch,
+        ...(beyondPage ? { noSuccessInLastRuns: runs.length } : {}),
       };
     }),
   );
@@ -406,15 +448,11 @@ export async function loadGitHubWorkflowJobs({
  * be empty costs one click; asserting a billing refusal that did not happen
  * sends them to the billing page instead (L11, L93).
  */
-async function readLastDispatch(
+async function describeLastDispatch(
   api: <T>(path: string) => Promise<T>,
   repo: string,
-  source: string,
+  run: WorkflowRun | undefined,
 ): Promise<LastDispatch | null> {
-  const runs = await api<WorkflowRunsResponse>(
-    `/repos/${repo}/actions/workflows/${source}/runs?event=schedule&per_page=1`,
-  );
-  const run = runs.workflow_runs?.[0];
   if (!run) return null;
 
   const at = run.updated_at ?? run.run_started_at ?? null;
