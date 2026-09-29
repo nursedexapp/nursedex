@@ -764,11 +764,21 @@ describe("loadGitHubWorkflowJobs", () => {
     const calls: string[] = [];
     const api = async <T,>(path: string): Promise<T> => {
       calls.push(path);
-      const succeeded = path.includes("status=success");
-      const isWatchdog = path.includes("job-watchdog.yml");
-      const at =
-        isWatchdog && succeeded ? NOW - 3 * DAY : NOW - 2 * HOUR;
-      return { workflow_runs: [{ updated_at: iso(at) }] } as T;
+      if (path.includes("job-watchdog.yml/runs"))
+        return {
+          workflow_runs: [
+            { id: 3, conclusion: "failure", updated_at: iso(NOW - 2 * HOUR) },
+            { id: 2, conclusion: "failure", updated_at: iso(NOW - 26 * HOUR) },
+            { id: 1, conclusion: "success", updated_at: iso(NOW - 3 * DAY) },
+          ],
+        } as T;
+      if (path.includes("/runs/") && path.endsWith("/jobs"))
+        return { jobs: [{ id: 9, conclusion: "failure", steps: [{}] }] } as T;
+      return {
+        workflow_runs: [
+          { id: 4, conclusion: "success", updated_at: iso(NOW - 2 * HOUR) },
+        ],
+      } as T;
     };
     return { api, calls };
   }
@@ -806,24 +816,89 @@ describe("loadGitHubWorkflowJobs", () => {
   });
 
   it("still judges every other workflow by its last SUCCESSFUL scheduled run", async () => {
-    const { api, calls } = fakeApi();
-    await loadGitHubWorkflowJobs({
+    const { api } = fakeApi();
+    const jobs = await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: FILES,
+      api,
+      selfSource: null,
+    });
+
+    // Its newest run failed and the one before it too; the success it is
+    // judged on is the older one further down the same list.
+    const watchdog = jobs.find((j) => j.source === "job-watchdog.yml");
+    expect(watchdog?.lastSuccessAt).toBe(iso(NOW - 3 * DAY));
+    expect(watchdog?.lastDispatch?.conclusion).toBe("failure");
+  });
+
+  /**
+   * #1113. GitHub's `event=schedule&status=success` answered from an
+   * incomplete index on 2026-09-29: total_count 24 and a newest run from
+   * 2026-08-26, when there were 55 and the newest was the day before. Each
+   * filter alone was right on every call. The double answers the combined
+   * query the way GitHub did and the single filter query correctly, so the
+   * test passes only if the combined query is not what decides (L1014).
+   */
+  it("is not misled when GitHub's combined run filter answers from a stale index", async () => {
+    const calls: string[] = [];
+    const api = async <T,>(path: string): Promise<T> => {
+      calls.push(path);
+      if (path.includes("event=schedule") && path.includes("status=success"))
+        return {
+          workflow_runs: [
+            { id: 1, conclusion: "success", updated_at: iso(NOW - 34 * DAY) },
+          ],
+        } as T;
+      return {
+        workflow_runs: [
+          { id: 2, conclusion: "success", updated_at: iso(NOW - 17 * HOUR) },
+          { id: 1, conclusion: "success", updated_at: iso(NOW - 34 * DAY) },
+        ],
+      } as T;
+    };
+
+    const jobs = await loadGitHubWorkflowJobs({
       repo: "nursedexapp/nursedex",
       files: FILES,
       api,
       selfSource: "job-watchdog.yml",
     });
 
-    // The JUDGING call, not every call: since #1041 each non-self workflow
-    // also gets a supplementary read of its last run whatever the conclusion,
-    // which deliberately carries no status filter. What this asserts is that
-    // the timestamp the check is judged on still comes from a successful run.
-    const others = calls.filter((p) => !p.includes("job-watchdog.yml"));
-    expect(others.filter((p) => p.includes("status=success")).length).toBe(1);
+    expect(evaluateScheduledJobs({ jobs, now: NOW }).overdue).toEqual([]);
+    for (const path of calls)
+      expect(path.includes("event=schedule") && path.includes("status=success")).toBe(false);
+  });
 
-    const own = calls.filter((p) => p.includes("job-watchdog.yml"));
-    expect(own.length).toBeGreaterThan(0);
-    for (const path of own) expect(path).not.toContain("status=success");
+  /**
+   * A full page with no success in it does not know when the last success
+   * was, only that it is older than everything listed. It must say that
+   * rather than "never", which is a claim it did not measure (L11).
+   */
+  it("says the job has not succeeded in any listed run when a full page holds no success", async () => {
+    const runs = Array.from({ length: 100 }, (_, i) => ({
+      id: 1000 - i,
+      conclusion: "failure",
+      updated_at: iso(NOW - (i + 1) * DAY),
+    }));
+    const api = async <T,>(path: string): Promise<T> => {
+      if (path.endsWith("/jobs"))
+        return { jobs: [{ id: 9, conclusion: "failure", steps: [{}] }] } as T;
+      if (path.includes("/runs")) return { workflow_runs: runs } as T;
+      return { created_at: iso(NOW - 400 * DAY) } as T;
+    };
+
+    const jobs = await loadGitHubWorkflowJobs({
+      repo: "nursedexapp/nursedex",
+      files: [FILES[1]],
+      api,
+      selfSource: null,
+    });
+    const report = formatWatchdogReport(
+      evaluateScheduledJobs({ jobs, now: NOW }),
+    );
+
+    expect(report).toMatch(/not succeeded in its last 100 scheduled runs/i);
+    expect(report).not.toMatch(/never completed successfully/i);
   });
 
   /**
@@ -927,6 +1002,28 @@ describe("which of the dispatch states an overdue job is in", () => {
    * distinction the list cannot, and quote GitHub's own words for it: the
    * remedy is on the billing account and nowhere near the job.
    */
+  /**
+   * #1113. The last dispatched run PASSED and the job is still overdue: the
+   * schedule stopped firing after a good run, which is what GitHub does when
+   * it disables a workflow for inactivity. The message used to fall through
+   * to "it did not succeed (success) ... the job itself is broken".
+   */
+  it("says the schedule stopped, not that the job failed, when the last dispatched run succeeded", () => {
+    const report = formatWatchdogReport(
+      weekly({
+        conclusion: "success",
+        at: new Date(NOW - 20 * DAY).toISOString(),
+        ranAnySteps: true,
+        refusal: null,
+      }),
+    );
+
+    expect(report).toMatch(/succeeded/i);
+    expect(report).toMatch(/nothing has been dispatched since/i);
+    expect(report).not.toMatch(/did not succeed/i);
+    expect(report).not.toMatch(/job itself is broken/i);
+  });
+
   it("names a refusal, and quotes it, when the run executed no steps", () => {
     const report = formatWatchdogReport(
       weekly({
@@ -1014,7 +1111,6 @@ describe("reading which state an overdue workflow is in", () => {
         // contains "/runs". A double that selects what it intercepts by
         // pattern becomes no double at all when the pattern is too loose, and
         // the test then measures the wrong call (L143).
-        if (path.includes("status=success")) return { workflow_runs: [] } as T;
         if (path.includes("/annotations"))
           return [
             {
@@ -1071,7 +1167,6 @@ describe("reading which state an overdue workflow is in", () => {
    */
   it("does not report a failed annotation read as a job that never ran", async () => {
     const api = async <T,>(path: string): Promise<T> => {
-      if (path.includes("status=success")) return { workflow_runs: [] } as T;
       if (path.endsWith("/jobs")) throw new Error("GitHub API 502");
       if (path.includes("/runs"))
         return {

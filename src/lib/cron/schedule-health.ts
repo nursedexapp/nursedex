@@ -121,6 +121,12 @@ export interface ScheduledJob {
    * it looked and found a run.
    */
   lastDispatch?: LastDispatch | null;
+  /**
+   * Set when none of the scheduled runs read had succeeded, to how many were
+   * read. lastSuccessAt is then the oldest of them: the latest the last
+   * success can have been, not when it was (#1113).
+   */
+  noSuccessInLastRuns?: number;
   /** How long its last successful run took, when the job records that. */
   lastDurationMs?: number | null;
   /** The budget that run had, from the route's own maxDuration export. */
@@ -137,6 +143,8 @@ export interface OverdueJob {
   measuredBy: "success" | "dispatch";
   /** Carried through so the report can name which failure this is (#1041). */
   lastDispatch?: LastDispatch | null;
+  /** Carried through so the report does not state a lower bound as a date. */
+  noSuccessInLastRuns?: number;
 }
 
 export interface NearBudgetJob {
@@ -558,6 +566,9 @@ export function evaluateScheduledJobs({
         neverRan,
         measuredBy: job.measuredBy ?? "success",
         lastDispatch: job.lastDispatch,
+        ...(job.noSuccessInLastRuns
+          ? { noSuccessInLastRuns: job.noSuccessInLastRuns }
+          : {}),
       });
     }
   }
