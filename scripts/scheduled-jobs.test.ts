@@ -997,12 +997,6 @@ describe("which of the dispatch states an overdue job is in", () => {
   });
 
   /**
-   * The state that cost a week. A refused run is indistinguishable from a
-   * failed one in every list (L276), so the message has to make the
-   * distinction the list cannot, and quote GitHub's own words for it: the
-   * remedy is on the billing account and nowhere near the job.
-   */
-  /**
    * #1113. The last dispatched run PASSED and the job is still overdue: the
    * schedule stopped firing after a good run, which is what GitHub does when
    * it disables a workflow for inactivity. The message used to fall through
@@ -1024,6 +1018,12 @@ describe("which of the dispatch states an overdue job is in", () => {
     expect(report).not.toMatch(/job itself is broken/i);
   });
 
+  /**
+   * The state that cost a week. A refused run is indistinguishable from a
+   * failed one in every list (L276), so the message has to make the
+   * distinction the list cannot, and quote GitHub's own words for it: the
+   * remedy is on the billing account and nowhere near the job.
+   */
   it("names a refusal, and quotes it, when the run executed no steps", () => {
     const report = formatWatchdogReport(
       weekly({
