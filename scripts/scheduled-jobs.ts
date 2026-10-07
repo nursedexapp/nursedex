@@ -121,7 +121,9 @@ function describeDispatch(
       `(${last.conclusion ?? "no conclusion recorded"}), but whether any step ` +
       "ran could not be read, so this is either a broken job or GitHub " +
       "refusing to start it. That run's log tells you which: a refused run " +
-      "has none, and its remedy is on the billing account."
+      "has none, and its annotations in the Actions tab say whether it was " +
+      "the account (billing or a spending limit) or GitHub having no runner " +
+      "free."
     );
   }
 

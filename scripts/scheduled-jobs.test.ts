@@ -1447,6 +1447,11 @@ describe("reading which state an overdue workflow is in", () => {
     expect(report).not.toMatch(/refused to start/i);
     expect(report).toMatch(/could not be read/i);
     expect(report).toMatch(/log/i);
+    // #1138. A refusal is either the account or a runner shortage, and which
+    // was not read here, so the message must not name the billing account as
+    // the remedy (L11).
+    expect(report).not.toMatch(/remedy is on the billing account/i);
+    expect(report).toMatch(/runner/i);
   });
 });
 
