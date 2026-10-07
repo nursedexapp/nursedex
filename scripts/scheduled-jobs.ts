@@ -60,6 +60,27 @@ export type {
 };
 
 /**
+ * Which of GitHub's refusals a run that executed no steps carries, classified
+ * once from the annotation GitHub put on it (#1138, L35).
+ *
+ * The two seen so far have different remedies. A failed payment or spending
+ * limit is fixed on the account and nowhere else (2026-09-07 to 09-14). A
+ * runner GitHub could not acquire is GitHub's own capacity, fixed by nothing
+ * anybody here does and usually gone by the next scheduled run (2026-10-05).
+ * Anything else is quoted without a remedy, because naming one would be a
+ * claim this check never measured (L11).
+ */
+type RefusalKind = "account" | "capacity" | "unrecognised" | "unstated";
+
+function refusalKind(refusal: string | null): RefusalKind {
+  if (!refusal) return "unstated";
+  if (/not acquired by Runner/i.test(refusal)) return "capacity";
+  if (/payments have failed|spending limit|billing/i.test(refusal))
+    return "account";
+  return "unrecognised";
+}
+
+/**
  * Which dispatch state an overdue job is in, as one sentence, or null when
  * nothing read it (#1041).
  *
@@ -100,20 +121,46 @@ function describeDispatch(
       `(${last.conclusion ?? "no conclusion recorded"}), but whether any step ` +
       "ran could not be read, so this is either a broken job or GitHub " +
       "refusing to start it. That run's log tells you which: a refused run " +
-      "has none, and its remedy is on the billing account."
+      "has none, and its annotations in the Actions tab say whether it was " +
+      "the account (billing or a spending limit) or GitHub having no runner " +
+      "free."
     );
   }
 
   if (!last.ranAnySteps) {
     // No steps executed means GitHub refused to start the job. There is no log
-    // to read, so the reader must not be sent to one.
-    const quoted = last.refusal
-      ? ` GitHub said: "${last.refusal}".`
-      : " GitHub gave no reason on the run.";
+    // to read, so the reader must not be sent to one. WHY it refused decides
+    // where the remedy is, and only GitHub's own words say why (#1138).
+    const kind = refusalKind(last.refusal);
+    const quoted = ` GitHub said: "${last.refusal}".`;
+
+    if (kind === "capacity") {
+      return (
+        `${when} was dispatched, and GitHub found no runner to start the job ` +
+        `on before any step ran.${quoted} That is a GitHub capacity problem, ` +
+        "not the job and not the account, and the next scheduled run usually " +
+        "clears it."
+      );
+    }
+    if (kind === "account") {
+      return (
+        `${when} was dispatched, and GitHub refused to start the job before ` +
+        `any step ran.${quoted} The remedy is on the account, usually billing ` +
+        "or a spending limit, and not in the job."
+      );
+    }
+    if (kind === "unrecognised") {
+      return (
+        `${when} was dispatched, and GitHub refused to start the job before ` +
+        `any step ran.${quoted} Nothing in the job ran, so GitHub's reason is ` +
+        "the place to start."
+      );
+    }
     return (
       `${when} was dispatched, and GitHub refused to start the job before any ` +
-      `step ran.${quoted} The remedy is on the account, usually billing or a ` +
-      "spending limit, and not in the job."
+      "step ran. GitHub gave no reason on the run. The two causes seen so far " +
+      "are the account (billing or a spending limit) and GitHub having no " +
+      "runner free, and the run's annotations in the Actions tab say which."
     );
   }
 
@@ -203,8 +250,8 @@ export function formatWatchdogReport(result: WatchdogResult): string {
   }
 
   // #1077. This used to end "re-run the job by hand to confirm it still
-  // works", which is advice that cannot settle the thing being reported: every
-  // entry is queried with event=schedule, deliberately, because a hand run
+  // works", which is advice that cannot settle the thing being reported: only
+  // runs whose event is schedule are counted, deliberately, because a hand run
   // proves the script works and not that GitHub is still firing it. A reader
   // who followed it saw a green run and got the identical alert next time.
   // Suggesting it is still right, saying what it settles is the fix (L36).
@@ -304,7 +351,10 @@ const RUNS_PAGE = 100;
 /** The slice of a workflow run this needs. */
 interface WorkflowRun {
   id?: number;
+  /** What started it. Only "schedule" counts; read from the unfiltered list. */
+  event?: string;
   conclusion?: string | null;
+  created_at?: string;
   updated_at?: string;
   run_started_at?: string;
 }
@@ -346,14 +396,24 @@ export interface LoadWorkflowJobsOptions {
   api: <T>(path: string) => Promise<T>;
   /** The entry that is this watchdog, from selfWorkflowSource. */
   selfSource: string | null;
+  /**
+   * Where to say what was read, one line per workflow (#1138). Optional, and
+   * the CI entry point passes the run log. On 2026-10-07 nothing recorded
+   * what GitHub had answered, so the stale list behind a false alert could be
+   * inferred afterwards but never shown.
+   */
+  log?: (message: string) => void;
 }
 
 /**
  * Every scheduled workflow, with the timestamp each one is judged against.
  *
- * `event=schedule` throughout, self entry included: a run somebody started by
- * hand proves the job still works, not that GitHub is still firing it, and a
- * schedule GitHub has disabled is precisely what this exists to catch.
+ * Only runs whose event is `schedule` are counted, self entry included: a run
+ * somebody started by hand proves the job still works, not that GitHub is
+ * still firing it, and a schedule GitHub has disabled is precisely what this
+ * exists to catch. The `event=schedule` list is the primary read; the
+ * unfiltered list is read beside it as a cross check (see below), and only
+ * its scheduled runs are taken from it.
  *
  * Every entry is judged on its newest SUCCESSFUL scheduled run EXCEPT this
  * workflow's own, which is judged on its newest dispatch. The reasoning is on
@@ -363,10 +423,20 @@ export interface LoadWorkflowJobsOptions {
  * One list per workflow, filtered on `event=schedule` only, with the success
  * picked out of it here. GitHub's combined `event=schedule&status=success`
  * answered from an incomplete index on 2026-09-29, returning a newest success
- * a month old for a job that had passed the day before, while each filter on
- * its own was right on every call (#1113, L1014). Reading one list also means
- * the success and the last dispatch come from one answer, so the report can
- * no longer say a run failed while quoting its conclusion as success.
+ * a month old for a job that had passed the day before (#1113, L1014). Reading
+ * one list also means the success and the last dispatch come from one answer,
+ * so the report can no longer say a run failed while quoting its conclusion
+ * as success.
+ *
+ * That list is a filtered index too, and on 2026-10-07 it was the stale one:
+ * its newest run was a refusal from 2026-09-10, for two jobs that had passed
+ * their scheduled runs the day before (#1138). So the unfiltered list is read
+ * as well, and any scheduled run it holds that is newer than the filtered
+ * list's head is put in front of it before anything is judged. A stale index
+ * can then make a reading less complete, but it can no longer accuse a job
+ * whose newer runs the primary list shows (L119). Runs from that list that
+ * GitHub did not dispatch on the schedule are dropped exactly as the filter
+ * would drop them.
  *
  * A workflow the API cannot answer for throws rather than arriving as "never
  * ran": an unreadable answer and a dead job are different things, and only one
@@ -377,6 +447,7 @@ export async function loadGitHubWorkflowJobs({
   files,
   api,
   selfSource,
+  log,
 }: LoadWorkflowJobsOptions): Promise<ScheduledJob[]> {
   const scheduled = collectScheduledWorkflows(files);
 
@@ -384,10 +455,43 @@ export async function loadGitHubWorkflowJobs({
     scheduled.map(async (job): Promise<ScheduledJob> => {
       const isSelf = selfSource !== null && job.source === selfSource;
 
-      const response = await api<WorkflowRunsResponse>(
-        `/repos/${repo}/actions/workflows/${job.source}/runs?event=schedule&per_page=${RUNS_PAGE}`,
-      );
-      const runs = response.workflow_runs ?? [];
+      // The unfiltered list only supplements the filtered one, so a failure to
+      // read it costs the cross check and never the reading itself (L371).
+      // The filtered list stays required: without it there is nothing to
+      // judge, and that failure must surface as the watchdog unable to run.
+      const [filteredResponse, fullRead] = await Promise.all([
+        api<WorkflowRunsResponse>(
+          `/repos/${repo}/actions/workflows/${job.source}/runs?event=schedule&per_page=${RUNS_PAGE}`,
+        ),
+        api<WorkflowRunsResponse>(
+          `/repos/${repo}/actions/workflows/${job.source}/runs?per_page=${RUNS_PAGE}`,
+        ).then(
+          (response) => ({ ok: true as const, response }),
+          (err: unknown) => ({
+            ok: false as const,
+            reason: err instanceof Error ? err.message : String(err),
+          }),
+        ),
+      ]);
+      const filtered = filteredResponse.workflow_runs ?? [];
+      const head = filtered[0];
+      const fresher = fullRead.ok
+        ? (fullRead.response.workflow_runs ?? []).filter(
+            (run) =>
+              run.event === "schedule" &&
+              (!head || runTime(run) > runTime(head)),
+          )
+        : [];
+      const runs = [...fresher, ...filtered];
+
+      log?.(describeRead(job.source, filtered, fresher));
+      if (!fullRead.ok) {
+        log?.(
+          `${job.source}: the full run list could not be read ` +
+            `(${fullRead.reason}), so the scheduled list was not cross checked ` +
+            "and was judged on its own.",
+        );
+      }
 
       const judged = isSelf
         ? runs[0]
@@ -397,7 +501,7 @@ export async function loadGitHubWorkflowJobs({
       // older than everything listed, not that there never was one. The
       // oldest listed run is then the most recent it can have been, and the
       // report says which it is (L11).
-      const beyondPage = !judged && !isSelf && runs.length >= RUNS_PAGE;
+      const beyondPage = !judged && !isSelf && filtered.length >= RUNS_PAGE;
       const judgedRun = beyondPage ? runs[runs.length - 1] : judged;
 
       // A workflow with no success on record is judged from when it was
@@ -411,7 +515,7 @@ export async function loadGitHubWorkflowJobs({
       // The last run on this schedule WHATEVER its conclusion, so the report
       // can name which failure this is (#1041). It is the head of the same
       // list, and two more calls are made only when it did not succeed, so a
-      // healthy repository pays one call per workflow and nothing else.
+      // healthy repository pays two calls per workflow and nothing else.
       const lastDispatch = isSelf
         ? undefined
         : await describeLastDispatch(api, repo, runs[0]);
@@ -422,9 +526,39 @@ export async function loadGitHubWorkflowJobs({
         firstSeenAt: workflow?.created_at ?? null,
         measuredBy: isSelf ? "dispatch" : "success",
         lastDispatch,
-        ...(beyondPage ? { noSuccessInLastRuns: runs.length } : {}),
+        // The page that was measured. Runs the full list added in front of a
+        // stale page are not a contiguous history, so they do not count (L629).
+        ...(beyondPage ? { noSuccessInLastRuns: filtered.length } : {}),
       };
     }),
+  );
+}
+
+/** When a run was created, for ordering two answers about the same workflow. */
+function runTime(run: WorkflowRun): number {
+  const at = run.created_at ?? run.run_started_at ?? run.updated_at;
+  return at ? Date.parse(at) : Number.NEGATIVE_INFINITY;
+}
+
+/** One line for the run log saying what GitHub answered for a workflow. */
+function describeRead(
+  source: string,
+  filtered: WorkflowRun[],
+  fresher: WorkflowRun[],
+): string {
+  const name = (run: WorkflowRun | undefined) =>
+    run
+      ? `run ${run.id ?? "without an id"} from ${
+          run.created_at ?? run.updated_at ?? "an unknown date"
+        } (${run.conclusion ?? "no conclusion"})`
+      : "no run at all";
+
+  const read = `${source}: GitHub's scheduled run list starts at ${name(filtered[0])}.`;
+  if (fresher.length === 0) return read;
+  return (
+    `${read} The full run list holds ${fresher.length} scheduled ` +
+    `run${fresher.length === 1 ? "" : "s"} newer than that, the newest ` +
+    `${name(fresher[0])}, and both were judged together.`
   );
 }
 
