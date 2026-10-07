@@ -965,11 +965,15 @@ describe("loadGitHubWorkflowJobs", () => {
       expect(evaluateScheduledJobs({ jobs, now: AT }).overdue).toEqual([]);
       expect(jobs[0].lastSuccessAt).toBe("2026-10-06T18:47:00Z");
       expect(jobs[0].lastDispatch?.conclusion).toBe("success");
-      // The run log says the filtered answer was stale and what it ended on,
-      // so the next anomaly can be read from the log rather than guessed at.
+      // The run log says what the filtered answer ended on and what the full
+      // list held beyond it, so the next anomaly can be read from the log
+      // rather than guessed at. It states what was measured and does not call
+      // the index stale: a run starting between the two reads looks the same
+      // (L11).
       const note = logged.join("\n");
       expect(note).toContain("migration-drift.yml");
-      expect(note).toMatch(/stale/i);
+      expect(note).toMatch(/newer than/i);
+      expect(note).not.toMatch(/stale/i);
       expect(note).toContain("2026-09-10");
       expect(note).toContain("2026-10-06");
     });
@@ -1028,7 +1032,7 @@ describe("loadGitHubWorkflowJobs", () => {
       expect(note).toContain("migration-drift.yml");
       expect(note).toContain("3010");
       expect(note).toContain("2026-09-10");
-      expect(note).not.toMatch(/stale/i);
+      expect(note).not.toMatch(/newer than/i);
     });
 
     /**

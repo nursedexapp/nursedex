@@ -553,8 +553,8 @@ function describeRead(
   const read = `${source}: GitHub's scheduled run list starts at ${name(filtered[0])}.`;
   if (fresher.length === 0) return read;
   return (
-    `${read} That list was stale: the full run list holds ${fresher.length} ` +
-    `newer scheduled run${fresher.length === 1 ? "" : "s"}, the newest ` +
+    `${read} The full run list holds ${fresher.length} scheduled ` +
+    `run${fresher.length === 1 ? "" : "s"} newer than that, the newest ` +
     `${name(fresher[0])}, and both were judged together.`
   );
 }
