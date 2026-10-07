@@ -1030,6 +1030,81 @@ describe("loadGitHubWorkflowJobs", () => {
       expect(note).toContain("2026-09-10");
       expect(note).not.toMatch(/stale/i);
     });
+
+    /**
+     * The unfiltered list only supplements the filtered one, so its failure
+     * must cost the cross check and not the whole reading (L371). The reading
+     * falls back to the filtered list alone, which is what shipped before
+     * #1138, and the log says the cross check did not happen.
+     */
+    it("falls back to the filtered list when the full list cannot be read", async () => {
+      const api = async <T,>(path: string): Promise<T> => {
+        if (path.endsWith("/jobs"))
+          return { jobs: [{ id: 77, conclusion: "failure", steps: [{}] }] } as T;
+        if (path.includes("/runs?") && path.includes("event=schedule"))
+          return { workflow_runs: STALE_FILTERED } as T;
+        if (path.includes("/runs?")) throw new Error("GitHub API 502");
+        return { created_at: "2026-07-09T00:00:00Z" } as T;
+      };
+      const logged: string[] = [];
+
+      const jobs = await loadGitHubWorkflowJobs({
+        repo: "nursedexapp/nursedex",
+        files: DRIFT,
+        api,
+        selfSource: null,
+        log: (m) => logged.push(m),
+      });
+
+      expect(jobs[0].lastSuccessAt).toBe("2026-09-06T16:00:00Z");
+      const note = logged.join("\n");
+      expect(note).toContain("migration-drift.yml");
+      expect(note).toContain("GitHub API 502");
+      expect(note).toMatch(/not cross checked|could not be read/i);
+    });
+
+    /**
+     * The count in "has not succeeded in its last N scheduled runs" is the
+     * page that was measured. Runs the full list added in front of a stale
+     * page are not a contiguous history, so they must not inflate it (L629).
+     */
+    it("counts only the measured page when no success is found", async () => {
+      const page = Array.from({ length: 100 }, (_, i) => ({
+        id: 3000 - i,
+        event: "schedule",
+        conclusion: "failure",
+        created_at: new Date(Date.UTC(2026, 8, 10) - i * DAY).toISOString(),
+        updated_at: new Date(Date.UTC(2026, 8, 10) - i * DAY).toISOString(),
+      }));
+      const api = async <T,>(path: string): Promise<T> => {
+        if (path.endsWith("/jobs"))
+          return { jobs: [{ id: 77, conclusion: "failure", steps: [{}] }] } as T;
+        if (path.includes("/runs?") && path.includes("event=schedule"))
+          return { workflow_runs: page } as T;
+        if (path.includes("/runs?"))
+          return {
+            workflow_runs: [
+              {
+                id: 4006,
+                event: "schedule",
+                conclusion: "failure",
+                created_at: "2026-10-06T18:45:36Z",
+                updated_at: "2026-10-06T18:47:00Z",
+              },
+            ],
+          } as T;
+        return { created_at: "2026-01-01T00:00:00Z" } as T;
+      };
+
+      const jobs = await loadGitHubWorkflowJobs({
+        repo: "nursedexapp/nursedex",
+        files: DRIFT,
+        api,
+        selfSource: null,
+      });
+
+      expect(jobs[0].noSuccessInLastRuns).toBe(100);
+    });
   });
 
   /**

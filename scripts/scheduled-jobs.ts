@@ -452,23 +452,43 @@ export async function loadGitHubWorkflowJobs({
     scheduled.map(async (job): Promise<ScheduledJob> => {
       const isSelf = selfSource !== null && job.source === selfSource;
 
-      const [filteredResponse, fullResponse] = await Promise.all([
+      // The unfiltered list only supplements the filtered one, so a failure to
+      // read it costs the cross check and never the reading itself (L371).
+      // The filtered list stays required: without it there is nothing to
+      // judge, and that failure must surface as the watchdog unable to run.
+      const [filteredResponse, fullRead] = await Promise.all([
         api<WorkflowRunsResponse>(
           `/repos/${repo}/actions/workflows/${job.source}/runs?event=schedule&per_page=${RUNS_PAGE}`,
         ),
         api<WorkflowRunsResponse>(
           `/repos/${repo}/actions/workflows/${job.source}/runs?per_page=${RUNS_PAGE}`,
+        ).then(
+          (response) => ({ ok: true as const, response }),
+          (err: unknown) => ({
+            ok: false as const,
+            reason: err instanceof Error ? err.message : String(err),
+          }),
         ),
       ]);
       const filtered = filteredResponse.workflow_runs ?? [];
       const head = filtered[0];
-      const fresher = (fullResponse.workflow_runs ?? []).filter(
-        (run) =>
-          run.event === "schedule" && (!head || runTime(run) > runTime(head)),
-      );
+      const fresher = fullRead.ok
+        ? (fullRead.response.workflow_runs ?? []).filter(
+            (run) =>
+              run.event === "schedule" &&
+              (!head || runTime(run) > runTime(head)),
+          )
+        : [];
       const runs = [...fresher, ...filtered];
 
       log?.(describeRead(job.source, filtered, fresher));
+      if (!fullRead.ok) {
+        log?.(
+          `${job.source}: the full run list could not be read ` +
+            `(${fullRead.reason}), so the scheduled list was not cross checked ` +
+            "and was judged on its own.",
+        );
+      }
 
       const judged = isSelf
         ? runs[0]
@@ -503,7 +523,9 @@ export async function loadGitHubWorkflowJobs({
         firstSeenAt: workflow?.created_at ?? null,
         measuredBy: isSelf ? "dispatch" : "success",
         lastDispatch,
-        ...(beyondPage ? { noSuccessInLastRuns: runs.length } : {}),
+        // The page that was measured. Runs the full list added in front of a
+        // stale page are not a contiguous history, so they do not count (L629).
+        ...(beyondPage ? { noSuccessInLastRuns: filtered.length } : {}),
       };
     }),
   );
