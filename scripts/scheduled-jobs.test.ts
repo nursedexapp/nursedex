@@ -870,6 +870,169 @@ describe("loadGitHubWorkflowJobs", () => {
   });
 
   /**
+   * #1138. On 2026-10-07 the single `event=schedule` filter answered from a
+   * stale index too: its newest run was a 2026-09-10 billing refusal, while
+   * the job had passed its scheduled run the day before. The same call made
+   * an hour later was right, and the unfiltered list was right throughout.
+   * The double answers the filtered query the way GitHub did and the
+   * unfiltered one correctly, so this passes only if the unfiltered list is
+   * consulted (L119, L1014).
+   */
+  describe("when GitHub's scheduled run list is stale", () => {
+    const AT = Date.UTC(2026, 9, 7, 13, 30, 0);
+    const DRIFT = [
+      {
+        path: ".github/workflows/migration-drift.yml",
+        contents:
+          'name: Migration Drift\non:\n  schedule:\n    - cron: "30 13 * * *"\n',
+      },
+    ];
+
+    /** The filtered answer GitHub gave at 13:30 UTC, ending on 2026-09-10. */
+    const STALE_FILTERED = [
+      {
+        id: 3010,
+        event: "schedule",
+        conclusion: "failure",
+        created_at: "2026-09-10T16:53:00Z",
+        updated_at: "2026-09-10T16:53:02Z",
+      },
+      {
+        id: 3006,
+        event: "schedule",
+        conclusion: "success",
+        created_at: "2026-09-06T15:58:00Z",
+        updated_at: "2026-09-06T16:00:00Z",
+      },
+    ];
+
+    function staleApi(full: Array<Record<string, unknown>>) {
+      const calls: string[] = [];
+      const api = async <T,>(path: string): Promise<T> => {
+        calls.push(path);
+        if (path.includes("/annotations"))
+          return [
+            {
+              message:
+                "The job was not started because recent account payments have failed",
+            },
+          ] as T;
+        if (path.endsWith("/jobs"))
+          return { jobs: [{ id: 77, conclusion: "failure", steps: [] }] } as T;
+        if (path.includes("/runs?") && path.includes("event=schedule"))
+          return { workflow_runs: STALE_FILTERED } as T;
+        if (path.includes("/runs?")) return { workflow_runs: full } as T;
+        return { created_at: "2026-07-09T00:00:00Z" } as T;
+      };
+      return { api, calls };
+    }
+
+    it("judges the job on the newer scheduled run the full list holds", async () => {
+      const { api } = staleApi([
+        {
+          id: 4007,
+          event: "push",
+          conclusion: "failure",
+          created_at: "2026-10-07T09:00:00Z",
+          updated_at: "2026-10-07T09:01:00Z",
+        },
+        {
+          id: 4006,
+          event: "schedule",
+          conclusion: "success",
+          created_at: "2026-10-06T18:45:36Z",
+          updated_at: "2026-10-06T18:47:00Z",
+        },
+        {
+          id: 4005,
+          event: "schedule",
+          conclusion: "failure",
+          created_at: "2026-10-05T20:57:07Z",
+          updated_at: "2026-10-05T20:57:09Z",
+        },
+        ...STALE_FILTERED,
+      ]);
+      const logged: string[] = [];
+
+      const jobs = await loadGitHubWorkflowJobs({
+        repo: "nursedexapp/nursedex",
+        files: DRIFT,
+        api,
+        selfSource: null,
+        log: (m) => logged.push(m),
+      });
+
+      expect(evaluateScheduledJobs({ jobs, now: AT }).overdue).toEqual([]);
+      expect(jobs[0].lastSuccessAt).toBe("2026-10-06T18:47:00Z");
+      expect(jobs[0].lastDispatch?.conclusion).toBe("success");
+      // The run log says the filtered answer was stale and what it ended on,
+      // so the next anomaly can be read from the log rather than guessed at.
+      const note = logged.join("\n");
+      expect(note).toContain("migration-drift.yml");
+      expect(note).toMatch(/stale/i);
+      expect(note).toContain("2026-09-10");
+      expect(note).toContain("2026-10-06");
+    });
+
+    /**
+     * The positive control (L159). With the same stale filtered answer and a
+     * full list holding nothing newer that GitHub dispatched on the schedule,
+     * the job IS overdue. A hand run newer than everything, and a push run,
+     * must not stand in for a scheduled one: a hand run proves the script, not
+     * that GitHub still fires the schedule.
+     */
+    it("still accuses the job when the full list holds no newer scheduled run", async () => {
+      const { api } = staleApi([
+        {
+          id: 4008,
+          event: "workflow_dispatch",
+          conclusion: "success",
+          created_at: "2026-10-07T10:00:00Z",
+          updated_at: "2026-10-07T10:02:00Z",
+        },
+        {
+          id: 4007,
+          event: "push",
+          conclusion: "success",
+          created_at: "2026-10-07T09:00:00Z",
+          updated_at: "2026-10-07T09:01:00Z",
+        },
+        ...STALE_FILTERED,
+      ]);
+
+      const jobs = await loadGitHubWorkflowJobs({
+        repo: "nursedexapp/nursedex",
+        files: DRIFT,
+        api,
+        selfSource: null,
+      });
+
+      const overdue = evaluateScheduledJobs({ jobs, now: AT }).overdue;
+      expect(overdue.map((j) => j.source)).toEqual(["migration-drift.yml"]);
+      expect(jobs[0].lastSuccessAt).toBe("2026-09-06T16:00:00Z");
+    });
+
+    it("logs the newest scheduled run it read, even when nothing was stale", async () => {
+      const { api } = staleApi(STALE_FILTERED);
+      const logged: string[] = [];
+
+      await loadGitHubWorkflowJobs({
+        repo: "nursedexapp/nursedex",
+        files: DRIFT,
+        api,
+        selfSource: null,
+        log: (m) => logged.push(m),
+      });
+
+      const note = logged.join("\n");
+      expect(note).toContain("migration-drift.yml");
+      expect(note).toContain("3010");
+      expect(note).toContain("2026-09-10");
+      expect(note).not.toMatch(/stale/i);
+    });
+  });
+
+  /**
    * A full page with no success in it does not know when the last success
    * was, only that it is older than everything listed. It must say that
    * rather than "never", which is a claim it did not measure (L11).
@@ -905,16 +1068,57 @@ describe("loadGitHubWorkflowJobs", () => {
    * A run somebody started by hand proves the job still works, not that GitHub
    * is still firing it, and a schedule GitHub has disabled is the whole thing
    * this exists to catch. That holds for the relaxed self reading too.
+   *
+   * This used to assert every request carried `event=schedule`. Since #1138
+   * the unfiltered list is read as well, so the property is asserted on what
+   * is JUDGED instead: a hand run newer than everything must not count as the
+   * watchdog's own dispatch.
    */
-  it("asks only about scheduled runs, including its own", async () => {
-    const { api, calls } = fakeApi();
-    await loadGitHubWorkflowJobs({
+  it("never counts a hand run as a scheduled one, including its own", async () => {
+    const api = async <T,>(path: string): Promise<T> => {
+      if (path.includes("job-watchdog.yml/runs?") && path.includes("event=schedule"))
+        return {
+          workflow_runs: [
+            {
+              id: 1,
+              event: "schedule",
+              conclusion: "success",
+              created_at: iso(NOW - 5 * DAY),
+              updated_at: iso(NOW - 5 * DAY),
+            },
+          ],
+        } as T;
+      if (path.includes("job-watchdog.yml/runs?"))
+        return {
+          workflow_runs: [
+            {
+              id: 2,
+              event: "workflow_dispatch",
+              conclusion: "success",
+              created_at: iso(NOW - HOUR),
+              updated_at: iso(NOW - HOUR),
+            },
+          ],
+        } as T;
+      return {
+        workflow_runs: [
+          { id: 4, event: "schedule", conclusion: "success", updated_at: iso(NOW - 2 * HOUR) },
+        ],
+      } as T;
+    };
+
+    const jobs = await loadGitHubWorkflowJobs({
       repo: "nursedexapp/nursedex",
       files: FILES,
       api,
       selfSource: "job-watchdog.yml",
     });
-    for (const path of calls) expect(path).toContain("event=schedule");
+
+    const overdue = evaluateScheduledJobs({ jobs, now: NOW }).overdue;
+    expect(overdue.map((j) => j.source)).toEqual(["job-watchdog.yml"]);
+    expect(jobs.find((j) => j.source === "job-watchdog.yml")?.lastSuccessAt).toBe(
+      iso(NOW - 5 * DAY),
+    );
   });
 
   it("says it was last dispatched, not that it succeeded, when its own schedule has stopped", () => {
@@ -1039,6 +1243,50 @@ describe("which of the dispatch states an overdue job is in", () => {
     expect(report).toContain("recent account payments have failed");
     // The reader must not be sent to read a log: a refused run has none.
     expect(report).not.toMatch(/read that run's log/i);
+  });
+
+  /**
+   * #1138. On 2026-10-05 Migration Drift's run executed no steps because
+   * GitHub had no hosted runner for it, and the alert sent the reader to the
+   * billing page. Nothing on the account fixes a runner shortage; the next
+   * scheduled run did, the following day.
+   */
+  it("calls a runner shortage a GitHub capacity problem, not an account one", () => {
+    const report = formatWatchdogReport(
+      weekly({
+        conclusion: "failure",
+        at: new Date(NOW - 1 * DAY).toISOString(),
+        ranAnySteps: false,
+        refusal:
+          "The job was not acquired by Runner of type hosted even after multiple attempts",
+      }),
+    );
+
+    expect(report).toContain("not acquired by Runner of type hosted");
+    expect(report).toMatch(/capacity/i);
+    expect(report).toMatch(/next scheduled run/i);
+    expect(report).not.toMatch(/billing|spending limit|on the account/i);
+    expect(report).not.toMatch(/read that run's log/i);
+  });
+
+  /**
+   * A reason GitHub gave that is neither of the two known ones is quoted and
+   * not interpreted. Saying where the remedy is would be a claim this check
+   * never measured (L11).
+   */
+  it("quotes an unrecognised refusal without naming a remedy it did not measure", () => {
+    const report = formatWatchdogReport(
+      weekly({
+        conclusion: "failure",
+        at: new Date(NOW - 1 * DAY).toISOString(),
+        ranAnySteps: false,
+        refusal: "Something new GitHub says",
+      }),
+    );
+
+    expect(report).toMatch(/refused to start/i);
+    expect(report).toContain("Something new GitHub says");
+    expect(report).not.toMatch(/billing|spending limit|capacity/i);
   });
 });
 

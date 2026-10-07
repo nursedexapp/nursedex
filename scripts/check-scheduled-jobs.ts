@@ -87,6 +87,7 @@ async function loadJobs(): Promise<ScheduledJob[]> {
     files,
     api,
     selfSource: selfWorkflowSource(process.env),
+    log: (message) => console.log(message),
   });
 
   return [...workflows, ...(await loadVercelCronJobs())];
