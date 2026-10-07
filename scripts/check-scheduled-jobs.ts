@@ -13,9 +13,10 @@
  * The Vercel half runs HERE rather than as a fourteenth cron, because a check
  * that runs on the same scheduler as the jobs it watches dies with them.
  *
- * `event=schedule` on purpose: a run somebody started by hand proves the job
- * still works, not that GitHub is still firing it, and a schedule GitHub has
- * disabled is precisely what this exists to catch.
+ * Only scheduled runs count, on purpose: a run somebody started by hand proves
+ * the job still works, not that GitHub is still firing it, and a schedule
+ * GitHub has disabled is precisely what this exists to catch. The unfiltered
+ * run list is read too, as a cross check, and only its scheduled runs are used.
  *
  * Usage:
  *   GITHUB_TOKEN=... GITHUB_REPOSITORY=owner/name npx tsx scripts/check-scheduled-jobs.ts

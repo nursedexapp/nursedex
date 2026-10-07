@@ -1374,8 +1374,8 @@ describe("what the alert tells the reader to do about it", () => {
 
   /**
    * #1077. The message used to end "re-run the job by hand to confirm it still
-   * works". A hand run cannot satisfy this check: every entry is queried with
-   * event=schedule, deliberately, because a hand run proves the script works
+   * works". A hand run cannot satisfy this check: only runs whose event is
+   * schedule are counted, deliberately, because a hand run proves the script works
    * and not that GitHub is still firing it. So the reader does exactly what the
    * alert says, sees a green run, and the next reading reports the identical
    * finding. Confirmed on 2026-09-15 by dispatching stale-prs.yml by hand.

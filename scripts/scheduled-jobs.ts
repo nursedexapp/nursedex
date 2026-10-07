@@ -250,8 +250,8 @@ export function formatWatchdogReport(result: WatchdogResult): string {
   }
 
   // #1077. This used to end "re-run the job by hand to confirm it still
-  // works", which is advice that cannot settle the thing being reported: every
-  // entry is queried with event=schedule, deliberately, because a hand run
+  // works", which is advice that cannot settle the thing being reported: only
+  // runs whose event is schedule are counted, deliberately, because a hand run
   // proves the script works and not that GitHub is still firing it. A reader
   // who followed it saw a green run and got the identical alert next time.
   // Suggesting it is still right, saying what it settles is the fix (L36).
@@ -408,9 +408,12 @@ export interface LoadWorkflowJobsOptions {
 /**
  * Every scheduled workflow, with the timestamp each one is judged against.
  *
- * `event=schedule` throughout, self entry included: a run somebody started by
- * hand proves the job still works, not that GitHub is still firing it, and a
- * schedule GitHub has disabled is precisely what this exists to catch.
+ * Only runs whose event is `schedule` are counted, self entry included: a run
+ * somebody started by hand proves the job still works, not that GitHub is
+ * still firing it, and a schedule GitHub has disabled is precisely what this
+ * exists to catch. The `event=schedule` list is the primary read; the
+ * unfiltered list is read beside it as a cross check (see below), and only
+ * its scheduled runs are taken from it.
  *
  * Every entry is judged on its newest SUCCESSFUL scheduled run EXCEPT this
  * workflow's own, which is judged on its newest dispatch. The reasoning is on
