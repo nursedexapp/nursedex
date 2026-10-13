@@ -3,7 +3,7 @@
  * after it counts only browsers that accepted (L683), so each surface that
  * shows a PostHog number carries this caption. Set in the launch step.
  */
-export const CONSENT_LAUNCH_DATE: string | null = null;
+export const CONSENT_LAUNCH_DATE: string | null = "2026-10-13";
 
 const FORMAT = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
