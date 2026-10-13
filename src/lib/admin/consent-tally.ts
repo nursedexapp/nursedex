@@ -1,14 +1,13 @@
 import "server-only";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { isConsentEventKind } from "@/lib/consent/kinds";
-import { newYorkDay } from "@/lib/dates/new-york-day";
+import { newYorkDaysAgo } from "@/lib/dates/new-york-day";
 
 export type ConsentTally =
   | { status: "ok"; days: number; shown: number; accepted: number; declined: number; acceptRate: number | null }
   | { status: "error"; message: string };
 
 export const CONSENT_RATE_MIN_SHOWN = 20;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function summariseConsentRows(rows: unknown, days: number): ConsentTally {
   const totals = { shown: 0, accepted: 0, declined: 0 };
@@ -36,7 +35,7 @@ export function summariseConsentRows(rows: unknown, days: number): ConsentTally 
 
 /** Exactly `days` New York days ending today. Never throws: the section renders the error. */
 export async function getConsentTally(days = 30, now: Date = new Date()): Promise<ConsentTally> {
-  const since = newYorkDay(new Date(now.getTime() - (days - 1) * DAY_MS));
+  const since = newYorkDaysAgo(now, days - 1);
   try {
     const { data, error } = await createServiceRoleClient()
       .from("consent_tally")
