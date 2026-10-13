@@ -11,6 +11,13 @@ vi.mock("posthog-js", () => ({
   },
 }));
 
+const replay = vi.hoisted(() => ({ stops: 0 }));
+vi.mock("@/lib/consent/sentry-replay", () => ({
+  stopSentryReplay: () => {
+    replay.stops += 1;
+  },
+}));
+
 import posthog from "posthog-js";
 import { applyAnalyticsPreference } from "./preference";
 import { __resetConsentMemoryForTests, accountAnalyticsOff } from "@/lib/consent/store";
@@ -31,6 +38,7 @@ beforeEach(() => {
   vi.mocked(posthog.has_opted_out_capturing).mockReturnValue(false);
   (posthog as unknown as { __loaded: boolean }).__loaded = true;
   setDoNotTrack(null);
+  replay.stops = 0;
 });
 
 afterEach(() => {
@@ -89,5 +97,19 @@ describe("applyAnalyticsPreference", () => {
     expect(accountAnalyticsOff()).toBe(true);
     applyAnalyticsPreference(false);
     expect(accountAnalyticsOff()).toBe(false);
+  });
+
+  it("stops Sentry session replay for somebody who has opted out, even before PostHog loaded", () => {
+    // Replay starts in instrumentation-client.ts for any browser that accepted
+    // the banner, before this device has seen the account setting, and it
+    // records the screen as fully as PostHog would.
+    (posthog as unknown as { __loaded: boolean }).__loaded = false;
+    applyAnalyticsPreference(true);
+    expect(replay.stops).toBe(1);
+  });
+
+  it("leaves replay alone for somebody who has not opted out", () => {
+    applyAnalyticsPreference(false);
+    expect(replay.stops).toBe(0);
   });
 });

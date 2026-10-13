@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { initPostHog, posthog } from "@/lib/posthog";
 import { applyAnalyticsPreference } from "@/lib/analytics/preference";
+import { analyticsAllowed } from "@/lib/consent/store";
+import { useConsentState } from "@/lib/consent/use-consent-state";
 
 /**
  * Links the PostHog person to our user id so client events (anonymous until
@@ -25,6 +27,13 @@ import { applyAnalyticsPreference } from "@/lib/analytics/preference";
  * for somebody opted out, because identify is itself a capture, and it is the
  * one that attaches their email address to a PostHog profile.
  *
+ * It also waits for the cookie banner: initPostHog refuses until this browser
+ * has accepted and the account allows it, and the effect re-runs when either
+ * changes. The preference is applied before initPostHog as well as after it,
+ * because the gate reads the account setting from this device: recorded only
+ * once PostHog runs, an opted out person who accepts the banner would start
+ * PostHog and send a pageview before the opt-out arrived.
+ *
  * Known gap, named rather than hidden: this component renders on the dashboard
  * and the pricing page, so on a BRAND NEW device a few public pageviews can be
  * recorded before the person reaches one of them. Those are anonymous
@@ -41,19 +50,27 @@ export function PostHogIdentify({
   email?: string;
   analyticsOptOut: boolean;
 }) {
-  useEffect(() => {
-    initPostHog();
-    if (!posthog.__loaded) return;
+  const consent = useConsentState();
 
-    // Before the early return below, not after: a person already identified on
-    // this device is exactly the person whose choice may have changed
-    // somewhere else.
+  useEffect(() => {
+    // First, before anything can start PostHog: records the account setting on
+    // this device, which initPostHog's gate reads, and stops replay for
+    // somebody opted out. Also before the early returns below: a person
+    // already identified on this device is exactly the person whose choice
+    // may have changed somewhere else.
     applyAnalyticsPreference(analyticsOptOut);
-    if (analyticsOptOut) return;
+    if (!posthog.__loaded) {
+      initPostHog();
+      if (!posthog.__loaded) return;
+      // Started just now, so PostHog's own stored opt-out, from a time this
+      // person was opted out, is only reachable now.
+      applyAnalyticsPreference(analyticsOptOut);
+    }
+    if (analyticsOptOut || !analyticsAllowed()) return;
 
     if (posthog.get_distinct_id() === userId) return;
     posthog.identify(userId, email ? { email } : undefined);
-  }, [userId, email, analyticsOptOut]);
+  }, [userId, email, analyticsOptOut, consent]);
 
   return null;
 }

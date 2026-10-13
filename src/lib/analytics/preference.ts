@@ -2,15 +2,17 @@
 
 import posthog from "posthog-js";
 import { browserSendsPrivacySignal, setAccountAnalyticsOff } from "@/lib/consent/store";
+import { stopSentryReplay } from "@/lib/consent/sentry-replay";
 
 /**
  * Apply a person's stored analytics choice to this browser (#715), and record
  * the account setting on this device so the consent gate and Sentry replay see
  * it too.
  *
- * `opt_out_capturing` stops events AND session recording, which is what the
- * privacy policy promises, and PostHog persists the decision in the browser's
- * own storage, so it survives a reload without us doing anything.
+ * `opt_out_capturing` stops PostHog's events AND session recording, and
+ * stopSentryReplay stops Sentry's replay, which together are what the privacy
+ * policy promises. PostHog persists the decision in the browser's own storage,
+ * so it survives a reload without us doing anything.
  *
  * It has to work in BOTH directions. Because PostHog persists the opt-out
  * itself, a person who changed their mind would otherwise stay untracked on
@@ -30,6 +32,10 @@ export function applyAnalyticsPreference(optedOut: boolean): void {
   // Recorded on this device first, so the banner's gate and Sentry replay
   // both see it, including on pages that never render PostHogIdentify.
   setAccountAnalyticsOff(optedOut);
+  // Sentry replay records the screen as fully as PostHog does, and it can be
+  // running without PostHog (instrumentation-client.ts starts it for any
+  // browser that accepted), so it stops here whether or not PostHog loaded.
+  if (optedOut) stopSentryReplay();
 
   if (!posthog.__loaded) return;
 
