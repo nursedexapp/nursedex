@@ -86,6 +86,10 @@ body {
   font-family: var(--font-body);
   color: var(--color-soft-black);
   background-color: var(--color-warm-white);
+  /* The cookie bar pads the page by its own measured height while it shows
+     (ConsentBanner, use-height-variable.ts), so it never hides the end of a
+     page. 0px when the bar is closed or never measured. */
+  padding-bottom: var(--consent-bar-height, 0px);
 }
 
 @keyframes fadeIn {

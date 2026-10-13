@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PrivacyChoicesButton } from "@/components/consent/PrivacyChoicesButton";
 import { SocialLinks } from "@/components/shared/SocialLinks";
 
 // Slim footer for in-app surfaces (dashboard, auth). Lighter than the marketing
@@ -20,6 +21,7 @@ export function AppFooter({ className }: { className?: string }) {
           >
             Privacy Policy
           </Link>
+          <PrivacyChoicesButton />
           <Link
             href="/terms"
             className="hover:text-soft-black underline underline-offset-2"

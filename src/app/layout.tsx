@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { FamilyAccessCelebration } from "@/components/FamilyAccessCelebration";
 import { OrganizationJsonLd } from "@/components/shared/OrganizationJsonLd";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { ConsentBanner } from "@/components/consent/ConsentBanner";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -65,6 +66,7 @@ export default function RootLayout({
       <body>
         <OrganizationJsonLd />
         <PostHogProvider />
+        <ConsentBanner />
         {children}
         <Suspense fallback={null}>
           <FamilyAccessCelebration />

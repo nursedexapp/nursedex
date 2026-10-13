@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PrivacyChoicesButton } from "@/components/consent/PrivacyChoicesButton";
 import { SocialLinks } from "@/components/shared/SocialLinks";
 
 /**
@@ -79,6 +80,7 @@ export function Footer({ year }: FooterProps) {
           >
             Privacy Policy
           </Link>
+          <PrivacyChoicesButton />
           <Link
             href="/terms"
             className="hover:text-soft-black underline underline-offset-2"

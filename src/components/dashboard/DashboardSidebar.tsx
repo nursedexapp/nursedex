@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { NavPendingIcon } from "@/components/nav/NavPendingIcon";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { useHeightVariable } from "@/components/ui/use-height-variable";
 
 interface NavItem {
   href: string;
@@ -49,6 +51,11 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ role }: DashboardSidebarProps) {
   const pathname = usePathname();
   const navItems = role === "family" ? FAMILY_NAV : NURSE_NAV;
+  // The cookie bar sits on top of the mobile nav. The nav's height is
+  // published rather than assumed because its labels wrap to two lines on a
+  // phone; it reads 0px at lg, where the nav is hidden.
+  const mobileNavRef = useRef<HTMLElement>(null);
+  useHeightVariable(mobileNavRef, "--bottom-nav-height");
 
   return (
     <>
@@ -93,7 +100,10 @@ export function DashboardSidebar({ role }: DashboardSidebarProps) {
       </aside>
 
       {/* Mobile bottom nav */}
-      <nav className="border-sage/20 fixed inset-x-0 bottom-0 z-50 flex border-t bg-white lg:hidden">
+      <nav
+        ref={mobileNavRef}
+        className="border-sage/20 fixed inset-x-0 bottom-0 z-50 flex border-t bg-white lg:hidden"
+      >
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive =
             href === "/dashboard"
