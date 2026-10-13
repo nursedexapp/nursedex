@@ -5,14 +5,19 @@ import {
 } from "@/lib/sentry/ignored-browser-errors";
 import { analyticsAllowed } from "@/lib/consent/store";
 import { startSentryReplay } from "@/lib/consent/sentry-replay";
+import { tracesSampleRateFor } from "@/lib/sentry/traces-sample-rate";
 
 // Must be NEXT_PUBLIC_-prefixed to be inlined into the client bundle; a
 // bare SENTRY_DSN resolves to undefined in the browser and silently
 // disables client-side error and replay capture (#395). Sentry DSNs are
 // meant to be public (they're embedded in every client SDK by design),
 // so exposing this one client-side isn't a secret-handling concern.
-// See src/sentry.server.config.ts for why this isn't a flat 1.0.
-const tracesSampleRate = process.env.VERCEL_ENV === "production" ? 0.1 : 1.0;
+// NEXT_PUBLIC_VERCEL_ENV, not VERCEL_ENV, for the same reason: next.config.ts
+// sets it from VERCEL_ENV at build time so Next inlines it here. A bare
+// VERCEL_ENV read undefined in the browser and traced every page load.
+const tracesSampleRate = tracesSampleRateFor(
+  process.env.NEXT_PUBLIC_VERCEL_ENV,
+);
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,

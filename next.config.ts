@@ -23,6 +23,15 @@ const posthogAssetsHost = posthogHost.replace(
 // withSentryConfig's build-time work (network calls for source-map
 // upload); only the wrapped default export matters to Next.js itself.
 export const nextConfig: NextConfig = {
+  // The Vercel environment, inlined into the browser bundle. VERCEL_ENV is
+  // present at build time but is not NEXT_PUBLIC_, so Next never inlines it,
+  // and the browser's Sentry trace rate read undefined and traced every page
+  // load (src/lib/sentry/traces-sample-rate.ts). Set here rather than relying
+  // on Vercel exposing NEXT_PUBLIC_VERCEL_ENV itself, which nothing in this
+  // project confirms. Empty outside Vercel, which samples fully.
+  env: {
+    NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "",
+  },
   images: {
     remotePatterns: supabaseImageRemotePatterns(),
   },
