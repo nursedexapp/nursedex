@@ -15,6 +15,16 @@ describe("nurse photo tokens", () => {
     process.env.SUPABASE_SECRET_KEY = original;
   });
 
+  it("still opens a token minted before the construction was shared with video previews", () => {
+    // Minted by this module on 2026-10-13, before sealed-token.ts existed.
+    // Cached photo URLs carry tokens like it, so the shared helper must
+    // produce and accept exactly the same bytes.
+    const minted =
+      "2E6QojFKXmK5-SQ3m8O_HB9x2UMDhGOqie2B_LEQgYS9s3yDuzf5Ty0trySHzv-p-9t6vHlUflctvNYaPEjlfWOba3eHwiEp9h4VTINfvTVDpA";
+    expect(encodePhotoToken(PATH)).toBe(minted);
+    expect(decodePhotoToken(minted)).toBe(PATH);
+  });
+
   it("round trips a storage path", () => {
     expect(decodePhotoToken(encodePhotoToken(PATH))).toBe(PATH);
   });
