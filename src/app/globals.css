@@ -19,6 +19,9 @@
   --color-sage: #a8c5b5;
   --color-sage-light: #c4d9cf;
   --color-sage-dark: #8baf9d;
+  /* sage-light over warm-white: a panel that reads apart from the page while
+     soft-black text stays at 10:1. The consent bar's surface (#1160). */
+  --color-sage-wash: #dde7e1;
   --color-cream: #f5d5a8;
   --color-cream-light: #fae8cd;
   --color-cream-dark: #e8bf82;

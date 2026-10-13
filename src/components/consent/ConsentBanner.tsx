@@ -122,7 +122,10 @@ export function ConsentBanner() {
   const current =
     state === "accepted" || state === "declined" ? readConsent() : null;
   const policy = (
-    <Link href="/privacy" className="text-teal underline underline-offset-2">
+    <Link
+      href="/privacy"
+      className="text-teal-dark underline underline-offset-2"
+    >
       Privacy policy
     </Link>
   );
@@ -133,7 +136,7 @@ export function ConsentBanner() {
       role="region"
       aria-label="Privacy choices"
       tabIndex={-1}
-      className="border-sage-light/50 bg-warm-white focus-visible:ring-ring/50 fixed inset-x-0 bottom-[var(--bottom-nav-height,0px)] z-40 border-t px-4 pt-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)_-_var(--bottom-nav-height,0px)))] shadow-lg outline-none focus-visible:ring-3 focus-visible:ring-inset sm:px-6"
+      className="border-sage bg-sage-wash focus-visible:ring-ring/50 fixed inset-x-0 bottom-[var(--bottom-nav-height,0px)] z-40 border-t px-4 pt-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)_-_var(--bottom-nav-height,0px)))] shadow-lg outline-none focus-visible:ring-3 focus-visible:ring-inset sm:px-6"
     >
       <div className="max-w-site font-body text-soft-black mx-auto flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
         {state === "signal" ? (
