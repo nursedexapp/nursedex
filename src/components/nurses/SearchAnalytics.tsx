@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { captureClientEvent } from "@/lib/analytics/capture";
+import { useCaptureOnce } from "@/lib/analytics/use-capture-once";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { SearchFilters } from "@/lib/nurses/search-params";
 
@@ -19,19 +18,11 @@ export function SearchAnalytics({
   filters,
   resultCount,
 }: SearchAnalyticsProps) {
-  const fingerprint = JSON.stringify(filters);
-  const lastSent = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (lastSent.current === fingerprint) return;
-    // Only mark it sent when it really was: a refused capture (no consent, or
-    // PostHog not running) must stay eligible.
-    const sent = captureClientEvent(ANALYTICS_EVENTS.SEARCH_PERFORMED, {
-      ...filters,
-      result_count: resultCount,
-    });
-    if (sent) lastSent.current = fingerprint;
-  }, [fingerprint, filters, resultCount]);
+  useCaptureOnce(
+    ANALYTICS_EVENTS.SEARCH_PERFORMED,
+    { ...filters, result_count: resultCount },
+    JSON.stringify(filters),
+  );
 
   return null;
 }
