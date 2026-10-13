@@ -193,6 +193,11 @@ const IGNORED = [
   // where React never calls eval at all. The e2e suite runs the dev server, so
   // this appears there and nowhere a family will ever be.
   /eval\(\) is not supported in this environment/,
+  // The e2e browser Sentry DSN is on sentry.invalid (playwright.config.ts), so
+  // that no run can reach a real Sentry. Our own CSP refuses it, which is the
+  // point, and logs two errors per send naming the host. Only that placeholder
+  // host is ignored: a refusal of anything else still fails this spec.
+  /sentry\.invalid/,
 ];
 
 function collectConsole(page: Page): { errors: string[]; warnings: string[] } {

@@ -156,7 +156,12 @@ export default defineConfig({
     // whole point and a build per run would be intolerable.
     command: process.env.CI ? "npm run build && npm run start" : "npm run dev",
     url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    // Never reuse a server, locally either. One somebody started by hand
+    // carries .env.local's production Sentry DSN and PostHog key, not the
+    // overrides in `env` below, so reusing it sent a local run's server
+    // errors to production Sentry and paged Slack (NURSEDEX-SITE-15 and 16,
+    // 2026-10-13). With reuse off, a busy port 3000 fails the run loudly.
+    reuseExistingServer: false,
     // The build now happens inside this window, so the old 120s (sized for a
     // Turbopack cold start) no longer describes what is being waited for. The
     // measured run needed well under 120s, but a timeout that trips
@@ -165,34 +170,40 @@ export default defineConfig({
     // on a hang, not a delay anybody waits out.
     timeout: 300 * 1000,
     // The consent spec must see PostHog and Sentry TRY to run after Accept, or
-    // "nothing before Accept" passes on a build where they never could. The
-    // browser's sends are intercepted by the spec, so nothing leaves the
-    // machine from it. Playwright merges this over process.env, and Next lets
-    // the process environment win over .env.local, an empty value included
-    // (processEnv in @next/env skips any key already set).
+    // "nothing before Accept" passes on a build where they never could. So both
+    // are configured, and every address they could send to is one that cannot
+    // leave the machine. Playwright merges this over process.env, and Next
+    // lets the process environment win over .env.local, an empty value
+    // included (processEnv in @next/env skips any key already set). All four
+    // are fixed values, never taken from the shell.
     //
-    // Both Sentry DSNs are ALWAYS overridden, never taken from the shell.
-    // .env.local on a dev machine holds the PRODUCTION DSN, and the server
-    // SDK (src/sentry.server.config.ts) reads SENTRY_DSN: on 2026-10-13 a local
-    // run filed NURSEDEX-SITE-15 and NURSEDEX-SITE-16 against production and
-    // paged Slack. Server side sends cannot be intercepted by a spec, so the
-    // server SDK is switched off here with an empty DSN.
+    // SENTRY_DSN is empty, so the server SDK (src/sentry.server.config.ts,
+    // sentry.edge.config.ts) is off. .env.local holds the PRODUCTION DSN, and
+    // a server side send cannot be intercepted by a spec.
     //
-    // The browser DSN is a placeholder on the one ingest host the CSP's
-    // connect-src allows (SENTRY_INGEST_HOST in src/proxy.ts). Any other host is
-    // blocked by the browser before a request exists, so the spec would see no
-    // envelope at all (measured). Its key and project are fake, so Sentry
-    // refuses whatever a spec that intercepts nothing happens to send.
+    // The browser DSN is on a .invalid host, which never resolves. The CSP's
+    // connect-src does not list it, so in every spec but consent.spec.ts the
+    // browser refuses the request before it exists; consent.spec.ts bypasses
+    // the CSP and fulfils the envelopes in its own route.
     //
-    // The PostHog key is always a placeholder for the same reason: the server
-    // captures some events itself (src/lib/analytics/server.ts) with this key,
-    // and those cannot be intercepted either. PostHog refuses the fake key.
+    // PostHog's host is a dead local port. The browser only ever talks to the
+    // same origin /ingest proxy, which next.config.ts rewrites to this host and
+    // consent.spec.ts intercepts; the server's own captures
+    // (src/lib/analytics/server.ts) and the proxy reach nothing.
+    //
+    // Next's own anonymous telemetry is switched off too, so the server has
+    // nothing of ours to send off the machine but its database traffic.
+    //
+    // Measured 2026-10-13: across consent.spec.ts and a run of the public pages,
+    // the browser made no request to any host but localhost, 127.0.0.1 and the
+    // routed sentry.invalid, and sampling the server's sockets found no
+    // connection to Sentry's or PostHog's addresses (task 10 report, fixes).
     env: {
       NEXT_PUBLIC_POSTHOG_KEY: "phc_e2e_placeholder",
-      NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
+      NEXT_PUBLIC_POSTHOG_HOST: "http://127.0.0.1:9",
       SENTRY_DSN: "",
-      NEXT_PUBLIC_SENTRY_DSN:
-        "https://e2epublic@o4511116810584064.ingest.us.sentry.io/0",
+      NEXT_PUBLIC_SENTRY_DSN: "https://e2epublic@sentry.invalid/0",
+      NEXT_TELEMETRY_DISABLED: "1",
     },
   },
 });

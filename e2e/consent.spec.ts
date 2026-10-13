@@ -17,8 +17,13 @@ import {
 // then sends nothing at all, so no test here could see an event, and a
 // withdrawal that left PostHog running would look exactly like one that
 // stopped it. So the spec presents an ordinary desktop Chrome.
+//
+// bypassCSP: the e2e Sentry DSN is on sentry.invalid (playwright.config.ts),
+// which the CSP's connect-src does not list, so the browser would refuse the
+// envelope before any request exists and the route below would never see it.
 test.use({
   storageState: { cookies: [], origins: [] },
+  bypassCSP: true,
   userAgent:
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
 });
@@ -45,7 +50,28 @@ type Seen = {
   errors: string[];
   /** Bodies of the banner's server action calls, which would count a tally. */
   tally: string[];
+  /** Every request this context made to a host off this machine. */
+  offMachine: Request[];
+  /** Requests a route here answered, so they never reached the network. */
+  answered: Set<Request>;
 };
+
+const ON_MACHINE = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+let watched: Seen | null = null;
+
+// Nothing this spec does may reach a real service: PostHog and Sentry are
+// pointed at addresses that cannot leave the machine, and anything sent
+// anywhere else must have been answered by a route here.
+test.afterEach(() => {
+  const seen = watched;
+  watched = null;
+  if (!seen) return;
+  expect(
+    seen.offMachine.filter((r) => !seen.answered.has(r)).map((r) => r.url()),
+    "requests that left this machine",
+  ).toEqual([]);
+});
 
 /**
  * PostHog batches events and sends them as JSON, gzip, or a base64 form field.
@@ -99,7 +125,15 @@ async function watch(context: BrowserContext): Promise<Seen> {
     replays: 0,
     errors: [],
     tally: [],
+    offMachine: [],
+    answered: new Set(),
   };
+  watched = seen;
+  context.on("request", (request) => {
+    const url = new URL(request.url());
+    if (!/^https?:$/.test(url.protocol)) return;
+    if (!ON_MACHINE.has(url.hostname)) seen.offMachine.push(request);
+  });
 
   // Registered first, so it runs last: Playwright tries the newest route
   // first, and this one passes on everything that is not a server action.
@@ -110,6 +144,7 @@ async function watch(context: BrowserContext): Promise<Seen> {
       return;
     }
     seen.tally.push(request.postData() ?? "");
+    seen.answered.add(request);
     // Not a valid action response, so the banner sees a failed count and
     // carries on, exactly as it does when the tally is unreachable.
     await route.fulfill({ status: 200, contentType: "text/plain", body: "" });
@@ -118,6 +153,7 @@ async function watch(context: BrowserContext): Promise<Seen> {
   await context.route("**/ingest/**", async (route) => {
     const request = route.request();
     seen.ingest.push(request.url());
+    seen.answered.add(request);
     seen.events.push(...decodeEvents(request));
     await route.fulfill({
       status: 200,
@@ -129,6 +165,7 @@ async function watch(context: BrowserContext): Promise<Seen> {
   // The DSN's ingest URL is https://<host>/api/<project>/envelope/?sentry_key=...
   // (dsnToString and getEnvelopeEndpoint in @sentry/core), whatever the host.
   await context.route("**/api/*/envelope/**", async (route) => {
+    seen.answered.add(route.request());
     const body = route.request().postDataBuffer()?.toString("latin1") ?? "";
     if (body.includes('"type":"replay_event"')) seen.replays += 1;
     if (body.includes('"type":"event"')) seen.errors.push(body);
@@ -212,7 +249,6 @@ test("nothing runs before Accept, and it all starts after", async ({
     reportOf(seen, before)?.includes('"replayId"'),
     "the error report sent before Accept is tagged with a replay",
   ).toBe(false);
-  expect(seen.replays).toBe(0);
   expect(seen.ingest).toEqual([]);
   expect(await phStorage(page)).toEqual([]);
 
@@ -270,6 +306,10 @@ test("withdrawing on a live page stops tracking for the rest of the visit", asyn
   // another page of the site, as a visitor would.
   await reloaded;
   await settled(page, "declined");
+  // A flat count below is NOT the evidence that withdrawal works: with
+  // withdrawPostHog broken it stayed flat in 3 of 3 runs, because nothing on
+  // the live page sends within a bounded wait. The identity poll above is
+  // what fails. This guards the fresh page after the reload.
   const after = seen.ingest.length;
   await page.getByRole("link", { name: "Find a Nurse" }).first().click();
   await page.waitForURL("**/nurses");

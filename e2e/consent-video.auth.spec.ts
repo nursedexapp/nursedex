@@ -21,16 +21,24 @@ const PIXEL = Buffer.from(
 );
 
 let title: string | null = null;
+let published = false;
 
 test.afterEach(async () => {
   if (!title) return;
-  const { error } = await serviceClient()
+  const { data, error } = await serviceClient()
     .from("blog_posts")
     .delete()
-    .eq("title", title);
+    .eq("title", title)
+    .select("id");
+  const expectOne = published;
   title = null;
-  if (error)
+  published = false;
+  if (error) {
     throw new Error(`Could not delete the test post: ${error.message}`);
+  }
+  // A published post that deletes nothing means the cleanup is aimed wrong,
+  // and every run would leave a post behind.
+  if (expectOne) expect(data, "test posts deleted").toHaveLength(1);
 });
 
 test("a blog video fetches nothing from its provider until played", async ({
@@ -48,6 +56,7 @@ test("a blog video fetches nothing from its provider until played", async ({
   await expect(page.getByText("YouTube embed")).toBeVisible();
   await page.getByRole("button", { name: "Publish now" }).click();
   await page.waitForURL(/\/admin\/blog$/);
+  published = true;
 
   const { data: post, error } = await service
     .from("blog_posts")

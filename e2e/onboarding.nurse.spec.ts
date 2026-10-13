@@ -290,6 +290,8 @@ test("a nurse onboards, and stays invisible to families until an admin approves"
   // hands you the nurse's own session, and the app quite rightly lets a nurse see
   // her own pending profile. The gate would have been tested by the one person
   // allowed through it.
+  // Empty storage also means no cookie bar answer, so this context meets the
+  // bar; harmless, because nothing below clicks near the bottom of the page.
   const anon = await browser.newContext({
     storageState: { cookies: [], origins: [] },
   });

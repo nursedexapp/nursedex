@@ -8,16 +8,15 @@ npm run test:e2e
 
 ### Let Playwright start the server
 
-Stop any `npm run dev` you started yourself before running the suite, so that
-port 3000 is free and Playwright starts its own server.
+Stop any dev server on port 3000 before running e2e: Playwright never reuses
+one (`reuseExistingServer: false`) and fails loudly if the port is busy.
 
-Playwright's `webServer` (playwright.config.ts) switches the server side Sentry
-SDK off and gives PostHog and the browser Sentry SDK placeholder keys, because
-`.env.local` holds the PRODUCTION Sentry DSN and PostHog key, and what the
-server sends cannot be intercepted by a spec. Locally `reuseExistingServer` is
-on, so a dev server you started yourself is reused as it is, with the
-production keys: every server error a spec provokes is then filed in the
-production Sentry project and alerts Slack (NURSEDEX-SITE-15 and
+It starts its own, with the server Sentry SDK switched off and PostHog and the
+browser Sentry SDK pointed at addresses that cannot leave the machine, because
+`.env.local` holds the PRODUCTION Sentry DSN and PostHog key and nothing a
+spec does can intercept what the server sends. A dev server started by hand
+carries those production keys, which is how a local run once filed errors in
+the production Sentry project and alerted Slack (NURSEDEX-SITE-15 and
 NURSEDEX-SITE-16, 2026-10-13).
 
 ## Authenticated blog author tests
