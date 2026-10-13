@@ -15,11 +15,21 @@ const h = vi.hoisted(() => ({
   ok: true,
   running: false,
   reloads: 0,
+  // When set, the "shown" count waits until the test settles it, the way a
+  // slow server action does.
+  holdShown: false,
+  settleShown: null as ((ok: boolean) => void) | null,
 }));
 
 vi.mock("@/lib/consent/actions", () => ({
   recordConsentEvent: async (kind: string) => {
     h.recorded.push(kind);
+    if (kind === "shown" && h.holdShown) {
+      const ok = await new Promise<boolean>((resolve) => {
+        h.settleShown = resolve;
+      });
+      return { ok };
+    }
     return { ok: h.ok };
   },
 }));
@@ -73,6 +83,8 @@ beforeEach(() => {
   h.ok = true;
   h.running = false;
   h.reloads = 0;
+  h.holdShown = false;
+  h.settleShown = null;
   window.localStorage.clear();
   __resetConsentMemoryForTests();
   setGpc(undefined);
@@ -252,5 +264,51 @@ describe("ConsentBanner", () => {
       "pb-[max(1rem,calc(env(safe-area-inset-bottom)_-_var(--bottom-nav-height,0px)))]",
     );
     expect(classes).not.toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
+  });
+
+  it("moves focus back to the bar when Privacy choices is pressed again while it is open", async () => {
+    render(<ConsentBanner />);
+    fireEvent.click(await screen.findByRole("button", { name: "Decline" }));
+    act(() => openConsentBanner());
+    expect(document.activeElement).toBe(bar());
+    screen.getByRole("button", { name: "Accept" }).focus();
+    act(() => openConsentBanner());
+    expect(document.activeElement).toBe(bar());
+  });
+
+  it("shows keyboard users where focus went, with the design system's ring", async () => {
+    render(<ConsentBanner />);
+    await screen.findByRole("button", { name: "Accept" });
+    const classes = bar()?.className.split(" ") ?? [];
+    expect(classes).toEqual(
+      expect.arrayContaining([
+        "focus-visible:ring-3",
+        "focus-visible:ring-ring/50",
+        "focus-visible:ring-inset",
+      ]),
+    );
+  });
+
+  it("counts a first answer given before the showing's count came back, once it does", async () => {
+    h.holdShown = true;
+    render(<ConsentBanner />);
+    await waitFor(() => expect(h.settleShown).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    expect(h.recorded).toEqual(["shown"]);
+    await act(async () => h.settleShown?.(true));
+    await waitFor(() => expect(h.recorded).toEqual(["shown", "accepted"]));
+    expect(shownCounted()).toBe(true);
+  });
+
+  it("never counts a fast answer whose showing was not counted", async () => {
+    h.holdShown = true;
+    render(<ConsentBanner />);
+    await waitFor(() => expect(h.settleShown).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Decline" }));
+    await act(async () => h.settleShown?.(false));
+    // Settled and refused: the count's own result decides, so wait on that.
+    await waitFor(() => expect(h.recorded).toEqual(["shown"]));
+    expect(shownCounted()).toBe(false);
+    expect(h.recorded).toEqual(["shown"]);
   });
 });

@@ -48,6 +48,7 @@ describe("applyConsentChoice", () => {
     applyConsentChoice("accepted");
     h.calls = [];
     expect(applyConsentChoice("accepted")).toEqual({
+      firstAnswer: false,
       countAnswer: false,
       reload: false,
     });
@@ -75,5 +76,15 @@ describe("applyConsentChoice", () => {
     expect(applyConsentChoice("declined").countAnswer).toBe(true);
     // A change of mind, not a first answer.
     expect(applyConsentChoice("accepted").countAnswer).toBe(false);
+  });
+
+  it("says whether this is the first answer, whether or not its showing was counted yet", () => {
+    // The banner uses this to count an answer given while the showing's count
+    // is still on its way (ConsentBanner).
+    expect(applyConsentChoice("declined")).toMatchObject({
+      firstAnswer: true,
+      countAnswer: false,
+    });
+    expect(applyConsentChoice("accepted").firstAnswer).toBe(false);
   });
 });

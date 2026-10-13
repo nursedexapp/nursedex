@@ -11,9 +11,12 @@ import {
 /**
  * What Accept and Decline do in this browser.
  *
- * countAnswer: true only for this browser's first answer in the period, and
- * only if its showing was counted, so the tally's answers can never outnumber
- * its showings.
+ * firstAnswer: this browser's first answer in the period.
+ *
+ * countAnswer: true only for a first answer whose showing was already
+ * counted, so the tally's answers can never outnumber its showings. A first
+ * answer given while the showing's count is still on its way is counted by the
+ * banner once that count confirms.
  *
  * reload: true only for Decline while PostHog is running on this page. The
  * in memory stop (withdrawTracking) holds for the life of the page, and the
@@ -22,24 +25,27 @@ import {
  * so unsaved form input is never lost to it (L608).
  */
 export function applyConsentChoice(choice: ConsentChoice): {
+  firstAnswer: boolean;
   countAnswer: boolean;
   reload: boolean;
 } {
   const previous = readConsent();
-  if (previous?.choice === choice) return { countAnswer: false, reload: false };
+  if (previous?.choice === choice)
+    return { firstAnswer: false, countAnswer: false, reload: false };
 
-  const countAnswer = previous === null && shownCounted();
+  const firstAnswer = previous === null;
+  const countAnswer = firstAnswer && shownCounted();
   writeConsent(choice);
 
   if (choice === "declined") {
-    return { countAnswer, reload: withdrawTracking() };
+    return { firstAnswer, countAnswer, reload: withdrawTracking() };
   }
 
   // Both refuse an account this device knows is opted out: initPostHog gates
   // itself, replay is gated here.
   initPostHog();
   if (analyticsAllowed()) startSentryReplay();
-  return { countAnswer, reload: false };
+  return { firstAnswer, countAnswer, reload: false };
 }
 
 /**
