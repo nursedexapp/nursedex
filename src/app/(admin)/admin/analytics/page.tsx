@@ -10,7 +10,6 @@ import {
   Briefcase,
 } from "lucide-react";
 import { requireSuperAdmin } from "@/lib/auth/helpers";
-import { Card, CardContent } from "@/components/ui/card";
 import { getAnalyticsTotals } from "@/lib/admin/analytics";
 import { subscriptionPipelineLabel } from "@/lib/admin/subscription-health";
 import {
@@ -18,6 +17,9 @@ import {
   optOutNoteText,
 } from "@/lib/admin/analytics-opt-out-share";
 import { PRICING } from "@/lib/constants";
+import { getConsentTally } from "@/lib/admin/consent-tally";
+import { ConsentSection } from "./ConsentSection";
+import { Section, Stat } from "./analytics-parts";
 
 export const metadata: Metadata = {
   title: "Analytics | NurseDex Admin",
@@ -29,7 +31,10 @@ export const dynamic = "force-dynamic";
 
 export default async function AnalyticsPage() {
   await requireSuperAdmin();
-  const t = await getAnalyticsTotals();
+  const [t, consent] = await Promise.all([
+    getAnalyticsTotals(),
+    getConsentTally(30),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-5xl p-6 sm:p-8">
@@ -50,10 +55,10 @@ export default async function AnalyticsPage() {
           agree, and its visitor counts are not headcounts at all.
         */}
         <p className="text-soft-black-light mt-1 text-sm">
-          Every figure on this page comes from the database, so each one is a
-          real account. PostHog answers a different question (how people behave,
-          and how they arrived) and the two are not meant to reconcile. See the
-          Analytics Guide before comparing them.
+          Every account figure on this page comes from the database, so each one
+          is a real account. PostHog answers a different question (how people
+          behave, and how they arrived) and the two are not meant to reconcile.
+          See the Analytics Guide before comparing them.
         </p>
       </header>
 
@@ -97,6 +102,8 @@ export default async function AnalyticsPage() {
           {optOutNoteText(t.analyticsOptOuts, t.analyticsOptOutShare)}
         </p>
       </Section>
+
+      <ConsentSection consent={consent} />
 
       <Section title="Revenue">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -163,47 +170,5 @@ export default async function AnalyticsPage() {
         </div>
       </Section>
     </div>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="mb-6">
-      <h2 className="text-soft-black mb-2 text-sm font-semibold">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Stat({
-  icon,
-  label,
-  value,
-  sub,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number | string;
-  sub?: string;
-}) {
-  return (
-    <Card className="border-sage/20">
-      <CardContent className="space-y-1 pt-4">
-        <div className="text-muted-foreground flex items-center gap-2 text-xs">
-          {icon}
-          {label}
-        </div>
-        <p className="font-heading text-soft-black text-2xl font-semibold">
-          {typeof value === "number" ? value.toLocaleString() : value}
-        </p>
-        {sub && <p className="text-muted-foreground text-xs">{sub}</p>}
-      </CardContent>
-    </Card>
   );
 }

@@ -8,6 +8,7 @@ import { MessageSquare, Tags, Mail } from "lucide-react";
 import { getAllPostsForAdmin } from "@/lib/blog/queries";
 import { getPendingCommentCount } from "@/lib/comments/queries";
 import { getBlogPostViews } from "@/lib/analytics/post-views";
+import { postHogCoverageCaption } from "@/lib/analytics/consent-launch";
 import { BLOG_POST_STATUS_LABELS, BlogPostStatus } from "@/types/enums";
 import { BlogPostActions } from "@/components/admin/BlogPostActions";
 
@@ -38,6 +39,7 @@ export default async function AdminBlogPage() {
     getPendingCommentCount(),
     getBlogPostViews(),
   ]);
+  const coverageCaption = postHogCoverageCaption();
 
   return (
     <div className="mx-auto w-full max-w-4xl p-6 sm:p-8">
@@ -92,6 +94,9 @@ export default async function AdminBlogPage() {
         </Card>
       ) : (
         <div className="space-y-2">
+          {coverageCaption && (
+            <p className="text-soft-black-light text-xs">{coverageCaption}</p>
+          )}
           {posts.map((post) => (
             <Card key={post.id} className="border-sage/20">
               <CardContent className="flex flex-wrap items-center gap-3 py-3">
