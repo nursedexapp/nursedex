@@ -71,4 +71,18 @@ describe("Sentry wiring (#394, #395, #400)", () => {
     const source = read("src/instrumentation-client.ts");
     expect(source).toMatch(/denyUrls:\s*IGNORED_BROWSER_FRAME_URLS/);
   });
+
+  it("does not record replays before consent: replay is not in Sentry.init", () => {
+    const source = read("src/instrumentation-client.ts");
+    const start = source.indexOf("Sentry.init(");
+    const init = source.slice(start, source.indexOf("});", start) + 3);
+    expect(init).not.toMatch(/replayIntegration/);
+    expect(init).toMatch(/replaysOnErrorSampleRate/);
+  });
+
+  it("starts replay only behind the consent check", () => {
+    expect(read("src/instrumentation-client.ts")).toMatch(
+      /if \(analyticsAllowed\(\)\) startSentryReplay\(\);/,
+    );
+  });
 });

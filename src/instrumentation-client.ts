@@ -3,6 +3,8 @@ import {
   IGNORED_BROWSER_ERRORS,
   IGNORED_BROWSER_FRAME_URLS,
 } from "@/lib/sentry/ignored-browser-errors";
+import { analyticsAllowed } from "@/lib/consent/store";
+import { startSentryReplay } from "@/lib/consent/sentry-replay";
 
 // Must be NEXT_PUBLIC_-prefixed to be inlined into the client bundle; a
 // bare SENTRY_DSN resolves to undefined in the browser and silently
@@ -17,7 +19,6 @@ Sentry.init({
   tracesSampleRate,
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
-  integrations: [Sentry.replayIntegration()],
   // Errors thrown by an in-app browser's own injected script, not our code.
   // The list and the reasoning live beside it, with the behaviour asserted
   // against Sentry's own filter.
@@ -27,6 +28,11 @@ Sentry.init({
   // the message alone cannot do it (NURSEDEX-SITE-12).
   denyUrls: IGNORED_BROWSER_FRAME_URLS,
 });
+
+// Replay records the session, so it waits for consent like PostHog. A visitor
+// who accepted on an earlier visit gets it from the first frame; one who
+// accepts now gets it from the banner (src/lib/consent/apply.ts).
+if (analyticsAllowed()) startSentryReplay();
 
 // Required by the SDK to instrument App Router navigations for tracing.
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
