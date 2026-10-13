@@ -177,6 +177,14 @@ describe("proxy security headers (#393)", () => {
     expect(h.updateSession).not.toHaveBeenCalled();
   });
 
+  it("skips the session refresh for the public nurse photo route only", async () => {
+    const res = await proxy(fakeRequest("/api/nurse-photo/sometoken"));
+    expect(res.headers.get("Content-Security-Policy")).toBeTruthy();
+    expect(h.updateSession).not.toHaveBeenCalled();
+    await proxy(fakeRequest("/api/nurse-photos"));
+    expect(h.updateSession).toHaveBeenCalledTimes(1);
+  });
+
   it("still applies security headers on the stripe webhook skip path", async () => {
     const res = await proxy(fakeRequest("/api/stripe/webhook"));
     expect(res.headers.get("Content-Security-Policy")).toBeTruthy();
