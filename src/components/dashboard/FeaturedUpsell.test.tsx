@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, render, screen, fireEvent } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  fireEvent,
+} from "@testing-library/react";
 
 const captured: { event: string; properties?: Record<string, unknown> }[] = [];
 /** Whether the fake PostHog manages to send. False stands for "not loaded yet". */
@@ -16,6 +22,10 @@ vi.mock("@/lib/analytics/capture", () => ({
 }));
 
 import { FeaturedUpsell } from "./FeaturedUpsell";
+import {
+  writeConsent,
+  __resetConsentMemoryForTests,
+} from "@/lib/consent/store";
 
 /**
  * Featured is the only paid product aimed at the audience this site actually
@@ -58,6 +68,10 @@ function fireAll(isIntersecting: boolean) {
 }
 
 beforeEach(() => {
+  // A visitor who accepted: the link watches only while tracking is allowed.
+  window.localStorage.clear();
+  __resetConsentMemoryForTests();
+  writeConsent("accepted");
   captureSucceeds = true;
   captured.length = 0;
   observed = [];

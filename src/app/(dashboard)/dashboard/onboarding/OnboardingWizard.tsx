@@ -1,7 +1,7 @@
 "use client";
 
 import { DEFAULT_FOCAL } from "@/lib/profile/focal-point";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import type { NurseProfileDraft } from "@/types/database";
@@ -15,6 +15,7 @@ import {
 } from "@/lib/schemas/profile";
 import { saveOnboardingStep, completeOnboarding } from "@/lib/profile/actions";
 import { captureClientEvent } from "@/lib/analytics/capture";
+import { useCaptureOnce } from "@/lib/analytics/use-capture-once";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { StepLayout } from "@/components/profile-form/StepLayout";
 import { BasicsFields } from "@/components/profile-form/BasicsFields";
@@ -137,14 +138,13 @@ export function OnboardingWizard({
   // before the first save can repeat it, so any funnel built on this counts
   // PEOPLE rather than events. Firing on plain mount would have counted every
   // step navigation as a fresh start, since each step is its own route push.
-  const startedFired = useRef(false);
-  useEffect(() => {
-    if (!loaded || startedFired.current) return;
-    if (currentStep !== 1) return;
-    if ((draft.completed_step ?? 0) > 0) return;
-    startedFired.current = true;
-    captureClientEvent(ANALYTICS_EVENTS.ONBOARDING_STARTED, { tier });
-  }, [loaded, currentStep, draft.completed_step, tier]);
+  useCaptureOnce(
+    ANALYTICS_EVENTS.ONBOARDING_STARTED,
+    { tier },
+    loaded && currentStep === 1 && (draft.completed_step ?? 0) === 0
+      ? "started"
+      : null,
+  );
 
   // Save draft to localStorage whenever it changes. Uses the functional
   // setState form so back-to-back updates compose correctly. The earlier

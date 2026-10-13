@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { CONSENT_ANSWERED } from "./e2e/helpers/consent-state";
 
 // Authenticated blog tests create real posts, so they only run when
 // explicitly enabled (E2E_AUTH=1) against a local/test Supabase. The
@@ -42,7 +43,9 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      // Every spec starts with the cookie bar already answered, so it never
+      // covers what a spec clicks. consent.spec.ts clears it for itself.
+      use: { ...devices["Desktop Chrome"], storageState: CONSENT_ANSWERED },
       // The auth setup and authenticated specs run only via the dedicated
       // projects below (when AUTH is enabled), never in the default run.
       testIgnore: [
@@ -58,7 +61,11 @@ export default defineConfig({
     },
     ...(AUTH
       ? [
-          { name: "setup", testMatch: /auth\.setup\.ts/ },
+          {
+            name: "setup",
+            testMatch: /auth\.setup\.ts/,
+            use: { storageState: CONSENT_ANSWERED },
+          },
           {
             name: "authenticated",
             testMatch: /.*\.auth\.spec\.ts/,
@@ -71,7 +78,11 @@ export default defineConfig({
           // The family specs need a DIFFERENT session (a subscribed family, not
           // an admin), so they get their own setup and storageState rather than
           // sharing the admin one.
-          { name: "family-setup", testMatch: /family\.setup\.ts/ },
+          {
+            name: "family-setup",
+            testMatch: /family\.setup\.ts/,
+            use: { storageState: CONSENT_ANSWERED },
+          },
           {
             name: "family",
             testMatch: /.*\.family\.spec\.ts/,
@@ -86,7 +97,11 @@ export default defineConfig({
           // the profile by filling the form rather than finding one waiting.
           // It depends on "setup" too, because the journey ends with an ADMIN
           // approving the nurse, which needs the admin storageState.
-          { name: "nurse-setup", testMatch: /nurse\.setup\.ts/ },
+          {
+            name: "nurse-setup",
+            testMatch: /nurse\.setup\.ts/,
+            use: { storageState: CONSENT_ANSWERED },
+          },
           {
             name: "nurse",
             testMatch: /.*\.nurse\.spec\.ts/,
@@ -101,7 +116,11 @@ export default defineConfig({
           // above cannot stand in, because she is deliberately pre-onboarding,
           // and a spec that waited for that journey to verify her would depend
           // on another spec's state while Playwright runs both in parallel.
-          { name: "featured-setup", testMatch: /featured\.setup\.ts/ },
+          {
+            name: "featured-setup",
+            testMatch: /featured\.setup\.ts/,
+            use: { storageState: CONSENT_ANSWERED },
+          },
           {
             name: "featured",
             testMatch: /.*\.featured\.spec\.ts/,
@@ -137,7 +156,12 @@ export default defineConfig({
     // whole point and a build per run would be intolerable.
     command: process.env.CI ? "npm run build && npm run start" : "npm run dev",
     url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    // Never reuse a server, locally either. One somebody started by hand
+    // carries .env.local's production Sentry DSN and PostHog key, not the
+    // overrides in `env` below, so reusing it sent a local run's server
+    // errors to production Sentry and paged Slack (NURSEDEX-SITE-15 and 16,
+    // 2026-10-13). With reuse off, a busy port 3000 fails the run loudly.
+    reuseExistingServer: false,
     // The build now happens inside this window, so the old 120s (sized for a
     // Turbopack cold start) no longer describes what is being waited for. The
     // measured run needed well under 120s, but a timeout that trips
@@ -145,5 +169,41 @@ export default defineConfig({
     // place in the config where being generous costs nothing: it is a ceiling
     // on a hang, not a delay anybody waits out.
     timeout: 300 * 1000,
+    // The consent spec must see PostHog and Sentry TRY to run after Accept, or
+    // "nothing before Accept" passes on a build where they never could. So both
+    // are configured, and every address they could send to is one that cannot
+    // leave the machine. Playwright merges this over process.env, and Next
+    // lets the process environment win over .env.local, an empty value
+    // included (processEnv in @next/env skips any key already set). All four
+    // are fixed values, never taken from the shell.
+    //
+    // SENTRY_DSN is empty, so the server SDK (src/sentry.server.config.ts,
+    // sentry.edge.config.ts) is off. .env.local holds the PRODUCTION DSN, and
+    // a server side send cannot be intercepted by a spec.
+    //
+    // The browser DSN is on a .invalid host, which never resolves. The CSP's
+    // connect-src does not list it, so in every spec but consent.spec.ts the
+    // browser refuses the request before it exists; consent.spec.ts bypasses
+    // the CSP and fulfils the envelopes in its own route.
+    //
+    // PostHog's host is a dead local port. The browser only ever talks to the
+    // same origin /ingest proxy, which next.config.ts rewrites to this host and
+    // consent.spec.ts intercepts; the server's own captures
+    // (src/lib/analytics/server.ts) and the proxy reach nothing.
+    //
+    // Next's own anonymous telemetry is switched off too, so the server has
+    // nothing of ours to send off the machine but its database traffic.
+    //
+    // Measured 2026-10-13: across consent.spec.ts and a run of the public pages,
+    // the browser made no request to any host but localhost, 127.0.0.1 and the
+    // routed sentry.invalid, and sampling the server's sockets found no
+    // connection to Sentry's or PostHog's addresses (task 10 report, fixes).
+    env: {
+      NEXT_PUBLIC_POSTHOG_KEY: "phc_e2e_placeholder",
+      NEXT_PUBLIC_POSTHOG_HOST: "http://127.0.0.1:9",
+      SENTRY_DSN: "",
+      NEXT_PUBLIC_SENTRY_DSN: "https://e2epublic@sentry.invalid/0",
+      NEXT_TELEMETRY_DISABLED: "1",
+    },
   },
 });

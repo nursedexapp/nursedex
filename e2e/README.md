@@ -6,6 +6,19 @@ Run the default suite (unauthenticated UI flows, safe against any environment):
 npm run test:e2e
 ```
 
+### Let Playwright start the server
+
+Stop any dev server on port 3000 before running e2e: Playwright never reuses
+one (`reuseExistingServer: false`) and fails loudly if the port is busy.
+
+It starts its own, with the server Sentry SDK switched off and PostHog and the
+browser Sentry SDK pointed at addresses that cannot leave the machine, because
+`.env.local` holds the PRODUCTION Sentry DSN and PostHog key and nothing a
+spec does can intercept what the server sends. A dev server started by hand
+carries those production keys, which is how a local run once filed errors in
+the production Sentry project and alerted Slack (NURSEDEX-SITE-15 and
+NURSEDEX-SITE-16, 2026-10-13).
+
 ## Authenticated blog author tests
 
 `blog.author.auth.spec.ts` drives the real admin CMS (create, publish, draft)

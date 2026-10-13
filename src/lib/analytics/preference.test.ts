@@ -11,8 +11,16 @@ vi.mock("posthog-js", () => ({
   },
 }));
 
+const replay = vi.hoisted(() => ({ stops: 0 }));
+vi.mock("@/lib/consent/sentry-replay", () => ({
+  stopSentryReplay: () => {
+    replay.stops += 1;
+  },
+}));
+
 import posthog from "posthog-js";
-import { applyAnalyticsPreference, browserSendsDoNotTrack } from "./preference";
+import { applyAnalyticsPreference } from "./preference";
+import { __resetConsentMemoryForTests, accountAnalyticsOff } from "@/lib/consent/store";
 
 /** happy-dom's navigator.doNotTrack is read-only, so it is redefined. */
 function setDoNotTrack(value: string | null) {
@@ -23,11 +31,14 @@ function setDoNotTrack(value: string | null) {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
+  __resetConsentMemoryForTests();
   vi.mocked(posthog.opt_out_capturing).mockClear();
   vi.mocked(posthog.opt_in_capturing).mockClear();
   vi.mocked(posthog.has_opted_out_capturing).mockReturnValue(false);
   (posthog as unknown as { __loaded: boolean }).__loaded = true;
   setDoNotTrack(null);
+  replay.stops = 0;
 });
 
 afterEach(() => {
@@ -79,17 +90,26 @@ describe("applyAnalyticsPreference", () => {
     applyAnalyticsPreference(true);
     expect(posthog.opt_out_capturing).not.toHaveBeenCalled();
   });
-});
 
-describe("browserSendsDoNotTrack", () => {
-  it.each([
-    ["1", true],
-    ["yes", true],
-    ["0", false],
-    ["unspecified", false],
-    [null, false],
-  ])("reads %s as %s", (value, expected) => {
-    setDoNotTrack(value);
-    expect(browserSendsDoNotTrack()).toBe(expected);
+  it("records the account setting on this device even when PostHog never loaded", () => {
+    (posthog as unknown as { __loaded: boolean }).__loaded = false;
+    applyAnalyticsPreference(true);
+    expect(accountAnalyticsOff()).toBe(true);
+    applyAnalyticsPreference(false);
+    expect(accountAnalyticsOff()).toBe(false);
+  });
+
+  it("stops Sentry session replay for somebody who has opted out, even before PostHog loaded", () => {
+    // Replay starts in instrumentation-client.ts for any browser that accepted
+    // the banner, before this device has seen the account setting, and it
+    // records the screen as fully as PostHog would.
+    (posthog as unknown as { __loaded: boolean }).__loaded = false;
+    applyAnalyticsPreference(true);
+    expect(replay.stops).toBe(1);
+  });
+
+  it("leaves replay alone for somebody who has not opted out", () => {
+    applyAnalyticsPreference(false);
+    expect(replay.stops).toBe(0);
   });
 });

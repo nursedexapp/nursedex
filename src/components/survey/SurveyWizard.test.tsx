@@ -12,8 +12,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
-vi.mock("posthog-js", () => ({
-  default: { __loaded: false, capture: vi.fn() },
+vi.mock("@/lib/analytics/capture", () => ({
+  captureClientEvent: vi.fn(() => false),
 }));
 
 afterEach(cleanup);

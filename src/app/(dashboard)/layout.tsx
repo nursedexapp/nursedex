@@ -76,10 +76,13 @@ export default async function DashboardLayout({
       {pastDueBanner}
       <div className="flex flex-1">
         <DashboardSidebar role={role} />
-        <main className="flex-1 pb-16 lg:pb-0">{children}</main>
+        {/* Both clear the fixed mobile bottom nav by the height it publishes
+            (its labels wrap on a phone); 4rem only until it has measured. */}
+        <main className="flex-1 pb-[var(--bottom-nav-height,4rem)] lg:pb-0">
+          {children}
+        </main>
       </div>
-      {/* mb clears the fixed mobile bottom nav so the footer stays visible */}
-      <AppFooter className="mb-16 lg:mb-0" />
+      <AppFooter className="mb-[var(--bottom-nav-height,4rem)] lg:mb-0" />
     </div>
   );
 }

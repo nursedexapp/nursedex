@@ -98,7 +98,12 @@ export async function proxy(request: NextRequest) {
     path.startsWith("/api/cron") ||
     path === "/api/auth/send-email" ||
     // Browser-posted CSP violation reports carry no session; skip the refresh.
-    path === "/api/csp-report"
+    path === "/api/csp-report" ||
+    // The public video preview image carries no session, and a refreshed
+    // session Set-Cookie must never ride on a response the CDN caches.
+    path.startsWith("/api/video-thumbnail/") ||
+    // The public nurse photo redirect is cached too, and needs no session.
+    path.startsWith("/api/nurse-photo/")
   ) {
     return applySecurityHeaders(NextResponse.next(), csp);
   }

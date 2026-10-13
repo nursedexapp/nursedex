@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePendingPhase } from "@/components/ui/pending-button";
 import { toggleSavedNurse } from "@/lib/nurses/saves-actions";
-import { posthog } from "@/lib/posthog";
+import { captureClientEvent } from "@/lib/analytics/capture";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface SaveHeartButtonProps {
@@ -93,14 +93,12 @@ export function SaveHeartButton({
       );
       // The grid's membership changed, not just this heart.
       if (inSavedOnlyView) router.refresh();
-      if (posthog.__loaded) {
-        posthog.capture(
-          result.isSaved
-            ? ANALYTICS_EVENTS.NURSE_SAVED
-            : ANALYTICS_EVENTS.NURSE_UNSAVED,
-          { nurse_user_id: nurseUserId },
-        );
-      }
+      captureClientEvent(
+        result.isSaved
+          ? ANALYTICS_EVENTS.NURSE_SAVED
+          : ANALYTICS_EVENTS.NURSE_UNSAVED,
+        { nurse_user_id: nurseUserId },
+      );
     });
   };
 

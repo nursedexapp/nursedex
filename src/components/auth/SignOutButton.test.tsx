@@ -15,6 +15,13 @@ vi.mock("@/lib/posthog", () => ({ resetPostHog: vi.fn() }));
 import { SignOutButton } from "./SignOutButton";
 import { STALL_MS } from "@/components/ui/pending-button";
 import { signOut } from "@/lib/auth/actions";
+import {
+  ACCOUNT_OFF_KEY,
+  CONSENT_CHANGE_EVENT,
+  __resetConsentMemoryForTests,
+  accountAnalyticsOff,
+  setAccountAnalyticsOff,
+} from "@/lib/consent/store";
 
 // #659. There were FOUR sign-out buttons (nurse sidebar, admin sidebar, mobile
 // nav, settings page) and not one of them tracked pending state: each was a bare
@@ -102,5 +109,25 @@ describe("signing out", () => {
     await click(/^sign out$/i);
 
     expect(screen.getByRole("button", { name: /signing out/i })).toBeDisabled();
+  });
+
+  it("forgets the account's analytics setting on this device, so the next person here is governed by their own answer", async () => {
+    window.localStorage.clear();
+    __resetConsentMemoryForTests();
+    setAccountAnalyticsOff(true);
+    expect(window.localStorage.getItem(ACCOUNT_OFF_KEY)).toBe("1");
+    vi.mocked(signOut).mockReturnValue(hang());
+    const announced = vi.fn();
+    window.addEventListener(CONSENT_CHANGE_EVENT, announced);
+    render(<SignOutButton />);
+
+    await click(/^sign out$/i);
+
+    window.removeEventListener(CONSENT_CHANGE_EVENT, announced);
+    expect(window.localStorage.getItem(ACCOUNT_OFF_KEY)).toBeNull();
+    expect(accountAnalyticsOff()).toBe(false);
+    // Not announced: the person signing out is still on this page, and an
+    // announcement would let tracking start for them before they leave.
+    expect(announced).not.toHaveBeenCalled();
   });
 });

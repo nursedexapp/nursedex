@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
   toURLSearchParams,
   type SearchFilters,
 } from "@/lib/nurses/search-params";
-import { posthog } from "@/lib/posthog";
+import { useCaptureOnce } from "@/lib/analytics/use-capture-once";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { DirectoryFacets } from "@/lib/nurses/facets";
 import { ChevronLeft } from "lucide-react";
@@ -71,15 +71,8 @@ export function SurveyWizard({
     initialFilters.languages,
   );
 
-  // Fire survey_started once per session.
-  const startedFired = useRef(false);
-  useEffect(() => {
-    if (startedFired.current) return;
-    startedFired.current = true;
-    if (posthog.__loaded) {
-      posthog.capture(ANALYTICS_EVENTS.SURVEY_STARTED);
-    }
-  }, []);
+  // survey_started once per visit to the survey.
+  useCaptureOnce(ANALYTICS_EVENTS.SURVEY_STARTED, {}, "started");
 
   const buildFilters = (): Partial<SearchFilters> => ({
     care_type: careType,

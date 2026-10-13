@@ -24,10 +24,17 @@ vi.mock("@/lib/posthog", () => ({
   },
 }));
 
+import {
+  writeConsent,
+  __resetConsentMemoryForTests,
+} from "@/lib/consent/store";
 import { captureClientEvent } from "./capture";
 import { ANALYTICS_EVENTS } from "./events";
 
 beforeEach(() => {
+  window.localStorage.clear();
+  __resetConsentMemoryForTests();
+  writeConsent("accepted");
   h.initSucceeds = true;
   h.loaded = false;
   h.captured.length = 0;
@@ -67,6 +74,13 @@ describe("captureClientEvent", () => {
     h.initSucceeds = false;
 
     expect(captureClientEvent(ANALYTICS_EVENTS.HOMEPAGE_CTA_SEEN)).toBe(false);
+    expect(h.captured).toEqual([]);
+  });
+
+  it("refuses to capture without consent even when PostHog is already loaded", () => {
+    h.loaded = true;
+    writeConsent("declined");
+    expect(captureClientEvent(ANALYTICS_EVENTS.SEARCH_PERFORMED)).toBe(false);
     expect(h.captured).toEqual([]);
   });
 });

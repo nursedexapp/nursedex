@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { captureClientEvent } from "@/lib/analytics/capture";
 import type { AnalyticsEvent } from "@/lib/analytics/capture";
+import { useTrackingState } from "@/lib/consent/use-consent-state";
 
 interface TrackedLinkProps {
   href: string;
@@ -42,6 +43,7 @@ export function TrackedLink({
   children,
 }: TrackedLinkProps) {
   const ref = useRef<HTMLAnchorElement>(null);
+  const tracking = useTrackingState();
   const seenFired = useRef(false);
   const latestProperties = useRef(properties);
   latestProperties.current = properties;
@@ -54,7 +56,10 @@ export function TrackedLink({
     // prefetching, so a browser without it has already lost the link long
     // before it reaches this line. A guard here would be dead code that reads
     // like a considered decision.
-    if (!element) return;
+    // Watched again when tracking becomes allowed: an observer reports
+    // whether the link is on screen as soon as it starts, so a visitor who
+    // accepts the cookie banner with the link in view is still counted.
+    if (!element || tracking !== "allowed" || seenFired.current) return;
 
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -64,10 +69,7 @@ export function TrackedLink({
         // PostHog had loaded was dropped AND the observer disconnected, so the
         // sighting could never be recorded at all.
         if (
-          !captureClientEvent(
-            latestSeenEvent.current,
-            latestProperties.current,
-          )
+          !captureClientEvent(latestSeenEvent.current, latestProperties.current)
         ) {
           continue;
         }
@@ -78,16 +80,14 @@ export function TrackedLink({
 
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [tracking]);
 
   return (
     <Link
       ref={ref}
       href={href}
       className={className}
-      onClick={() =>
-        captureClientEvent(clickedEvent, latestProperties.current)
-      }
+      onClick={() => captureClientEvent(clickedEvent, latestProperties.current)}
     >
       {children}
     </Link>

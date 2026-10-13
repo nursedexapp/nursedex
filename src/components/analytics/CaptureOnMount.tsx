@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { captureClientEvent, type AnalyticsEvent } from "@/lib/analytics/capture";
+import type { AnalyticsEvent } from "@/lib/analytics/capture";
+import { useCaptureOnce } from "@/lib/analytics/use-capture-once";
 
 interface CaptureOnMountProps {
   event: AnalyticsEvent;
@@ -19,27 +19,16 @@ interface CaptureOnMountProps {
  * to instrument a page view of something specific (a nurse profile, the start
  * of onboarding) without making the whole page a client component.
  *
- * The dedupe ref matters because React runs effects twice in development
- * Strict Mode, and a double count is indistinguishable from real traffic once
- * it is in PostHog.
+ * A component form of useCaptureOnce, which is where the once per key rule
+ * lives (React runs effects twice in development Strict Mode, and a double
+ * count is indistinguishable from real traffic once it is in PostHog) and
+ * where a visitor who accepts the cookie banner on the page is still counted.
  */
 export function CaptureOnMount({
   event,
   properties,
   dedupeKey,
 }: CaptureOnMountProps) {
-  const key = dedupeKey ?? event;
-  const lastFired = useRef<string | null>(null);
-  // Held in a ref so a new object identity each render cannot re-fire the
-  // event; only the dedupe key decides that.
-  const latestProperties = useRef(properties);
-  latestProperties.current = properties;
-
-  useEffect(() => {
-    if (lastFired.current === key) return;
-    lastFired.current = key;
-    captureClientEvent(event, latestProperties.current);
-  }, [event, key]);
-
+  useCaptureOnce(event, properties ?? {}, dedupeKey ?? event);
   return null;
 }
