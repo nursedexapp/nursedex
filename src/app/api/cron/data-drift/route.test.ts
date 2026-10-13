@@ -310,7 +310,7 @@ describe("the cookie banner tally check", () => {
     const res = await GET(cronRequest());
     const body = await res.json();
 
-    expect(body.consentTallyRowsLast7d).toBe(0);
+    expect(body.consentTallyHasRecentRows).toBe(false);
     expect(h.calls.slack).toHaveLength(1);
     const text = JSON.stringify(h.calls.slack[0]);
     expect(text).toContain("*Cookie banner tally*");
@@ -321,7 +321,7 @@ describe("the cookie banner tally check", () => {
     const res = await GET(cronRequest());
     const body = await res.json();
 
-    expect(body.consentTallyRowsLast7d).toBe(1);
+    expect(body.consentTallyHasRecentRows).toBe(true);
     expect(body.alerted).toBeNull();
     expect(h.calls.slack).toHaveLength(0);
   });
@@ -330,7 +330,34 @@ describe("the cookie banner tally check", () => {
     h.state.tallyError = { message: "permission denied for table consent_tally" };
 
     await expect(GET(cronRequest())).rejects.toThrow(/consent_tally could not be read/);
-    expect(h.calls.slack).toHaveLength(0);
+  });
+
+  it("posts the findings it already has before failing on an unreadable tally", async () => {
+    // A tally read that throws before the post would lose the completeness
+    // finding computed in the same run, so the run reports everything it
+    // knows and only then fails, which is what marks it failed.
+    h.state.profiles = [scored("a", 50)];
+    h.state.tallyError = { message: "permission denied for table consent_tally" };
+
+    await expect(GET(cronRequest())).rejects.toThrow(
+      /consent_tally could not be read: permission denied for table consent_tally/,
+    );
+
+    expect(h.calls.slack).toHaveLength(1);
+    const text = JSON.stringify(h.calls.slack[0]);
+    expect(text).toContain("scored above");
+    expect(text).toContain("*Cookie banner tally* could not be read");
+    expect(text).toContain("permission denied for table consent_tally");
+    expect(text).not.toContain("no rows in the last 7 days");
+  });
+
+  it("posts the tally read failure alone when nothing else drifted", async () => {
+    h.state.tallyError = { message: "permission denied for table consent_tally" };
+
+    await expect(GET(cronRequest())).rejects.toThrow(/consent_tally could not be read/);
+
+    expect(h.calls.slack).toHaveLength(1);
+    expect(JSON.stringify(h.calls.slack[0])).toContain("*Cookie banner tally* could not be read");
   });
 
   it("reads consent_tally from 6 New York days back, across a clock change", async () => {

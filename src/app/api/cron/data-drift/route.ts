@@ -91,17 +91,16 @@ const handleDataDrift = withCronAlerting(
     // The banner tally logs its write failures instead of alerting (L498), so
     // a tally that broke for good would read as a quiet week. A whole week
     // with no row at all is the signal: the site always has some new browser.
-    // A read that fails throws, so an unreadable table is not a clean week.
+    // A read that fails is recorded here and fails the run AFTER the one message
+    // is posted, so an unreadable table is not a clean week and does not cost
+    // the findings already computed.
     const tallySince = newYorkDaysAgo(new Date(), 6);
     const { data: tallyRows, error: tallyError } = await createServiceRoleClient()
       .from("consent_tally")
       .select("day")
       .gte("day", tallySince)
       .limit(1);
-    if (tallyError) {
-      throw new Error(`consent_tally could not be read: ${tallyError.message}`);
-    }
-    const tallyRowCount = (tallyRows ?? []).length;
+    const tallyHasRecentRows = (tallyRows ?? []).length > 0;
 
     const findings: string[] = [];
     if (scoreDrift.length > 0) {
@@ -120,16 +119,21 @@ const handleDataDrift = withCronAlerting(
       );
     }
 
-    if (tallyRowCount === 0) {
+    if (tallyError) {
+      findings.push(
+        `*Cookie banner tally* could not be read: ${tallyError.message}. ` +
+          "Whether showings and answers are being counted is unknown this week.",
+      );
+    } else if (!tallyHasRecentRows) {
       findings.push(
         "*Cookie banner tally* has no rows in the last 7 days, so showings and answers are not being counted. " +
           "Check the Vercel logs for `[consent-tally]`.",
       );
     }
 
-    // One message carrying every finding, not one per check. They arrive together, are
-    // read together, and two alerts a week for the same run is how an alert
-    // stops being read (L36).
+    // One message carrying every finding, not one per check. They arrive
+    // together, are read together, and two alerts a week for the same run is
+    // how an alert stops being read (L36).
     let alerted: boolean | null = null;
     if (findings.length > 0) {
       alerted = true;
@@ -152,12 +156,18 @@ const handleDataDrift = withCronAlerting(
       }
     }
 
+    // The message above has gone, so the run can now fail on the tally read and
+    // withCronAlerting marks it failed instead of recording a clean week.
+    if (tallyError) {
+      throw new Error(`consent_tally could not be read: ${tallyError.message}`);
+    }
+
     return NextResponse.json({
       success: true,
       alerted,
       completeness: { examined: profiles.length, drifted: scoreDrift.length },
       zips: { examined: storedZips.length, drifted: zipDrift.length },
-      consentTallyRowsLast7d: tallyRowCount,
+      consentTallyHasRecentRows: tallyHasRecentRows,
     });
   },
 );
