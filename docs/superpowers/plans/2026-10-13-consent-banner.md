@@ -1,4 +1,6 @@
-# Consent Banner Implementation Plan (revision 2)
+# Consent Banner Implementation Plan (revision 3)
+
+> Revision 3 (13 October 2026): design rounds settled the look (`docs/design/consent-banner.html`). Buttons are the default teal variant; blog videos show their own preview image served from a NurseDex route (Task 8 rewritten).
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -43,7 +45,7 @@ Pushed back, with reason:
 - Do Not Track or Global Privacy Control counts as Decline: no banner, nothing loads, no Accept offered.
 - Tracking requires ALL of: this browser's Accept, the account setting not off (as last seen on this device), no browser signal. The banner never writes the account setting.
 - Server side events (`src/lib/analytics/server.ts`) are unchanged by the banner and gated only by the account setting.
-- Non blocking bar, `z-40` (below dialogs and sheets at `z-50`), Decline and Accept with the same variant and size.
+- Non blocking full width bar, `z-40` (below dialogs and sheets at `z-50`). Decline and Accept are both the default (teal) Button at size `lg`: a consent choice never gives one answer more visual weight than the other. The settled design is `docs/design/consent-banner.html`; every look decision there governs.
 - A banner answer lasts 12 months (`CONSENT_TTL_MS`). "Privacy choices" in both footers reopens the bar.
 - Tally: `shown`, `accepted`, `declined` per New York day; no identifier.
 - Copy: no dashes as punctuation, no emoji, domain not interface (L604). Every DOM test file starts with `// @vitest-environment happy-dom`.
@@ -1682,15 +1684,15 @@ export function ConsentBanner() {
         )}
         <div className="flex shrink-0 gap-2">
           {state === "signal" ? (
-            <Button variant="outline" size="lg" onClick={() => setReopened(false)}>
+            <Button variant="default" size="lg" onClick={() => setReopened(false)}>
               Close
             </Button>
           ) : (
             <>
-              <Button variant="outline" size="lg" onClick={() => choose("declined")}>
+              <Button variant="default" size="lg" onClick={() => choose("declined")}>
                 Decline
               </Button>
-              <Button variant="outline" size="lg" onClick={() => choose("accepted")}>
+              <Button variant="default" size="lg" onClick={() => choose("accepted")}>
                 Accept
               </Button>
             </>
@@ -1903,13 +1905,72 @@ git commit -m "Show the banner's accept rate and caption PostHog figures"
 
 ---
 
-### Task 8: Blog videos load on click
+### Task 8: Blog videos show their preview, served from NurseDex, and load on click
 
-**Files:** Create `src/components/blog/VideoEmbed.tsx`, `src/components/blog/VideoEmbed.test.tsx`. Modify `src/lib/blog/render.tsx:220-242`, and its test if one asserts the iframe (`grep -rln "embedUrl\|iframe" src/lib/blog/*.test.* src/components/blog/*.test.*`).
+**Settled design:** `docs/design/consent-banner.html`, decisions 3 and 4. The video's own preview image fills the frame with the teal play button centred on it and no visible note. The image is fetched by our server and served from nursedex.com, so the reader's browser contacts neither YouTube nor Vimeo until they press play. If the preview cannot be had, the frame falls back to a plain dark panel with the same button.
 
-YouTube and Vimeo players set their own tracking cookies when they load. Until the reader asks for the video, nothing from either is fetched: no iframe, no thumbnail.
+**Files:** Modify `src/lib/blog/embed.ts` (add `id`; export the id patterns) and its test. Create `src/app/api/video-thumbnail/[provider]/[id]/route.ts`, `src/lib/blog/video-thumbnail.ts`, `src/lib/blog/video-thumbnail.test.ts`, `src/components/blog/VideoEmbed.tsx`, `src/components/blog/VideoEmbed.test.tsx`. Modify `src/lib/blog/render.tsx:220-242` and any render test that asserts the iframe (`grep -rln "embedUrl\|iframe" src/lib/blog src/components/blog | grep test`).
 
-- [ ] **Step 1: Failing test**
+**Route contract (state it in the route's doc comment):** caller is anyone (public, unauthenticated, like the images it replaces); it touches no user data; it only ever contacts two fixed hosts, with an id that has passed the same shape check `parseEmbed` uses, so it cannot be steered at another host (no SSRF). Responses are cached publicly so the CDN, not the function, answers repeat requests. Upstream failure returns 404 with `console.warn`, never a thrown error or a Sentry alert, because anyone can trigger it at will (L498).
+
+**Produces:**
+- `ParsedEmbed` gains `id: string`; `YT_ID` and `VIMEO_ID` exported.
+- `thumbnailUpstreamUrl(provider, id, fetchFn): Promise<string | null>`: YouTube `https://i.ytimg.com/vi/<id>/hqdefault.jpg`; Vimeo reads `thumbnail_url` from `https://vimeo.com/api/oembed.json?url=https://vimeo.com/<id>&width=1280`.
+- `GET /api/video-thumbnail/<provider>/<id>` returning the image bytes.
+- `videoThumbnailPath(provider, id): string`.
+
+- [ ] **Step 1: Failing tests**
+
+```ts
+// src/lib/blog/video-thumbnail.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { thumbnailUpstreamUrl, videoThumbnailPath } from "./video-thumbnail";
+
+describe("thumbnailUpstreamUrl", () => {
+  it("builds YouTube's preview address without a network call", async () => {
+    const fetchFn = vi.fn();
+    await expect(thumbnailUpstreamUrl("youtube", "abcdefghijk", fetchFn)).resolves.toBe(
+      "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
+    );
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("asks Vimeo's oEmbed for the preview address", async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ thumbnail_url: "https://i.vimeocdn.com/video/1-d_1280" })));
+    await expect(thumbnailUpstreamUrl("vimeo", "123", fetchFn)).resolves.toBe("https://i.vimeocdn.com/video/1-d_1280");
+    expect(fetchFn).toHaveBeenCalledWith(
+      "https://vimeo.com/api/oembed.json?url=https%3A%2F%2Fvimeo.com%2F123&width=1280",
+      expect.anything(),
+    );
+  });
+
+  it("refuses an id of the wrong shape before any request", async () => {
+    const fetchFn = vi.fn();
+    await expect(thumbnailUpstreamUrl("youtube", "../../etc", fetchFn)).resolves.toBeNull();
+    await expect(thumbnailUpstreamUrl("vimeo", "12a", fetchFn)).resolves.toBeNull();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("refuses a Vimeo answer that points anywhere but Vimeo's image host", async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ thumbnail_url: "https://evil.example/x.jpg" })));
+    await expect(thumbnailUpstreamUrl("vimeo", "123", fetchFn)).resolves.toBeNull();
+  });
+
+  it("returns null when Vimeo fails or answers nonsense", async () => {
+    await expect(thumbnailUpstreamUrl("vimeo", "123", vi.fn(async () => new Response("", { status: 404 })))).resolves.toBeNull();
+    await expect(thumbnailUpstreamUrl("vimeo", "123", vi.fn(async () => new Response("not json")))).resolves.toBeNull();
+    await expect(thumbnailUpstreamUrl("vimeo", "123", vi.fn(async () => { throw new Error("network"); }))).resolves.toBeNull();
+  });
+});
+
+describe("videoThumbnailPath", () => {
+  it("is a NurseDex path", () => {
+    expect(videoThumbnailPath("youtube", "abcdefghijk")).toBe("/api/video-thumbnail/youtube/abcdefghijk");
+  });
+});
+```
+
+Add a route test (`src/app/api/video-thumbnail/[provider]/[id]/route.test.ts`, following how other route tests in `src/app/api` call `GET` directly) covering: a valid YouTube id streams the upstream bytes with `content-type` from upstream and `cache-control` containing `public` and `s-maxage`; an unknown provider returns 404 without fetching; an upstream 404 returns 404; an upstream response that is not an image (`content-type` not starting `image/`) returns 404. Inject the fetch through a module seam the route reads (for example `export const deps = { fetch: globalThis.fetch }` in `video-thumbnail.ts`), never a real network call.
 
 ```tsx
 // src/components/blog/VideoEmbed.test.tsx
@@ -1921,32 +1982,138 @@ import { VideoEmbed } from "./VideoEmbed";
 
 afterEach(cleanup);
 
+const youtube = { provider: "youtube" as const, id: "abcdefghijk", embedUrl: "https://www.youtube.com/embed/abcdefghijk" };
+
 describe("VideoEmbed", () => {
-  it("fetches nothing from the provider until asked", () => {
-    const { container } = render(
-      <VideoEmbed provider="youtube" embedUrl="https://www.youtube.com/embed/abcdefghijk" />,
-    );
+  it("shows the preview from NurseDex and loads nothing from the provider", () => {
+    const { container } = render(<VideoEmbed {...youtube} />);
     expect(container.querySelector("iframe")).toBeNull();
+    const img = container.querySelector("img");
+    expect(img?.getAttribute("src")).toBe("/api/video-thumbnail/youtube/abcdefghijk");
+    expect(img?.getAttribute("alt")).toBe("");
+    expect(screen.getByRole("button", { name: "Play YouTube video" })).toBeInTheDocument();
+  });
+
+  it("shows no visible cookie note (decision 4)", () => {
+    render(<VideoEmbed {...youtube} />);
+    expect(screen.queryByText(/cookies/i)).toBeNull();
+  });
+
+  it("falls back to the plain panel when the preview cannot load", () => {
+    const { container } = render(<VideoEmbed {...youtube} />);
+    fireEvent.error(container.querySelector("img")!);
     expect(container.querySelector("img")).toBeNull();
     expect(screen.getByRole("button", { name: "Play YouTube video" })).toBeInTheDocument();
   });
 
   it("loads the player, playing, once the reader clicks", () => {
-    const { container } = render(
-      <VideoEmbed provider="vimeo" embedUrl="https://player.vimeo.com/video/123" />,
-    );
+    const { container } = render(<VideoEmbed provider="vimeo" id="123" embedUrl="https://player.vimeo.com/video/123" />);
     fireEvent.click(screen.getByRole("button", { name: "Play Vimeo video" }));
-    const iframe = container.querySelector("iframe");
-    expect(iframe?.getAttribute("src")).toBe("https://player.vimeo.com/video/123?autoplay=1");
+    expect(container.querySelector("iframe")?.getAttribute("src")).toBe("https://player.vimeo.com/video/123?autoplay=1");
   });
 });
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+In `embed.ts`'s existing test, add `id` to every expected `ParsedEmbed`.
 
-Run: `npx vitest run src/components/blog/VideoEmbed.test.tsx` → FAIL.
+- [ ] **Step 2: Run to verify they fail** → FAIL (modules missing, `id` absent).
 
 - [ ] **Step 3: Implement**
+
+`embed.ts`: `export const YT_ID`, `export const VIMEO_ID`; add `id` to the interface and to every returned object (the id each branch already extracted).
+
+```ts
+// src/lib/blog/video-thumbnail.ts
+import { VIMEO_ID, YT_ID, type ParsedEmbed } from "./embed";
+
+type Provider = ParsedEmbed["provider"];
+type FetchFn = typeof fetch;
+
+/** The seam route tests replace; production uses the platform fetch. */
+export const deps: { fetch: FetchFn } = { fetch: (...args) => globalThis.fetch(...args) };
+
+const VIMEO_IMAGE_HOST = "i.vimeocdn.com";
+
+export function videoThumbnailPath(provider: Provider, id: string): string {
+  return `/api/video-thumbnail/${provider}/${id}`;
+}
+
+/**
+ * Where a video's preview image lives at its provider, or null. Only ever two
+ * fixed hosts, with an id that passed the same shape check parseEmbed uses,
+ * so nothing a caller sends can point this at another server.
+ */
+export async function thumbnailUpstreamUrl(
+  provider: string,
+  id: string,
+  fetchFn: FetchFn = deps.fetch,
+): Promise<string | null> {
+  if (provider === "youtube") {
+    return YT_ID.test(id) ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
+  }
+  if (provider !== "vimeo" || !VIMEO_ID.test(id)) return null;
+  try {
+    const target = encodeURIComponent(`https://vimeo.com/${id}`);
+    const res = await fetchFn(`https://vimeo.com/api/oembed.json?url=${target}&width=1280`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { thumbnail_url?: unknown };
+    if (typeof body.thumbnail_url !== "string") return null;
+    const url = new URL(body.thumbnail_url);
+    return url.protocol === "https:" && url.hostname === VIMEO_IMAGE_HOST ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+```
+
+```ts
+// src/app/api/video-thumbnail/[provider]/[id]/route.ts
+import { NextResponse } from "next/server";
+import { deps, thumbnailUpstreamUrl } from "@/lib/blog/video-thumbnail";
+
+/**
+ * A blog video's preview image, served from NurseDex so a reader's browser
+ * contacts neither YouTube nor Vimeo until they press play.
+ *
+ * WHO CALLS IT: anyone; it is a public image, like the pictures it stands in for.
+ * WHAT IT TOUCHES: no user data. It fetches from i.ytimg.com, vimeo.com's
+ * oEmbed and i.vimeocdn.com only, with an id checked against the same shape
+ * parseEmbed uses, so it cannot be aimed elsewhere.
+ * FAILURE: 404 with a warning in the logs, never a thrown error or a Sentry
+ * alert, because anyone can trigger one at will (L498). The player falls back
+ * to a plain panel.
+ */
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ provider: string; id: string }> },
+) {
+  const { provider, id } = await params;
+  const upstream = await thumbnailUpstreamUrl(provider, id);
+  if (!upstream) return new NextResponse(null, { status: 404 });
+  try {
+    const res = await deps.fetch(upstream, { signal: AbortSignal.timeout(5000) });
+    const type = res.headers.get("content-type") ?? "";
+    if (!res.ok || !type.startsWith("image/")) {
+      console.warn("[video-thumbnail] upstream refused", provider, id, res.status, type);
+      return new NextResponse(null, { status: 404 });
+    }
+    return new NextResponse(res.body, {
+      status: 200,
+      headers: {
+        "content-type": type,
+        "cache-control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+      },
+    });
+  } catch (err) {
+    console.warn("[video-thumbnail] upstream failed", provider, id, err);
+    return new NextResponse(null, { status: 404 });
+  }
+}
+```
+
+Read `node_modules/next/dist/docs/` for this Next version's route handler `params` shape before writing it (AGENTS.md); adjust the signature if it differs, keeping the behaviour.
 
 ```tsx
 // src/components/blog/VideoEmbed.tsx
@@ -1955,15 +2122,18 @@ Run: `npx vitest run src/components/blog/VideoEmbed.test.tsx` → FAIL.
 import { useState } from "react";
 import { Play } from "lucide-react";
 import type { ParsedEmbed } from "@/lib/blog/embed";
+import { videoThumbnailPath } from "@/lib/blog/video-thumbnail";
 
 /**
- * A provider video that loads only when the reader asks for it. YouTube and
- * Vimeo players set their own tracking cookies as soon as they load, so the
- * page shows a plain placeholder (no provider thumbnail, which would itself be
- * a request to the provider) until the click.
+ * A provider video that loads only when the reader asks for it (settled design,
+ * docs/design/consent-banner.html, decisions 3 and 4). Its preview image comes
+ * from NurseDex's own route, so nothing is fetched from YouTube or Vimeo until
+ * the click. No visible cookie note: the privacy policy carries it, and the
+ * button's name says where the video plays from.
  */
-export function VideoEmbed({ provider, embedUrl }: ParsedEmbed) {
+export function VideoEmbed({ provider, id, embedUrl }: ParsedEmbed) {
   const [playing, setPlaying] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const name = provider === "youtube" ? "YouTube" : "Vimeo";
 
   return (
@@ -1978,37 +2148,46 @@ export function VideoEmbed({ provider, embedUrl }: ParsedEmbed) {
           referrerPolicy="strict-origin-when-cross-origin"
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setPlaying(true)}
-          aria-label={`Play ${name} video`}
-          className="font-body absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-3 text-white"
-        >
-          <span className="bg-teal flex size-16 items-center justify-center rounded-full">
-            <Play className="size-7" aria-hidden="true" />
-          </span>
-          <span className="text-sm">
-            Plays from {name}, which may set its own cookies.
-          </span>
-        </button>
+        <>
+          {!previewFailed && (
+            // eslint-disable-next-line @next/next/no-img-element -- already a NurseDex route; next/image would add a second proxy hop
+            <img
+              src={videoThumbnailPath(provider, id)}
+              alt=""
+              loading="lazy"
+              onError={() => setPreviewFailed(true)}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => setPlaying(true)}
+            aria-label={`Play ${name} video`}
+            className="absolute inset-0 flex cursor-pointer items-center justify-center"
+          >
+            <span className="bg-teal flex size-[72px] items-center justify-center rounded-full shadow-lg">
+              <Play className="size-7 fill-white text-white" aria-hidden="true" />
+            </span>
+          </button>
+        </>
       )}
     </div>
   );
 }
 ```
 
-In `render.tsx`, replace the `<div>...<iframe/></div>` returned for `"embed"` with `<VideoEmbed key={key} provider={parsed.provider} embedUrl={parsed.embedUrl} />`. Confirm `parseEmbed` never returns an `embedUrl` that already carries a query string (read `embed.ts:30-63`; it builds them from the id alone), so `?autoplay=1` is always the first parameter.
+In `render.tsx`, replace the `<div>...<iframe/></div>` for `"embed"` with `<VideoEmbed key={key} provider={parsed.provider} id={parsed.id} embedUrl={parsed.embedUrl} />`. `parseEmbed` builds every `embedUrl` from the id alone, so `?autoplay=1` is always the first parameter. Check whether the lint config forbids `<img>` (`grep -rn "no-img-element" eslint.config.*`); if the rule is off, drop the disable comment.
 
 - [ ] **Step 4: Run, including the blog render tests**
 
-Run: `npx vitest run src/components/blog src/lib/blog && npx tsc --noEmit` → PASS. Update any render test that asserted an iframe to assert the play button instead, keeping the assertion that an unrecognised URL renders nothing.
+Run: `npx vitest run src/components/blog src/lib/blog "src/app/api/video-thumbnail" && npx tsc --noEmit` → PASS. Update any render test that asserted an iframe to assert the play button, keeping the assertion that an unrecognised URL renders nothing.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/blog/VideoEmbed.tsx src/components/blog/VideoEmbed.test.tsx src/lib/blog/render.tsx
-git add <the render test file, if changed>
-git commit -m "Load blog videos only when the reader plays them"
+git add src/lib/blog/embed.ts src/lib/blog/video-thumbnail.ts src/lib/blog/video-thumbnail.test.ts "src/app/api/video-thumbnail/[provider]/[id]/route.ts" "src/app/api/video-thumbnail/[provider]/[id]/route.test.ts" src/components/blog/VideoEmbed.tsx src/components/blog/VideoEmbed.test.tsx src/lib/blog/render.tsx
+git add <the embed and render test files changed, by name>
+git commit -m "Blog videos: preview served from NurseDex, player loads on play"
 ```
 
 ---
