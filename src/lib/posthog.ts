@@ -55,8 +55,10 @@ export function initPostHog() {
 /**
  * Removes PostHog's visitor id and session from this browser, so somebody
  * who used the site before the banner existed, or who withdrew, does not keep
- * a PostHog cookie they did not agree to. Run on a page load where analytics
- * are not allowed, before anything could start PostHog.
+ * a PostHog cookie they did not agree to. Run whenever analytics are not
+ * allowed: on a page load before anything could start PostHog, and right after
+ * an in memory withdrawal, which has already turned PostHog's persistence off
+ * so it cannot write the identity back.
  *
  * Only `ph_` keys. PostHog's opt-out record (`__ph_opt_in_out_*`) may hold the
  * ACCOUNT's choice, written by applyAnalyticsPreference, and deleting it on a
@@ -99,18 +101,21 @@ export function clearPostHogIdentity() {
 }
 
 /**
- * Withdrawal on a page where PostHog is already running. posthog-js cannot be
- * reliably stopped in memory: opt_out_capturing does not stop the recorder
- * outside cookieless mode (posthog-core.js:4067-4073), and it writes PostHog's
- * own opt-out record, which may hold the ACCOUNT's choice. So, in memory only:
- * stop recording, stop writing cookies, and drop every later event on this
- * page. The reload that follows fires PostHog's unload handler, which captures
- * $pageleave and sends it by beacon (posthog-core.js _handle_unload), so
- * capture_pageleave goes off, autocapture stops listening, and before_send
- * rejects whatever else still calls capture (heatmaps, exceptions, anything
- * already wired): posthog-js drops an event whose before_send returns null.
- * Returns true so the caller reloads; the next load never starts PostHog and
- * clears its identity.
+ * Withdrawal on a page where PostHog is already running. Never
+ * opt_out_capturing: it does not stop the recorder outside cookieless mode
+ * (posthog-core.js:4067-4073), and it writes PostHog's own opt-out record,
+ * which may hold the ACCOUNT's choice. So, in memory only: stop recording,
+ * stop writing cookies, and drop every later event on this page.
+ * capture_pageleave goes off, because PostHog's unload handler captures
+ * $pageleave and sends it by beacon (posthog-core.js _handle_unload);
+ * autocapture stops listening; and before_send rejects whatever else still
+ * calls capture (heatmaps, exceptions, anything already wired): posthog-js
+ * drops an event whose before_send returns null.
+ *
+ * Complete for the life of the page, so a tab that hears of a withdrawal made
+ * in another tab stops here without reloading (withdrawTracking in
+ * src/lib/consent/apply.ts). Returns true when PostHog was running, which is
+ * when the tab that declined reloads.
  */
 export function withdrawPostHog(): boolean {
   if (!posthog.__loaded) return false;
