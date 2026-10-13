@@ -41,17 +41,28 @@ describe("getConsentTally", () => {
       error: null,
     });
     await expect(getConsentTally(30, now)).resolves.toEqual({
-      status: "ok", days: 30, shown: 40, accepted: 12, declined: 8, acceptRate: 0.3,
+      status: "ok",
+      days: 30,
+      shown: 40,
+      accepted: 12,
+      declined: 8,
+      acceptRate: 0.3,
     });
     expect(h.from).toHaveBeenCalledWith("consent_tally");
     expect(h.gte).toHaveBeenCalledWith("day", "2026-10-17");
   });
 
   it("returns an error with the message, and logs, when the read fails", async () => {
-    h.gte.mockResolvedValue({ data: null, error: { message: "permission denied" } });
+    h.gte.mockResolvedValue({
+      data: null,
+      error: { message: "permission denied" },
+    });
     const result = await getConsentTally(30, now);
     expect(result.status).toBe("error");
-    expect(result).toMatchObject({ message: expect.stringContaining("permission denied") });
+    expect(result).toMatchObject({
+      days: 30,
+      message: expect.stringContaining("permission denied"),
+    });
     expect(console.error).toHaveBeenCalled();
   });
 
@@ -59,7 +70,9 @@ describe("getConsentTally", () => {
     h.create.mockImplementation(() => {
       throw new Error("missing service role key");
     });
-    await expect(getConsentTally(30, now)).resolves.toMatchObject({ status: "error" });
+    await expect(getConsentTally(30, now)).resolves.toMatchObject({
+      status: "error",
+    });
     expect(console.error).toHaveBeenCalled();
   });
 });
@@ -73,7 +86,12 @@ describe("summariseConsentRows", () => {
       { day: "2026-10-15", kind: "declined", count: 8 },
     ];
     expect(summariseConsentRows(rows, 30)).toEqual({
-      status: "ok", days: 30, shown: 40, accepted: 12, declined: 8, acceptRate: 0.3,
+      status: "ok",
+      days: 30,
+      shown: 40,
+      accepted: 12,
+      declined: 8,
+      acceptRate: 0.3,
     });
   });
 
@@ -82,7 +100,10 @@ describe("summariseConsentRows", () => {
       { day: "2026-10-14", kind: "shown", count: CONSENT_RATE_MIN_SHOWN - 1 },
       { day: "2026-10-14", kind: "accepted", count: 5 },
     ];
-    expect(summariseConsentRows(rows, 30)).toMatchObject({ status: "ok", acceptRate: null });
+    expect(summariseConsentRows(rows, 30)).toMatchObject({
+      status: "ok",
+      acceptRate: null,
+    });
   });
 
   it("refuses counts where answers outnumber showings, rather than print a rate over 100% (L588)", () => {
@@ -95,22 +116,58 @@ describe("summariseConsentRows", () => {
   });
 
   it("skips malformed rows", () => {
-    const rows = [{ day: "x", kind: "shown", count: "40" }, { day: "x", kind: "other", count: 4 }, null];
-    expect(summariseConsentRows(rows, 30)).toMatchObject({ shown: 0, accepted: 0, declined: 0 });
+    const rows = [
+      { day: "x", kind: "shown", count: "40" },
+      { day: "x", kind: "other", count: 4 },
+      null,
+    ];
+    expect(summariseConsentRows(rows, 30)).toMatchObject({
+      shown: 0,
+      accepted: 0,
+      declined: 0,
+    });
   });
 });
 
 describe("consentNoteText", () => {
   it("says no browsers yet when nothing was counted", () => {
-    expect(consentNoteText({ status: "ok", days: 30, shown: 0, accepted: 0, declined: 0, acceptRate: null }))
-      .toBe("No browsers have been shown the banner in the last 30 days. If the site had visitors in that time, the count is not being recorded.");
+    expect(
+      consentNoteText({
+        status: "ok",
+        days: 30,
+        shown: 0,
+        accepted: 0,
+        declined: 0,
+        acceptRate: null,
+      }),
+    ).toBe(
+      "No browsers have been shown the banner in the last 30 days. If the site had visitors in that time, the count is not being recorded.",
+    );
   });
   it("says when there are too few to read", () => {
-    expect(consentNoteText({ status: "ok", days: 30, shown: 5, accepted: 2, declined: 1, acceptRate: null }))
-      .toBe("Too few browsers to read a rate yet (5 shown, 20 needed).");
+    expect(
+      consentNoteText({
+        status: "ok",
+        days: 30,
+        shown: 5,
+        accepted: 2,
+        declined: 1,
+        acceptRate: null,
+      }),
+    ).toBe("Too few browsers to read a rate yet (5 shown, 20 needed).");
   });
   it("states what was measured, and no more", () => {
-    expect(consentNoteText({ status: "ok", days: 30, shown: 200, accepted: 60, declined: 40, acceptRate: 0.3 }))
-      .toBe("30% of browsers shown the banner in the last 30 days accepted on their first answer. PostHog figures since launch come only from browsers that accepted.");
+    expect(
+      consentNoteText({
+        status: "ok",
+        days: 30,
+        shown: 200,
+        accepted: 60,
+        declined: 40,
+        acceptRate: 0.3,
+      }),
+    ).toBe(
+      "30% of browsers shown the banner in the last 30 days accepted on their first answer. PostHog figures since launch come only from browsers that accepted.",
+    );
   });
 });

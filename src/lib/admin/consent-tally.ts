@@ -4,12 +4,22 @@ import { isConsentEventKind } from "@/lib/consent/kinds";
 import { newYorkDaysAgo } from "@/lib/dates/new-york-day";
 
 export type ConsentTally =
-  | { status: "ok"; days: number; shown: number; accepted: number; declined: number; acceptRate: number | null }
-  | { status: "error"; message: string };
+  | {
+      status: "ok";
+      days: number;
+      shown: number;
+      accepted: number;
+      declined: number;
+      acceptRate: number | null;
+    }
+  | { status: "error"; days: number; message: string };
 
 export const CONSENT_RATE_MIN_SHOWN = 20;
 
-export function summariseConsentRows(rows: unknown, days: number): ConsentTally {
+export function summariseConsentRows(
+  rows: unknown,
+  days: number,
+): ConsentTally {
   const totals = { shown: 0, accepted: 0, declined: 0 };
   if (Array.isArray(rows)) {
     for (const row of rows) {
@@ -26,15 +36,22 @@ export function summariseConsentRows(rows: unknown, days: number): ConsentTally 
   if (totals.accepted + totals.declined > totals.shown) {
     return {
       status: "error",
+      days,
       message: `Answers (${totals.accepted + totals.declined}) outnumber showings (${totals.shown}), so the count is not trustworthy.`,
     };
   }
-  const acceptRate = totals.shown >= CONSENT_RATE_MIN_SHOWN ? totals.accepted / totals.shown : null;
+  const acceptRate =
+    totals.shown >= CONSENT_RATE_MIN_SHOWN
+      ? totals.accepted / totals.shown
+      : null;
   return { status: "ok", days, ...totals, acceptRate };
 }
 
 /** Exactly `days` New York days ending today. Never throws: the section renders the error. */
-export async function getConsentTally(days = 30, now: Date = new Date()): Promise<ConsentTally> {
+export async function getConsentTally(
+  days = 30,
+  now: Date = new Date(),
+): Promise<ConsentTally> {
   const since = newYorkDaysAgo(now, days - 1);
   try {
     const { data, error } = await createServiceRoleClient()
@@ -43,16 +60,26 @@ export async function getConsentTally(days = 30, now: Date = new Date()): Promis
       .gte("day", since);
     if (error) {
       console.error("[consent-tally] could not read", error);
-      return { status: "error", message: `The banner counts could not be read: ${error.message}` };
+      return {
+        status: "error",
+        days,
+        message: `The banner counts could not be read: ${error.message}`,
+      };
     }
     return summariseConsentRows(data ?? [], days);
   } catch (err) {
     console.error("[consent-tally] could not read", err);
-    return { status: "error", message: "The banner counts could not be read." };
+    return {
+      status: "error",
+      days,
+      message: "The banner counts could not be read.",
+    };
   }
 }
 
-export function consentNoteText(t: Extract<ConsentTally, { status: "ok" }>): string {
+export function consentNoteText(
+  t: Extract<ConsentTally, { status: "ok" }>,
+): string {
   if (t.shown === 0) {
     return `No browsers have been shown the banner in the last ${t.days} days. If the site had visitors in that time, the count is not being recorded.`;
   }

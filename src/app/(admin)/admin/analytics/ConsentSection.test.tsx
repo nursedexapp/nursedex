@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/supabase/service-role", () => ({
@@ -18,14 +18,36 @@ describe("ConsentSection", () => {
       <ConsentSection
         consent={{
           status: "error",
+          days: 30,
           message: "The banner counts could not be read.",
         }}
       />,
     );
+    expect(
+      screen.getByRole("heading", { name: "Cookie banner, last 30 days" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The banner counts could not be read.",
     );
     expect(screen.queryByText("Browsers shown")).toBeNull();
+  });
+
+  it("names the period it was read over, from the tally itself", () => {
+    render(
+      <ConsentSection
+        consent={{
+          status: "ok",
+          days: 7,
+          shown: 0,
+          accepted: 0,
+          declined: 0,
+          acceptRate: null,
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: "Cookie banner, last 7 days" }),
+    ).toBeInTheDocument();
   });
 
   it("renders the three stats and the note when ok", () => {
@@ -41,13 +63,15 @@ describe("ConsentSection", () => {
         }}
       />,
     );
-    expect(screen.getByText("Cookie banner, last 30 days")).toBeInTheDocument();
-    expect(screen.getByText("Browsers shown")).toBeInTheDocument();
-    expect(screen.getByText("Accepted")).toBeInTheDocument();
-    expect(screen.getByText("Declined")).toBeInTheDocument();
-    expect(screen.getByText("100")).toBeInTheDocument();
-    expect(screen.getByText("60")).toBeInTheDocument();
-    expect(screen.getByText("30")).toBeInTheDocument();
+    // Each value read inside its own stat, so a number elsewhere on the
+    // section (the period in the title, the note) cannot satisfy it.
+    const stat = (label: string) =>
+      within(
+        screen.getByText(label).closest("[data-slot=card]") as HTMLElement,
+      );
+    expect(stat("Browsers shown").getByText("100")).toBeInTheDocument();
+    expect(stat("Accepted").getByText("60")).toBeInTheDocument();
+    expect(stat("Declined").getByText("30")).toBeInTheDocument();
     expect(
       screen.getByText(/60% of browsers shown the banner/),
     ).toBeInTheDocument();

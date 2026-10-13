@@ -4,7 +4,7 @@ import { Section, Stat } from "./analytics-parts";
 
 export function ConsentSection({ consent }: { consent: ConsentTally }) {
   return (
-    <Section title="Cookie banner, last 30 days">
+    <Section title={`Cookie banner, last ${consent.days} days`}>
       {consent.status === "error" ? (
         <p
           role="alert"
