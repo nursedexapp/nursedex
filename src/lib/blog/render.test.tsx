@@ -159,17 +159,35 @@ describe("PostContent renderer", () => {
     expect(out).toContain("click");
   });
 
-  it("renders a known embed as a play button with a NurseDex preview, no iframe", () => {
-    const out = html(
-      doc({
-        type: "embed",
-        attrs: { url: "https://youtu.be/dQw4w9WgXcQ" },
-      }),
+  it("renders a known embed as a play button with its signed NurseDex preview, no iframe", () => {
+    const out = renderToStaticMarkup(
+      <PostContent
+        doc={doc({
+          type: "embed",
+          attrs: { url: "https://youtu.be/dQw4w9WgXcQ" },
+        })}
+        videoPreviews={{
+          "youtube/dQw4w9WgXcQ":
+            "/api/video-thumbnail/youtube/dQw4w9WgXcQ?t=signed",
+        }}
+      />,
     );
-    expect(out).toContain('src="/api/video-thumbnail/youtube/dQw4w9WgXcQ"');
+    expect(out).toContain(
+      'src="/api/video-thumbnail/youtube/dQw4w9WgXcQ?t=signed"',
+    );
     expect(out).toContain("Play YouTube video");
     expect(out).not.toContain("<iframe");
     expect(out).not.toContain("youtube.com");
+  });
+
+  it("renders an embed with no signed preview as the plain panel, with no image", () => {
+    // The draft preview renders in the browser, where nothing can sign.
+    const out = html(
+      doc({ type: "embed", attrs: { url: "https://youtu.be/dQw4w9WgXcQ" } }),
+    );
+    expect(out).toContain("Play YouTube video");
+    expect(out).not.toContain("<img");
+    expect(out).not.toContain("/api/video-thumbnail/");
   });
 
   it("drops an embed from an unknown provider", () => {

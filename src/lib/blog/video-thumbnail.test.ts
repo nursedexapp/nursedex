@@ -115,9 +115,9 @@ describe("thumbnailUpstreamUrl", () => {
 });
 
 describe("videoThumbnailPath", () => {
-  it("is a NurseDex path", () => {
-    expect(videoThumbnailPath("youtube", "abcdefghijk")).toBe(
-      "/api/video-thumbnail/youtube/abcdefghijk",
+  it("is a NurseDex path carrying the server's signature", () => {
+    expect(videoThumbnailPath("youtube", "abcdefghijk", "sig_-1")).toBe(
+      "/api/video-thumbnail/youtube/abcdefghijk?t=sig_-1",
     );
   });
 });

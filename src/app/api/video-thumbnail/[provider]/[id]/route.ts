@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deps, thumbnailUpstreamUrl } from "@/lib/blog/video-thumbnail";
+import { videoPreviewIsSigned } from "@/lib/blog/video-preview-token";
 
 const RASTER = new Set(["image/jpeg", "image/png", "image/webp"]);
 const NO_PREVIEW_CACHE = "public, s-maxage=3600";
@@ -9,6 +10,11 @@ const NO_PREVIEW_CACHE = "public, s-maxage=3600";
  * contacts neither YouTube nor Vimeo until they press play.
  *
  * WHO CALLS IT: anyone; it is a public image, like the pictures it stands in for.
+ * WHAT IT SERVES: only a video NurseDex itself put in a published post. The
+ * post page signs each preview path on the server (?t=, see
+ * src/lib/blog/video-preview-token.ts), and a missing, altered or borrowed
+ * signature is a 404 before any upstream fetch, so the route cannot be used as
+ * a free thumbnail proxy at our cost (L498). The refusal is not cached.
  * WHAT IT TOUCHES: no user data. It fetches from i.ytimg.com, vimeo.com's
  * oEmbed and i.vimeocdn.com only, with an id checked against the same shape
  * parseEmbed uses, so it cannot be aimed elsewhere (no SSRF).
@@ -18,10 +24,14 @@ const NO_PREVIEW_CACHE = "public, s-maxage=3600";
  * Vimeo may legitimately redirect within their own CDNs.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ provider: string; id: string }> },
 ) {
   const { provider, id } = await params;
+  const token = new URL(request.url).searchParams.get("t");
+  if (!videoPreviewIsSigned(provider, id, token)) {
+    return new NextResponse(null, { status: 404 });
+  }
   const found = await thumbnailUpstreamUrl(provider, id);
   // A video with no preview is as definite as the image host saying 404, so it
   // is cached the same way; a failed lookup or a refusal never is.

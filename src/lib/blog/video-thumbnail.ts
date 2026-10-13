@@ -10,8 +10,24 @@ export const deps: { fetch: FetchFn } = {
 
 const VIMEO_IMAGE_HOST = "i.vimeocdn.com";
 
-export function videoThumbnailPath(provider: Provider, id: string): string {
-  return `/api/video-thumbnail/${provider}/${id}`;
+/**
+ * The preview route's address for a video, carrying the server's signature
+ * (src/lib/blog/video-preview-token.ts); the route refuses anything unsigned.
+ */
+export function videoThumbnailPath(
+  provider: Provider,
+  id: string,
+  token: string,
+): string {
+  return `/api/video-thumbnail/${provider}/${id}?t=${encodeURIComponent(token)}`;
+}
+
+/** Signed preview paths for a post, keyed by videoPreviewKey. */
+export type VideoPreviews = Record<string, string>;
+
+/** "provider/id": what a preview signature covers, and how a post finds it. */
+export function videoPreviewKey(provider: string, id: string): string {
+  return `${provider}/${id}`;
 }
 
 /**

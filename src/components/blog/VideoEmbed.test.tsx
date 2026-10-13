@@ -15,6 +15,7 @@ const youtube = {
   provider: "youtube" as const,
   id: "abcdefghijk",
   embedUrl: "https://www.youtube.com/embed/abcdefghijk",
+  previewSrc: "/api/video-thumbnail/youtube/abcdefghijk?t=signed",
 };
 
 describe("VideoEmbed", () => {
@@ -23,9 +24,19 @@ describe("VideoEmbed", () => {
     expect(container.querySelector("iframe")).toBeNull();
     const img = container.querySelector("img");
     expect(img?.getAttribute("src")).toBe(
-      "/api/video-thumbnail/youtube/abcdefghijk",
+      "/api/video-thumbnail/youtube/abcdefghijk?t=signed",
     );
     expect(img?.getAttribute("alt")).toBe("");
+    expect(
+      screen.getByRole("button", { name: "Play YouTube video" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the plain panel, with no image, when there is no signed preview", () => {
+    const { container } = render(
+      <VideoEmbed {...youtube} previewSrc={undefined} />,
+    );
+    expect(container.querySelector("img")).toBeNull();
     expect(
       screen.getByRole("button", { name: "Play YouTube video" }),
     ).toBeInTheDocument();

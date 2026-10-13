@@ -1,6 +1,7 @@
 import Link from "next/link";
 import NextImage from "next/image";
 import { PostContent } from "@/lib/blog/render";
+import type { VideoPreviews } from "@/lib/blog/video-thumbnail";
 import { extractHeadings } from "@/lib/blog/toc";
 import { RelatedPosts } from "@/components/blog/RelatedPosts";
 import { BlogToc } from "@/components/blog/BlogToc";
@@ -20,6 +21,12 @@ interface BlogArticleProps {
   related: BlogPostListItem[];
   /** Show share buttons. Off for the draft preview (not publicly shareable). */
   showShare?: boolean;
+  /**
+   * Signed video preview paths, from videoPreviewPaths on the server. The
+   * draft preview renders in the browser and has none, so its videos show
+   * the plain panel.
+   */
+  videoPreviews?: VideoPreviews;
 }
 
 function formatDate(iso: string | null): string {
@@ -42,6 +49,7 @@ export function BlogArticle({
   authorName,
   related,
   showShare = false,
+  videoPreviews,
 }: BlogArticleProps) {
   const headings = extractHeadings(post.content);
 
@@ -98,7 +106,7 @@ export function BlogArticle({
       <BlogToc headings={headings} />
 
       <article className="prose prose-headings:font-heading prose-headings:text-soft-black prose-a:text-teal-dark prose-img:rounded-lg max-w-none">
-        <PostContent doc={post.content} />
+        <PostContent doc={post.content} videoPreviews={videoPreviews} />
       </article>
 
       {tags.length > 0 && (

@@ -7,11 +7,20 @@ import { imageAlignClass } from "./image-align";
 import { parseEmbed } from "./embed";
 import { CodeBlock } from "@/components/blog/CodeBlock";
 import { VideoEmbed } from "@/components/blog/VideoEmbed";
+import { videoPreviewKey, type VideoPreviews } from "./video-thumbnail";
 import { trustedSupabaseHosts } from "@/lib/supabase/trusted-hosts";
 
 // Reserved key in the shared `seen` map used to number footnotes in
 // document order. It cannot collide with a heading slug.
 const FN_KEY = " footnote";
+
+/** State shared across one render of a post. */
+interface RenderPass {
+  /** Heading slugs and the footnote counter, in document order. */
+  seen: Map<string, number>;
+  /** Signed preview paths for the post's videos. */
+  videoPreviews: VideoPreviews;
+}
 
 /**
  * Render a stored Tiptap (ProseMirror) document to React elements.
@@ -115,7 +124,7 @@ function applyMarks(text: ReactNode, node: TiptapNode, key: string): ReactNode {
 function renderNode(
   node: TiptapNode,
   key: string,
-  seen: Map<string, number>,
+  pass: RenderPass,
 ): ReactNode {
   switch (node.type) {
     case "text":
@@ -123,27 +132,27 @@ function renderNode(
         <Fragment key={key}>{applyMarks(node.text ?? "", node, key)}</Fragment>
       );
     case "paragraph":
-      return <p key={key}>{renderChildren(node, key, seen)}</p>;
+      return <p key={key}>{renderChildren(node, key, pass)}</p>;
     case "heading": {
       const raw = Number(node.attrs?.level) || 2;
       const level = Math.min(Math.max(raw, 2), 6);
       const Tag = `h${level}` as "h2" | "h3" | "h4" | "h5" | "h6";
       // The id matches the table of contents: same generator, same order.
-      const id = headingId(nodeText(node), seen);
+      const id = headingId(nodeText(node), pass.seen);
       return (
         <Tag key={key} id={id} className="scroll-mt-24">
-          {renderChildren(node, key, seen)}
+          {renderChildren(node, key, pass)}
         </Tag>
       );
     }
     case "bulletList":
-      return <ul key={key}>{renderChildren(node, key, seen)}</ul>;
+      return <ul key={key}>{renderChildren(node, key, pass)}</ul>;
     case "orderedList":
-      return <ol key={key}>{renderChildren(node, key, seen)}</ol>;
+      return <ol key={key}>{renderChildren(node, key, pass)}</ol>;
     case "listItem":
-      return <li key={key}>{renderChildren(node, key, seen)}</li>;
+      return <li key={key}>{renderChildren(node, key, pass)}</li>;
     case "blockquote":
-      return <blockquote key={key}>{renderChildren(node, key, seen)}</blockquote>;
+      return <blockquote key={key}>{renderChildren(node, key, pass)}</blockquote>;
     case "codeBlock": {
       // Preserve the raw code (newlines included) for the highlighter,
       // rather than the whitespace-collapsing renderChildren path.
@@ -208,8 +217,8 @@ function renderNode(
         typeof node.attrs?.text === "string" ? node.attrs.text.trim() : "";
       if (!text) return null;
       // Number in document order via the shared map (matches collectFootnotes).
-      const n = (seen.get(FN_KEY) ?? 0) + 1;
-      seen.set(FN_KEY, n);
+      const n = (pass.seen.get(FN_KEY) ?? 0) + 1;
+      pass.seen.set(FN_KEY, n);
       return (
         <sup key={key} id={`fnref-${n}`}>
           <a href={`#fn-${n}`} className="text-teal-dark no-underline">
@@ -231,6 +240,9 @@ function renderNode(
           provider={parsed.provider}
           id={parsed.id}
           embedUrl={parsed.embedUrl}
+          previewSrc={
+            pass.videoPreviews[videoPreviewKey(parsed.provider, parsed.id)]
+          }
         />
       );
     }
@@ -243,23 +255,34 @@ function renderNode(
 function renderChildren(
   node: TiptapNode,
   key: string,
-  seen: Map<string, number>,
+  pass: RenderPass,
 ): ReactNode {
   return (node.content ?? []).map((child, i) =>
-    renderNode(child, `${key}-${i}`, seen),
+    renderNode(child, `${key}-${i}`, pass),
   );
 }
 
-export function PostContent({ doc }: { doc: TiptapDoc | null | undefined }) {
+/**
+ * videoPreviews: each video's signed preview path, from videoPreviewPaths on
+ * the server. Absent where nothing can sign (the draft preview renders in the
+ * browser), and those videos show their plain panel.
+ */
+export function PostContent({
+  doc,
+  videoPreviews = {},
+}: {
+  doc: TiptapDoc | null | undefined;
+  videoPreviews?: VideoPreviews;
+}) {
   if (!doc || doc.type !== "doc" || !doc.content) return null;
   // Shared across the render pass so heading ids de-dupe in document order,
   // matching extractHeadings used by the table of contents, and so footnotes
   // are numbered in document order matching collectFootnotes below.
-  const seen = new Map<string, number>();
+  const pass: RenderPass = { seen: new Map<string, number>(), videoPreviews };
   const footnotes = collectFootnotes(doc);
   return (
     <>
-      {doc.content.map((node, i) => renderNode(node, `n-${i}`, seen))}
+      {doc.content.map((node, i) => renderNode(node, `n-${i}`, pass))}
       {footnotes.length > 0 && (
         <section className="border-sage-light/40 mt-10 border-t pt-6">
           <h2 className="font-heading text-soft-black mb-3 text-lg font-semibold">

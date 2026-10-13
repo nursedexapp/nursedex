@@ -14,6 +14,7 @@ import { ArticleJsonLd } from "@/components/shared/ArticleJsonLd";
 import { BreadcrumbJsonLd } from "@/components/shared/BreadcrumbJsonLd";
 import { blogPostBreadcrumbs } from "@/lib/blog/breadcrumbs";
 import { BlogArticle } from "@/components/blog/BlogArticle";
+import { videoPreviewPaths } from "@/lib/blog/video-preview-token";
 import { NewsletterCta } from "@/components/blog/NewsletterCta";
 import { BlogPostAnalytics } from "@/components/blog/BlogPostAnalytics";
 import { BlogComments } from "@/components/blog/BlogComments";
@@ -108,6 +109,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           authorName={authorName}
           related={related}
           showShare
+          videoPreviews={videoPreviewPaths(post.content)}
         />
 
         <BlogComments postId={post.id} />
