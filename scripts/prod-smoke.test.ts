@@ -257,10 +257,23 @@ const CREATED =
 const DROPPED =
   /\bDROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?/gi;
 
+/**
+ * The statements alone: function bodies ($$ or $tag$ quoted) and comments are
+ * removed, so a create or drop written inside one is not read as executed.
+ * A function's header precedes its body, so its own CREATE survives.
+ */
+function statementsOnly(sql: string): string {
+  return sql
+    .replace(/\$(\w*)\$[\s\S]*?\$\1\$/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/--[^\n]*/g, "");
+}
+
 /** Public functions the migrations leave in place, applied in file order. */
 function functionsLeftByMigrations(sources: string[]): Set<string> {
   const live = new Set<string>();
-  for (const sql of sources) {
+  for (const raw of sources) {
+    const sql = statementsOnly(raw);
     const events = [
       ...[...sql.matchAll(CREATED)].map((m) => [m.index, m[1], true] as const),
       ...[...sql.matchAll(DROPPED)].map((m) => [m.index, m[1], false] as const),
@@ -281,6 +294,15 @@ describe("FUNCTION_GRANTS covers every function the migrations create", () => {
       'DROP FUNCTION IF EXISTS public.gone(); CREATE FUNCTION "quoted" ()',
     ]);
     expect([...left].sort()).toEqual(["kept", "quoted"]);
+  });
+
+  it("ignores a create or drop inside a comment or a function body", () => {
+    const left = functionsLeftByMigrations([
+      "CREATE FUNCTION public.real() RETURNS void AS $$ SELECT 1 $$ LANGUAGE sql;",
+      "-- DROP FUNCTION public.real();\n/* CREATE FUNCTION commented() */",
+      "CREATE FUNCTION outer_fn() RETURNS void AS $body$ BEGIN EXECUTE 'x'; -- CREATE FUNCTION in_body()\n END $body$ LANGUAGE plpgsql;",
+    ]);
+    expect([...left].sort()).toEqual(["outer_fn", "real"]);
   });
 
   it("declares an expectation for each one", () => {
