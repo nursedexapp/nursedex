@@ -1,8 +1,10 @@
 // src/lib/consent/store.test.ts
 // @vitest-environment happy-dom
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   CONSENT_CHANGE_EVENT,
+  CONSENT_OPEN_EVENT,
+  CONSENT_SHOWN_KEY,
   CONSENT_STORAGE_KEY,
   CONSENT_TTL_MS,
   __resetConsentMemoryForTests,
@@ -11,6 +13,7 @@ import {
   browserSendsPrivacySignal,
   currentConsentSnapshot,
   markShownCounted,
+  openConsentBanner,
   readConsent,
   setAccountAnalyticsOff,
   shownCounted,
@@ -24,11 +27,40 @@ function setSignals({ dnt = null, gpc = undefined }: { dnt?: string | null; gpc?
   Object.defineProperty(window.navigator, "globalPrivacyControl", { value: gpc, configurable: true });
 }
 
+// happy-dom's localStorage is a proxy, so vi.restoreAllMocks() does not undo a
+// spy on it: a leaked spy silently changes every later test. Restore by handle.
+const storageSpies: Array<{ mockRestore: () => void }> = [];
+
+function refuseStorage({ reads }: { reads: boolean }) {
+  storageSpies.push(
+    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
+      throw new Error("SecurityError");
+    }),
+  );
+  if (reads) {
+    storageSpies.push(
+      vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
+        throw new Error("SecurityError");
+      }),
+    );
+  }
+  expect(() => window.localStorage.setItem("x", "y")).toThrow();
+  if (reads) expect(() => window.localStorage.getItem("x")).toThrow();
+}
+
+function restoreStorage() {
+  while (storageSpies.length) storageSpies.pop()?.mockRestore();
+}
+
+afterEach(restoreStorage);
+
 beforeEach(() => {
   vi.restoreAllMocks();
   window.localStorage.clear();
   __resetConsentMemoryForTests();
   setSignals({});
+  Object.defineProperty(window, "doNotTrack", { value: undefined, configurable: true });
+  Object.defineProperty(window.navigator, "msDoNotTrack", { value: undefined, configurable: true });
 });
 
 describe("readConsent", () => {
@@ -59,12 +91,7 @@ describe("readConsent", () => {
 
 describe("when the browser refuses storage", () => {
   beforeEach(() => {
-    vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
-      throw new Error("SecurityError");
-    });
-    vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
-      throw new Error("SecurityError");
-    });
+    refuseStorage({ reads: true });
   });
 
   it("still honours the answer for the life of the page", () => {
@@ -76,8 +103,46 @@ describe("when the browser refuses storage", () => {
   it("never records a showing it could not store", () => {
     markShownCounted(NOW);
     expect(shownCounted(NOW)).toBe(true); // in memory for this page
+    restoreStorage();
+    expect(window.localStorage.getItem(CONSENT_SHOWN_KEY)).toBeNull();
     __resetConsentMemoryForTests();
     expect(shownCounted(NOW)).toBe(false);
+  });
+});
+
+describe("when a later answer cannot be stored", () => {
+  const refuseWrites = () => refuseStorage({ reads: false });
+
+  it("lets a Decline whose write failed beat the stored Accept", () => {
+    writeConsent("accepted", NOW);
+    refuseWrites();
+    writeConsent("declined", NOW + 1000);
+    expect(readConsent(NOW + 1000)).toEqual({ choice: "declined", at: NOW + 1000 });
+    expect(analyticsAllowed(NOW + 1000)).toBe(false);
+  });
+
+  it("prefers declined when memory and storage tie on time (memory declined)", () => {
+    writeConsent("accepted", NOW);
+    refuseWrites();
+    writeConsent("declined", NOW);
+    expect(readConsent(NOW)).toEqual({ choice: "declined", at: NOW });
+  });
+
+  it("prefers declined when memory and storage tie on time (storage declined)", () => {
+    writeConsent("declined", NOW);
+    refuseWrites();
+    writeConsent("accepted", NOW);
+    expect(readConsent(NOW)).toEqual({ choice: "declined", at: NOW });
+  });
+});
+
+describe("openConsentBanner", () => {
+  it("asks the banner to open", () => {
+    const heard = vi.fn();
+    window.addEventListener(CONSENT_OPEN_EVENT, heard);
+    openConsentBanner();
+    window.removeEventListener(CONSENT_OPEN_EVENT, heard);
+    expect(heard).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -103,6 +168,18 @@ describe("browserSendsPrivacySignal", () => {
   ])("reads %o as %s", (signals, expected) => {
     setSignals(signals);
     expect(browserSendsPrivacySignal()).toBe(expected);
+  });
+});
+
+describe("older Do Not Track spellings", () => {
+  it("reads window.doNotTrack = 1 as a signal", () => {
+    Object.defineProperty(window, "doNotTrack", { value: "1", configurable: true });
+    expect(browserSendsPrivacySignal()).toBe(true);
+  });
+
+  it("reads navigator.msDoNotTrack = 1 as a signal", () => {
+    Object.defineProperty(window.navigator, "msDoNotTrack", { value: "1", configurable: true });
+    expect(browserSendsPrivacySignal()).toBe(true);
   });
 });
 

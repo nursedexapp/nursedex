@@ -106,9 +106,14 @@ function parseRecord(raw: string | null, now: number): ConsentRecord | null {
 
 export function readConsent(now: number = Date.now()): ConsentRecord | null {
   const stored = parseRecord(getItem(CONSENT_STORAGE_KEY), now);
-  if (stored) return stored;
-  if (memory.consent && withinTtl(memory.consent.at, now)) return memory.consent;
-  return null;
+  const remembered =
+    memory.consent && withinTtl(memory.consent.at, now) ? memory.consent : null;
+  if (!stored) return remembered;
+  if (!remembered) return stored;
+  // Both exist when a later write was refused by storage: the newest answer
+  // wins, and on a tie the safer one (declined) does.
+  if (remembered.at !== stored.at) return remembered.at > stored.at ? remembered : stored;
+  return remembered.choice === "declined" ? remembered : stored.choice === "declined" ? stored : remembered;
 }
 
 export function writeConsent(choice: ConsentChoice, now: number = Date.now()): void {
@@ -159,5 +164,6 @@ export function markShownCounted(now: number = Date.now()): void {
 }
 
 export function openConsentBanner(): void {
+  if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(CONSENT_OPEN_EVENT));
 }

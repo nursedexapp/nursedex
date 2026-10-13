@@ -4,7 +4,9 @@ import posthog from "posthog-js";
 import { browserSendsPrivacySignal, setAccountAnalyticsOff } from "@/lib/consent/store";
 
 /**
- * Apply a person's stored analytics choice to this browser (#715).
+ * Apply a person's stored analytics choice to this browser (#715), and record
+ * the account setting on this device so the consent gate and Sentry replay see
+ * it too.
  *
  * `opt_out_capturing` stops events AND session recording, which is what the
  * privacy policy promises, and PostHog persists the decision in the browser's
