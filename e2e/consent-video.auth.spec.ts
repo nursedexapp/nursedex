@@ -48,11 +48,17 @@ test("a blog video fetches nothing from its provider until played", async ({
   // Refuses anything but a local Supabase, before a post is written.
   const service = serviceClient();
 
-  title = `E2E Video ${Date.now()}`;
+  // A timestamp alone collides when workers start in the same millisecond,
+  // and the afterEach deletes by title, so one run would delete another's
+  // post. The random suffix keeps each run's post its own.
+  title = `E2E Video ${Date.now()} ${crypto.randomUUID().slice(0, 8)}`;
   await fillNewPost(page, title, "A post with a video in it.");
   await page.getByRole("button", { name: "Embed a video" }).click();
-  await page.getByPlaceholder("Paste a YouTube or Vimeo URL").fill(VIDEO_URL);
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  // Enter submits the inline field (PostEditor's onKeyDown). The page has a
+  // second "Add" button elsewhere, so a button lookup is ambiguous.
+  const embedUrl = page.getByPlaceholder("Paste a YouTube or Vimeo URL");
+  await embedUrl.fill(VIDEO_URL);
+  await embedUrl.press("Enter");
   await expect(page.getByText("YouTube embed")).toBeVisible();
   await page.getByRole("button", { name: "Publish now" }).click();
   await page.waitForURL(/\/admin\/blog$/);
@@ -86,13 +92,18 @@ test("a blog video fetches nothing from its provider until played", async ({
   );
 
   await page.goto(`/blog/${post.slug}`);
-  const play = page.getByRole("button", { name: "Play YouTube video" });
-  await play.scrollIntoViewIfNeeded();
-  // Positive control: the preview image was requested, from NurseDex, so the
-  // empty list below is about a page that did load its video block.
-  await expect.poll(() => previews).toBeGreaterThan(0);
+  // Bring the whole post into view without touching the video block, so a
+  // lazily loaded preview or player has every chance to load on its own.
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForLoadState("networkidle");
-  expect(provider).toEqual([]);
+  // Checked first, so a player that loads before Play fails here and names
+  // the provider URL it fetched, rather than as a missing button below.
+  expect(provider, "requests to the video provider before Play").toEqual([]);
+  const play = page.getByRole("button", { name: "Play YouTube video" });
+  await expect(play).toBeVisible();
+  // Positive control: the preview image was requested, from NurseDex, so the
+  // empty list above is about a page that did load its video block.
+  await expect.poll(() => previews).toBeGreaterThan(0);
 
   await play.click();
   await expect.poll(() => provider.length).toBeGreaterThan(0);
