@@ -17,9 +17,13 @@ describe("VideoEmbed", () => {
     const { container } = render(<VideoEmbed {...youtube} />);
     expect(container.querySelector("iframe")).toBeNull();
     const img = container.querySelector("img");
-    expect(img?.getAttribute("src")).toBe("/api/video-thumbnail/youtube/abcdefghijk");
+    expect(img?.getAttribute("src")).toBe(
+      "/api/video-thumbnail/youtube/abcdefghijk",
+    );
     expect(img?.getAttribute("alt")).toBe("");
-    expect(screen.getByRole("button", { name: "Play YouTube video" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Play YouTube video" }),
+    ).toBeInTheDocument();
   });
 
   it("shows no visible cookie note (decision 4)", () => {
@@ -31,16 +35,28 @@ describe("VideoEmbed", () => {
     const { container } = render(<VideoEmbed {...youtube} />);
     fireEvent.error(container.querySelector("img")!);
     expect(container.querySelector("img")).toBeNull();
-    expect(screen.getByRole("button", { name: "Play YouTube video" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Play YouTube video" }),
+    ).toBeInTheDocument();
   });
 
   it("loads the player, playing, once the reader clicks", () => {
     const { container } = render(
-      <VideoEmbed provider="vimeo" id="123" embedUrl="https://player.vimeo.com/video/123" />,
+      <VideoEmbed
+        provider="vimeo"
+        id="123"
+        embedUrl="https://player.vimeo.com/video/123"
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Play Vimeo video" }));
     expect(container.querySelector("iframe")?.getAttribute("src")).toBe(
       "https://player.vimeo.com/video/123?autoplay=1",
     );
+  });
+
+  it("moves focus to the player after the click, since the button is gone", () => {
+    const { container } = render(<VideoEmbed {...youtube} />);
+    fireEvent.click(screen.getByRole("button", { name: "Play YouTube video" }));
+    expect(document.activeElement).toBe(container.querySelector("iframe"));
   });
 });

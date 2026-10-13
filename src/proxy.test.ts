@@ -169,6 +169,14 @@ describe("proxy security headers (#393)", () => {
     expect(h.updateSession).not.toHaveBeenCalled();
   });
 
+  it("skips the session refresh for the public video preview image", async () => {
+    const res = await proxy(
+      fakeRequest("/api/video-thumbnail/youtube/abcdefghijk"),
+    );
+    expect(res.headers.get("Content-Security-Policy")).toBeTruthy();
+    expect(h.updateSession).not.toHaveBeenCalled();
+  });
+
   it("still applies security headers on the stripe webhook skip path", async () => {
     const res = await proxy(fakeRequest("/api/stripe/webhook"));
     expect(res.headers.get("Content-Security-Policy")).toBeTruthy();

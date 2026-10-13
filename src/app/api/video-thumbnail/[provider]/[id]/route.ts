@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { deps, thumbnailUpstreamUrl } from "@/lib/blog/video-thumbnail";
 
+const RASTER = new Set(["image/jpeg", "image/png", "image/webp"]);
+const NO_PREVIEW_CACHE = "public, s-maxage=3600";
+
 /**
  * A blog video's preview image, served from NurseDex so a reader's browser
  * contacts neither YouTube nor Vimeo until they press play.
@@ -11,7 +14,8 @@ import { deps, thumbnailUpstreamUrl } from "@/lib/blog/video-thumbnail";
  * parseEmbed uses, so it cannot be aimed elsewhere (no SSRF).
  * FAILURE: 404 with a warning in the logs, never a thrown error or a Sentry
  * alert, because anyone can trigger one at will (L498). The player falls back
- * to a plain panel.
+ * to a plain panel. Redirects stay at the platform default, since Google and
+ * Vimeo may legitimately redirect within their own CDNs.
  */
 export async function GET(
   _request: Request,
@@ -21,11 +25,24 @@ export async function GET(
   const upstream = await thumbnailUpstreamUrl(provider, id);
   if (!upstream) return new NextResponse(null, { status: 404 });
   try {
-    const res = await deps.fetch(upstream, { signal: AbortSignal.timeout(5000) });
+    const res = await deps.fetch(upstream, {
+      signal: AbortSignal.timeout(5000),
+    });
     const type = res.headers.get("content-type") ?? "";
-    if (!res.ok || !type.startsWith("image/")) {
-      console.warn("[video-thumbnail] upstream refused", provider, id, res.status, type);
-      return new NextResponse(null, { status: 404 });
+    if (!res.ok || !RASTER.has(type.split(";")[0].trim().toLowerCase())) {
+      console.warn(
+        "[video-thumbnail] upstream refused",
+        provider,
+        id,
+        res.status,
+        type,
+      );
+      // Only a definite "no such preview" is cached; a timeout or odd status is not.
+      return new NextResponse(null, {
+        status: 404,
+        headers:
+          res.status === 404 ? { "cache-control": NO_PREVIEW_CACHE } : {},
+      });
     }
     return new NextResponse(res.body, {
       status: 200,

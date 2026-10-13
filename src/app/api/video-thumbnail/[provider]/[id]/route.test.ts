@@ -28,7 +28,10 @@ describe("GET /api/video-thumbnail/[provider]/[id]", () => {
 
   it("streams the upstream image with a public cache header", async () => {
     fetchMock.mockResolvedValue(
-      new Response("IMGBYTES", { status: 200, headers: { "content-type": "image/jpeg" } }),
+      new Response("IMGBYTES", {
+        status: 200,
+        headers: { "content-type": "image/jpeg" },
+      }),
     );
     const res = await call("youtube", "abcdefghijk");
     expect(res.status).toBe(200);
@@ -37,7 +40,9 @@ describe("GET /api/video-thumbnail/[provider]/[id]", () => {
     expect(cache).toContain("public");
     expect(cache).toContain("s-maxage");
     expect(await res.text()).toBe("IMGBYTES");
-    expect(fetchMock.mock.calls[0][0]).toBe("https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg");
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
+    );
   });
 
   it("returns 404 for an unknown provider without fetching", async () => {
@@ -53,7 +58,12 @@ describe("GET /api/video-thumbnail/[provider]/[id]", () => {
   });
 
   it("returns 404 and warns when the upstream refuses", async () => {
-    fetchMock.mockResolvedValue(new Response("", { status: 404, headers: { "content-type": "image/jpeg" } }));
+    fetchMock.mockResolvedValue(
+      new Response("", {
+        status: 404,
+        headers: { "content-type": "image/jpeg" },
+      }),
+    );
     const res = await call("youtube", "abcdefghijk");
     expect(res.status).toBe(404);
     expect(warn).toHaveBeenCalled();
@@ -61,7 +71,10 @@ describe("GET /api/video-thumbnail/[provider]/[id]", () => {
 
   it("returns 404 when the upstream is not an image", async () => {
     fetchMock.mockResolvedValue(
-      new Response("<html>", { status: 200, headers: { "content-type": "text/html" } }),
+      new Response("<html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
     );
     const res = await call("youtube", "abcdefghijk");
     expect(res.status).toBe(404);
@@ -72,5 +85,76 @@ describe("GET /api/video-thumbnail/[provider]/[id]", () => {
     const res = await call("youtube", "abcdefghijk");
     expect(res.status).toBe(404);
     expect(warn).toHaveBeenCalled();
+  });
+
+  it("serves a Vimeo preview end to end: oEmbed, then the image", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            thumbnail_url: "https://i.vimeocdn.com/video/1-d_1280",
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response("VIMEOBYTES", {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        }),
+      );
+    const res = await call("vimeo", "123");
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("VIMEOBYTES");
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      "https://vimeo.com/api/oembed.json",
+    );
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "https://i.vimeocdn.com/video/1-d_1280",
+    );
+  });
+
+  it("returns 404 and warns when Vimeo's oEmbed fails", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 404 }));
+    const res = await call("vimeo", "123");
+    expect(res.status).toBe(404);
+    expect(warn).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts jpeg, png and webp only, refusing svg and the rest with a warning", async () => {
+    for (const ok of ["image/jpeg", "image/png", "image/webp"]) {
+      fetchMock.mockResolvedValueOnce(
+        new Response("x", { headers: { "content-type": ok } }),
+      );
+      expect((await call("youtube", "abcdefghijk")).status).toBe(200);
+    }
+    for (const bad of ["image/svg+xml", "image/gif", "image/x-icon"]) {
+      warn.mockClear();
+      fetchMock.mockResolvedValueOnce(
+        new Response("x", { headers: { "content-type": bad } }),
+      );
+      expect((await call("youtube", "abcdefghijk")).status).toBe(404);
+      expect(warn).toHaveBeenCalled();
+    }
+  });
+
+  it("lets the CDN absorb repeat views when the upstream says 404", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 404 }));
+    const res = await call("youtube", "abcdefghijk");
+    expect(res.status).toBe(404);
+    expect(res.headers.get("cache-control")).toBe("public, s-maxage=3600");
+  });
+
+  it("does not cache a 404 caused by a timeout or thrown error", async () => {
+    fetchMock.mockRejectedValue(new Error("timeout"));
+    const res = await call("youtube", "abcdefghijk");
+    expect(res.status).toBe(404);
+    expect(res.headers.get("cache-control")).toBeNull();
+  });
+
+  it("does not cache a 404 for a refused upstream status other than 404", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 500 }));
+    const res = await call("youtube", "abcdefghijk");
+    expect(res.headers.get("cache-control")).toBeNull();
   });
 });
