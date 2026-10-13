@@ -59,10 +59,12 @@ export default function PrivacyPolicyPage() {
               are working.
             </p>
             <p className="mt-3">
-              When you use the site, we collect standard analytics data: pages
-              visited, browser type, device type, approximate location (country
-              or region level), and interaction events such as button clicks. We
-              do not collect precise geolocation.
+              If you accept analytics in the banner shown on your first visit,
+              we collect standard analytics data in your browser: pages visited,
+              browser type, device type, approximate location (country or region
+              level), and interaction events such as button clicks. We do not
+              collect precise geolocation. Until you answer, and if you decline,
+              none of this runs.
             </p>
             <p className="mt-3">
               If you are signed in, this analytics data is linked to your
@@ -71,14 +73,14 @@ export default function PrivacyPolicyPage() {
               visits. If you are signed out, it is not linked to you.
             </p>
             <p className="mt-3">
-              We also record sessions: a replay of how a page looked and how you
-              moved through it, so we can see where the product is confusing or
-              broken. Recordings are masked. Anything you type into a form (your
-              password, your phone number, a nurse&apos;s license number) is
-              hidden from the recording, and so is personal information we
-              display back to you, including a nurse&apos;s contact details once
-              you have revealed them. We do not use recordings to read your
-              personal data.
+              If you accept, we also record sessions: a replay of how a page
+              looked and how you moved through it, so we can see where the
+              product is confusing or broken. Recordings are masked. Anything
+              you type into a form (your password, your phone number, a
+              nurse&apos;s license number) is hidden from the recording, and so
+              is personal information we display back to you, including a
+              nurse&apos;s contact details once you have revealed them. We do
+              not use recordings to read your personal data.
             </p>
           </section>
 
@@ -118,43 +120,48 @@ export default function PrivacyPolicyPage() {
               function.
             </p>
             <p className="mt-3">
-              Our analytics and session recording are provided by PostHog. If
-              you have an account, you can turn both off yourself under Privacy
-              in your{" "}
+              Analytics and session recording are provided by PostHog, and
+              session replays for diagnosing errors by Sentry. Both run in your
+              browser only after you accept them. You can change your answer at
+              any time with Privacy choices at the bottom of every page; it is
+              remembered in your browser for 12 months. If your browser sends Do
+              Not Track or Global Privacy Control, we treat that as declining
+              and do not ask.
+            </p>
+            <p className="mt-3">
+              If you have an account, you can also turn analytics and session
+              recording off under Privacy in your{" "}
               <Link
                 href="/dashboard/settings"
                 className="text-teal hover:underline"
               >
                 settings
               </Link>
-              . The choice is stored against your account, so it applies on
-              every device you sign in on, and it stops events being captured
-              about you and stops your sessions being recorded.
+              , which applies on every device you sign in on. Our servers record
+              a few account events for every account whatever your browser
+              answer is (signing in, choosing your role, and payments), so we
+              can run the service and its billing; turning analytics off in
+              settings stops those being sent to PostHog too.
             </p>
             <p className="mt-3">
-              You can also opt out by enabling &quot;Do Not Track&quot; in your
-              browser: we check for it, and when it is on we do not capture
-              events about you and we do not record your session. Not every
-              browser still offers the setting, so if you have no account and
-              would rather opt out, email{" "}
-              <a
-                href="mailto:support@nursedex.com"
-                className="text-teal hover:underline"
-              >
-                support@nursedex.com
-              </a>{" "}
-              and we will do it for you.
+              For every visitor, Sentry receives error reports when a page
+              breaks (the page, the browser, and where in our code it failed)
+              and timing for a sample of page loads, so we can keep the site
+              working. These do not include what you type or see.
             </p>
           </section>
 
           <section>
             <h2 className="font-heading text-soft-black text-xl">Cookies</h2>
             <p className="mt-3">
-              NurseDex uses minimal cookies. Our analytics provider may set a
-              cookie to distinguish unique visitors. We do not use advertising
-              cookies or cross-site tracking cookies. Essential cookies (such as
-              session tokens when you log in) are required for the site to
-              function.
+              NurseDex uses minimal cookies. If you accept analytics, PostHog
+              sets a cookie to distinguish unique visitors; if you decline, we
+              remove it. We do not use advertising cookies. Videos in blog posts
+              load from YouTube or Vimeo only when you press play, and those
+              services may then set their own cookies. Essential cookies (such
+              as session tokens when you log in) are required for the site to
+              function. Your banner answer is kept in your browser&apos;s
+              storage, not in a cookie.
             </p>
           </section>
 

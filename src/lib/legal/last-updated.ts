@@ -48,9 +48,9 @@ export function extractProse(source: string): string {
 export const LEGAL_PAGES = {
   privacy: {
     path: "src/app/(public)/privacy/page.tsx",
-    date: "September 2, 2026",
+    date: "October 13, 2026",
     proseSha:
-      "e7f9b1eb237471931bdbf3ff55d11042b45c8702bdf5274c30e6396625225c73",
+      "56430c3b42770f678e908f886665fdd5227aa68aeec2d1a1be57a1482f749951",
   },
   terms: {
     path: "src/app/(public)/terms/page.tsx",
