@@ -62,9 +62,9 @@ export function startRealPostHog() {
   if (posthog.__loaded) {
     // The module's singleton outlives a test: put back whatever an earlier
     // test's withdrawal switched off, so every test starts from a running
-    // PostHog. before_send goes back to null, not undefined, because
-    // set_config skips undefined values.
-    posthog.set_config({ ...CONFIG, before_send: null });
+    // PostHog. before_send goes back to an empty list, which passes every
+    // event, because set_config skips an undefined value.
+    posthog.set_config({ ...CONFIG, before_send: [] });
   } else {
     posthog.init("phc_test", CONFIG);
   }
