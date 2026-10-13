@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { usePendingPhase } from "@/components/ui/pending-button";
 import { stalledMessageFor } from "@/components/ui/stalled-copy";
 import { signOut } from "@/lib/auth/actions";
+import { forgetAccountAnalyticsSetting } from "@/lib/consent/store";
 import { resetPostHog } from "@/lib/posthog";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,7 @@ export function SignOutButton({
     setPending(true);
     onNavigate?.();
     resetPostHog();
+    forgetAccountAnalyticsSetting();
     await signOut();
   }
 

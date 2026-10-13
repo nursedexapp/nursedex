@@ -112,11 +112,19 @@ export function readConsent(now: number = Date.now()): ConsentRecord | null {
   if (!remembered) return stored;
   // Both exist when a later write was refused by storage: the newest answer
   // wins, and on a tie the safer one (declined) does.
-  if (remembered.at !== stored.at) return remembered.at > stored.at ? remembered : stored;
-  return remembered.choice === "declined" ? remembered : stored.choice === "declined" ? stored : remembered;
+  if (remembered.at !== stored.at)
+    return remembered.at > stored.at ? remembered : stored;
+  return remembered.choice === "declined"
+    ? remembered
+    : stored.choice === "declined"
+      ? stored
+      : remembered;
 }
 
-export function writeConsent(choice: ConsentChoice, now: number = Date.now()): void {
+export function writeConsent(
+  choice: ConsentChoice,
+  now: number = Date.now(),
+): void {
   memory.consent = { choice, at: now };
   setItem(CONSENT_STORAGE_KEY, JSON.stringify(memory.consent));
   announce();
@@ -139,7 +147,21 @@ export function setAccountAnalyticsOff(off: boolean): void {
   announce();
 }
 
-export function currentConsentSnapshot(now: number = Date.now()): ConsentSnapshot {
+/**
+ * On sign-out: the account's setting belongs to the person leaving, so the
+ * next person on a shared device is governed by their own answer, not by a
+ * stranger's. Not announced, because the person signing out is still on this
+ * page: an announcement would let tracking start for them on the way out. The
+ * next page reads the device afresh.
+ */
+export function forgetAccountAnalyticsSetting(): void {
+  memory.accountOff = null;
+  setItem(ACCOUNT_OFF_KEY, null);
+}
+
+export function currentConsentSnapshot(
+  now: number = Date.now(),
+): ConsentSnapshot {
   if (browserSendsPrivacySignal()) return "signal";
   return readConsent(now)?.choice ?? "none";
 }
