@@ -30,6 +30,12 @@ export default defineConfig({
     // top of that file. Use happy-dom, not jsdom: jsdom + vitest 4.1.4 hangs
     // the worker pool in this repo (see memory feedback_vitest_jsdom).
     environment: "node",
+    // happy-dom loads an iframe's page for real, so mounting a YouTube or
+    // Vimeo player in a unit test made real requests to them. Off for every
+    // DOM test; src/components/blog/VideoEmbed.test.tsx proves it holds.
+    environmentOptions: {
+      happyDOM: { settings: { disableIframePageLoading: true } },
+    },
     setupFiles: [],
     // scripts/ holds CI-only tooling (e.g. the migration drift detector). It
     // lives outside src/ so it never enters the app bundle, but it still has
