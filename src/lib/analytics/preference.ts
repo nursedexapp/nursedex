@@ -1,30 +1,7 @@
 "use client";
 
 import posthog from "posthog-js";
-
-/**
- * Does this browser ask not to be tracked? (#498)
- *
- * PostHog checks this itself at init through `respect_dnt`. It is read again
- * here for a narrower reason: to make sure an ACCOUNT setting never opts
- * somebody back IN over a BROWSER setting. Those are two different promises,
- * and the browser's is the broader one.
- *
- * The three spellings are the ones browsers have actually shipped. "1" and
- * "yes" mean the person asked; "0", "unspecified" and absent do not.
- */
-export function browserSendsDoNotTrack(): boolean {
-  if (typeof window === "undefined") return false;
-  const nav = window.navigator as Navigator & {
-    msDoNotTrack?: string | null;
-  };
-  const signals = [
-    nav.doNotTrack,
-    (window as Window & { doNotTrack?: string | null }).doNotTrack,
-    nav.msDoNotTrack,
-  ];
-  return signals.some((signal) => signal === "1" || signal === "yes");
-}
+import { browserSendsPrivacySignal, setAccountAnalyticsOff } from "@/lib/consent/store";
 
 /**
  * Apply a person's stored analytics choice to this browser (#715).
@@ -48,6 +25,10 @@ export function browserSendsDoNotTrack(): boolean {
  * choice was made, and for most people no such choice has been.
  */
 export function applyAnalyticsPreference(optedOut: boolean): void {
+  // Recorded on this device first, so the banner's gate and Sentry replay
+  // both see it, including on pages that never render PostHogIdentify.
+  setAccountAnalyticsOff(optedOut);
+
   if (!posthog.__loaded) return;
 
   if (optedOut) {
@@ -55,6 +36,6 @@ export function applyAnalyticsPreference(optedOut: boolean): void {
     return;
   }
 
-  if (browserSendsDoNotTrack()) return;
+  if (browserSendsPrivacySignal()) return;
   if (posthog.has_opted_out_capturing()) posthog.opt_in_capturing();
 }
