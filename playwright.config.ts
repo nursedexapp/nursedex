@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { CONSENT_ANSWERED } from "./e2e/helpers/consent-state";
 
 // Authenticated blog tests create real posts, so they only run when
 // explicitly enabled (E2E_AUTH=1) against a local/test Supabase. The
@@ -42,7 +43,9 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      // Every spec starts with the cookie bar already answered, so it never
+      // covers what a spec clicks. consent.spec.ts clears it for itself.
+      use: { ...devices["Desktop Chrome"], storageState: CONSENT_ANSWERED },
       // The auth setup and authenticated specs run only via the dedicated
       // projects below (when AUTH is enabled), never in the default run.
       testIgnore: [
@@ -58,7 +61,11 @@ export default defineConfig({
     },
     ...(AUTH
       ? [
-          { name: "setup", testMatch: /auth\.setup\.ts/ },
+          {
+            name: "setup",
+            testMatch: /auth\.setup\.ts/,
+            use: { storageState: CONSENT_ANSWERED },
+          },
           {
             name: "authenticated",
             testMatch: /.*\.auth\.spec\.ts/,
@@ -71,7 +78,11 @@ export default defineConfig({
           // The family specs need a DIFFERENT session (a subscribed family, not
           // an admin), so they get their own setup and storageState rather than
           // sharing the admin one.
-          { name: "family-setup", testMatch: /family\.setup\.ts/ },
+          {
+            name: "family-setup",
+            testMatch: /family\.setup\.ts/,
+            use: { storageState: CONSENT_ANSWERED },
+          },
           {
             name: "family",
             testMatch: /.*\.family\.spec\.ts/,
@@ -86,7 +97,11 @@ export default defineConfig({
           // the profile by filling the form rather than finding one waiting.
           // It depends on "setup" too, because the journey ends with an ADMIN
           // approving the nurse, which needs the admin storageState.
-          { name: "nurse-setup", testMatch: /nurse\.setup\.ts/ },
+          {
+            name: "nurse-setup",
+            testMatch: /nurse\.setup\.ts/,
+            use: { storageState: CONSENT_ANSWERED },
+          },
           {
             name: "nurse",
             testMatch: /.*\.nurse\.spec\.ts/,
@@ -101,7 +116,11 @@ export default defineConfig({
           // above cannot stand in, because she is deliberately pre-onboarding,
           // and a spec that waited for that journey to verify her would depend
           // on another spec's state while Playwright runs both in parallel.
-          { name: "featured-setup", testMatch: /featured\.setup\.ts/ },
+          {
+            name: "featured-setup",
+            testMatch: /featured\.setup\.ts/,
+            use: { storageState: CONSENT_ANSWERED },
+          },
           {
             name: "featured",
             testMatch: /.*\.featured\.spec\.ts/,
@@ -145,5 +164,35 @@ export default defineConfig({
     // place in the config where being generous costs nothing: it is a ceiling
     // on a hang, not a delay anybody waits out.
     timeout: 300 * 1000,
+    // The consent spec must see PostHog and Sentry TRY to run after Accept, or
+    // "nothing before Accept" passes on a build where they never could. The
+    // browser's sends are intercepted by the spec, so nothing leaves the
+    // machine from it. Playwright merges this over process.env, and Next lets
+    // the process environment win over .env.local, an empty value included
+    // (processEnv in @next/env skips any key already set).
+    //
+    // Both Sentry DSNs are ALWAYS overridden, never taken from the shell.
+    // .env.local on a dev machine holds the PRODUCTION DSN, and the server
+    // SDK (src/sentry.server.config.ts) reads SENTRY_DSN: on 2026-10-13 a local
+    // run filed NURSEDEX-SITE-15 and NURSEDEX-SITE-16 against production and
+    // paged Slack. Server side sends cannot be intercepted by a spec, so the
+    // server SDK is switched off here with an empty DSN.
+    //
+    // The browser DSN is a placeholder on the one ingest host the CSP's
+    // connect-src allows (SENTRY_INGEST_HOST in src/proxy.ts). Any other host is
+    // blocked by the browser before a request exists, so the spec would see no
+    // envelope at all (measured). Its key and project are fake, so Sentry
+    // refuses whatever a spec that intercepts nothing happens to send.
+    //
+    // The PostHog key is always a placeholder for the same reason: the server
+    // captures some events itself (src/lib/analytics/server.ts) with this key,
+    // and those cannot be intercepted either. PostHog refuses the fake key.
+    env: {
+      NEXT_PUBLIC_POSTHOG_KEY: "phc_e2e_placeholder",
+      NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
+      SENTRY_DSN: "",
+      NEXT_PUBLIC_SENTRY_DSN:
+        "https://e2epublic@o4511116810584064.ingest.us.sentry.io/0",
+    },
   },
 });

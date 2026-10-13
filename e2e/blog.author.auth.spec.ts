@@ -1,26 +1,8 @@
 import { test, expect } from "@playwright/test";
+import { fillNewPost, slugify } from "./helpers/blog-post";
 
 // Authenticated author flow. Runs as the seeded admin (storageState from
 // auth.setup.ts) only when E2E_AUTH=1 against a local/test Supabase.
-
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-async function fillNewPost(
-  page: import("@playwright/test").Page,
-  title: string,
-  body: string,
-) {
-  await page.goto("/admin/blog/new");
-  await page.locator("#title").fill(title);
-  const editor = page.locator(".ProseMirror");
-  await editor.click();
-  await editor.pressSequentially(body);
-}
 
 test("admin can create and publish a post that appears publicly", async ({
   page,
