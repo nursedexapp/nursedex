@@ -269,21 +269,50 @@ function statementsOnly(sql: string): string {
     .replace(/--[^\n]*/g, "");
 }
 
-/** Public functions the migrations leave in place, applied in file order. */
+/** The argument list opening at `open` (a "("), brackets matched, spacing folded. */
+function argumentsAt(sql: string, open: number): string {
+  let depth = 0;
+  for (let i = open; i < sql.length; i++) {
+    if (sql[i] === "(") depth++;
+    else if (sql[i] === ")" && --depth === 0)
+      return sql
+        .slice(open + 1, i)
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+  }
+  return sql
+    .slice(open + 1)
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Public functions the migrations leave in place, applied in file order.
+ * The production check keys on the name alone, so this does too, but a name
+ * created with more than one argument list may have an overload still in
+ * place: dropping one of those never removes the name. That can only keep a
+ * dropped name, which fails loud, never lose a live one, which would not.
+ */
 function functionsLeftByMigrations(sources: string[]): Set<string> {
-  const live = new Set<string>();
+  const live = new Map<string, Set<string>>();
   for (const raw of sources) {
     const sql = statementsOnly(raw);
     const events = [
-      ...[...sql.matchAll(CREATED)].map((m) => [m.index, m[1], true] as const),
-      ...[...sql.matchAll(DROPPED)].map((m) => [m.index, m[1], false] as const),
+      ...[...sql.matchAll(CREATED)].map(
+        (m) =>
+          [m.index, m[1], argumentsAt(sql, m.index + m[0].length - 1)] as const,
+      ),
+      ...[...sql.matchAll(DROPPED)].map((m) => [m.index, m[1], null] as const),
     ].sort((a, b) => a[0] - b[0]);
-    for (const [, name, created] of events) {
-      if (created) live.add(name.toLowerCase());
-      else live.delete(name.toLowerCase());
+    for (const [, rawName, args] of events) {
+      const name = rawName.toLowerCase();
+      const signatures = live.get(name) ?? new Set<string>();
+      if (args !== null) live.set(name, signatures.add(args));
+      else if (signatures.size <= 1) live.delete(name);
     }
   }
-  return live;
+  return new Set(live.keys());
 }
 
 describe("FUNCTION_GRANTS covers every function the migrations create", () => {
@@ -303,6 +332,17 @@ describe("FUNCTION_GRANTS covers every function the migrations create", () => {
       "CREATE FUNCTION outer_fn() RETURNS void AS $body$ BEGIN EXECUTE 'x'; -- CREATE FUNCTION in_body()\n END $body$ LANGUAGE plpgsql;",
     ]);
     expect([...left].sort()).toEqual(["outer_fn", "real"]);
+  });
+
+  it("keeps a name while another of its overloads may still exist", () => {
+    const left = functionsLeftByMigrations([
+      "CREATE FUNCTION over(p integer) RETURNS void; CREATE FUNCTION over(p text) RETURNS void;",
+      "DROP FUNCTION over(integer);",
+      "CREATE FUNCTION moved(a integer) RETURNS void;",
+      "DROP FUNCTION moved(integer); CREATE FUNCTION moved(a numeric(10, 2)) RETURNS void;",
+      "CREATE FUNCTION once(a integer) RETURNS void; DROP FUNCTION once(integer);",
+    ]);
+    expect([...left].sort()).toEqual(["moved", "over"]);
   });
 
   it("declares an expectation for each one", () => {
