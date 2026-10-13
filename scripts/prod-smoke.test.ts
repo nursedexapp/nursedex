@@ -260,13 +260,12 @@ const DROPPED =
 /**
  * The statements alone: function bodies ($$ or $tag$ quoted) and comments are
  * removed, so a create or drop written inside one is not read as executed.
- * A function's header precedes its body, so its own CREATE survives.
+ * One left to right pass, so whichever opens first wins: a comment that
+ * mentions $$ stays a comment, and a -- inside a body stays body. A
+ * function's header precedes its body, so its own CREATE survives.
  */
 function statementsOnly(sql: string): string {
-  return sql
-    .replace(/\$(\w*)\$[\s\S]*?\$\1\$/g, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/--[^\n]*/g, "");
+  return sql.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|\$(\w*)\$[\s\S]*?\$\1\$/g, " ");
 }
 
 /** The argument list opening at `open` (a "("), brackets matched, spacing folded. */
@@ -343,6 +342,13 @@ describe("FUNCTION_GRANTS covers every function the migrations create", () => {
       "CREATE FUNCTION once(a integer) RETURNS void; DROP FUNCTION once(integer);",
     ]);
     expect([...left].sort()).toEqual(["moved", "over"]);
+  });
+
+  it("reads past a comment that mentions dollar quoting", () => {
+    const left = functionsLeftByMigrations([
+      "-- bodies use $$ quoting\nCREATE FUNCTION first() RETURNS void AS $$ SELECT 1 $$ LANGUAGE sql;\nCREATE FUNCTION second() RETURNS void AS $$ SELECT 2 $$ LANGUAGE sql;",
+    ]);
+    expect([...left].sort()).toEqual(["first", "second"]);
   });
 
   it("declares an expectation for each one", () => {
