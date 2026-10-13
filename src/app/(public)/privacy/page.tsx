@@ -124,9 +124,10 @@ export default function PrivacyPolicyPage() {
               session replays of a sample of visits, and of visits where
               something breaks, by Sentry. Both run in your browser only after
               you accept them. You can change your answer at any time with
-              Privacy choices at the bottom of every page; it is remembered in
-              your browser for 12 months. If your browser sends Do Not Track or
-              Global Privacy Control, we treat that as declining and do not ask.
+              Privacy choices at the bottom of the site&apos;s pages; it is
+              remembered in your browser for 12 months. If your browser sends Do
+              Not Track or Global Privacy Control, we treat that as declining
+              and do not ask.
             </p>
             <p className="mt-3">
               If you have an account, you can also turn analytics and session
@@ -189,9 +190,9 @@ export default function PrivacyPolicyPage() {
               <li>Have your data corrected or deleted.</li>
               <li>
                 Opt out of analytics tracking, which you can do yourself with
-                Privacy choices at the bottom of every page, by turning on Do
-                Not Track or Global Privacy Control in your browser, or under
-                Privacy in your settings.
+                Privacy choices at the bottom of the site&apos;s pages, by
+                turning on Do Not Track or Global Privacy Control in your
+                browser, or under Privacy in your settings.
               </li>
               <li>Delete your account at any time.</li>
             </ul>

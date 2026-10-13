@@ -14,7 +14,7 @@ describe("the privacy policy says what the site does", () => {
     );
   });
   it("says the answer lasts 12 months and can be changed", () => {
-    expect(prose).toMatch(/Privacy choices at the bottom of every page/);
+    expect(prose).toMatch(/Privacy choices at the bottom of the site's pages/);
     expect(prose).toMatch(/remembered in your browser for 12 months/);
   });
   it("treats Do Not Track and Global Privacy Control as declining", () => {
@@ -54,6 +54,10 @@ describe("the privacy policy says what the site does", () => {
     expect(prose).toMatch(
       /Opt out of analytics tracking[^.]*Privacy choices[^.]*Do Not Track/,
     );
+  });
+  it("never claims Privacy choices is on every page", () => {
+    // Admin, brand and error pages render no footer, so they have no control.
+    expect(prose).not.toMatch(/every page/);
   });
   it("no longer asks visitors to email us to opt out", () => {
     expect(prose).not.toMatch(/would rather opt out, email/);
