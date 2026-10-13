@@ -1,73 +1,73 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeAll } from "vitest";
-import posthog from "posthog-js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { withdrawPostHog } from "./posthog";
+import {
+  clickAButton,
+  postHogIdentityKeys,
+  startRealPostHog,
+} from "../../test/real-posthog";
 
 /**
  * Against the real posthog-js, not a mock: what withdrawPostHog has to stop
- * is the library's own unload handler, which captures $pageleave and sends it
- * by beacon (posthog-core.js _handle_unload), and Decline reloads the page,
- * so without this every withdrawal ends with one more event.
+ * is the library's own autocapture and unload handler, which captures
+ * $pageleave and sends it by beacon (posthog-core.js _handle_unload).
  *
- * Nothing reaches the network: fetch, XMLHttpRequest and sendBeacon are all
- * replaced, and only what they were asked to send is recorded.
+ * Nothing reaches the network (test/real-posthog.ts). `captured` is every
+ * event that got past before_send, so an event still waiting in the batch
+ * queue counts as much as one already sent.
  */
-const sent: string[] = [];
+let ph: ReturnType<typeof startRealPostHog>;
 
-beforeAll(() => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (url: unknown) => {
-      sent.push(`fetch:${String(url)}`);
-      return new Response("{}", { status: 200 });
-    }),
-  );
-  vi.stubGlobal(
-    "XMLHttpRequest",
-    class {
-      open(_method: string, url: string) {
-        sent.push(`xhr:${url}`);
-      }
-      setRequestHeader() {}
-      send() {}
-    },
-  );
-  Object.defineProperty(window.navigator, "sendBeacon", {
-    value: (url: string) => {
-      sent.push(`beacon:${url}`);
-      return true;
-    },
-    configurable: true,
-  });
-  posthog.init("phc_test", {
-    api_host: "https://ph.example",
-    capture_pageview: false,
-    capture_pageleave: true,
-    autocapture: true,
-    advanced_disable_flags: true,
-    disable_session_recording: true,
-    disable_surveys: true,
-    // happy-dom's user agent reads as a bot, which PostHog drops anyway, and
-    // that would make the control below pass for the wrong reason.
-    opt_out_useragent_filter: true,
-  });
+beforeEach(() => {
+  ph = startRealPostHog();
+});
+
+afterEach(() => {
+  ph.teardown();
 });
 
 const leave = () => window.dispatchEvent(new Event("pagehide"));
 
 describe("withdrawPostHog on the real library", () => {
-  it("sends nothing more from the page, the unload pageleave included, and never opts out", () => {
-    // Control: before withdrawal, leaving the page sends the pageleave.
+  it("captures and sends nothing more from the page, a button click and the unload pageleave included, and never opts out", () => {
+    // Control: before withdrawal a call, a click on a button and leaving the
+    // page are all captured, and leaving sends them.
+    ph.posthog.capture("before_withdrawal");
+    clickAButton();
     leave();
-    expect(sent.some((s) => s.startsWith("beacon:"))).toBe(true);
+    expect(ph.captured).toEqual([
+      "before_withdrawal",
+      "$autocapture",
+      "$pageleave",
+    ]);
+    expect(ph.sent.some((s) => s.startsWith("beacon:"))).toBe(true);
 
-    sent.length = 0;
+    ph.captured.length = 0;
+    ph.sent.length = 0;
     expect(withdrawPostHog()).toBe(true);
-    posthog.capture("after_withdrawal");
-    document.body.click();
+    ph.posthog.capture("after_withdrawal");
+    clickAButton();
     leave();
-    expect(sent).toEqual([]);
+    expect(ph.captured).toEqual([]);
+    expect(ph.sent).toEqual([]);
     // PostHog's own opt-out record may carry the ACCOUNT's choice: untouched.
-    expect(posthog.has_opted_out_capturing()).toBe(false);
+    expect(ph.posthog.has_opted_out_capturing()).toBe(false);
+  });
+
+  it("writes no identity back once withdrawn", () => {
+    // Runs after the test above withdrew the shared instance, so this also
+    // proves the helper put the singleton back: PostHog is running again.
+    ph.posthog.capture("before_withdrawal");
+    expect(ph.captured).toEqual(["before_withdrawal"]);
+    expect(postHogIdentityKeys().length).toBeGreaterThan(0);
+
+    withdrawPostHog();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    ph.posthog.capture("after_withdrawal");
+    clickAButton();
+    expect(
+      postHogIdentityKeys().filter((k) => !k.startsWith("cookie:")),
+    ).toEqual([]);
   });
 });
