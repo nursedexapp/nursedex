@@ -1,10 +1,11 @@
 export interface ParsedEmbed {
   provider: "youtube" | "vimeo";
+  id: string;
   embedUrl: string;
 }
 
-const YT_ID = /^[\w-]{11}$/;
-const VIMEO_ID = /^\d+$/;
+export const YT_ID = /^[\w-]{11}$/;
+export const VIMEO_ID = /^\d+$/;
 
 /**
  * Validate and normalize an embeddable URL to a safe provider embed URL.
@@ -30,12 +31,13 @@ export function parseEmbed(rawUrl: string | null | undefined): ParsedEmbed | nul
   if (host === "youtube.com" || host === "m.youtube.com") {
     const v = url.searchParams.get("v");
     if (v && YT_ID.test(v)) {
-      return { provider: "youtube", embedUrl: `https://www.youtube.com/embed/${v}` };
+      return { provider: "youtube", id: v, embedUrl: `https://www.youtube.com/embed/${v}` };
     }
     const embedMatch = url.pathname.match(/^\/embed\/([\w-]{11})$/);
     if (embedMatch) {
       return {
         provider: "youtube",
+        id: embedMatch[1],
         embedUrl: `https://www.youtube.com/embed/${embedMatch[1]}`,
       };
     }
@@ -44,7 +46,7 @@ export function parseEmbed(rawUrl: string | null | undefined): ParsedEmbed | nul
   if (host === "youtu.be") {
     const id = url.pathname.slice(1);
     if (YT_ID.test(id)) {
-      return { provider: "youtube", embedUrl: `https://www.youtube.com/embed/${id}` };
+      return { provider: "youtube", id, embedUrl: `https://www.youtube.com/embed/${id}` };
     }
     return null;
   }
@@ -53,14 +55,14 @@ export function parseEmbed(rawUrl: string | null | undefined): ParsedEmbed | nul
   if (host === "vimeo.com") {
     const id = url.pathname.split("/")[1] ?? "";
     if (VIMEO_ID.test(id)) {
-      return { provider: "vimeo", embedUrl: `https://player.vimeo.com/video/${id}` };
+      return { provider: "vimeo", id, embedUrl: `https://player.vimeo.com/video/${id}` };
     }
     return null;
   }
   if (host === "player.vimeo.com") {
     const m = url.pathname.match(/^\/video\/(\d+)/);
     if (m) {
-      return { provider: "vimeo", embedUrl: `https://player.vimeo.com/video/${m[1]}` };
+      return { provider: "vimeo", id: m[1], embedUrl: `https://player.vimeo.com/video/${m[1]}` };
     }
     return null;
   }

@@ -6,6 +6,7 @@ import { collectFootnotes } from "./footnotes";
 import { imageAlignClass } from "./image-align";
 import { parseEmbed } from "./embed";
 import { CodeBlock } from "@/components/blog/CodeBlock";
+import { VideoEmbed } from "@/components/blog/VideoEmbed";
 import { trustedSupabaseHosts } from "@/lib/supabase/trusted-hosts";
 
 // Reserved key in the shared `seen` map used to number footnotes in
@@ -218,27 +219,19 @@ function renderNode(
       );
     }
     case "embed": {
-      // Only ever iframe a normalized provider embed URL (see parseEmbed);
+      // Only ever load a normalized provider embed URL (see parseEmbed);
       // an unrecognized or tampered URL is dropped.
       const parsed = parseEmbed(
         typeof node.attrs?.url === "string" ? node.attrs.url : null,
       );
       if (!parsed) return null;
       return (
-        <div
+        <VideoEmbed
           key={key}
-          className="relative my-6 aspect-video w-full overflow-hidden rounded-lg"
-        >
-          <iframe
-            src={parsed.embedUrl}
-            title={parsed.provider === "youtube" ? "YouTube video" : "Vimeo video"}
-            className="absolute inset-0 h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
-        </div>
+          provider={parsed.provider}
+          id={parsed.id}
+          embedUrl={parsed.embedUrl}
+        />
       );
     }
     default:

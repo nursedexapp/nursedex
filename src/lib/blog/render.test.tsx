@@ -159,15 +159,17 @@ describe("PostContent renderer", () => {
     expect(out).toContain("click");
   });
 
-  it("renders a known embed as a normalized provider iframe", () => {
+  it("renders a known embed as a play button with a NurseDex preview, no iframe", () => {
     const out = html(
       doc({
         type: "embed",
         attrs: { url: "https://youtu.be/dQw4w9WgXcQ" },
       }),
     );
-    expect(out).toContain('src="https://www.youtube.com/embed/dQw4w9WgXcQ"');
-    expect(out).toContain("<iframe");
+    expect(out).toContain('src="/api/video-thumbnail/youtube/dQw4w9WgXcQ"');
+    expect(out).toContain("Play YouTube video");
+    expect(out).not.toContain("<iframe");
+    expect(out).not.toContain("youtube.com");
   });
 
   it("drops an embed from an unknown provider", () => {
@@ -176,6 +178,7 @@ describe("PostContent renderer", () => {
     );
     expect(out).not.toContain("evil.com");
     expect(out).not.toContain("<iframe");
+    expect(out).not.toContain("Play ");
   });
 
   it("uses next/image (width/height) for an image with stored dimensions", () => {

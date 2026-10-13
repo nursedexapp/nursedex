@@ -6,6 +6,7 @@ describe("parseEmbed", () => {
   it("normalizes YouTube watch, short, and embed URLs", () => {
     const want = {
       provider: "youtube",
+      id: "dQw4w9WgXcQ",
       embedUrl: "https://www.youtube.com/embed/dQw4w9WgXcQ",
     };
     expect(parseEmbed("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toEqual(want);
@@ -17,10 +18,12 @@ describe("parseEmbed", () => {
   it("normalizes Vimeo URLs", () => {
     expect(parseEmbed("https://vimeo.com/123456789")).toEqual({
       provider: "vimeo",
+      id: "123456789",
       embedUrl: "https://player.vimeo.com/video/123456789",
     });
     expect(parseEmbed("https://player.vimeo.com/video/123456789")).toEqual({
       provider: "vimeo",
+      id: "123456789",
       embedUrl: "https://player.vimeo.com/video/123456789",
     });
   });
