@@ -10,7 +10,7 @@ import {
 } from "@/lib/subscriptions/actions";
 import { PendingButton } from "@/components/ui/pending-button";
 import { PAYMENT_STALLED } from "@/components/ui/stalled-copy";
-import { posthog } from "@/lib/posthog";
+import { captureClientEvent } from "@/lib/analytics/capture";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 type Action =
@@ -51,8 +51,8 @@ export function CheckoutButton({
       // Counted here, not on click (#657). Firing on click counted a
       // subscription start for a checkout that never reached Stripe, and counted
       // a second one on the next attempt. One session, one start.
-      if (action !== "customer_portal" && posthog.__loaded) {
-        posthog.capture(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
+      if (action !== "customer_portal") {
+        captureClientEvent(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
           plan:
             action === "nurse_featured_checkout"
               ? "nurse_featured"

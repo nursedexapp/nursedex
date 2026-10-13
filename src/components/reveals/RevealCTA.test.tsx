@@ -28,13 +28,8 @@ vi.mock("@/lib/subscriptions/actions", () => ({
   createFamilyAccessCheckout: vi.fn(),
   redirectToCheckout: vi.fn(),
 }));
-vi.mock("@/lib/posthog", () => ({
-  posthog: {
-    get __loaded() {
-      return h.posthog.__loaded;
-    },
-    capture: (...a: unknown[]) => h.capture(...a),
-  },
+vi.mock("@/lib/analytics/capture", () => ({
+  captureClientEvent: (...a: unknown[]) => h.capture(...a),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 

@@ -1,9 +1,15 @@
 import posthog from "posthog-js";
+import { analyticsAllowed } from "@/lib/consent/store";
 import { MASK_PII, BLOCK_PII } from "@/components/ui/private";
 
 export function initPostHog() {
   if (typeof window === "undefined") return;
   if (posthog.__loaded) return;
+
+  // Nothing loads until this browser has accepted the banner, and never while
+  // it sends Do Not Track or Global Privacy Control or the account has
+  // analytics off. posthog-chokepoint.test.ts keeps this the only way in.
+  if (!analyticsAllowed()) return;
 
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
@@ -44,6 +50,62 @@ export function initPostHog() {
       blockClass: BLOCK_PII,
     },
   });
+}
+
+/**
+ * Removes PostHog's visitor id and session from this browser, so somebody
+ * who used the site before the banner existed, or who withdrew, does not keep
+ * a PostHog cookie they did not agree to. Run on a page load where analytics
+ * are not allowed, before anything could start PostHog.
+ *
+ * Only `ph_` keys. PostHog's opt-out record (`__ph_opt_in_out_*`) may hold the
+ * ACCOUNT's choice, written by applyAnalyticsPreference, and deleting it on a
+ * live page restarts capture (posthog-js consent.js re-reads it on every
+ * call), so it is never touched.
+ */
+export function clearPostHogIdentity() {
+  if (typeof window === "undefined") return;
+  const isIdentityKey = (name: string) => name.startsWith("ph_");
+  for (const getStore of [() => window.localStorage, () => window.sessionStorage]) {
+    try {
+      const store = getStore();
+      const doomed: string[] = [];
+      for (let i = 0; i < store.length; i++) {
+        const key = store.key(i);
+        if (key && isIdentityKey(key)) doomed.push(key);
+      }
+      doomed.forEach((key) => store.removeItem(key));
+    } catch {
+      // Storage blocked: PostHog could not have written here either.
+    }
+  }
+  // PostHog sets its cookie on the parent domain (cross_subdomain_cookie), so
+  // expire it with and without a domain or the parent copy survives.
+  const host = window.location.hostname;
+  const parts = host.split(".");
+  const parent = parts.length > 2 ? `.${parts.slice(-2).join(".")}` : `.${host}`;
+  const expired = "=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
+  for (const pair of document.cookie.split(";")) {
+    const name = pair.split("=")[0]?.trim();
+    if (!name || !isIdentityKey(name)) continue;
+    document.cookie = `${name}${expired}`;
+    document.cookie = `${name}${expired}; domain=${host}`;
+    document.cookie = `${name}${expired}; domain=${parent}`;
+  }
+}
+
+/**
+ * Withdrawal on a page where PostHog is already running. posthog-js cannot be
+ * reliably stopped in memory: opt_out_capturing does not stop the recorder
+ * outside cookieless mode (posthog-core.js:4067-4073). So: stop recording and
+ * stop it writing cookies now, and return true so the caller reloads. The next
+ * load never starts PostHog and clears its identity.
+ */
+export function withdrawPostHog(): boolean {
+  if (!posthog.__loaded) return false;
+  posthog.stopSessionRecording();
+  posthog.set_config({ disable_persistence: true });
+  return true;
 }
 
 /**

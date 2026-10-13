@@ -18,8 +18,8 @@ vi.mock("@/lib/subscriptions/actions", () => ({
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 const capture = vi.fn();
-vi.mock("@/lib/posthog", () => ({
-  posthog: { __loaded: true, capture: (...a: unknown[]) => capture(...a) },
+vi.mock("@/lib/analytics/capture", () => ({
+  captureClientEvent: (...a: unknown[]) => capture(...a),
 }));
 
 import { CheckoutButton } from "./CheckoutButton";

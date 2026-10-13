@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { posthog } from "@/lib/posthog";
+import { captureClientEvent } from "@/lib/analytics/capture";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 
 interface BlogPostAnalyticsProps {
@@ -23,9 +23,8 @@ export function BlogPostAnalytics({
   const fired = useRef(false);
 
   useEffect(() => {
-    if (fired.current || !posthog.__loaded) return;
-    fired.current = true;
-    posthog.capture(ANALYTICS_EVENTS.BLOG_POST_VIEWED, {
+    if (fired.current) return;
+    fired.current = captureClientEvent(ANALYTICS_EVENTS.BLOG_POST_VIEWED, {
       post_id: postId,
       slug,
       category: category ?? undefined,

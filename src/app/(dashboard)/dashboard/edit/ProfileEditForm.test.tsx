@@ -22,8 +22,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
 
-vi.mock("posthog-js", () => ({
-  default: { __loaded: false, capture: vi.fn() },
+vi.mock("@/lib/analytics/capture", () => ({
+  captureClientEvent: vi.fn(() => false),
 }));
 
 const updateNurseProfile = vi.fn();

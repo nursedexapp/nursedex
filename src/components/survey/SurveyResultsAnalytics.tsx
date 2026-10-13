@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { posthog } from "@/lib/posthog";
+import { captureClientEvent } from "@/lib/analytics/capture";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { SearchFilters } from "@/lib/nurses/search-params";
 
@@ -21,13 +21,14 @@ export function SurveyResultsAnalytics({
   const lastSent = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!posthog.__loaded) return;
     if (lastSent.current === fingerprint) return;
-    lastSent.current = fingerprint;
-    posthog.capture(ANALYTICS_EVENTS.SURVEY_COMPLETED, {
+    // Only mark it sent when it really was: a refused capture (no consent, or
+    // PostHog not running) must stay eligible.
+    const sent = captureClientEvent(ANALYTICS_EVENTS.SURVEY_COMPLETED, {
       ...filters,
       result_count: resultCount,
     });
+    if (sent) lastSent.current = fingerprint;
   }, [fingerprint, filters, resultCount]);
 
   return null;

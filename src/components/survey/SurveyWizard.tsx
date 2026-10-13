@@ -22,7 +22,7 @@ import {
   toURLSearchParams,
   type SearchFilters,
 } from "@/lib/nurses/search-params";
-import { posthog } from "@/lib/posthog";
+import { captureClientEvent } from "@/lib/analytics/capture";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import type { DirectoryFacets } from "@/lib/nurses/facets";
 import { ChevronLeft } from "lucide-react";
@@ -76,9 +76,7 @@ export function SurveyWizard({
   useEffect(() => {
     if (startedFired.current) return;
     startedFired.current = true;
-    if (posthog.__loaded) {
-      posthog.capture(ANALYTICS_EVENTS.SURVEY_STARTED);
-    }
+    captureClientEvent(ANALYTICS_EVENTS.SURVEY_STARTED);
   }, []);
 
   const buildFilters = (): Partial<SearchFilters> => ({

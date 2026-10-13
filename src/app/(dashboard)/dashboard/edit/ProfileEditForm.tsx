@@ -4,7 +4,7 @@ import { DEFAULT_FOCAL } from "@/lib/profile/focal-point";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import posthog from "posthog-js";
+import { captureClientEvent } from "@/lib/analytics/capture";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PendingButton } from "@/components/ui/pending-button";
 import { BasicsFields } from "@/components/profile-form/BasicsFields";
@@ -33,11 +33,9 @@ interface ProfileEditFormProps {
 }
 
 function showFeaturedUpsellToast() {
-  if (posthog.__loaded) {
-    posthog.capture(ANALYTICS_EVENTS.FEATURED_UPSELL_SHOWN, {
-      surface: "profile_edit",
-    });
-  }
+  captureClientEvent(ANALYTICS_EVENTS.FEATURED_UPSELL_SHOWN, {
+    surface: "profile_edit",
+  });
 
   toast.success("Profile updated", {
     description:
@@ -46,16 +44,14 @@ function showFeaturedUpsellToast() {
     action: {
       label: "Upgrade",
       onClick: async () => {
-        if (posthog.__loaded) {
-          posthog.capture(ANALYTICS_EVENTS.FEATURED_UPSELL_CLICKED, {
-            surface: "profile_edit",
-          });
-          posthog.capture(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
-            plan: "nurse_featured",
-            interval: "month",
-            source: "profile_edit_upsell",
-          });
-        }
+        captureClientEvent(ANALYTICS_EVENTS.FEATURED_UPSELL_CLICKED, {
+          surface: "profile_edit",
+        });
+        captureClientEvent(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
+          plan: "nurse_featured",
+          interval: "month",
+          source: "profile_edit_upsell",
+        });
         const result = await createNurseFeaturedCheckout();
         if (result.error) {
           toast.error(result.error);
@@ -224,7 +220,7 @@ export function ProfileEditForm({
     } else {
       // One capture for both success branches: the upsell hint changes what the
       // nurse is shown, not whether the profile saved.
-      posthog.capture(ANALYTICS_EVENTS.PROFILE_UPDATED, {
+      captureClientEvent(ANALYTICS_EVENTS.PROFILE_UPDATED, {
         upsell_shown: !!saveResult.upsellHint,
       });
       if (saveResult.upsellHint) {

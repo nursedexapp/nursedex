@@ -1,3 +1,4 @@
+import { analyticsAllowed } from "@/lib/consent/store";
 import { initPostHog, posthog } from "@/lib/posthog";
 import type { ANALYTICS_EVENTS } from "./events";
 
@@ -23,6 +24,9 @@ export function captureClientEvent(
   event: AnalyticsEvent,
   properties?: Record<string, unknown>,
 ): boolean {
+  // Withdrawal reloads the page, but a click handler can still run between the
+  // click and the reload; this keeps that window empty.
+  if (!analyticsAllowed()) return false;
   if (!posthog.__loaded) initPostHog();
   // Still not loaded means PostHog genuinely cannot run here: no keys, or
   // blocked. Nothing to retry against, but the caller is told.

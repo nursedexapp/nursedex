@@ -14,8 +14,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh }),
 }));
 vi.mock("@/lib/nurses/saves-actions", () => ({ toggleSavedNurse: vi.fn() }));
-vi.mock("@/lib/posthog", () => ({
-  posthog: { __loaded: false, capture: vi.fn() },
+vi.mock("@/lib/analytics/capture", () => ({
+  captureClientEvent: vi.fn(() => false),
 }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 

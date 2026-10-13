@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner";
 import { TurnstileWidget } from "./TurnstileWidget";
 import { ProvisioningNotice } from "./ProvisioningNotice";
-import { posthog } from "@/lib/posthog";
+import { captureClientEvent } from "@/lib/analytics/capture";
 import { ANALYTICS_EVENTS } from "@/lib/analytics/events";
 import { revealNurse } from "@/lib/reveals/actions";
 import type { RevealedContact } from "./ContactDetailsCard";
@@ -88,11 +88,9 @@ export function RevealCTA({
     turnstileToken?: string,
   ) => {
     {
-      if (posthog.__loaded) {
-        posthog.capture(ANALYTICS_EVENTS.REVEAL_ATTEMPTED, {
-          nurse_user_id: nurseUserId,
-        });
-      }
+      captureClientEvent(ANALYTICS_EVENTS.REVEAL_ATTEMPTED, {
+        nurse_user_id: nurseUserId,
+      });
       const result = await revealNurse(nurseUserId, turnstileToken);
 
       // Superseded by a retry. The reveal itself is safe (migration 059 spends
@@ -122,11 +120,9 @@ export function RevealCTA({
         return;
       }
       setCaptchaOpen(false);
-      if (posthog.__loaded) {
-        posthog.capture(ANALYTICS_EVENTS.REVEAL_COMPLETED, {
-          nurse_user_id: nurseUserId,
-        });
-      }
+      captureClientEvent(ANALYTICS_EVENTS.REVEAL_COMPLETED, {
+        nurse_user_id: nurseUserId,
+      });
       // Hand the contact over first. The refresh still runs, because the rest
       // of the page changes with the reveal (identity, the review and hire
       // controls it unlocks), but the contact's appearance no longer waits on
@@ -215,13 +211,11 @@ function PaywallTrigger({ returnTo }: { returnTo: string }) {
     // #657 names in CheckoutButton: firing on click counted a subscription start
     // for a checkout that never reached Stripe, and counted another on the next
     // attempt.
-    if (posthog.__loaded) {
-      posthog.capture(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
-        plan: "family_access",
-        interval,
-        source: "reveal_paywall",
-      });
-    }
+    captureClientEvent(ANALYTICS_EVENTS.SUBSCRIPTION_STARTED, {
+      plan: "family_access",
+      interval,
+      source: "reveal_paywall",
+    });
 
     await redirectToCheckout(result);
   };

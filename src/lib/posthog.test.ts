@@ -4,11 +4,22 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // happy-dom (not jsdom, see vitest.config.ts) gives us a window so
 // initPostHog doesn't bail on its server-side guard.
 vi.mock("posthog-js", () => ({
-  default: { __loaded: false, init: vi.fn() },
+  default: {
+    __loaded: false,
+    init: vi.fn(),
+    stopSessionRecording: vi.fn(),
+    set_config: vi.fn(),
+    opt_out_capturing: vi.fn(),
+  },
 }));
 
 import posthog from "posthog-js";
-import { initPostHog } from "./posthog";
+import { initPostHog, clearPostHogIdentity, withdrawPostHog } from "./posthog";
+import {
+  writeConsent,
+  setAccountAnalyticsOff,
+  __resetConsentMemoryForTests,
+} from "@/lib/consent/store";
 
 describe("initPostHog", () => {
   beforeEach(() => {
@@ -16,6 +27,44 @@ describe("initPostHog", () => {
     (posthog as unknown as { __loaded: boolean }).__loaded = false;
     process.env.NEXT_PUBLIC_POSTHOG_KEY = "phc_test";
     process.env.NEXT_PUBLIC_POSTHOG_HOST = "https://us.i.posthog.com";
+    vi.mocked(posthog.stopSessionRecording).mockClear();
+    vi.mocked(posthog.set_config).mockClear();
+    vi.mocked(posthog.opt_out_capturing).mockClear();
+    window.localStorage.clear();
+    __resetConsentMemoryForTests();
+    Object.defineProperty(window.navigator, "globalPrivacyControl", {
+      value: undefined,
+      configurable: true,
+    });
+    writeConsent("accepted");
+  });
+
+  it("loads nothing before the visitor has answered", () => {
+    window.localStorage.clear();
+    __resetConsentMemoryForTests();
+    initPostHog();
+    expect(posthog.init).not.toHaveBeenCalled();
+  });
+
+  it("loads nothing after Decline", () => {
+    writeConsent("declined");
+    initPostHog();
+    expect(posthog.init).not.toHaveBeenCalled();
+  });
+
+  it("loads nothing with Global Privacy Control, even after Accept", () => {
+    Object.defineProperty(window.navigator, "globalPrivacyControl", {
+      value: true,
+      configurable: true,
+    });
+    initPostHog();
+    expect(posthog.init).not.toHaveBeenCalled();
+  });
+
+  it("loads nothing when the account has analytics off, even after Accept", () => {
+    setAccountAnalyticsOff(true);
+    initPostHog();
+    expect(posthog.init).not.toHaveBeenCalled();
   });
 
   it("sends events through the same-origin /ingest proxy", () => {
@@ -86,5 +135,48 @@ describe("initPostHog", () => {
         }),
       }),
     );
+  });
+});
+
+describe("withdrawPostHog", () => {
+  beforeEach(() => {
+    vi.mocked(posthog.stopSessionRecording).mockClear();
+    vi.mocked(posthog.set_config).mockClear();
+    vi.mocked(posthog.opt_out_capturing).mockClear();
+  });
+
+  it("stops recording and persistence on a running PostHog and asks for a reload", () => {
+    (posthog as unknown as { __loaded: boolean }).__loaded = true;
+    expect(withdrawPostHog()).toBe(true);
+    expect(posthog.stopSessionRecording).toHaveBeenCalledTimes(1);
+    expect(posthog.set_config).toHaveBeenCalledWith({ disable_persistence: true });
+    // PostHog's own opt-out record may carry the ACCOUNT's choice: never touched here.
+    expect(posthog.opt_out_capturing).not.toHaveBeenCalled();
+  });
+
+  it("does nothing and needs no reload when PostHog never ran", () => {
+    (posthog as unknown as { __loaded: boolean }).__loaded = false;
+    expect(withdrawPostHog()).toBe(false);
+    expect(posthog.stopSessionRecording).not.toHaveBeenCalled();
+  });
+});
+
+describe("clearPostHogIdentity", () => {
+  it("removes PostHog's visitor id and session but keeps its opt-out record and ours", () => {
+    window.localStorage.setItem("ph_phc_test_posthog", "x");
+    window.localStorage.setItem("__ph_opt_in_out_phc_test", "0");
+    window.sessionStorage.setItem("ph_phc_test_window_id", "x");
+    window.localStorage.setItem("nursedex_consent", "kept");
+    document.cookie = "ph_phc_test_posthog=x; path=/";
+    document.cookie = "sb-session=kept; path=/";
+
+    clearPostHogIdentity();
+
+    expect(window.localStorage.getItem("ph_phc_test_posthog")).toBeNull();
+    expect(window.sessionStorage.getItem("ph_phc_test_window_id")).toBeNull();
+    expect(window.localStorage.getItem("__ph_opt_in_out_phc_test")).toBe("0");
+    expect(window.localStorage.getItem("nursedex_consent")).toBe("kept");
+    expect(document.cookie).not.toContain("ph_phc_test_posthog");
+    expect(document.cookie).toContain("sb-session=kept");
   });
 });
