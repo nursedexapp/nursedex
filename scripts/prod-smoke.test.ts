@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   parseGrantRows,
   checkGrants,
@@ -242,5 +244,55 @@ describe("formatSmokeReport", () => {
     const report = formatSmokeReport(checkGrants(healthyRows()));
 
     expect(report).toMatch(/targeted/i);
+  });
+});
+
+// The production check fails on a function it has no expectation for, but only
+// after the migration is live (migration 071's increment_consent_tally paged
+// Slack on launch day). This reads the migrations, so the same omission fails
+// in the pull request that adds the function instead.
+const MIGRATIONS = "supabase/migrations";
+const CREATED =
+  /\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?"?(\w+)"?\s*\(/gi;
+const DROPPED =
+  /\bDROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?/gi;
+
+/** Public functions the migrations leave in place, applied in file order. */
+function functionsLeftByMigrations(sources: string[]): Set<string> {
+  const live = new Set<string>();
+  for (const sql of sources) {
+    const events = [
+      ...[...sql.matchAll(CREATED)].map((m) => [m.index, m[1], true] as const),
+      ...[...sql.matchAll(DROPPED)].map((m) => [m.index, m[1], false] as const),
+    ].sort((a, b) => a[0] - b[0]);
+    for (const [, name, created] of events) {
+      if (created) live.add(name.toLowerCase());
+      else live.delete(name.toLowerCase());
+    }
+  }
+  return live;
+}
+
+describe("FUNCTION_GRANTS covers every function the migrations create", () => {
+  it("reads a create, a later drop, and a schema it does not check", () => {
+    const left = functionsLeftByMigrations([
+      "CREATE OR REPLACE FUNCTION public.kept(p text) RETURNS void",
+      "create function gone() returns int; CREATE FUNCTION private.other()",
+      'DROP FUNCTION IF EXISTS public.gone(); CREATE FUNCTION "quoted" ()',
+    ]);
+    expect([...left].sort()).toEqual(["kept", "quoted"]);
+  });
+
+  it("declares an expectation for each one", () => {
+    const files = readdirSync(MIGRATIONS)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+    expect(files.length).toBeGreaterThan(60);
+    const left = functionsLeftByMigrations(
+      files.map((f) => readFileSync(join(MIGRATIONS, f), "utf8")),
+    );
+    expect(left.size).toBeGreaterThan(10);
+    const undeclared = [...left].filter((name) => !(name in FUNCTION_GRANTS));
+    expect(undeclared).toEqual([]);
   });
 });

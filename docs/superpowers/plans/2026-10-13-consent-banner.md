@@ -2,6 +2,8 @@
 
 > Revision 3 (13 October 2026): design rounds settled the look (`docs/design/consent-banner.html`). Buttons are the default teal variant; blog videos show their own preview image served from a NurseDex route (Task 8 rewritten).
 
+> As shipped (#1173, 13 October 2026): where a code block below differs from the code in `src/`, the code governs; these blocks are the drafts it was built from. Known differences: `readConsent` returns the newest of the stored and in-memory answers (the tie goes to declined), not the stored one; Decline stops Sentry replay before PostHog (`apply.test.ts` asserts that order); `PostHogTracker` reads `useTrackingState`, which changes with the account setting, not `useConsentState`; the tracker's direct `$pageview` is one of four direct calls `posthog-chokepoint.test.ts` allows, each checking consent first; and an event sent when a page opens goes through `useCaptureOnce`, which retries on Accept.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** No PostHog analytics, PostHog session recording, Sentry session replay or third party video player runs in a visitor's browser until that visitor has agreed to it.

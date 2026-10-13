@@ -152,6 +152,12 @@ export const FUNCTION_GRANTS: Record<string, FunctionExpectation> = {
     why: "claims a consulting request and writes its billable time entry in one transaction (#663); service_role only, so nobody but the /done route can bill work",
   },
 
+  increment_consent_tally: {
+    anon: false,
+    authenticated: false,
+    why: "counts cookie banner showings and first answers per day (migration 071); service_role only, called by the tally server action, so a browser cannot write the count directly",
+  },
+
   // ── Dead code: deliberately left with no grant ────────────────
   get_user_role: {
     anon: false,
