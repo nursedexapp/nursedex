@@ -227,4 +227,12 @@ describe("shownCounted", () => {
     expect(shownCounted(NOW + CONSENT_TTL_MS - 1)).toBe(true);
     expect(shownCounted(NOW + CONSENT_TTL_MS)).toBe(false);
   });
+
+  it("is remembered by the browser, not only by the page, so the next page never counts it again", () => {
+    markShownCounted(NOW);
+    expect(window.localStorage.getItem(CONSENT_SHOWN_KEY)).toBe(String(NOW));
+    // A new page load starts with empty module memory.
+    __resetConsentMemoryForTests();
+    expect(shownCounted(NOW + 1)).toBe(true);
+  });
 });
