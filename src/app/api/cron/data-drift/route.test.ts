@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   cronRequest,
   describeCronAuthGuard,
@@ -26,8 +26,14 @@ const h = vi.hoisted(() => {
     zipsThrow: null as Error | null,
     referenceThrow: null as Error | null,
     slackThrow: null as Error | null,
+    tallyRows: [{ day: "2026-10-12" }] as unknown[],
+    tallyError: null as { message: string } | null,
   };
-  const calls = { slack: [] as unknown[] };
+  const calls = {
+    slack: [] as unknown[],
+    tallyFrom: [] as string[],
+    tallySince: [] as string[],
+  };
   const slackPost = vi.fn(async (_method: string, payload: unknown) => {
     if (h.state.slackThrow) throw h.state.slackThrow;
     h.calls.slack.push(payload);
@@ -41,7 +47,26 @@ const h = vi.hoisted(() => {
     if (h.state.zipsThrow) throw h.state.zipsThrow;
     return h.state.zips;
   });
-  return { state, calls, slackPost, readScoredProfiles, readAllZips };
+  // The consent_tally read: from().select().gte().limit(), answering the
+  // seeded rows or error and recording which table and start day were asked for.
+  const serviceClient = {
+    from: (table: string) => {
+      h.calls.tallyFrom.push(table);
+      const query = {
+        select: () => query,
+        gte: (_column: string, since: string) => {
+          h.calls.tallySince.push(since);
+          return query;
+        },
+        limit: async () => ({
+          data: h.state.tallyError ? null : h.state.tallyRows,
+          error: h.state.tallyError,
+        }),
+      };
+      return query;
+    },
+  };
+  return { state, calls, slackPost, readScoredProfiles, readAllZips, serviceClient };
 });
 
 vi.mock("@/lib/data-drift/completeness", async (importOriginal) => ({
@@ -60,10 +85,10 @@ vi.mock("@/lib/data-drift/zips", async (importOriginal) => ({
   },
 }));
 
-// The profile read is stood in for above; this only keeps `server-only` out of
-// the import graph, which vitest cannot resolve.
+// The profile read is stood in for above, so this keeps `server-only` out of
+// the import graph, which vitest cannot resolve, and answers the tally read.
 vi.mock("@/lib/supabase/service-role", () => ({
-  createServiceRoleClient: vi.fn(() => ({})),
+  createServiceRoleClient: vi.fn(() => h.serviceClient),
 }));
 
 vi.mock("@/lib/slack/client", () => ({
@@ -122,7 +147,11 @@ beforeEach(() => {
   h.state.zipsThrow = null;
   h.state.referenceThrow = null;
   h.state.slackThrow = null;
+  h.state.tallyRows = [{ day: "2026-10-12" }];
+  h.state.tallyError = null;
   h.calls.slack = [];
+  h.calls.tallyFrom = [];
+  h.calls.tallySince = [];
   h.slackPost.mockClear();
   h.readScoredProfiles.mockClear();
   h.readAllZips.mockClear();
@@ -262,6 +291,70 @@ describe("the data drift cron", () => {
     expect(res.status).toBe(200);
     expect(body.completeness).toMatchObject({ drifted: 1 });
     expect(body.alerted).toBe(false);
+  });
+});
+
+/**
+ * The cookie banner tally logs its write failures instead of alerting, so one
+ * that broke for good would read as a quiet week. A whole week with no row is
+ * the signal.
+ */
+describe("the cookie banner tally check", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("alerts when the tally has no rows in the last 7 days", async () => {
+    h.state.tallyRows = [];
+
+    const res = await GET(cronRequest());
+    const body = await res.json();
+
+    expect(body.consentTallyRowsLast7d).toBe(0);
+    expect(h.calls.slack).toHaveLength(1);
+    const text = JSON.stringify(h.calls.slack[0]);
+    expect(text).toContain("*Cookie banner tally*");
+    expect(text).toContain("no rows in the last 7 days");
+  });
+
+  it("says nothing about the tally when it has a row", async () => {
+    const res = await GET(cronRequest());
+    const body = await res.json();
+
+    expect(body.consentTallyRowsLast7d).toBe(1);
+    expect(body.alerted).toBeNull();
+    expect(h.calls.slack).toHaveLength(0);
+  });
+
+  it("fails the run when the tally cannot be read, rather than reporting clean", async () => {
+    h.state.tallyError = { message: "permission denied for table consent_tally" };
+
+    await expect(GET(cronRequest())).rejects.toThrow(/consent_tally could not be read/);
+    expect(h.calls.slack).toHaveLength(0);
+  });
+
+  it("reads consent_tally from 6 New York days back, across a clock change", async () => {
+    // 2026-11-02 12:00 UTC is a Monday morning in New York, the day after the
+    // clocks went back, so a 24 hour step per day would land a day early.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-02T12:00:00Z"));
+
+    await GET(cronRequest());
+
+    expect(h.calls.tallyFrom).toEqual(["consent_tally"]);
+    expect(h.calls.tallySince).toEqual(["2026-10-27"]);
+  });
+
+  it("is carried in the same alert as another finding", async () => {
+    h.state.tallyRows = [];
+    h.state.profiles = [scored("a", 50)];
+
+    await GET(cronRequest());
+
+    expect(h.calls.slack).toHaveLength(1);
+    const text = JSON.stringify(h.calls.slack[0]);
+    expect(text).toContain("scored above");
+    expect(text).toContain("*Cookie banner tally*");
   });
 });
 

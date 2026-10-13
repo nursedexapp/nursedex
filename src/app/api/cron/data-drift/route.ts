@@ -14,6 +14,7 @@ import {
   zipsNeedingCorrection,
   summariseZips,
 } from "@/lib/data-drift/zips";
+import { newYorkDaysAgo } from "@/lib/dates/new-york-day";
 
 export const runtime = "nodejs";
 // Two paged reads over about 2,300 rows plus an in-memory comparison. Measured
@@ -87,6 +88,21 @@ const handleDataDrift = withCronAlerting(
     }
     const zipDrift = zipsNeedingCorrection(storedZips, reference);
 
+    // The banner tally logs its write failures instead of alerting (L498), so
+    // a tally that broke for good would read as a quiet week. A whole week
+    // with no row at all is the signal: the site always has some new browser.
+    // A read that fails throws, so an unreadable table is not a clean week.
+    const tallySince = newYorkDaysAgo(new Date(), 6);
+    const { data: tallyRows, error: tallyError } = await createServiceRoleClient()
+      .from("consent_tally")
+      .select("day")
+      .gte("day", tallySince)
+      .limit(1);
+    if (tallyError) {
+      throw new Error(`consent_tally could not be read: ${tallyError.message}`);
+    }
+    const tallyRowCount = (tallyRows ?? []).length;
+
     const findings: string[] = [];
     if (scoreDrift.length > 0) {
       findings.push(
@@ -104,7 +120,14 @@ const handleDataDrift = withCronAlerting(
       );
     }
 
-    // One message carrying both, not one per check. They arrive together, are
+    if (tallyRowCount === 0) {
+      findings.push(
+        "*Cookie banner tally* has no rows in the last 7 days, so showings and answers are not being counted. " +
+          "Check the Vercel logs for `[consent-tally]`.",
+      );
+    }
+
+    // One message carrying every finding, not one per check. They arrive together, are
     // read together, and two alerts a week for the same run is how an alert
     // stops being read (L36).
     let alerted: boolean | null = null;
@@ -134,6 +157,7 @@ const handleDataDrift = withCronAlerting(
       alerted,
       completeness: { examined: profiles.length, drifted: scoreDrift.length },
       zips: { examined: storedZips.length, drifted: zipDrift.length },
+      consentTallyRowsLast7d: tallyRowCount,
     });
   },
 );
