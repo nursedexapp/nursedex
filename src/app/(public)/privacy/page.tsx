@@ -121,12 +121,12 @@ export default function PrivacyPolicyPage() {
             </p>
             <p className="mt-3">
               Analytics and session recording are provided by PostHog, and
-              session replays for diagnosing errors by Sentry. Both run in your
-              browser only after you accept them. You can change your answer at
-              any time with Privacy choices at the bottom of every page; it is
-              remembered in your browser for 12 months. If your browser sends Do
-              Not Track or Global Privacy Control, we treat that as declining
-              and do not ask.
+              session replays of a sample of visits, and of visits where
+              something breaks, by Sentry. Both run in your browser only after
+              you accept them. You can change your answer at any time with
+              Privacy choices at the bottom of every page; it is remembered in
+              your browser for 12 months. If your browser sends Do Not Track or
+              Global Privacy Control, we treat that as declining and do not ask.
             </p>
             <p className="mt-3">
               If you have an account, you can also turn analytics and session
@@ -139,15 +139,17 @@ export default function PrivacyPolicyPage() {
               </Link>
               , which applies on every device you sign in on. Our servers record
               a few account events for every account whatever your browser
-              answer is (signing in, choosing your role, and payments), so we
-              can run the service and its billing; turning analytics off in
-              settings stops those being sent to PostHog too.
+              answer is (creating an account, signing in, choosing your role,
+              and subscribing or cancelling a plan), so we can run the service
+              and its billing; turning analytics off in settings stops those
+              being sent to PostHog too.
             </p>
             <p className="mt-3">
               For every visitor, Sentry receives error reports when a page
               breaks (the page, the browser, and where in our code it failed)
               and timing for a sample of page loads, so we can keep the site
-              working. These do not include what you type or see.
+              working. These do not include what you type into forms or a
+              recording of the page.
             </p>
           </section>
 
@@ -186,7 +188,9 @@ export default function PrivacyPolicyPage() {
               <li>See what personal data we hold about you.</li>
               <li>Have your data corrected or deleted.</li>
               <li>
-                Opt out of analytics tracking, which you can do yourself under
+                Opt out of analytics tracking, which you can do yourself with
+                Privacy choices at the bottom of every page, by turning on Do
+                Not Track or Global Privacy Control in your browser, or under
                 Privacy in your settings.
               </li>
               <li>Delete your account at any time.</li>
