@@ -22,9 +22,21 @@ import {
 
 const NOW = 1_800_000_000_000;
 
-function setSignals({ dnt = null, gpc = undefined }: { dnt?: string | null; gpc?: boolean }) {
-  Object.defineProperty(window.navigator, "doNotTrack", { value: dnt, configurable: true });
-  Object.defineProperty(window.navigator, "globalPrivacyControl", { value: gpc, configurable: true });
+function setSignals({
+  dnt = null,
+  gpc = undefined,
+}: {
+  dnt?: string | null;
+  gpc?: boolean;
+}) {
+  Object.defineProperty(window.navigator, "doNotTrack", {
+    value: dnt,
+    configurable: true,
+  });
+  Object.defineProperty(window.navigator, "globalPrivacyControl", {
+    value: gpc,
+    configurable: true,
+  });
 }
 
 // happy-dom's localStorage is a proxy, so vi.restoreAllMocks() does not undo a
@@ -59,8 +71,14 @@ beforeEach(() => {
   window.localStorage.clear();
   __resetConsentMemoryForTests();
   setSignals({});
-  Object.defineProperty(window, "doNotTrack", { value: undefined, configurable: true });
-  Object.defineProperty(window.navigator, "msDoNotTrack", { value: undefined, configurable: true });
+  Object.defineProperty(window, "doNotTrack", {
+    value: undefined,
+    configurable: true,
+  });
+  Object.defineProperty(window.navigator, "msDoNotTrack", {
+    value: undefined,
+    configurable: true,
+  });
 });
 
 describe("readConsent", () => {
@@ -70,7 +88,10 @@ describe("readConsent", () => {
 
   it("returns the answer and when it was given, inside 12 months", () => {
     writeConsent("accepted", NOW);
-    expect(readConsent(NOW + CONSENT_TTL_MS - 1)).toEqual({ choice: "accepted", at: NOW });
+    expect(readConsent(NOW + CONSENT_TTL_MS - 1)).toEqual({
+      choice: "accepted",
+      at: NOW,
+    });
   });
 
   it("expires at 12 months", () => {
@@ -117,7 +138,10 @@ describe("when a later answer cannot be stored", () => {
     writeConsent("accepted", NOW);
     refuseWrites();
     writeConsent("declined", NOW + 1000);
-    expect(readConsent(NOW + 1000)).toEqual({ choice: "declined", at: NOW + 1000 });
+    expect(readConsent(NOW + 1000)).toEqual({
+      choice: "declined",
+      at: NOW + 1000,
+    });
     expect(analyticsAllowed(NOW + 1000)).toBe(false);
   });
 
@@ -173,12 +197,18 @@ describe("browserSendsPrivacySignal", () => {
 
 describe("older Do Not Track spellings", () => {
   it("reads window.doNotTrack = 1 as a signal", () => {
-    Object.defineProperty(window, "doNotTrack", { value: "1", configurable: true });
+    Object.defineProperty(window, "doNotTrack", {
+      value: "1",
+      configurable: true,
+    });
     expect(browserSendsPrivacySignal()).toBe(true);
   });
 
   it("reads navigator.msDoNotTrack = 1 as a signal", () => {
-    Object.defineProperty(window.navigator, "msDoNotTrack", { value: "1", configurable: true });
+    Object.defineProperty(window.navigator, "msDoNotTrack", {
+      value: "1",
+      configurable: true,
+    });
     expect(browserSendsPrivacySignal()).toBe(true);
   });
 });
