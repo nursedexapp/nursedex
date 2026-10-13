@@ -13,7 +13,9 @@ describe("thumbnailUpstreamUrl", () => {
     const fetchFn = vi.fn();
     await expect(
       thumbnailUpstreamUrl("youtube", "abcdefghijk", fetchFn),
-    ).resolves.toBe("https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg");
+    ).resolves.toEqual({
+      url: "https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg",
+    });
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
@@ -26,9 +28,9 @@ describe("thumbnailUpstreamUrl", () => {
           }),
         ),
     );
-    await expect(thumbnailUpstreamUrl("vimeo", "123", fetchFn)).resolves.toBe(
-      "https://i.vimeocdn.com/video/1-d_1280",
-    );
+    await expect(
+      thumbnailUpstreamUrl("vimeo", "123", fetchFn),
+    ).resolves.toEqual({ url: "https://i.vimeocdn.com/video/1-d_1280" });
     expect(fetchFn).toHaveBeenCalledWith(
       "https://vimeo.com/api/oembed.json?url=https%3A%2F%2Fvimeo.com%2F123&width=1280",
       expect.anything(),
@@ -39,10 +41,10 @@ describe("thumbnailUpstreamUrl", () => {
     const fetchFn = vi.fn();
     await expect(
       thumbnailUpstreamUrl("youtube", "../../etc", fetchFn),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ refused: true });
     await expect(
       thumbnailUpstreamUrl("vimeo", "12a", fetchFn),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ refused: true });
     expect(fetchFn).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled(); // only probers send these (L498)
   });
@@ -56,14 +58,14 @@ describe("thumbnailUpstreamUrl", () => {
     );
     await expect(
       thumbnailUpstreamUrl("vimeo", "123", fetchFn),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({ failed: true });
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0].map(String).join(" ")).toContain("evil.example");
   });
 
   it("warns, naming provider, id and reason, on every Vimeo failure branch", async () => {
     const cases: Array<() => Promise<Response>> = [
-      async () => new Response("", { status: 404 }),
+      async () => new Response("", { status: 500 }),
       async () => new Response("not json"),
       async () => new Response(JSON.stringify({})),
       async () => {
@@ -74,7 +76,7 @@ describe("thumbnailUpstreamUrl", () => {
       warn.mockClear();
       await expect(
         thumbnailUpstreamUrl("vimeo", "123", vi.fn(c)),
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ failed: true });
       expect(warn).toHaveBeenCalledTimes(1);
       const args = warn.mock.calls[0].map(String).join(" ");
       expect(args).toContain("vimeo");
@@ -82,30 +84,33 @@ describe("thumbnailUpstreamUrl", () => {
     }
   });
 
-  it("returns null when Vimeo fails or answers nonsense", async () => {
-    await expect(
-      thumbnailUpstreamUrl(
-        "vimeo",
-        "123",
-        vi.fn(async () => new Response("", { status: 404 })),
-      ),
-    ).resolves.toBeNull();
-    await expect(
-      thumbnailUpstreamUrl(
-        "vimeo",
-        "123",
-        vi.fn(async () => new Response("not json")),
-      ),
-    ).resolves.toBeNull();
-    await expect(
-      thumbnailUpstreamUrl(
-        "vimeo",
-        "123",
-        vi.fn(async () => {
-          throw new Error("network");
-        }),
-      ),
-    ).resolves.toBeNull();
+  it("treats an oEmbed 404 or 403 as a video with no preview, still warning", async () => {
+    for (const status of [404, 403]) {
+      warn.mockClear();
+      await expect(
+        thumbnailUpstreamUrl(
+          "vimeo",
+          "123",
+          vi.fn(async () => new Response("", { status })),
+        ),
+      ).resolves.toEqual({ absent: true });
+      expect(warn).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("reports a failure when Vimeo errors, answers nonsense or throws", async () => {
+    const cases: Array<() => Promise<Response>> = [
+      async () => new Response("", { status: 500 }),
+      async () => new Response("not json"),
+      async () => {
+        throw new Error("network");
+      },
+    ];
+    for (const c of cases) {
+      await expect(
+        thumbnailUpstreamUrl("vimeo", "123", vi.fn(c)),
+      ).resolves.toEqual({ failed: true });
+    }
   });
 });
 

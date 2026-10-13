@@ -113,10 +113,24 @@ describe("GET /api/video-thumbnail/[provider]/[id]", () => {
     );
   });
 
-  it("returns 404 and warns when Vimeo's oEmbed fails", async () => {
-    fetchMock.mockResolvedValueOnce(new Response("", { status: 404 }));
+  it("returns a cached 404 and warns when Vimeo's oEmbed says 404 or 403", async () => {
+    for (const status of [404, 403]) {
+      warn.mockClear();
+      fetchMock.mockReset();
+      fetchMock.mockResolvedValueOnce(new Response("", { status }));
+      const res = await call("vimeo", "123");
+      expect(res.status).toBe(404);
+      expect(res.headers.get("cache-control")).toBe("public, s-maxage=3600");
+      expect(warn).toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("returns an uncached 404 when Vimeo's oEmbed errors with 500", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("", { status: 500 }));
     const res = await call("vimeo", "123");
     expect(res.status).toBe(404);
+    expect(res.headers.get("cache-control")).toBeNull();
     expect(warn).toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

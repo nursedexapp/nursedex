@@ -22,10 +22,18 @@ export async function GET(
   { params }: { params: Promise<{ provider: string; id: string }> },
 ) {
   const { provider, id } = await params;
-  const upstream = await thumbnailUpstreamUrl(provider, id);
-  if (!upstream) return new NextResponse(null, { status: 404 });
+  const found = await thumbnailUpstreamUrl(provider, id);
+  // A video with no preview is as definite as the image host saying 404, so it
+  // is cached the same way; a failed lookup or a refusal never is.
+  if ("absent" in found) {
+    return new NextResponse(null, {
+      status: 404,
+      headers: { "cache-control": NO_PREVIEW_CACHE },
+    });
+  }
+  if (!("url" in found)) return new NextResponse(null, { status: 404 });
   try {
-    const res = await deps.fetch(upstream, {
+    const res = await deps.fetch(found.url, {
       signal: AbortSignal.timeout(5000),
     });
     const type = res.headers.get("content-type") ?? "";

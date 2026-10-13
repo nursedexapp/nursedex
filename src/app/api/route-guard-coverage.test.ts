@@ -55,7 +55,7 @@ const PUBLIC_ROUTES: Record<string, string> = {
   "nurse-photo/[token]/route.ts":
     "Serves nurse photos, which are public on the directory (decision 2026-09-01, #873), so there is no caller to authenticate. It is scoped instead of guarded: it will only sign a path our own server encrypted into the token, so a caller cannot name a path or reach anything the app did not itself put in a page, and an unverifiable token is refused. See its colocated route.test.ts (#871).",
   "video-thumbnail/[provider]/[id]/route.ts":
-    "A blog video's preview image, public like the pictures it stands in for. It touches no user data and only contacts i.ytimg.com, vimeo.com's oEmbed and i.vimeocdn.com, with an id that passed the same shape check parseEmbed uses, so it cannot be aimed at another host. Upstream failure is a 404 with a warning, never an alert. See its colocated route.test.ts.",
+    "A blog video's preview image, public like the pictures it stands in for. It touches no user data and only contacts i.ytimg.com, vimeo.com's oEmbed and i.vimeocdn.com, with an id that passed the same shape check parseEmbed uses, so it cannot be aimed at another host; redirects within the providers' own CDNs are followed. Upstream failure is a 404 with a warning, never an alert. See its colocated route.test.ts.",
 };
 
 const API_ROOT = dirname(fileURLToPath(import.meta.url));
