@@ -15,7 +15,11 @@ import {
 } from "@/lib/consent/store";
 import { useConsentState } from "@/lib/consent/use-consent-state";
 
-const DATE = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" });
+const DATE = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
 
 /**
  * Asks before analytics, session recording or replay run in this browser.
@@ -27,22 +31,36 @@ const DATE = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", y
  * mobile nav through --bottom-nav-height, which the nav publishes, and pads the
  * page by its own measured height through --consent-bar-height (globals.css),
  * so it never hides the end of a page or the footer's Privacy choices control.
+ * The home indicator's safe area is cleared only at the screen edge: above the
+ * nav, the inset minus the nav's height is below 1rem.
+ *
+ * Reopened from Privacy choices, it takes focus so keyboard and screen reader
+ * users land on it, and gives focus back to the opener when it closes. On its
+ * first showing it takes nothing: it never blocks.
  */
 export function ConsentBanner() {
   const state = useConsentState();
   const [reopened, setReopened] = useState(false);
   const counting = useRef(false);
   const barRef = useRef<HTMLElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    const open = () => setReopened(true);
+    const open = () => {
+      opener.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      setReopened(true);
+    };
     window.addEventListener(CONSENT_OPEN_EVENT, open);
     return () => window.removeEventListener(CONSENT_OPEN_EVENT, open);
   }, []);
 
   // For the browser tests: the answer is known only after hydration.
   useEffect(() => {
-    if (state !== "unknown") document.documentElement.dataset.consentState = state;
+    if (state !== "unknown")
+      document.documentElement.dataset.consentState = state;
   }, [state]);
 
   useEffect(() => {
@@ -60,20 +78,32 @@ export function ConsentBanner() {
 
   const visible =
     state === "none" ||
-    (reopened && (state === "accepted" || state === "declined" || state === "signal"));
+    (reopened &&
+      (state === "accepted" || state === "declined" || state === "signal"));
 
   useHeightVariable(barRef, "--consent-bar-height", visible);
 
+  useEffect(() => {
+    if (reopened) barRef.current?.focus();
+  }, [reopened]);
+
   if (!visible) return null;
+
+  function close() {
+    setReopened(false);
+    if (opener.current?.isConnected) opener.current.focus();
+    opener.current = null;
+  }
 
   function choose(choice: ConsentChoice) {
     const { countAnswer, reload } = applyConsentChoice(choice);
-    setReopened(false);
+    close();
     if (countAnswer) recordConsentEvent(choice).catch(() => {});
     if (reload) window.location.reload();
   }
 
-  const current = state === "accepted" || state === "declined" ? readConsent() : null;
+  const current =
+    state === "accepted" || state === "declined" ? readConsent() : null;
   const policy = (
     <Link href="/privacy" className="text-teal underline underline-offset-2">
       Privacy policy
@@ -85,7 +115,8 @@ export function ConsentBanner() {
       ref={barRef}
       role="region"
       aria-label="Privacy choices"
-      className="border-sage-light/50 bg-warm-white fixed inset-x-0 bottom-[var(--bottom-nav-height,0px)] z-40 border-t px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-lg sm:px-6"
+      tabIndex={-1}
+      className="border-sage-light/50 bg-warm-white fixed inset-x-0 bottom-[var(--bottom-nav-height,0px)] z-40 border-t px-4 pt-4 pb-[max(1rem,calc(env(safe-area-inset-bottom)_-_var(--bottom-nav-height,0px)))] shadow-lg outline-none sm:px-6"
     >
       <div className="max-w-site font-body text-soft-black mx-auto flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between">
         {state === "signal" ? (
@@ -105,15 +136,23 @@ export function ConsentBanner() {
         )}
         <div className="flex shrink-0 gap-2">
           {state === "signal" ? (
-            <Button variant="default" size="lg" onClick={() => setReopened(false)}>
+            <Button variant="default" size="lg" onClick={close}>
               Close
             </Button>
           ) : (
             <>
-              <Button variant="default" size="lg" onClick={() => choose("declined")}>
+              <Button
+                variant="default"
+                size="lg"
+                onClick={() => choose("declined")}
+              >
                 Decline
               </Button>
-              <Button variant="default" size="lg" onClick={() => choose("accepted")}>
+              <Button
+                variant="default"
+                size="lg"
+                onClick={() => choose("accepted")}
+              >
                 Accept
               </Button>
             </>

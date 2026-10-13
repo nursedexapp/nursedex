@@ -16,7 +16,12 @@ vi.mock("./sentry-replay", () => ({
 }));
 
 import { applyConsentChoice } from "./apply";
-import { __resetConsentMemoryForTests, markShownCounted, readConsent } from "./store";
+import {
+  __resetConsentMemoryForTests,
+  markShownCounted,
+  readConsent,
+  setAccountAnalyticsOff,
+} from "./store";
 
 beforeEach(() => {
   h.calls = [];
@@ -32,10 +37,20 @@ describe("applyConsentChoice", () => {
     expect(h.calls).toEqual(["posthog:init", "replay:start"]);
   });
 
+  it("Accept never starts replay for an account this device knows is opted out", () => {
+    setAccountAnalyticsOff(true);
+    applyConsentChoice("accepted");
+    expect(readConsent()?.choice).toBe("accepted");
+    expect(h.calls).not.toContain("replay:start");
+  });
+
   it("Accept when already accepted changes nothing and never reloads", () => {
     applyConsentChoice("accepted");
     h.calls = [];
-    expect(applyConsentChoice("accepted")).toEqual({ countAnswer: false, reload: false });
+    expect(applyConsentChoice("accepted")).toEqual({
+      countAnswer: false,
+      reload: false,
+    });
     expect(h.calls).toEqual([]);
   });
 

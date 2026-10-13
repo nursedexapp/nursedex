@@ -30,7 +30,8 @@ function PostHogTracker() {
   }, [consent]);
 
   useEffect(() => {
-    if (consent !== "accepted" || !posthog.__loaded || !analyticsAllowed()) return;
+    if (consent !== "accepted" || !posthog.__loaded || !analyticsAllowed())
+      return;
     let url = window.location.origin + pathname;
     const qs = searchParams.toString();
     if (qs) url += `?${qs}`;

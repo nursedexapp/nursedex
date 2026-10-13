@@ -53,16 +53,21 @@ vi.mock("@/lib/consent/sentry-replay", () => ({
 vi.mock("@/lib/analytics/preference", async () => {
   const { setAccountAnalyticsOff } = await import("@/lib/consent/store");
   return {
-    applyAnalyticsPreference: (optedOut: boolean) => setAccountAnalyticsOff(optedOut),
+    applyAnalyticsPreference: (optedOut: boolean) =>
+      setAccountAnalyticsOff(optedOut),
   };
 });
 
 import { PostHogProvider } from "./PostHogProvider";
 import { PostHogIdentify } from "./PostHogIdentify";
 import { applyConsentChoice } from "@/lib/consent/apply";
-import { __resetConsentMemoryForTests, writeConsent } from "@/lib/consent/store";
+import {
+  __resetConsentMemoryForTests,
+  writeConsent,
+} from "@/lib/consent/store";
 
-const pageviews = () => h.calls.filter((c) => c.startsWith("capture:$pageview"));
+const pageviews = () =>
+  h.calls.filter((c) => c.startsWith("capture:$pageview"));
 
 /** Server rendered, then hydrated, the way the root layout reaches a browser. */
 function hydrate() {
@@ -97,7 +102,9 @@ describe("PostHogProvider", () => {
     writeConsent("accepted");
     hydrate();
     await act(async () => {});
-    expect(pageviews()).toEqual([`capture:$pageview:${window.location.origin}/nurses`]);
+    expect(pageviews()).toEqual([
+      `capture:$pageview:${window.location.origin}/nurses`,
+    ]);
   });
 
   it("starts nothing and clears PostHog's identity when the answer is declined", async () => {
@@ -144,6 +151,7 @@ describe("PostHogProvider", () => {
     });
     await act(async () => {});
     expect(h.calls).not.toContain("started");
+    expect(h.calls).not.toContain("replay:start");
     expect(h.posthog.__loaded).toBe(false);
     expect(pageviews()).toEqual([]);
   });
@@ -158,6 +166,7 @@ describe("PostHogProvider", () => {
     });
     await act(async () => {});
     expect(h.calls).toContain("started");
+    expect(h.calls).toContain("replay:start");
     expect(pageviews()).toHaveLength(1);
   });
 });

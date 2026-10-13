@@ -32,7 +32,8 @@ beforeEach(() => {
   h.height = 0;
   h.callbacks = [];
   h.disconnected = 0;
-  window.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+  window.ResizeObserver =
+    FakeResizeObserver as unknown as typeof ResizeObserver;
   const spy = vi
     .spyOn(HTMLElement.prototype, "offsetHeight", "get")
     .mockImplementation(() => h.height);
@@ -52,7 +53,8 @@ function Bar({ active = true }: { active?: boolean }) {
   return <div ref={ref}>bar</div>;
 }
 
-const published = () => document.documentElement.style.getPropertyValue("--test-height");
+const published = () =>
+  document.documentElement.style.getPropertyValue("--test-height");
 
 describe("useHeightVariable", () => {
   it("publishes the element's height on <html> as soon as it mounts", () => {

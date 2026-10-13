@@ -149,7 +149,22 @@ describe("withdrawPostHog", () => {
     (posthog as unknown as { __loaded: boolean }).__loaded = true;
     expect(withdrawPostHog()).toBe(true);
     expect(posthog.stopSessionRecording).toHaveBeenCalledTimes(1);
-    expect(posthog.set_config).toHaveBeenCalledWith({ disable_persistence: true });
+    expect(posthog.set_config).toHaveBeenCalledWith(
+      expect.objectContaining({
+        disable_persistence: true,
+        capture_pageleave: false,
+        autocapture: false,
+      }),
+    );
+    // Every later capture on this page is dropped in memory: the unload
+    // $pageleave, autocapture, heatmaps, exceptions. posthog-js drops an event
+    // whose before_send returns null.
+    const config = vi.mocked(posthog.set_config).mock.calls[0]?.[0] as {
+      before_send?: (event: unknown) => unknown;
+    };
+    expect(
+      config.before_send?.({ event: "$pageleave", properties: {} }),
+    ).toBeNull();
     // PostHog's own opt-out record may carry the ACCOUNT's choice: never touched here.
     expect(posthog.opt_out_capturing).not.toHaveBeenCalled();
   });

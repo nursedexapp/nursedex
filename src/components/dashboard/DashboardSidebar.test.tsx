@@ -4,13 +4,16 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/dashboard" }));
-vi.mock("@/components/auth/SignOutButton", () => ({ SignOutButton: () => null }));
+vi.mock("@/components/auth/SignOutButton", () => ({
+  SignOutButton: () => null,
+}));
 
 import { DashboardSidebar } from "./DashboardSidebar";
 
 afterEach(cleanup);
 
-const published = () => document.documentElement.style.getPropertyValue("--bottom-nav-height");
+const published = () =>
+  document.documentElement.style.getPropertyValue("--bottom-nav-height");
 
 describe("DashboardSidebar mobile nav", () => {
   // The cookie bar sits on top of this nav, so the nav publishes its real

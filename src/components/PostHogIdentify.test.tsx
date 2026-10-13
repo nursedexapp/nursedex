@@ -46,7 +46,10 @@ vi.mock("@/lib/analytics/preference", async () => {
 });
 
 import { PostHogIdentify } from "./PostHogIdentify";
-import { __resetConsentMemoryForTests, writeConsent } from "@/lib/consent/store";
+import {
+  __resetConsentMemoryForTests,
+  writeConsent,
+} from "@/lib/consent/store";
 
 beforeEach(() => {
   h.calls.length = 0;

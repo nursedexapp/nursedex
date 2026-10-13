@@ -1,6 +1,12 @@
 import { initPostHog, withdrawPostHog } from "@/lib/posthog";
 import { startSentryReplay, stopSentryReplay } from "./sentry-replay";
-import { readConsent, shownCounted, writeConsent, type ConsentChoice } from "./store";
+import {
+  analyticsAllowed,
+  readConsent,
+  shownCounted,
+  writeConsent,
+  type ConsentChoice,
+} from "./store";
 
 /**
  * What Accept and Decline do in this browser.
@@ -14,7 +20,10 @@ import { readConsent, shownCounted, writeConsent, type ConsentChoice } from "./s
  * next load never starts it. Accept never reloads, so unsaved form input is
  * never lost to it (L608).
  */
-export function applyConsentChoice(choice: ConsentChoice): { countAnswer: boolean; reload: boolean } {
+export function applyConsentChoice(choice: ConsentChoice): {
+  countAnswer: boolean;
+  reload: boolean;
+} {
   const previous = readConsent();
   if (previous?.choice === choice) return { countAnswer: false, reload: false };
 
@@ -27,7 +36,9 @@ export function applyConsentChoice(choice: ConsentChoice): { countAnswer: boolea
     return { countAnswer, reload };
   }
 
+  // Both refuse an account this device knows is opted out: initPostHog gates
+  // itself, replay is gated here.
   initPostHog();
-  startSentryReplay();
+  if (analyticsAllowed()) startSentryReplay();
   return { countAnswer, reload: false };
 }

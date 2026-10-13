@@ -66,7 +66,10 @@ export function initPostHog() {
 export function clearPostHogIdentity() {
   if (typeof window === "undefined") return;
   const isIdentityKey = (name: string) => name.startsWith("ph_");
-  for (const getStore of [() => window.localStorage, () => window.sessionStorage]) {
+  for (const getStore of [
+    () => window.localStorage,
+    () => window.sessionStorage,
+  ]) {
     try {
       const store = getStore();
       const doomed: string[] = [];
@@ -83,7 +86,8 @@ export function clearPostHogIdentity() {
   // expire it with and without a domain or the parent copy survives.
   const host = window.location.hostname;
   const parts = host.split(".");
-  const parent = parts.length > 2 ? `.${parts.slice(-2).join(".")}` : `.${host}`;
+  const parent =
+    parts.length > 2 ? `.${parts.slice(-2).join(".")}` : `.${host}`;
   const expired = "=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/";
   for (const pair of document.cookie.split(";")) {
     const name = pair.split("=")[0]?.trim();
@@ -97,14 +101,26 @@ export function clearPostHogIdentity() {
 /**
  * Withdrawal on a page where PostHog is already running. posthog-js cannot be
  * reliably stopped in memory: opt_out_capturing does not stop the recorder
- * outside cookieless mode (posthog-core.js:4067-4073). So: stop recording and
- * stop it writing cookies now, and return true so the caller reloads. The next
- * load never starts PostHog and clears its identity.
+ * outside cookieless mode (posthog-core.js:4067-4073), and it writes PostHog's
+ * own opt-out record, which may hold the ACCOUNT's choice. So, in memory only:
+ * stop recording, stop writing cookies, and drop every later event on this
+ * page. The reload that follows fires PostHog's unload handler, which captures
+ * $pageleave and sends it by beacon (posthog-core.js _handle_unload), so
+ * capture_pageleave goes off, autocapture stops listening, and before_send
+ * rejects whatever else still calls capture (heatmaps, exceptions, anything
+ * already wired): posthog-js drops an event whose before_send returns null.
+ * Returns true so the caller reloads; the next load never starts PostHog and
+ * clears its identity.
  */
 export function withdrawPostHog(): boolean {
   if (!posthog.__loaded) return false;
   posthog.stopSessionRecording();
-  posthog.set_config({ disable_persistence: true });
+  posthog.set_config({
+    disable_persistence: true,
+    capture_pageleave: false,
+    autocapture: false,
+    before_send: () => null,
+  });
   return true;
 }
 

@@ -11,7 +11,8 @@ import {
 
 function subscribe(onChange: () => void): () => void {
   const onStorage = (event: StorageEvent) => {
-    if (event.key === CONSENT_STORAGE_KEY || event.key === ACCOUNT_OFF_KEY) onChange();
+    if (event.key === CONSENT_STORAGE_KEY || event.key === ACCOUNT_OFF_KEY)
+      onChange();
   };
   window.addEventListener(CONSENT_CHANGE_EVENT, onChange);
   window.addEventListener("storage", onStorage);
@@ -27,5 +28,9 @@ function subscribe(onChange: () => void): () => void {
  * string, so it is stable between calls as React requires.
  */
 export function useConsentState(): "unknown" | ConsentSnapshot {
-  return useSyncExternalStore(subscribe, () => currentConsentSnapshot(), () => "unknown" as const);
+  return useSyncExternalStore(
+    subscribe,
+    () => currentConsentSnapshot(),
+    () => "unknown" as const,
+  );
 }

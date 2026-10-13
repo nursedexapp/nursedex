@@ -25,10 +25,13 @@ export function useHeightVariable(
       root.style.removeProperty(name);
       return;
     }
-    const publish = () => root.style.setProperty(name, `${element.offsetHeight}px`);
+    const publish = () =>
+      root.style.setProperty(name, `${element.offsetHeight}px`);
     publish();
     const observer =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(publish);
     observer?.observe(element, { box: "border-box" });
     return () => {
       observer?.disconnect();

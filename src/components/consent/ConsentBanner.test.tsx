@@ -1,9 +1,21 @@
 // @vitest-environment happy-dom
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 
-const h = vi.hoisted(() => ({ recorded: [] as string[], ok: true, running: false, reloads: 0 }));
+const h = vi.hoisted(() => ({
+  recorded: [] as string[],
+  ok: true,
+  running: false,
+  reloads: 0,
+}));
 
 vi.mock("@/lib/consent/actions", () => ({
   recordConsentEvent: async (kind: string) => {
@@ -29,7 +41,10 @@ import {
 } from "@/lib/consent/store";
 
 function setGpc(value: boolean | undefined) {
-  Object.defineProperty(window.navigator, "globalPrivacyControl", { value, configurable: true });
+  Object.defineProperty(window.navigator, "globalPrivacyControl", {
+    value,
+    configurable: true,
+  });
 }
 
 // happy-dom's localStorage is a proxy, so neither a spy on Storage.prototype
@@ -76,7 +91,10 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   restoreStorage();
-  Object.defineProperty(window, "location", { value: realLocation, configurable: true });
+  Object.defineProperty(window, "location", {
+    value: realLocation,
+    configurable: true,
+  });
 });
 
 const bar = () => screen.queryByRole("region", { name: "Privacy choices" });
@@ -107,13 +125,17 @@ describe("ConsentBanner", () => {
 
   it("marks the page once it knows the answer, for the browser tests to wait on", async () => {
     render(<ConsentBanner />);
-    await waitFor(() => expect(document.documentElement.dataset.consentState).toBe("none"));
+    await waitFor(() =>
+      expect(document.documentElement.dataset.consentState).toBe("none"),
+    );
   });
 
   it("gives Decline and Accept the same visual weight", async () => {
     render(<ConsentBanner />);
     const decline = await screen.findByRole("button", { name: "Decline" });
-    expect(decline.className).toBe(screen.getByRole("button", { name: "Accept" }).className);
+    expect(decline.className).toBe(
+      screen.getByRole("button", { name: "Accept" }).className,
+    );
   });
 
   it("links to the privacy policy", async () => {
@@ -126,7 +148,9 @@ describe("ConsentBanner", () => {
     render(<ConsentBanner />);
     await screen.findByRole("button", { name: "Accept" });
     const root = document.documentElement;
-    expect(root.style.getPropertyValue("--consent-bar-height")).toMatch(/^\d+px$/);
+    expect(root.style.getPropertyValue("--consent-bar-height")).toMatch(
+      /^\d+px$/,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expect(root.style.getPropertyValue("--consent-bar-height")).toBe("");
   });
@@ -181,13 +205,52 @@ describe("ConsentBanner", () => {
   it("never asks a browser that sends Global Privacy Control, and says why when reopened", async () => {
     setGpc(true);
     render(<ConsentBanner />);
-    await waitFor(() => expect(document.documentElement.dataset.consentState).toBe("signal"));
+    await waitFor(() =>
+      expect(document.documentElement.dataset.consentState).toBe("signal"),
+    );
     expect(bar()).not.toBeInTheDocument();
     expect(h.recorded).toEqual([]);
     act(() => openConsentBanner());
-    expect(screen.getByText(/browser asks sites not to track you/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/browser asks sites not to track you/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Accept" }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(bar()).not.toBeInTheDocument();
+  });
+
+  it("moves focus to the bar when Privacy choices reopens it, and back after the choice", async () => {
+    render(<ConsentBanner />);
+    fireEvent.click(await screen.findByRole("button", { name: "Decline" }));
+    const opener = document.createElement("button");
+    document.body.appendChild(opener);
+    opener.focus();
+    act(() => openConsentBanner());
+    expect(document.activeElement).toBe(bar());
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it("does not take focus when it first asks", async () => {
+    const elsewhere = document.createElement("button");
+    document.body.appendChild(elsewhere);
+    elsewhere.focus();
+    render(<ConsentBanner />);
+    await screen.findByRole("button", { name: "Accept" });
+    expect(document.activeElement).toBe(elsewhere);
+    elsewhere.remove();
+  });
+
+  it("clears the home indicator only when it sits at the screen edge, not above the nav", async () => {
+    render(<ConsentBanner />);
+    await screen.findByRole("button", { name: "Accept" });
+    const classes = bar()?.className.split(" ") ?? [];
+    expect(classes).toContain(
+      "pb-[max(1rem,calc(env(safe-area-inset-bottom)_-_var(--bottom-nav-height,0px)))]",
+    );
+    expect(classes).not.toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
   });
 });
