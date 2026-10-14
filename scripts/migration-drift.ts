@@ -35,10 +35,11 @@ export interface DriftReport {
  *
  * This check runs against `main`, so a migration applied from a branch that
  * has not merged yet counts as untracked. That is not a mistake: for any
- * migration whose absence breaks live code it is the SAFE order. Production
- * takes new code the moment a PR merges, so applying the migration afterwards
- * leaves a window where the running code queries a column that does not exist.
- * Applying it first closes that window, at the cost of production briefly
+ * migration whose absence breaks live code it is the SAFE order. Applying the
+ * migration after its merge holds every release behind it, because Promote
+ * refuses a commit while this check is red (#1118); before that hold existed
+ * it left a window where the running code queried a column that did not
+ * exist. Applying it first avoids both, at the cost of production briefly
  * being ahead of main.
  *
  * The old check failed on that, and an alert that fires on correct behaviour
