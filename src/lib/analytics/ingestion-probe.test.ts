@@ -667,6 +667,43 @@ describe("explaining a failed run", () => {
     },
   );
 
+  // Only the LAST poll has to be a refusal for these outcomes, and the count
+  // covers 429s and 5xx together, so a message saying the service was down
+  // "for the whole wait" or that every refusal was a 5xx claims more than the
+  // check measured.
+  it("says only what the polls showed when PostHog stopped answering", () => {
+    const message = explainRun(
+      run({
+        state: "query_unavailable",
+        status: 503,
+        waitedMs: 360_000,
+        attempts: 36,
+        unavailableAnswers: 4,
+      }),
+    );
+    expect(message).toMatch(/4 of 36 polls/);
+    expect(message).toMatch(/429 or 5xx/);
+    expect(message).toMatch(/last.*HTTP 503/);
+    expect(message).not.toMatch(/whole/);
+  });
+
+  it("does not claim to know why PostHog throttled", () => {
+    // A 429 can be our polling rate or PostHog shedding load. Nothing here
+    // measures which, so the message must not pick one.
+    const message = explainRun(
+      run({
+        state: "query_throttled",
+        status: 429,
+        waitedMs: 360_000,
+        attempts: 36,
+        unavailableAnswers: 36,
+      }),
+    );
+    expect(message).toMatch(/cannot tell/);
+    expect(message).not.toMatch(/more often than PostHog allows/);
+    expect(message).not.toMatch(/whole/);
+  });
+
   it("says how much of the wait the query service was down, when it timed out", () => {
     const message = explainRun({
       final: {

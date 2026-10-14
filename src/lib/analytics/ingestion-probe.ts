@@ -348,19 +348,25 @@ export function explainRun(run: ProbeRunResult): string {
         "tell whether ingestion works until it does."
       );
     case "query_unavailable":
+      // Only the last poll has to have been refused, and the count covers
+      // 429s and 5xx together, so the sentence says no more than that.
       return (
-        `PostHog's query service was unavailable for the whole ` +
-        `${Math.round(outcome.waitedMs / 1000)}s wait (${outcome.unavailableAnswers} ` +
-        `of ${outcome.attempts} polls answered HTTP 5xx, the last HTTP ` +
-        `${outcome.status}). That is an outage on PostHog's side, not a fault in ` +
-        "our setup, and this check cannot tell whether ingestion works until it ends."
+        `PostHog's query service was unavailable when the ` +
+        `${Math.round(outcome.waitedMs / 1000)}s wait ended: ` +
+        `${outcome.unavailableAnswers} of ${outcome.attempts} polls got HTTP 429 ` +
+        `or 5xx, the last HTTP ${outcome.status}. A 5xx is a failure on the ` +
+        "server side, not a refusal of our key, and this check cannot tell " +
+        "whether ingestion works until PostHog answers again."
       );
     case "query_throttled":
+      // A 429 can be our polling rate or PostHog shedding load, and nothing
+      // here measures which, so the message does not pick one.
       return (
-        `PostHog throttled the read back for the whole ` +
-        `${Math.round(outcome.waitedMs / 1000)}s wait (${outcome.unavailableAnswers} ` +
-        `of ${outcome.attempts} polls answered HTTP 429). The check is asking ` +
-        "more often than PostHog allows, so it cannot tell whether ingestion works."
+        `PostHog was throttling the read back when the ` +
+        `${Math.round(outcome.waitedMs / 1000)}s wait ended: ` +
+        `${outcome.unavailableAnswers} of ${outcome.attempts} polls got HTTP 429 ` +
+        "or 5xx, the last HTTP 429. This check cannot tell whether that is our " +
+        "polling rate or PostHog shedding load, nor whether ingestion works."
       );
     case "unreadable":
       return (
