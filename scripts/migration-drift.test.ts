@@ -33,9 +33,7 @@ describe("parseMigrationList", () => {
   it("throws when the CLI produced no JSON at all", () => {
     // A failed connection prints logs and exits; silently reporting "no drift"
     // here would be worse than useless, it would be a false all-clear.
-    expect(() => parseMigrationList(LOG_PREAMBLE)).toThrow(
-      /no JSON payload/i,
-    );
+    expect(() => parseMigrationList(LOG_PREAMBLE)).toThrow(/no JSON payload/i);
   });
 
   it("throws on a malformed JSON payload", () => {
@@ -187,9 +185,15 @@ describe("formatDriftReport", () => {
   // which is the order that opens the window this project hit on 2026-09-02.
   it("says a migration live code depends on is applied BEFORE the merge", () => {
     const msg = formatDriftReport(
-      classifyDrift({ pending: ["053"], untracked: [], hasDrift: true }, () => []),
+      classifyDrift(
+        { pending: ["053"], untracked: [], hasDrift: true },
+        () => [],
+      ),
     );
     expect(msg).toMatch(/before its pull request merges/i);
+    // Production no longer takes new code the moment a PR merges: Promote
+    // holds it while this check is red (#1118).
+    expect(msg).not.toMatch(/the\s+moment a PR merges/i);
   });
 
   it("names an untracked migration that is still on a branch, and says it clears", () => {
@@ -206,7 +210,10 @@ describe("formatDriftReport", () => {
 
   it("names an untracked migration that is on no branch as something to fix", () => {
     const msg = formatDriftReport(
-      classifyDrift({ pending: [], untracked: ["099"], hasDrift: true }, () => []),
+      classifyDrift(
+        { pending: [], untracked: ["099"], hasDrift: true },
+        () => [],
+      ),
     );
     expect(msg).toContain("099");
     expect(msg).toMatch(/no branch in this repository/i);
@@ -214,7 +221,10 @@ describe("formatDriftReport", () => {
 
   it("says plainly when the lookup could not run, rather than excusing it", () => {
     const msg = formatDriftReport(
-      classifyDrift({ pending: [], untracked: ["099"], hasDrift: true }, () => null),
+      classifyDrift(
+        { pending: [], untracked: ["099"], hasDrift: true },
+        () => null,
+      ),
     );
     expect(msg).toMatch(/not an all clear/i);
     expect(msg).toMatch(/fetch-depth/);
@@ -295,6 +305,41 @@ describe("runDriftCheck", () => {
    * other is an unapplied migration. Sharing one message would send whoever
    * reads it to look for a migration that is fine (L11).
    */
+  // #1118: Promote now refuses a commit while this check is red, so whoever
+  // reads the alert has to know production is held and how to release it.
+  it("says production is held, and how to release it, when it finds drift", async () => {
+    const announce = spyAnnounce();
+
+    await runDriftCheck({
+      raw: DRIFTED,
+      announceImpl: announce.impl,
+      token: "xoxb-test",
+      log: () => {},
+      lookupBranches: () => null,
+    });
+
+    const report = announce.calls[0].report;
+    expect(report).toMatch(/held/i);
+    expect(report).toMatch(/Run workflow/);
+    // A migration pasted into the dashboard records no history row, so this
+    // check stays red and the release stays held until the row is written.
+    expect(report).toMatch(/schema_migrations/);
+  });
+
+  it("says production is held when the check could not run either", async () => {
+    const announce = spyAnnounce();
+
+    await runDriftCheck({
+      raw: "failed to connect",
+      announceImpl: announce.impl,
+      token: "xoxb-test",
+      log: () => {},
+      lookupBranches: () => null,
+    });
+
+    expect(announce.calls[0].report).toMatch(/held/i);
+  });
+
   it("alerts with its own wording when the payload is unreadable", async () => {
     const announce = spyAnnounce();
 

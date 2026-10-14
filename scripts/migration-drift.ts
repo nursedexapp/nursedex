@@ -35,10 +35,11 @@ export interface DriftReport {
  *
  * This check runs against `main`, so a migration applied from a branch that
  * has not merged yet counts as untracked. That is not a mistake: for any
- * migration whose absence breaks live code it is the SAFE order. Production
- * takes new code the moment a PR merges, so applying the migration afterwards
- * leaves a window where the running code queries a column that does not exist.
- * Applying it first closes that window, at the cost of production briefly
+ * migration whose absence breaks live code it is the SAFE order. Applying the
+ * migration after its merge holds every release behind it, because Promote
+ * refuses a commit while this check is red (#1118); before that hold existed
+ * it left a window where the running code queried a column that did not
+ * exist. Applying it first avoids both, at the cost of production briefly
  * being ahead of main.
  *
  * The old check failed on that, and an alert that fires on correct behaviour
@@ -137,9 +138,7 @@ export function parseMigrationList(raw: string): MigrationRow[] {
   const parsed: unknown = JSON.parse(line);
   const migrations = (parsed as { migrations?: unknown })?.migrations;
   if (!Array.isArray(migrations)) {
-    throw new Error(
-      "supabase migration list payload has no migrations array",
-    );
+    throw new Error("supabase migration list payload has no migrations array");
   }
   return migrations as MigrationRow[];
 }
@@ -155,7 +154,11 @@ export function detectDrift(rows: MigrationRow[]): DriftReport {
     else if (remote && !local) untracked.push(remote);
   }
 
-  return { pending, untracked, hasDrift: pending.length + untracked.length > 0 };
+  return {
+    pending,
+    untracked,
+    hasDrift: pending.length + untracked.length > 0,
+  };
 }
 
 export function formatDriftReport(report: ClassifiedDrift): string {
@@ -179,9 +182,9 @@ export function formatDriftReport(report: ClassifiedDrift): string {
       "  npx supabase migration list --linked",
       "",
       "For the next one: a migration that live code DEPENDS on is applied",
-      "BEFORE its pull request merges, not after. Production takes new code the",
-      "moment a PR merges, so applying afterwards leaves a window where the",
-      "running code queries a column that does not exist yet.",
+      "BEFORE its pull request merges, not after. A merge whose migration is",
+      "not applied yet is held back from production until it is, so applying",
+      "afterwards holds up every release behind it.",
     );
   }
 
@@ -226,6 +229,23 @@ export function formatDriftReport(report: ClassifiedDrift): string {
   return lines.join("\n");
 }
 
+/**
+ * Said on every failure, because a red run of this check now HOLDS production
+ * (#1118): Promote refuses any commit it is red on. Whoever reads the alert
+ * has to know the site is serving an older version and what releases it.
+ */
+export const HELD_NOTE = [
+  "",
+  "Production is held on the version it is serving now: new merges are built",
+  "but not put live while this check is red. Once it is fixed, re-run this",
+  "check (Actions, Migration Drift, Run workflow) and the newest merge goes",
+  "live by itself.",
+  "",
+  "A migration pasted into the Supabase dashboard also needs its row written",
+  "to supabase_migrations.schema_migrations, or this check keeps reporting it",
+  "unapplied and the release stays held (#909).",
+].join("\n");
+
 /** The alert call, narrowed to what this check needs (see scripts/slack-alert.ts). */
 type AnnounceFn = (args: {
   title: string;
@@ -269,7 +289,10 @@ export async function runDriftCheck({
 }: DriftCheckOptions): Promise<number> {
   let report: ClassifiedDrift;
   try {
-    report = classifyDrift(detectDrift(parseMigrationList(raw)), lookupBranches);
+    report = classifyDrift(
+      detectDrift(parseMigrationList(raw)),
+      lookupBranches,
+    );
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     log(`Migration drift check could not run: ${message}`);
@@ -278,7 +301,8 @@ export async function runDriftCheck({
       report:
         `${message}\n\n` +
         "Nothing was compared, so this is not an all clear: production may or " +
-        "may not be in step with git.",
+        "may not be in step with git.\n" +
+        HELD_NOTE,
       token,
     }).catch((alertErr: unknown) => {
       log(
@@ -299,9 +323,10 @@ export async function runDriftCheck({
   // people to skim this channel in the first place.
   if (!report.blocking) return 0;
 
+  log(HELD_NOTE);
   await announceImpl({
     title: "Migration drift detected",
-    report: text,
+    report: `${text}\n${HELD_NOTE}`,
     token,
   }).catch((alertErr: unknown) => {
     log(

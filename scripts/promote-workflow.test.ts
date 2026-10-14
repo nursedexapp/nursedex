@@ -39,12 +39,17 @@ const TRANSPORT = readFileSync(
  * (L103, L135).
  */
 const TRANSPORT_CODE = TRANSPORT.split("\n")
-  .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
+  .filter(
+    (line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"),
+  )
   .join("\n");
 
 describe("the promote workflow", () => {
-  it("runs after both gating workflows finish, on main only", () => {
-    expect(WORKFLOW).toMatch(/workflows:\s*\[CI, E2E\]/);
+  // Migration Drift is a trigger too (#1118), so a release held for an
+  // unapplied migration goes live by itself once the check is re-run green,
+  // rather than waiting for the next merge.
+  it("runs after every gating workflow finishes, on main only", () => {
+    expect(WORKFLOW).toMatch(/workflows:\s*\[CI, E2E, Migration Drift\]/);
     expect(WORKFLOW).toMatch(/types:\s*\[completed\]/);
     expect(WORKFLOW).toMatch(/branches:\s*\[main\]/);
   });
@@ -74,7 +79,9 @@ describe("the promote workflow", () => {
     const block = WORKFLOW.match(/^permissions:\n(?:\s+.*\n)+/m)![0];
     expect(block).toMatch(/checks:\s*read/);
     expect(block).not.toMatch(/:\s*write/);
-    expect(WORKFLOW).toMatch(/VERCEL_TOKEN:\s*\$\{\{\s*secrets\.VERCEL_TOKEN\s*\}\}/);
+    expect(WORKFLOW).toMatch(
+      /VERCEL_TOKEN:\s*\$\{\{\s*secrets\.VERCEL_TOKEN\s*\}\}/,
+    );
   });
 });
 
@@ -84,6 +91,18 @@ describe("the promotion runner", () => {
   it("requires both gating checks by their exact names", () => {
     expect(RUNNER).toContain('"lint, typecheck, test"');
     expect(RUNNER).toContain('"authenticated e2e"');
+  });
+
+  // #1118: a commit whose migrations production has not applied must not go
+  // live, because its code may query what they create. The job name is what
+  // the check run is called, so it is pinned here the same way.
+  it("requires the migration drift check by its exact job name", () => {
+    expect(RUNNER).toContain('"Check production migration drift"');
+    const driftWorkflow = readFileSync(
+      join(process.cwd(), ".github/workflows/migration-drift.yml"),
+      "utf8",
+    );
+    expect(driftWorkflow).toMatch(/name:\s*Check production migration drift\n/);
   });
 
   // Verified against Vercel's own OpenAPI spec rather than memory: the read is
