@@ -11,12 +11,17 @@ name: Promote
 # Dan's decision on #839 taken with the numbers in front of him: about 4 minutes
 # to live, against 55 seconds when nothing was gated at all.
 #
+# It also waits for Migration Drift (#1118), so a commit whose migrations
+# production has not applied is held rather than put live. Migration Drift is a
+# trigger too: once the migrations are applied and it is re-run green, this
+# runs again and puts the held commit live with nothing else to do.
+#
 # It fires once per finishing check, so it runs repeatedly by design. The second
 # arrival finds the deployment already promoted and says so rather than failing.
 
 on:
   workflow_run:
-    workflows: [CI, E2E]
+    workflows: [CI, E2E, Migration Drift]
     types: [completed]
     branches: [main]
 

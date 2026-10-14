@@ -33,7 +33,11 @@ function deployment(overrides: Partial<Deployment> = {}): Deployment {
 
 function greenChecks(): CheckRun[] {
   return [
-    { name: "lint, typecheck, test", status: "completed", conclusion: "success" },
+    {
+      name: "lint, typecheck, test",
+      status: "completed",
+      conclusion: "success",
+    },
     { name: "authenticated e2e", status: "completed", conclusion: "success" },
   ];
 }
@@ -51,6 +55,58 @@ function decide(over: Partial<Parameters<typeof decidePromotion>[0]> = {}) {
 }
 
 describe("decidePromotion", () => {
+  // #1118: Migration Drift used to warn while the commit went live anyway. In
+  // September 2026 it was red for about 24 hours across three episodes, and all
+  // 107 merges that month were promoted regardless.
+  describe("with the migration drift check required", () => {
+    const DRIFT = "Check production migration drift";
+    const withDrift = (conclusion: string | null): CheckRun[] => [
+      ...greenChecks(),
+      {
+        name: DRIFT,
+        status: conclusion === null ? "in_progress" : "completed",
+        conclusion,
+      },
+    ];
+    const decideWithDrift = (conclusion: string | null) =>
+      decide({
+        checks: withDrift(conclusion),
+        requiredChecks: [...REQUIRED, DRIFT],
+        whenRed: { [DRIFT]: "the production database is behind this commit" },
+      });
+
+    it("holds the release while production is missing a migration", () => {
+      const d = decideWithDrift("failure");
+      expect(d.action).toBe("refuse");
+      // Says why in the check's own terms, not only "concluded failure".
+      expect(d.reason).toMatch(/production database is behind this commit/);
+    });
+
+    it("waits while the drift check is still running", () => {
+      expect(decideWithDrift(null).action).toBe("wait");
+    });
+
+    it("promotes once the drift check is green", () => {
+      expect(decideWithDrift("success").action).toBe("promote");
+    });
+
+    // The daily drift run also triggers this, against whatever is the tip of
+    // main, which is usually already live. A red check there has nothing left
+    // to refuse: telling the reader "this commit is not going to production"
+    // about the commit production is serving is false (L11), and it would turn
+    // this workflow red every day the drift check is.
+    it("reports a live commit as live even when a check has since gone red", () => {
+      const d = decide({
+        checks: withDrift("failure"),
+        requiredChecks: [...REQUIRED, DRIFT],
+        deployments: [deployment({ readySubstate: "PROMOTED" })],
+      });
+      expect(d.action).toBe("already-live");
+      expect(d.reason).toMatch(new RegExp(DRIFT));
+      expect(d.reason).not.toMatch(/not going to production/);
+    });
+  });
+
   it("promotes a staged production build when every required check is green", () => {
     const d = decide();
     expect(d.action).toBe("promote");
@@ -61,15 +117,25 @@ describe("decidePromotion", () => {
   // Assume it runs twice. The workflow fires once per finishing check, so the
   // second arrival finds the work already done and must succeed, not fail.
   it("does nothing when that deployment has already been promoted", () => {
-    const d = decide({ deployments: [deployment({ readySubstate: "PROMOTED" })] });
+    const d = decide({
+      deployments: [deployment({ readySubstate: "PROMOTED" })],
+    });
     expect(d.action).toBe("already-live");
   });
 
   it("waits rather than promoting while a required check is still running", () => {
     const d = decide({
       checks: [
-        { name: "lint, typecheck, test", status: "in_progress", conclusion: null },
-        { name: "authenticated e2e", status: "completed", conclusion: "success" },
+        {
+          name: "lint, typecheck, test",
+          status: "in_progress",
+          conclusion: null,
+        },
+        {
+          name: "authenticated e2e",
+          status: "completed",
+          conclusion: "success",
+        },
       ],
     });
     expect(d.action).toBe("wait");
@@ -80,8 +146,16 @@ describe("decidePromotion", () => {
   it("refuses when a required check failed", () => {
     const d = decide({
       checks: [
-        { name: "lint, typecheck, test", status: "completed", conclusion: "failure" },
-        { name: "authenticated e2e", status: "completed", conclusion: "success" },
+        {
+          name: "lint, typecheck, test",
+          status: "completed",
+          conclusion: "failure",
+        },
+        {
+          name: "authenticated e2e",
+          status: "completed",
+          conclusion: "success",
+        },
       ],
     });
     expect(d.action).toBe("refuse");
@@ -93,7 +167,11 @@ describe("decidePromotion", () => {
   it("refuses when a required check is missing entirely", () => {
     const d = decide({
       checks: [
-        { name: "authenticated e2e", status: "completed", conclusion: "success" },
+        {
+          name: "authenticated e2e",
+          status: "completed",
+          conclusion: "success",
+        },
       ],
     });
     expect(d.action).toBe("refuse");
@@ -104,8 +182,16 @@ describe("decidePromotion", () => {
   it("refuses a skipped check, which is not a passed one", () => {
     const d = decide({
       checks: [
-        { name: "lint, typecheck, test", status: "completed", conclusion: "skipped" },
-        { name: "authenticated e2e", status: "completed", conclusion: "success" },
+        {
+          name: "lint, typecheck, test",
+          status: "completed",
+          conclusion: "skipped",
+        },
+        {
+          name: "authenticated e2e",
+          status: "completed",
+          conclusion: "success",
+        },
       ],
     });
     expect(d.action).toBe("refuse");
@@ -143,7 +229,10 @@ describe("decidePromotion", () => {
 
   it("ignores a preview deployment for the same commit", () => {
     const d = decide({
-      deployments: [deployment(), deployment({ uid: "dpl_preview", target: "preview" })],
+      deployments: [
+        deployment(),
+        deployment({ uid: "dpl_preview", target: "preview" }),
+      ],
     });
     expect(d.action).toBe("promote");
   });
@@ -154,11 +243,14 @@ describe("decidePromotion", () => {
     const reasons = [
       decide({ deployments: [] }).reason,
       decide({ deployments: [deployment({ readyState: "BUILDING" })] }).reason,
-      decide({ deployments: [deployment({ readySubstate: "PROMOTED" })] }).reason,
+      decide({ deployments: [deployment({ readySubstate: "PROMOTED" })] })
+        .reason,
       decide({ checks: [] }).reason,
     ];
     expect(new Set(reasons).size).toBe(4);
-    expect(reasons.every((r) => typeof r === "string" && r.length > 0)).toBe(true);
+    expect(reasons.every((r) => typeof r === "string" && r.length > 0)).toBe(
+      true,
+    );
   });
 });
 
@@ -194,12 +286,42 @@ describe("runPromotion", () => {
   it("does not promote when a check failed", async () => {
     const h = harness({
       getChecks: async () => [
-        { name: "lint, typecheck, test", status: "completed", conclusion: "failure" },
-        { name: "authenticated e2e", status: "completed", conclusion: "success" },
+        {
+          name: "lint, typecheck, test",
+          status: "completed",
+          conclusion: "failure",
+        },
+        {
+          name: "authenticated e2e",
+          status: "completed",
+          conclusion: "success",
+        },
       ],
     });
     await expect(runPromotion(h.deps)).resolves.toBe("refuse");
     expect(h.promoted).toEqual([]);
+  });
+
+  // What the person reading the run needs is the remedy, so the meaning of a
+  // red check has to reach what is said, not stop at the decision (#1118).
+  it("says what a red check means in what it reports", async () => {
+    const h = harness({
+      getChecks: async () => [
+        {
+          name: "lint, typecheck, test",
+          status: "completed",
+          conclusion: "failure",
+        },
+        {
+          name: "authenticated e2e",
+          status: "completed",
+          conclusion: "success",
+        },
+      ],
+      whenRed: { "lint, typecheck, test": "the unit tests are failing" },
+    });
+    await expect(runPromotion(h.deps)).resolves.toBe("refuse");
+    expect(h.said.join("\n")).toContain("the unit tests are failing");
   });
 
   it("does not promote again when it is already live", async () => {
@@ -213,8 +335,16 @@ describe("runPromotion", () => {
   it("does not promote while a check is still running", async () => {
     const h = harness({
       getChecks: async () => [
-        { name: "lint, typecheck, test", status: "in_progress", conclusion: null },
-        { name: "authenticated e2e", status: "completed", conclusion: "success" },
+        {
+          name: "lint, typecheck, test",
+          status: "in_progress",
+          conclusion: null,
+        },
+        {
+          name: "authenticated e2e",
+          status: "completed",
+          conclusion: "success",
+        },
       ],
     });
     await expect(runPromotion(h.deps)).resolves.toBe("wait");
@@ -258,7 +388,9 @@ describe("runPromotion", () => {
   it("says something on every outcome", async () => {
     for (const over of [
       {},
-      { getDeployments: async () => [deployment({ readySubstate: "PROMOTED" })] },
+      {
+        getDeployments: async () => [deployment({ readySubstate: "PROMOTED" })],
+      },
       { getChecks: async () => [] },
       {
         getDeployments: async () => {
@@ -268,7 +400,9 @@ describe("runPromotion", () => {
     ]) {
       const h = harness(over as never);
       await runPromotion(h.deps);
-      expect(h.said.length, JSON.stringify(Object.keys(over))).toBeGreaterThan(0);
+      expect(h.said.length, JSON.stringify(Object.keys(over))).toBeGreaterThan(
+        0,
+      );
     }
   });
 });
@@ -318,6 +452,8 @@ describe("missingSettings", () => {
   // An empty string is how an unset GitHub secret actually arrives, and it must
   // not read as configured (L138).
   it("treats an empty value as missing, which is how an unset secret arrives", () => {
-    expect(missingSettings({ ...full, VERCEL_TOKEN: "" })).toEqual(["VERCEL_TOKEN"]);
+    expect(missingSettings({ ...full, VERCEL_TOKEN: "" })).toEqual([
+      "VERCEL_TOKEN",
+    ]);
   });
 });

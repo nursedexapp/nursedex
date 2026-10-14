@@ -45,10 +45,15 @@ export type DecisionInput = {
   checks: CheckRun[];
   /** Exact names, as the `Protect main` ruleset requires them. */
   requiredChecks: string[];
+  /**
+   * What a red result of a given check MEANS, by exact name, said in the
+   * refusal so it names the remedy rather than only "concluded failure".
+   */
+  whenRed?: Record<string, string>;
 };
 
 export function decidePromotion(input: DecisionInput): Decision {
-  const { sha, deployments, checks, requiredChecks } = input;
+  const { sha, deployments, checks, requiredChecks, whenRed = {} } = input;
 
   // The checks first: there is no point identifying a deployment we are not
   // allowed to promote, and a failed check is the interesting answer.
@@ -77,11 +82,29 @@ export function decidePromotion(input: DecisionInput): Decision {
     }
 
     if (check.conclusion !== "success") {
+      // A commit already live has nothing left to hold back. The daily drift
+      // run triggers this against the tip of main, usually the live commit, and
+      // "not going to production" about the commit production is serving would
+      // be false (L11). The red check is reported by its own workflow.
+      const live = deployments.filter(
+        (d) => d.target === "production" && d.readySubstate === "PROMOTED",
+      );
+      if (live.length === 1) {
+        return {
+          action: "already-live",
+          deployment: live[0],
+          reason:
+            `\`${name}\` on ${sha} concluded ${check.conclusion}, but this ` +
+            `commit's production build (${live[0].uid}) is already live, so ` +
+            `there is nothing to hold back. The failing check reports itself.`,
+        };
+      }
+      const meaning = whenRed[name] ? ` That means ${whenRed[name]}.` : "";
       return {
         action: "refuse",
         reason:
-          `\`${name}\` on ${sha} concluded ${check.conclusion}, not success. ` +
-          `This commit is not going to production.`,
+          `\`${name}\` on ${sha} concluded ${check.conclusion}, not success.` +
+          `${meaning} This commit is not going to production.`,
       };
     }
   }
@@ -114,8 +137,11 @@ export function decidePromotion(input: DecisionInput): Decision {
 
   const deployment = candidates[0];
 
-  if (deployment.readyState === "BUILDING" || deployment.readyState === "QUEUED" ||
-      deployment.readyState === "INITIALIZING") {
+  if (
+    deployment.readyState === "BUILDING" ||
+    deployment.readyState === "QUEUED" ||
+    deployment.readyState === "INITIALIZING"
+  ) {
     return {
       action: "wait",
       reason:
@@ -157,15 +183,12 @@ export function decidePromotion(input: DecisionInput): Decision {
 /* ------------------------------------------------------------- carrying it out */
 
 export type PromotionOutcome =
-  | "promoted"
-  | "already-live"
-  | "wait"
-  | "refuse"
-  | "failed";
+  "promoted" | "already-live" | "wait" | "refuse" | "failed";
 
 export type PromotionDeps = {
   sha: string;
   requiredChecks: string[];
+  whenRed?: Record<string, string>;
   getChecks: () => Promise<CheckRun[]>;
   getDeployments: () => Promise<Deployment[]>;
   promote: (uid: string) => Promise<void>;
@@ -180,8 +203,18 @@ export type PromotionDeps = {
  * that silently did not happen leaves production serving the previous build,
  * which looks exactly like a quiet week (L98, L13).
  */
-export async function runPromotion(deps: PromotionDeps): Promise<PromotionOutcome> {
-  const { sha, requiredChecks, getChecks, getDeployments, promote, say } = deps;
+export async function runPromotion(
+  deps: PromotionDeps,
+): Promise<PromotionOutcome> {
+  const {
+    sha,
+    requiredChecks,
+    whenRed,
+    getChecks,
+    getDeployments,
+    promote,
+    say,
+  } = deps;
 
   let checks: CheckRun[];
   let deployments: Deployment[];
@@ -196,7 +229,13 @@ export async function runPromotion(deps: PromotionDeps): Promise<PromotionOutcom
     return "failed";
   }
 
-  const decision = decidePromotion({ sha, deployments, checks, requiredChecks });
+  const decision = decidePromotion({
+    sha,
+    deployments,
+    checks,
+    requiredChecks,
+    whenRed,
+  });
 
   if (decision.action === "wait") {
     say(`### Production promotion: waiting\n\n${decision.reason}`);
@@ -248,8 +287,13 @@ export function isFailure(outcome: PromotionOutcome): boolean {
  * unconfigured run that says nothing is indistinguishable from one that had
  * nothing to do.
  */
-export function missingSettings(env: Record<string, string | undefined>): string[] {
-  return ["GITHUB_REPOSITORY", "COMMIT_SHA", "GITHUB_TOKEN", "VERCEL_TOKEN"].filter(
-    (name) => !env[name],
-  );
+export function missingSettings(
+  env: Record<string, string | undefined>,
+): string[] {
+  return [
+    "GITHUB_REPOSITORY",
+    "COMMIT_SHA",
+    "GITHUB_TOKEN",
+    "VERCEL_TOKEN",
+  ].filter((name) => !env[name]);
 }
