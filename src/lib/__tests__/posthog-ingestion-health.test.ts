@@ -11,8 +11,8 @@ import {
   pollForProbe,
   runIngestionProbe,
   type AttemptResult,
-  type ProbeRunResult,
-  PROBE_EVENT,
+  explainRun,
+  recoveryNote,
   outcomeBody,
   retryRateQueryBody,
   readRetryRate,
@@ -85,7 +85,14 @@ dotenv.config({ path: path.resolve(__dirname, "../../../.env.local") });
  * Re-measure with the cache bypassed before shortening either number.
  */
 const DEADLINE_MS = 360_000;
-const POLL_EVERY_MS = 3_000;
+/**
+ * Every 10 seconds, not 3 (#916). Each poll forces PostHog to recompute the
+ * query, so a run against a broken pipeline made up to 120 of them per
+ * deadline, which is how a check earns the throttling it then has to report.
+ * The probe takes 35 to 55 seconds to become queryable, so polling a third as
+ * often costs at most a few seconds on a healthy day.
+ */
+const POLL_EVERY_MS = 10_000;
 const MAX_ATTEMPTS = 2;
 
 /**
@@ -179,7 +186,14 @@ describe("PostHog ingestion", () => {
         maxAttempts: MAX_ATTEMPTS,
       });
 
-      expect(run.final.state, explain(run)).toBe("found");
+      expect(run.final.state, explainRun(run)).toBe("found");
+
+      // A pass that had to wait out PostHog's query service is said out loud
+      // too, for the same reason as the retry below (L77).
+      if (run.final.state === "found") {
+        const note = recoveryNote(run.final);
+        if (note) console.warn(note);
+      }
 
       // A retry that succeeded must not pass in silence (L77). The check going
       // green is the right outcome for one slow window, but a window that is
@@ -265,52 +279,3 @@ describe("PostHog ingestion", () => {
     DEADLINE_MS * MAX_ATTEMPTS + 60_000,
   );
 });
-
-/**
- * One sentence per cause. These are five different problems with five
- * different remedies, and a single "ingestion check failed" would send whoever
- * reads it looking in the wrong place.
- */
-function explain(run: ProbeRunResult): string {
-  const outcome = run.final;
-
-  switch (outcome.state) {
-    case "found":
-      return "";
-    case "capture_rejected":
-      return (
-        `PostHog refused the probe event with HTTP ${outcome.status}. Capture ` +
-        "itself is failing, so nothing the app sends is being recorded."
-      );
-    case "query_rejected":
-      return (
-        `PostHog rejected the read back with HTTP ${outcome.status}. The personal ` +
-        "API key is probably wrong or lacks query access, so this check cannot " +
-        "tell whether ingestion works either way."
-      );
-    case "unreadable":
-      return (
-        `PostHog answered in a shape this check does not understand ` +
-        `(${outcome.because}). That is not the same as the event being absent, ` +
-        "and it needs looking at rather than retrying."
-      );
-    case "timed_out": {
-      // Naming every attempt matters: two long waits are a different story
-      // from one, and the difference is what separates a slow window from
-      // ingestion actually being down.
-      const waits = run.timedOut
-        .map(
-          (t) => `${Math.round(t.waitedMs / 1000)}s over ${t.attempts} polls`,
-        )
-        .join(", then ");
-      return (
-        `${run.attemptsUsed} separate ${PROBE_EVENT} events were accepted by ` +
-        `PostHog and neither appeared in queries (${waits}). Capture is ` +
-        "answering while ingestion is not recording, which is the failure this " +
-        "check exists to catch: recorded events would quietly fall to zero and " +
-        "look like a drop in traffic. Measured on 4 September 2026, a healthy " +
-        "probe becomes queryable in 35 to 55 seconds."
-      );
-    }
-  }
-}
