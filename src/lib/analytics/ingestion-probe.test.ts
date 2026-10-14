@@ -11,6 +11,8 @@ import {
   interpretQueryResult,
   pollForProbe,
   runIngestionProbe,
+  explainRun,
+  recoveryNote,
   type AttemptResult,
   PROBE_OUTCOME_EVENT,
   outcomeBody,
@@ -203,7 +205,12 @@ describe("pollForProbe", () => {
     const h = harness([notYet, notYet, found]);
     const outcome = await pollForProbe(h.deps);
 
-    expect(outcome).toEqual({ state: "found", waitedMs: 6_000, attempts: 3 });
+    expect(outcome).toEqual({
+      state: "found",
+      waitedMs: 6_000,
+      attempts: 3,
+      unavailableAnswers: 0,
+    });
     // Two waits, not ten: it did not keep polling after it had its answer.
     expect(h.slept).toEqual([3_000, 3_000]);
   });
@@ -228,6 +235,71 @@ describe("pollForProbe", () => {
     // ingestion and must not be reported as it.
     expect(outcome).toEqual({ state: "query_rejected", status: 401 });
     expect(h.slept).toEqual([]);
+  });
+
+  it("blames the key on a 403 too, since that is also an authorisation refusal", async () => {
+    const h = harness([{ ok: false, status: 403, body: null }]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome).toEqual({ state: "query_rejected", status: 403 });
+    expect(h.slept).toEqual([]);
+  });
+
+  it("does not blame the key for a refusal that is not about authorisation", async () => {
+    // A 400 means PostHog could not run the query as written. Reporting it as
+    // a bad key sends whoever reads the alert to rotate a key that works.
+    const h = harness([{ ok: false, status: 400, body: null }]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome).toEqual({ state: "query_refused", status: 400 });
+    expect(h.slept).toEqual([]);
+  });
+
+  const unavailable = { ok: false, status: 503, body: null };
+  const throttled = { ok: false, status: 429, body: null };
+
+  // 2026-10-14 16:20 UTC: the read back got one HTTP 503 and the check failed
+  // at once, blaming the API key. A rerun minutes later passed with the same
+  // key. A service that is briefly down is waited out like a slow one.
+  it("waits out PostHog being briefly unavailable, and counts it", async () => {
+    const h = harness([unavailable, notYet, found]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome).toEqual({
+      state: "found",
+      waitedMs: 6_000,
+      attempts: 3,
+      unavailableAnswers: 1,
+    });
+  });
+
+  it("reports PostHog unavailable, not a bad key, when it never comes back", async () => {
+    const h = harness([unavailable]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome.state).toBe("query_unavailable");
+    expect(outcome).toMatchObject({ status: 503, unavailableAnswers: 10 });
+    expect((outcome as { waitedMs: number }).waitedMs).toBeGreaterThanOrEqual(
+      30_000,
+    );
+  });
+
+  it("reports throttling as its own outcome when PostHog keeps answering 429", async () => {
+    const h = harness([throttled]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome.state).toBe("query_throttled");
+    expect(outcome).toMatchObject({ status: 429, unavailableAnswers: 10 });
+  });
+
+  it("still blames ingestion when the queries recovered and the event never came", async () => {
+    // The last answers were real "not yet"s, so the query side was working by
+    // the deadline and the absence is about ingestion.
+    const h = harness([unavailable, notYet]);
+    const outcome = await pollForProbe(h.deps);
+
+    expect(outcome.state).toBe("timed_out");
+    expect(outcome).toMatchObject({ unavailableAnswers: 1 });
   });
 
   it("stops on an answer it cannot read, instead of retrying it to death", async () => {
@@ -270,11 +342,13 @@ describe("runIngestionProbe", () => {
     state: "found",
     waitedMs: 40_000,
     attempts: 14,
+    unavailableAnswers: 0,
   };
   const TIMED_OUT: AttemptResult = {
     state: "timed_out",
     waitedMs: 360_000,
     attempts: 120,
+    unavailableAnswers: 0,
   };
 
   it("stops at the first attempt when the event lands", async () => {
@@ -393,7 +467,12 @@ describe("recording what the run cost", () => {
     const body = outcomeBody(
       config,
       {
-        final: { state: "found", waitedMs: 41_000, attempts: 14 },
+        final: {
+          state: "found",
+          waitedMs: 41_000,
+          attempts: 14,
+          unavailableAnswers: 2,
+        },
         attemptsUsed: 1,
         timedOut: [],
       },
@@ -406,6 +485,9 @@ describe("recording what the run cost", () => {
       first_attempt_timed_out: false,
       final_state: "found",
       waited_ms: 41_000,
+      // Countable, so a query service that is down a little every day shows
+      // up as a rate rather than as green runs nobody reads.
+      unavailable_answers: 2,
     });
   });
 
@@ -413,7 +495,12 @@ describe("recording what the run cost", () => {
     const body = outcomeBody(
       config,
       {
-        final: { state: "found", waitedMs: 38_000, attempts: 13 },
+        final: {
+          state: "found",
+          waitedMs: 38_000,
+          attempts: 13,
+          unavailableAnswers: 0,
+        },
         attemptsUsed: 2,
         timedOut: [{ waitedMs: 360_000, attempts: 120 }],
       },
@@ -434,7 +521,12 @@ describe("recording what the run cost", () => {
     const body = outcomeBody(
       config,
       {
-        final: { state: "timed_out", waitedMs: 360_000, attempts: 120 },
+        final: {
+          state: "timed_out",
+          waitedMs: 360_000,
+          attempts: 120,
+          unavailableAnswers: 0,
+        },
         attemptsUsed: 2,
         timedOut: [
           { waitedMs: 360_000, attempts: 120 },
@@ -521,5 +613,131 @@ describe("judging that rate", () => {
     expect(judgeRetryRate({ runs: 9, retried: 4, ...LIMITS }).acceptable).toBe(
       false,
     );
+  });
+});
+
+/**
+ * One sentence per cause, each claiming only what its check measured (L11).
+ * On 2026-10-14 a 503 was reported as "the personal API key is probably
+ * wrong", which sends whoever reads the alert to the one thing that was fine.
+ */
+describe("explaining a failed run", () => {
+  const run = (final: AttemptResult) => ({
+    final,
+    attemptsUsed: 1,
+    timedOut: [],
+  });
+
+  it("names the key only for an authorisation refusal", () => {
+    expect(explainRun(run({ state: "query_rejected", status: 401 }))).toMatch(
+      /API key/,
+    );
+  });
+
+  it.each([
+    [
+      "an unavailable query service",
+      {
+        state: "query_unavailable",
+        status: 503,
+        waitedMs: 360_000,
+        attempts: 120,
+        unavailableAnswers: 120,
+      },
+      /unavailable/,
+    ],
+    [
+      "throttling",
+      {
+        state: "query_throttled",
+        status: 429,
+        waitedMs: 360_000,
+        attempts: 120,
+        unavailableAnswers: 120,
+      },
+      /throttl/,
+    ],
+    ["a refused query", { state: "query_refused", status: 400 }, /HTTP 400/],
+  ] as [string, AttemptResult, RegExp][])(
+    "does not blame the key for %s",
+    (_label, final, says) => {
+      const message = explainRun(run(final));
+      expect(message).toMatch(says);
+      expect(message).not.toMatch(/API key/);
+    },
+  );
+
+  // Only the LAST poll has to be a refusal for these outcomes, and the count
+  // covers 429s and 5xx together, so a message saying the service was down
+  // "for the whole wait" or that every refusal was a 5xx claims more than the
+  // check measured.
+  it("says only what the polls showed when PostHog stopped answering", () => {
+    const message = explainRun(
+      run({
+        state: "query_unavailable",
+        status: 503,
+        waitedMs: 360_000,
+        attempts: 36,
+        unavailableAnswers: 4,
+      }),
+    );
+    expect(message).toMatch(/4 of 36 polls/);
+    expect(message).toMatch(/429 or 5xx/);
+    expect(message).toMatch(/last.*HTTP 503/);
+    expect(message).not.toMatch(/whole/);
+  });
+
+  it("does not claim to know why PostHog throttled", () => {
+    // A 429 can be our polling rate or PostHog shedding load. Nothing here
+    // measures which, so the message must not pick one.
+    const message = explainRun(
+      run({
+        state: "query_throttled",
+        status: 429,
+        waitedMs: 360_000,
+        attempts: 36,
+        unavailableAnswers: 36,
+      }),
+    );
+    expect(message).toMatch(/cannot tell/);
+    expect(message).not.toMatch(/more often than PostHog allows/);
+    expect(message).not.toMatch(/whole/);
+  });
+
+  it("says how much of the wait the query service was down, when it timed out", () => {
+    const message = explainRun({
+      final: {
+        state: "timed_out",
+        waitedMs: 360_000,
+        attempts: 120,
+        unavailableAnswers: 40,
+      },
+      attemptsUsed: 1,
+      timedOut: [{ waitedMs: 360_000, attempts: 120 }],
+    });
+    expect(message).toMatch(/40 of 120/);
+  });
+});
+
+describe("a pass that needed PostHog to come back", () => {
+  it("is said out loud rather than passing in silence (L77)", () => {
+    const note = recoveryNote({
+      state: "found",
+      waitedMs: 40_000,
+      attempts: 14,
+      unavailableAnswers: 3,
+    });
+    expect(note).toMatch(/3 of 14/);
+  });
+
+  it("says nothing on an ordinary pass", () => {
+    expect(
+      recoveryNote({
+        state: "found",
+        waitedMs: 40_000,
+        attempts: 14,
+        unavailableAnswers: 0,
+      }),
+    ).toBeNull();
   });
 });

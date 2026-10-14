@@ -25,8 +25,7 @@ export type ProbeConfig = {
 };
 
 export type ConfigResult =
-  | { ok: true; config: ProbeConfig }
-  | { ok: false; missing: string[] };
+  { ok: true; config: ProbeConfig } | { ok: false; missing: string[] };
 
 /**
  * Reads the four settings the round trip needs.
@@ -140,11 +139,44 @@ export function interpretQueryResult(payload: unknown): ProbeAnswer {
   return first[0] > 0 ? { state: "found" } : { state: "not_yet" };
 }
 
+/**
+ * How long one probe was waited for, and how many of the polls in that wait
+ * PostHog could not answer at all (a 429 or a 5xx).
+ */
+type Waited = {
+  waitedMs: number;
+  attempts: number;
+  unavailableAnswers: number;
+};
+
+/**
+ * A refused read back, sorted by what the status means rather than lumped
+ * together.
+ *
+ * Until 2026-10-14 every non-ok status was "query_rejected", explained as a
+ * wrong API key. That day the query service answered one HTTP 503, the check
+ * failed at once blaming the key, and a rerun minutes later passed with the
+ * same key. Only 401 and 403 are about the key. A 429 or a 5xx is PostHog not
+ * answering right now, which is waited out inside the deadline like a slow
+ * answer. Anything else is a query PostHog would not run, and saying it is the
+ * key would send whoever reads the alert to rotate a key that works.
+ */
+export type QueryRefusal = "query_rejected" | "query_refused" | "transient";
+
+export function classifyQueryRefusal(status: number): QueryRefusal {
+  if (status === 401 || status === 403) return "query_rejected";
+  if (status === 429 || status >= 500) return "transient";
+  return "query_refused";
+}
+
 export type PollOutcome =
-  | { state: "found"; waitedMs: number; attempts: number }
+  | ({ state: "found" } & Waited)
   | { state: "query_rejected"; status: number }
+  | { state: "query_refused"; status: number }
+  | ({ state: "query_unavailable"; status: number } & Waited)
+  | ({ state: "query_throttled"; status: number } & Waited)
   | { state: "unreadable"; because: string }
-  | { state: "timed_out"; waitedMs: number; attempts: number };
+  | ({ state: "timed_out" } & Waited);
 
 /**
  * Waits for the probe to appear, or reports precisely why it did not.
@@ -168,15 +200,34 @@ export async function pollForProbe(deps: {
 }): Promise<PollOutcome> {
   const started = deps.now();
   let attempts = 0;
+  let unavailableAnswers = 0;
+  // The status of the most recent poll, if PostHog could not answer it. Read
+  // at the deadline: only when the LAST answer was a refusal is the absence
+  // about the query service rather than ingestion.
+  let lastUnavailable: number | null = null;
+  const waited = () => ({
+    waitedMs: deps.now() - started,
+    attempts,
+    unavailableAnswers,
+  });
 
   while (deps.now() - started < deps.deadlineMs) {
     attempts += 1;
     const res = await deps.runQuery();
-    if (!res.ok) return { state: "query_rejected", status: res.status };
+    if (!res.ok) {
+      const refusal = classifyQueryRefusal(res.status);
+      if (refusal !== "transient")
+        return { state: refusal, status: res.status };
+      unavailableAnswers += 1;
+      lastUnavailable = res.status;
+      await deps.sleep(deps.pollEveryMs);
+      continue;
+    }
+    lastUnavailable = null;
 
     const answer = interpretQueryResult(res.body);
     if (answer.state === "found") {
-      return { state: "found", waitedMs: deps.now() - started, attempts };
+      return { state: "found", ...waited() };
     }
     if (answer.state === "unreadable") {
       return { state: "unreadable", because: answer.because };
@@ -184,7 +235,14 @@ export async function pollForProbe(deps: {
     await deps.sleep(deps.pollEveryMs);
   }
 
-  return { state: "timed_out", waitedMs: deps.now() - started, attempts };
+  if (lastUnavailable !== null) {
+    return {
+      state: lastUnavailable === 429 ? "query_throttled" : "query_unavailable",
+      status: lastUnavailable,
+      ...waited(),
+    };
+  }
+  return { state: "timed_out", ...waited() };
 }
 
 /**
@@ -193,11 +251,7 @@ export async function pollForProbe(deps: {
  * over outcomes rather than over two nested shapes.
  */
 export type AttemptResult =
-  | { state: "found"; waitedMs: number; attempts: number }
-  | { state: "capture_rejected"; status: number }
-  | { state: "query_rejected"; status: number }
-  | { state: "unreadable"; because: string }
-  | { state: "timed_out"; waitedMs: number; attempts: number };
+  PollOutcome | { state: "capture_rejected"; status: number };
 
 export interface ProbeRunResult {
   final: AttemptResult;
@@ -217,11 +271,14 @@ export interface ProbeRunResult {
  * deadline and that was a transient excursion at PostHog rather than ingestion
  * being broken.
  *
- * ONLY A TIMEOUT IS RETRIED. A rejected query means the API key is wrong; an
- * unreadable answer means the query API changed shape; a refused capture means
- * capture itself is failing. None of those is transient, so a second attempt
- * would spend the whole budget again to be told the same thing, and would
- * report a configuration fault as a slow one.
+ * ONLY A TIMEOUT IS RETRIED. A rejected query means the API key is wrong; a
+ * refused one means PostHog will not run the query as written; an unreadable
+ * answer means the query API changed shape; a refused capture means capture
+ * itself is failing. None of those is transient, so a second attempt would
+ * spend the whole budget again to be told the same thing, and would report a
+ * configuration fault as a slow one. A query service that stayed unavailable
+ * or throttled was already waited on for a whole deadline, and a fresh probe
+ * would be read back through the same service.
  *
  * The retry costs nothing on a healthy day, because the first attempt succeeds
  * and the second never runs.
@@ -238,7 +295,12 @@ export async function runIngestionProbe(deps: {
   }
 
   const timedOut: { waitedMs: number; attempts: number }[] = [];
-  let final: AttemptResult = { state: "timed_out", waitedMs: 0, attempts: 0 };
+  let final: AttemptResult = {
+    state: "timed_out",
+    waitedMs: 0,
+    attempts: 0,
+    unavailableAnswers: 0,
+  };
 
   for (let n = 1; n <= deps.maxAttempts; n += 1) {
     final = await deps.attempt(n);
@@ -251,6 +313,112 @@ export async function runIngestionProbe(deps: {
   }
 
   return { final, attemptsUsed: deps.maxAttempts, timedOut };
+}
+
+// ── What a run's outcome means ─────────────────────────────────
+
+/**
+ * One sentence per cause. These are different problems with different
+ * remedies, and a single "ingestion check failed" would send whoever reads it
+ * looking in the wrong place. Each sentence claims only what its branch
+ * measured (L11): on 2026-10-14 an HTTP 503 was explained as a wrong API key.
+ */
+export function explainRun(run: ProbeRunResult): string {
+  const outcome = run.final;
+
+  switch (outcome.state) {
+    case "found":
+      return "";
+    case "capture_rejected":
+      return (
+        `PostHog refused the probe event with HTTP ${outcome.status}. Capture ` +
+        "itself is failing, so nothing the app sends is being recorded."
+      );
+    case "query_rejected":
+      return (
+        `PostHog refused the read back with HTTP ${outcome.status}, which is an ` +
+        "authorisation refusal: the personal API key is wrong, revoked, or lacks " +
+        "query access, so this check cannot tell whether ingestion works either way."
+      );
+    case "query_refused":
+      return (
+        `PostHog would not run the read back query and answered HTTP ` +
+        `${outcome.status}. That is not an authorisation refusal, so the query ` +
+        "itself or the endpoint it is sent to needs looking at. This check cannot " +
+        "tell whether ingestion works until it does."
+      );
+    case "query_unavailable":
+      // Only the last poll has to have been refused, and the count covers
+      // 429s and 5xx together, so the sentence says no more than that.
+      return (
+        `PostHog's query service was unavailable when the ` +
+        `${Math.round(outcome.waitedMs / 1000)}s wait ended: ` +
+        `${outcome.unavailableAnswers} of ${outcome.attempts} polls got HTTP 429 ` +
+        `or 5xx, the last HTTP ${outcome.status}. A 5xx is a failure on the ` +
+        "server side, not a refusal of our key, and this check cannot tell " +
+        "whether ingestion works until PostHog answers again."
+      );
+    case "query_throttled":
+      // A 429 can be our polling rate or PostHog shedding load, and nothing
+      // here measures which, so the message does not pick one.
+      return (
+        `PostHog was throttling the read back when the ` +
+        `${Math.round(outcome.waitedMs / 1000)}s wait ended: ` +
+        `${outcome.unavailableAnswers} of ${outcome.attempts} polls got HTTP 429 ` +
+        "or 5xx, the last HTTP 429. This check cannot tell whether that is our " +
+        "polling rate or PostHog shedding load, nor whether ingestion works."
+      );
+    case "unreadable":
+      return (
+        `PostHog answered in a shape this check does not understand ` +
+        `(${outcome.because}). That is not the same as the event being absent, ` +
+        "and it needs looking at rather than retrying."
+      );
+    case "timed_out": {
+      // Naming every attempt matters: two long waits are a different story
+      // from one, and the difference is what separates a slow window from
+      // ingestion actually being down.
+      const waits = run.timedOut
+        .map(
+          (t) => `${Math.round(t.waitedMs / 1000)}s over ${t.attempts} polls`,
+        )
+        .join(", then ");
+      // Polls PostHog could not answer are not evidence of absence, so a wait
+      // partly spent on them is said to be.
+      const down =
+        outcome.unavailableAnswers > 0
+          ? ` PostHog could not answer ${outcome.unavailableAnswers} of ` +
+            `${outcome.attempts} polls in the last wait, so part of it measured ` +
+            "nothing."
+          : "";
+      return (
+        `${run.attemptsUsed} separate ${PROBE_EVENT} events were accepted by ` +
+        `PostHog and neither appeared in queries (${waits}). Capture is ` +
+        "answering while ingestion is not recording, which is the failure this " +
+        "check exists to catch: recorded events would quietly fall to zero and " +
+        "look like a drop in traffic. Measured on 4 September 2026, a healthy " +
+        `probe becomes queryable in 35 to 55 seconds.${down}`
+      );
+    }
+  }
+}
+
+/**
+ * A pass that needed PostHog's query service to come back must not pass in
+ * silence (L77): a service that is down a little every day would otherwise be
+ * invisible behind green runs. The count is also recorded on the outcome
+ * event, so it can become a rate.
+ */
+export function recoveryNote(
+  found: Extract<PollOutcome, { state: "found" }>,
+): string | null {
+  if (found.unavailableAnswers === 0) return null;
+  return (
+    `[posthog-ingestion] PostHog could not answer ${found.unavailableAnswers} ` +
+    `of ${found.attempts} polls (HTTP 429 or 5xx) before the probe was found. ` +
+    "Waited out, so this run passed. Several days of this in a row is PostHog " +
+    "being unreliable for us, not a slow window."
+  );
 }
 
 // ── How often the first probe times out ───────────────────────
@@ -299,6 +467,8 @@ export function outcomeBody(
       attempts_used: run.attemptsUsed,
       first_attempt_timed_out: run.timedOut.length > 0,
       final_state: run.final.state,
+      unavailable_answers:
+        "unavailableAnswers" in run.final ? run.final.unavailableAnswers : 0,
       waited_ms:
         "waitedMs" in run.final
           ? run.final.waitedMs
