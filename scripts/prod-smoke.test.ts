@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   parseGrantRows,
   checkGrants,
@@ -242,5 +244,123 @@ describe("formatSmokeReport", () => {
     const report = formatSmokeReport(checkGrants(healthyRows()));
 
     expect(report).toMatch(/targeted/i);
+  });
+});
+
+// The production check fails on a function it has no expectation for, but only
+// after the migration is live (migration 071's increment_consent_tally paged
+// Slack on launch day). This reads the migrations, so the same omission fails
+// in the pull request that adds the function instead.
+const MIGRATIONS = "supabase/migrations";
+const CREATED =
+  /\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:public\.)?"?(\w+)"?\s*\(/gi;
+const DROPPED =
+  /\bDROP\s+FUNCTION\s+(?:IF\s+EXISTS\s+)?(?:public\.)?"?(\w+)"?/gi;
+
+/**
+ * The statements alone: function bodies ($$ or $tag$ quoted) and comments are
+ * removed, so a create or drop written inside one is not read as executed.
+ * One left to right pass, so whichever opens first wins: a comment that
+ * mentions $$ stays a comment, and a -- inside a body stays body. A
+ * function's header precedes its body, so its own CREATE survives.
+ */
+function statementsOnly(sql: string): string {
+  return sql.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|\$(\w*)\$[\s\S]*?\$\1\$/g, " ");
+}
+
+/** The argument list opening at `open` (a "("), brackets matched, spacing folded. */
+function argumentsAt(sql: string, open: number): string {
+  let depth = 0;
+  for (let i = open; i < sql.length; i++) {
+    if (sql[i] === "(") depth++;
+    else if (sql[i] === ")" && --depth === 0)
+      return sql
+        .slice(open + 1, i)
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+  }
+  return sql
+    .slice(open + 1)
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Public functions the migrations leave in place, applied in file order.
+ * The production check keys on the name alone, so this does too, but a name
+ * created with more than one argument list may have an overload still in
+ * place: dropping one of those never removes the name. That can only keep a
+ * dropped name, which fails loud, never lose a live one, which would not.
+ */
+function functionsLeftByMigrations(sources: string[]): Set<string> {
+  const live = new Map<string, Set<string>>();
+  for (const raw of sources) {
+    const sql = statementsOnly(raw);
+    const events = [
+      ...[...sql.matchAll(CREATED)].map(
+        (m) =>
+          [m.index, m[1], argumentsAt(sql, m.index + m[0].length - 1)] as const,
+      ),
+      ...[...sql.matchAll(DROPPED)].map((m) => [m.index, m[1], null] as const),
+    ].sort((a, b) => a[0] - b[0]);
+    for (const [, rawName, args] of events) {
+      const name = rawName.toLowerCase();
+      const signatures = live.get(name) ?? new Set<string>();
+      if (args !== null) live.set(name, signatures.add(args));
+      else if (signatures.size <= 1) live.delete(name);
+    }
+  }
+  return new Set(live.keys());
+}
+
+describe("FUNCTION_GRANTS covers every function the migrations create", () => {
+  it("reads a create, a later drop, and a schema it does not check", () => {
+    const left = functionsLeftByMigrations([
+      "CREATE OR REPLACE FUNCTION public.kept(p text) RETURNS void",
+      "create function gone() returns int; CREATE FUNCTION private.other()",
+      'DROP FUNCTION IF EXISTS public.gone(); CREATE FUNCTION "quoted" ()',
+    ]);
+    expect([...left].sort()).toEqual(["kept", "quoted"]);
+  });
+
+  it("ignores a create or drop inside a comment or a function body", () => {
+    const left = functionsLeftByMigrations([
+      "CREATE FUNCTION public.real() RETURNS void AS $$ SELECT 1 $$ LANGUAGE sql;",
+      "-- DROP FUNCTION public.real();\n/* CREATE FUNCTION commented() */",
+      "CREATE FUNCTION outer_fn() RETURNS void AS $body$ BEGIN EXECUTE 'x'; -- CREATE FUNCTION in_body()\n END $body$ LANGUAGE plpgsql;",
+    ]);
+    expect([...left].sort()).toEqual(["outer_fn", "real"]);
+  });
+
+  it("keeps a name while another of its overloads may still exist", () => {
+    const left = functionsLeftByMigrations([
+      "CREATE FUNCTION over(p integer) RETURNS void; CREATE FUNCTION over(p text) RETURNS void;",
+      "DROP FUNCTION over(integer);",
+      "CREATE FUNCTION moved(a integer) RETURNS void;",
+      "DROP FUNCTION moved(integer); CREATE FUNCTION moved(a numeric(10, 2)) RETURNS void;",
+      "CREATE FUNCTION once(a integer) RETURNS void; DROP FUNCTION once(integer);",
+    ]);
+    expect([...left].sort()).toEqual(["moved", "over"]);
+  });
+
+  it("reads past a comment that mentions dollar quoting", () => {
+    const left = functionsLeftByMigrations([
+      "-- bodies use $$ quoting\nCREATE FUNCTION first() RETURNS void AS $$ SELECT 1 $$ LANGUAGE sql;\nCREATE FUNCTION second() RETURNS void AS $$ SELECT 2 $$ LANGUAGE sql;",
+    ]);
+    expect([...left].sort()).toEqual(["first", "second"]);
+  });
+
+  it("declares an expectation for each one", () => {
+    const files = readdirSync(MIGRATIONS)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+    expect(files.length).toBeGreaterThan(60);
+    const left = functionsLeftByMigrations(
+      files.map((f) => readFileSync(join(MIGRATIONS, f), "utf8")),
+    );
+    expect(left.size).toBeGreaterThan(10);
+    const undeclared = [...left].filter((name) => !(name in FUNCTION_GRANTS));
+    expect(undeclared).toEqual([]);
   });
 });
