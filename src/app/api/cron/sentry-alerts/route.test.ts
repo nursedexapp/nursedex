@@ -13,13 +13,37 @@ const h = vi.hoisted(() => {
   const slackPost = vi.fn(async () => ({ ok: true }));
   const state: {
     loggedRows: Array<{ issue_id: string }>;
-  } = { loggedRows: [] };
+    lastSuccessAt: string | null;
+    heartbeatError: unknown;
+    logReadError: unknown;
+  } = {
+    loggedRows: [],
+    lastSuccessAt: null,
+    heartbeatError: null,
+    logReadError: null,
+  };
+  // A stand in with the real one's shape, so the route's instanceof check is
+  // exercised rather than mocked away.
+  class SentryUnavailableError extends Error {
+    constructor(
+      message: string,
+      readonly status: number | null,
+    ) {
+      super(message);
+    }
+  }
   const calls: { insert: unknown[]; deleteIn: unknown[]; ranges: number[] } = {
     insert: [],
     deleteIn: [],
     ranges: [],
   };
-  return { getIssuesNeedingReview, slackPost, state, calls };
+  return {
+    getIssuesNeedingReview,
+    slackPost,
+    state,
+    calls,
+    SentryUnavailableError,
+  };
 });
 
 function builder() {
@@ -34,11 +58,20 @@ function builder() {
       // Served a page at a time out of the state, so the loop's exit
       // condition is exercised rather than stubbed away (#984).
       const start = from as number;
+      if (h.state.logReadError)
+        return { data: null, error: h.state.logReadError };
       return {
         data: h.state.loggedRows.slice(start, start + ALERT_LOG_PAGE),
         error: null,
       };
     },
+    // The job's own heartbeat row, read for when it last got through.
+    maybeSingle: () => ({
+      data: h.state.heartbeatError
+        ? null
+        : { last_success_at: h.state.lastSuccessAt },
+      error: h.state.heartbeatError,
+    }),
     insert: (payload) => {
       h.calls.insert.push(payload);
       return { data: null, error: null };
@@ -52,6 +85,7 @@ function builder() {
 
 vi.mock("@/lib/sentry/issues", () => ({
   getIssuesNeedingReview: h.getIssuesNeedingReview,
+  SentryUnavailableError: h.SentryUnavailableError,
 }));
 vi.mock("@/lib/slack/client", () => ({
   slackPost: h.slackPost,
@@ -67,6 +101,10 @@ import { GET } from "./route";
 
 const req = cronRequest();
 
+function minutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * 60 * 1000).toISOString();
+}
+
 function issue(id: string) {
   return {
     id,
@@ -81,6 +119,10 @@ function issue(id: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   h.state.loggedRows = [];
+  // The run before each test got through, unless a test says otherwise.
+  h.state.lastSuccessAt = minutesAgo(15);
+  h.state.heartbeatError = null;
+  h.state.logReadError = null;
   h.calls.insert = [];
   h.calls.deleteIn = [];
   h.calls.ranges = [];
@@ -313,5 +355,121 @@ describe("reading the whole log", () => {
 
     expect(json.alerted).toBe(1);
     expect(h.calls.insert).toContainEqual({ issue_id: "new" });
+  });
+});
+
+/**
+ * A Sentry outage paged the channel on every 15 minute run on 2026-10-20,
+ * each page reading like a fault of ours. Now one page says it is Sentry,
+ * later failed runs stay quiet, and one message says when it is back.
+ */
+describe("when Sentry itself is down", () => {
+  const unavailable = () =>
+    new h.SentryUnavailableError(
+      "Sentry issues fetch failed: 503 upstream",
+      503,
+    );
+
+  function slackTexts(): string[] {
+    return h.slackPost.mock.calls.map(
+      (call) => ((call as unknown[])[1] as { text: string }).text,
+    );
+  }
+
+  it("pages once, as Sentry being down, when the run before got through", async () => {
+    h.getIssuesNeedingReview.mockRejectedValue(unavailable());
+
+    const res = await GET(cronRequest());
+
+    expect(res.status).toBe(500);
+    const texts = slackTexts();
+    expect(texts).toHaveLength(1);
+    expect(texts[0]).toContain("Sentry is down");
+    expect(texts[0]).toContain("503");
+    expect(texts[0]).not.toContain("Cron failed");
+  });
+
+  it("stays quiet on a later failed run of the same outage", async () => {
+    h.state.lastSuccessAt = minutesAgo(45);
+    h.getIssuesNeedingReview.mockRejectedValue(unavailable());
+
+    const res = await GET(cronRequest());
+
+    // Still a failed run: no heartbeat is written for it, so the watchdog and
+    // the jobs page still see the outage.
+    expect(res.status).toBe(500);
+    expect(h.slackPost).not.toHaveBeenCalled();
+  });
+
+  it("reminds when the outage reaches two hours", async () => {
+    h.state.lastSuccessAt = minutesAgo(121);
+    h.getIssuesNeedingReview.mockRejectedValue(unavailable());
+
+    await GET(cronRequest());
+
+    expect(slackTexts()).toEqual([expect.stringContaining("still down")]);
+  });
+
+  it("pages when the last success cannot be read, rather than assuming it already did", async () => {
+    h.state.heartbeatError = { message: "supabase unavailable" };
+    h.getIssuesNeedingReview.mockRejectedValue(unavailable());
+
+    await GET(cronRequest());
+
+    expect(slackTexts()).toEqual([expect.stringContaining("Sentry is down")]);
+  });
+
+  it("falls back to the ordinary failure page when the outage page cannot be posted", async () => {
+    h.slackPost.mockRejectedValueOnce(new Error("slack down"));
+    h.getIssuesNeedingReview.mockRejectedValue(unavailable());
+
+    const res = await GET(cronRequest());
+
+    expect(res.status).toBe(500);
+    expect(slackTexts()).toHaveLength(2);
+    expect(slackTexts()[1]).toContain("Cron failed");
+  });
+
+  it("still pages every run for a failure that is ours, not Sentry's", async () => {
+    h.state.lastSuccessAt = minutesAgo(45);
+    h.getIssuesNeedingReview.mockRejectedValue(
+      new Error("Sentry issues fetch failed: 401 bad token"),
+    );
+
+    await GET(cronRequest());
+
+    expect(slackTexts()).toEqual([expect.stringContaining("Cron failed")]);
+  });
+
+  it("says it is working again on the first run that gets through", async () => {
+    h.state.lastSuccessAt = minutesAgo(45);
+    h.getIssuesNeedingReview.mockResolvedValue([]);
+
+    const res = await GET(cronRequest());
+
+    expect(res.status).toBe(200);
+    expect(slackTexts()).toEqual([
+      expect.stringContaining("working again after 45 minutes"),
+    ]);
+  });
+
+  // "Has caught up" is a claim about the whole run, so it waits for the run.
+  it("does not say it is working again when the rest of the run fails", async () => {
+    h.state.lastSuccessAt = minutesAgo(45);
+    h.state.logReadError = { message: "supabase unavailable" };
+    h.getIssuesNeedingReview.mockResolvedValue([]);
+
+    const res = await GET(cronRequest());
+
+    expect(res.status).toBe(500);
+    expect(slackTexts().join("\n")).not.toContain("working again");
+  });
+
+  it("says nothing extra on an ordinary run", async () => {
+    h.getIssuesNeedingReview.mockResolvedValue([]);
+
+    await GET(cronRequest());
+
+    expect(h.slackPost).not.toHaveBeenCalled();
   });
 });

@@ -276,6 +276,72 @@ describe("getIssuesNeedingReview", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(sleep).not.toHaveBeenCalled();
     });
+
+    // The route pages once per outage rather than once per run, so it has to
+    // tell Sentry being down apart from a fault of ours.
+    it("marks a refusal that outlasts the retry as Sentry being unavailable", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => refusal(503)),
+      );
+      const sleep = vi.fn(async (_ms: number) => {});
+
+      const { getIssuesNeedingReview, SentryUnavailableError } =
+        await import("./issues");
+      const err = await getIssuesNeedingReview({ sleep }).catch((e) => e);
+
+      expect(err).toBeInstanceOf(SentryUnavailableError);
+      expect(err.status).toBe(503);
+      expect(err.message).toMatch(/503/);
+    });
+
+    it("marks a connection that never answered as Sentry being unavailable", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          throw new TypeError("fetch failed");
+        }),
+      );
+
+      const { getIssuesNeedingReview, SentryUnavailableError } =
+        await import("./issues");
+      const err = await getIssuesNeedingReview().catch((e) => e);
+
+      expect(err).toBeInstanceOf(SentryUnavailableError);
+      expect(err.status).toBeNull();
+      expect(err.message).toMatch(/fetch failed/);
+    });
+
+    it("does not mark a refusal that is ours to fix as Sentry being unavailable", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => refusal(401)),
+      );
+
+      const { getIssuesNeedingReview, SentryUnavailableError } =
+        await import("./issues");
+      const err = await getIssuesNeedingReview().catch((e) => e);
+
+      expect(err).toBeInstanceOf(Error);
+      expect(err).not.toBeInstanceOf(SentryUnavailableError);
+    });
+
+    // A rate limit that outlasts the retry may be our own over-use, so it is
+    // not announced as Sentry being down and still pages on every run.
+    it("does not mark a rate limit that outlasts the retry as Sentry being unavailable", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => refusal(429)),
+      );
+      const sleep = vi.fn(async (_ms: number) => {});
+
+      const { getIssuesNeedingReview, SentryUnavailableError } =
+        await import("./issues");
+      const err = await getIssuesNeedingReview({ sleep }).catch((e) => e);
+
+      expect(err.message).toMatch(/429/);
+      expect(err).not.toBeInstanceOf(SentryUnavailableError);
+    });
   });
 
   it("throws if SENTRY_AUTH_TOKEN is missing", async () => {

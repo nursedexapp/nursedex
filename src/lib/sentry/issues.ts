@@ -42,6 +42,38 @@ function retryDelayMs(retryAfter: string | null): number {
   return Math.min(seconds * 1000, MAX_RETRY_DELAY_MS);
 }
 
+/**
+ * Sentry itself could not answer: a server error that outlasted the retry, or
+ * a connection that never got a reply. The route pages once per
+ * outage for this rather than once per run, so it must stay distinct from a
+ * failure that is ours to fix (a bad token, a missing setting), which still
+ * pages every time.
+ */
+export class SentryUnavailableError extends Error {
+  constructor(
+    message: string,
+    /** Sentry's status code, or null when nothing answered at all. */
+    readonly status: number | null,
+  ) {
+    super(message);
+    this.name = "SentryUnavailableError";
+  }
+}
+
+async function fetchOrUnavailable(url: string): Promise<Response> {
+  // Outside the try: a missing token is ours to fix, not Sentry being down.
+  const headers = authHeaders();
+  try {
+    return await fetch(url, { headers });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new SentryUnavailableError(
+      `Sentry issues fetch got no answer: ${reason}`,
+      null,
+    );
+  }
+}
+
 function realSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -102,7 +134,7 @@ export async function getIssuesNeedingReview(
     url.searchParams.set("limit", "100");
     if (cursor) url.searchParams.set("cursor", cursor);
 
-    let res = await fetch(url.toString(), { headers: authHeaders() });
+    let res = await fetchOrUnavailable(url.toString());
     if (!retried && RETRYABLE_STATUS(res.status)) {
       retried = true;
       // Counted, not just absorbed (L77): blips growing common should show
@@ -113,12 +145,16 @@ export async function getIssuesNeedingReview(
         { level: "warning", tags: { action: "cron", job: "sentry-alerts" } },
       );
       await sleep(retryDelayMs(res.headers.get("retry-after")));
-      res = await fetch(url.toString(), { headers: authHeaders() });
+      res = await fetchOrUnavailable(url.toString());
     }
     if (!res.ok) {
-      throw new Error(
-        `Sentry issues fetch failed: ${res.status} ${await res.text()}`,
-      );
+      const message = `Sentry issues fetch failed: ${res.status} ${await res.text()}`;
+      // A 5xx only: a rate limit that outlasts the retry may be our own
+      // over-use, so it is not announced as Sentry being down.
+      if (res.status >= 500) {
+        throw new SentryUnavailableError(message, res.status);
+      }
+      throw new Error(message);
     }
 
     const data = (await res.json()) as Array<{
