@@ -57,7 +57,9 @@ describe("withCronAlerting", () => {
     expect(res.status).toBe(500);
     expect(h.captureException).toHaveBeenCalledWith(
       expect.any(Error),
-      expect.objectContaining({ tags: expect.objectContaining({ job: "test-job" }) }),
+      expect.objectContaining({
+        tags: expect.objectContaining({ job: "test-job" }),
+      }),
     );
     expect(h.slackPost).toHaveBeenCalledWith(
       "chat.postMessage",
@@ -69,7 +71,10 @@ describe("withCronAlerting", () => {
   });
 
   it("alerts Slack and captures a Sentry message when the handler returns non-2xx without throwing", async () => {
-    const failed = NextResponse.json({ error: "Query failed" }, { status: 500 });
+    const failed = NextResponse.json(
+      { error: "Query failed" },
+      { status: 500 },
+    );
     const handler = vi.fn(async () => failed);
 
     const res = await withCronAlerting("test-job", handler)(fakeRequest());
@@ -101,6 +106,33 @@ describe("withCronAlerting", () => {
 
     expect(res.status).toBe(500);
   });
+
+  /**
+   * A route that has already decided who to tell about its failure (or that
+   * nobody needs telling again) must not have the wrapper page on top of it.
+   * The run is still a failure: Sentry hears about it and no heartbeat is
+   * written, so the watchdog and the jobs page still see it.
+   */
+  it("does not page Slack for a failure the route has already handled", async () => {
+    const { CronFailureHandled } = await import("./alerting");
+    const handler = vi.fn(async (): Promise<NextResponse> => {
+      throw new CronFailureHandled(
+        new Error("Sentry issues fetch failed: 503"),
+      );
+    });
+
+    const res = await withCronAlerting("test-job", handler)(fakeRequest());
+
+    expect(res.status).toBe(500);
+    expect(h.slackPost).not.toHaveBeenCalled();
+    expect(h.recordCronHeartbeat).not.toHaveBeenCalled();
+    expect(h.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Sentry issues fetch failed: 503" }),
+      expect.objectContaining({
+        tags: expect.objectContaining({ action: "cron", job: "test-job" }),
+      }),
+    );
+  });
 });
 
 /**
@@ -113,7 +145,9 @@ describe("withCronAlerting", () => {
  */
 describe("withCronAlerting heartbeats", () => {
   it("records a heartbeat when the job succeeds", async () => {
-    const handler = vi.fn(async () => NextResponse.json({ success: true, sent: 2 }));
+    const handler = vi.fn(async () =>
+      NextResponse.json({ success: true, sent: 2 }),
+    );
 
     await withCronAlerting("access-expiry", handler)(fakeRequest());
 

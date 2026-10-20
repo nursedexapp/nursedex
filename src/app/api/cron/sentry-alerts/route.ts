@@ -1,9 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { verifyCronAuth } from "@/lib/cron/auth";
-import { withCronAlerting } from "@/lib/cron/alerting";
+import { withCronAlerting, CronFailureHandled } from "@/lib/cron/alerting";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { getIssuesNeedingReview } from "@/lib/sentry/issues";
+import {
+  getIssuesNeedingReview,
+  SentryUnavailableError,
+} from "@/lib/sentry/issues";
+import {
+  planOutageAlert,
+  outageMessage,
+  recoveryMessage,
+} from "@/lib/sentry/outage";
 import { slackPost, ALERTS_CHANNEL_ID } from "@/lib/slack/client";
 import {
   planAlertLogCleanup,
@@ -11,8 +19,37 @@ import {
 } from "@/lib/sentry/alert-log-cleanup";
 
 import { unwrapOrThrow, assertNoWriteError } from "@/lib/db/results";
+import type { SupabaseClient } from "@supabase/supabase-js";
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+const JOB_NAME = "sentry-alerts";
+
+/**
+ * When this job last got through, from the heartbeat the cron wrapper writes.
+ * Undefined when it cannot be read: the outage plan then pages rather than
+ * guessing the outage was already announced.
+ */
+async function readLastSuccess(
+  supabase: SupabaseClient,
+): Promise<Date | null | undefined> {
+  const { data, error } = await supabase
+    .from("job_heartbeats")
+    .select("last_success_at")
+    .eq("job_name", JOB_NAME)
+    .maybeSingle();
+  if (error) {
+    console.warn("[cron sentry-alerts] last success unreadable:", error);
+    Sentry.captureMessage(
+      "[cron sentry-alerts] could not read its own last success",
+      { level: "warning", tags: { action: "cron", job: JOB_NAME } },
+    );
+    return undefined;
+  }
+  const at = (data as { last_success_at: string | null } | null)
+    ?.last_success_at;
+  return at ? new Date(at) : null;
+}
 
 /**
  * Every 15 minutes. Sentry's free plan has no native Slack/webhook
@@ -39,10 +76,53 @@ export const maxDuration = 60;
  * log that could never be cleared and a warning below that could never stop.
  */
 const handleSentryAlerts = withCronAlerting(
-  "sentry-alerts",
+  JOB_NAME,
   async (_request: NextRequest) => {
-    const issues = await getIssuesNeedingReview();
     const supabase = createServiceRoleClient();
+    const lastSuccessAt = await readLastSuccess(supabase);
+    const now = new Date();
+
+    let issues;
+    try {
+      issues = await getIssuesNeedingReview();
+    } catch (err) {
+      if (!(err instanceof SentryUnavailableError)) throw err;
+      // Sentry being down pages once per outage, in words that say so, rather
+      // than as a cron failure on every run (2026-10-20).
+      const kind = planOutageAlert({ lastSuccessAt, now });
+      if (kind !== "quiet") {
+        try {
+          await slackPost("chat.postMessage", {
+            channel: ALERTS_CHANNEL_ID,
+            text: outageMessage({
+              kind,
+              status: err.status,
+              lastSuccessAt,
+              now,
+            }),
+          });
+        } catch (slackErr) {
+          // Not announced, so the wrapper's ordinary page is the fallback.
+          console.error("[cron sentry-alerts] outage page failed:", slackErr);
+          throw err;
+        }
+      }
+      throw new CronFailureHandled(err);
+    }
+
+    const recovered = recoveryMessage({ lastSuccessAt, now });
+    if (recovered) {
+      // Best effort: the run's real work matters more than this line.
+      await slackPost("chat.postMessage", {
+        channel: ALERTS_CHANNEL_ID,
+        text: recovered,
+      }).catch((slackErr) => {
+        console.error("[cron sentry-alerts] recovery note failed:", slackErr);
+        Sentry.captureException(slackErr, {
+          tags: { action: "cron", job: JOB_NAME },
+        });
+      });
+    }
 
     // A failed read is NOT "nothing has been alerted yet" (#847). It empties
     // the dedup set, so every issue already reported is reported again, and

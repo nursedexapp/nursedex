@@ -8,6 +8,21 @@ import { recordCronHeartbeat } from "./heartbeat";
 type CronHandler = (request: NextRequest) => Promise<NextResponse>;
 
 /**
+ * Thrown by a route that has already decided who to tell about its failure,
+ * so the wrapper does not page on top of it. sentry-alerts uses it during a
+ * Sentry outage: it pages once in its own words, then stays quiet on later
+ * runs. The run is still a failure: it reaches Sentry under the cron tag, it
+ * answers 500, and no heartbeat is written, so the watchdog and the jobs page
+ * still see it.
+ */
+export class CronFailureHandled extends Error {
+  constructor(readonly failure: Error) {
+    super(failure.message);
+    this.name = "CronFailureHandled";
+  }
+}
+
+/**
  * Wraps a cron route's GET handler with failure alerting (#397): a thrown
  * error or a non-2xx response from the handler now reports to Sentry and
  * posts a Slack ops alert naming the job, instead of failing silently.
@@ -82,6 +97,13 @@ export function withCronAlerting(
       }
       return res;
     } catch (err) {
+      if (err instanceof CronFailureHandled) {
+        console.error(`[cron ${jobName}] (already handled)`, err.failure);
+        Sentry.captureException(err.failure, {
+          tags: { action: "cron", job: jobName },
+        });
+        return NextResponse.json({ error: "Internal error" }, { status: 500 });
+      }
       console.error(`[cron ${jobName}]`, err);
       Sentry.captureException(err, { tags: { action: "cron", job: jobName } });
       // Best-effort: a failed alert must not mask the real 500.
