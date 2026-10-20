@@ -1,4 +1,5 @@
 import "server-only";
+import * as Sentry from "@sentry/nextjs";
 
 // Sentry's free plan has no native Slack/webhook alerting (that requires
 // the paid Team tier, confirmed by the "Alert Rule Action" toggle being
@@ -24,6 +25,26 @@ const API = "https://sentry.io/api/0";
 // never actually terminates); at 100/page this is 500 issues in one poll,
 // far beyond anything this project should ever see in a 15-minute window.
 const MAX_PAGES = 5;
+
+// Sentry's API gateway occasionally answers a single request "too many
+// requests" when this job is nowhere near any limit (one request every 15
+// minutes; NURSEDEX-SITE-H, 2026-10-19). One retry absorbs that blip, and a
+// second refusal still throws so a real outage alerts on its first run. The
+// retry is one per run, not per page, so the single capped wait is the most
+// this can add to the route's 60 second maxDuration.
+const RETRYABLE_STATUS = (status: number) => status === 429 || status >= 500;
+const DEFAULT_RETRY_DELAY_MS = 2_000;
+const MAX_RETRY_DELAY_MS = 10_000;
+
+function retryDelayMs(retryAfter: string | null): number {
+  const seconds = retryAfter === null ? NaN : Number(retryAfter);
+  if (!Number.isFinite(seconds) || seconds < 0) return DEFAULT_RETRY_DELAY_MS;
+  return Math.min(seconds * 1000, MAX_RETRY_DELAY_MS);
+}
+
+function realSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface SentryIssue {
   id: string;
@@ -58,8 +79,12 @@ function nextCursor(linkHeader: string | null): string | null {
  * Issues currently needing review (new, regressed, or reoccurring),
  * excluding ones already alerted via the cron/Stripe-webhook paths.
  * Paginates until Sentry reports no further pages or MAX_PAGES is hit.
+ * The whole run gets one retry on a 429 or 5xx (see RETRYABLE_STATUS).
  */
-export async function getIssuesNeedingReview(): Promise<SentryIssue[]> {
+export async function getIssuesNeedingReview(
+  deps: { sleep?: (ms: number) => Promise<void> } = {},
+): Promise<SentryIssue[]> {
+  const sleep = deps.sleep ?? realSleep;
   const org = process.env.SENTRY_ORG;
   const project = process.env.SENTRY_PROJECT;
   if (!org || !project) {
@@ -68,6 +93,7 @@ export async function getIssuesNeedingReview(): Promise<SentryIssue[]> {
 
   const issues: SentryIssue[] = [];
   let cursor: string | null = null;
+  let retried = false;
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const url = new URL(`${API}/projects/${org}/${project}/issues/`);
@@ -76,7 +102,19 @@ export async function getIssuesNeedingReview(): Promise<SentryIssue[]> {
     url.searchParams.set("limit", "100");
     if (cursor) url.searchParams.set("cursor", cursor);
 
-    const res = await fetch(url.toString(), { headers: authHeaders() });
+    let res = await fetch(url.toString(), { headers: authHeaders() });
+    if (!retried && RETRYABLE_STATUS(res.status)) {
+      retried = true;
+      // Counted, not just absorbed (L77): blips growing common should show
+      // as a rising count here before they turn into pages. Tagged cron so
+      // NEEDS_REVIEW_QUERY keeps it out of the relay it would otherwise feed.
+      Sentry.captureMessage(
+        `Sentry issues fetch refused with ${res.status}, retrying once`,
+        { level: "warning", tags: { action: "cron", job: "sentry-alerts" } },
+      );
+      await sleep(retryDelayMs(res.headers.get("retry-after")));
+      res = await fetch(url.toString(), { headers: authHeaders() });
+    }
     if (!res.ok) {
       throw new Error(
         `Sentry issues fetch failed: ${res.status} ${await res.text()}`,
