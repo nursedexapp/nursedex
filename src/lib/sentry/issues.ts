@@ -25,6 +25,25 @@ const API = "https://sentry.io/api/0";
 // far beyond anything this project should ever see in a 15-minute window.
 const MAX_PAGES = 5;
 
+// Sentry's API gateway occasionally answers a single request "too many
+// requests" when this job is nowhere near any limit (one request every 15
+// minutes; NURSEDEX-SITE-H, 2026-10-19). One retry absorbs that blip, and a
+// second refusal still throws so a real outage alerts on its first run. The
+// wait is capped well inside the route's 60 second maxDuration.
+const RETRYABLE_STATUS = (status: number) => status === 429 || status >= 500;
+const DEFAULT_RETRY_DELAY_MS = 2_000;
+const MAX_RETRY_DELAY_MS = 10_000;
+
+function retryDelayMs(retryAfter: string | null): number {
+  const seconds = retryAfter === null ? NaN : Number(retryAfter);
+  if (!Number.isFinite(seconds) || seconds < 0) return DEFAULT_RETRY_DELAY_MS;
+  return Math.min(seconds * 1000, MAX_RETRY_DELAY_MS);
+}
+
+function realSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export interface SentryIssue {
   id: string;
   // Sentry's human-readable reference (e.g. "NURSEDEX-SITE-6"). Referencing
@@ -58,8 +77,12 @@ function nextCursor(linkHeader: string | null): string | null {
  * Issues currently needing review (new, regressed, or reoccurring),
  * excluding ones already alerted via the cron/Stripe-webhook paths.
  * Paginates until Sentry reports no further pages or MAX_PAGES is hit.
+ * Each page gets one retry on a 429 or 5xx (see RETRYABLE_STATUS).
  */
-export async function getIssuesNeedingReview(): Promise<SentryIssue[]> {
+export async function getIssuesNeedingReview(
+  deps: { sleep?: (ms: number) => Promise<void> } = {},
+): Promise<SentryIssue[]> {
+  const sleep = deps.sleep ?? realSleep;
   const org = process.env.SENTRY_ORG;
   const project = process.env.SENTRY_PROJECT;
   if (!org || !project) {
@@ -76,7 +99,11 @@ export async function getIssuesNeedingReview(): Promise<SentryIssue[]> {
     url.searchParams.set("limit", "100");
     if (cursor) url.searchParams.set("cursor", cursor);
 
-    const res = await fetch(url.toString(), { headers: authHeaders() });
+    let res = await fetch(url.toString(), { headers: authHeaders() });
+    if (RETRYABLE_STATUS(res.status)) {
+      await sleep(retryDelayMs(res.headers.get("retry-after")));
+      res = await fetch(url.toString(), { headers: authHeaders() });
+    }
     if (!res.ok) {
       throw new Error(
         `Sentry issues fetch failed: ${res.status} ${await res.text()}`,
