@@ -325,6 +325,23 @@ describe("getIssuesNeedingReview", () => {
       expect(err).toBeInstanceOf(Error);
       expect(err).not.toBeInstanceOf(SentryUnavailableError);
     });
+
+    // A rate limit that outlasts the retry may be our own over-use, so it is
+    // not announced as Sentry being down and still pages on every run.
+    it("does not mark a rate limit that outlasts the retry as Sentry being unavailable", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => refusal(429)),
+      );
+      const sleep = vi.fn(async (_ms: number) => {});
+
+      const { getIssuesNeedingReview, SentryUnavailableError } =
+        await import("./issues");
+      const err = await getIssuesNeedingReview({ sleep }).catch((e) => e);
+
+      expect(err.message).toMatch(/429/);
+      expect(err).not.toBeInstanceOf(SentryUnavailableError);
+    });
   });
 
   it("throws if SENTRY_AUTH_TOKEN is missing", async () => {

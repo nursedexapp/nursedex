@@ -110,20 +110,6 @@ const handleSentryAlerts = withCronAlerting(
       throw new CronFailureHandled(err);
     }
 
-    const recovered = recoveryMessage({ lastSuccessAt, now });
-    if (recovered) {
-      // Best effort: the run's real work matters more than this line.
-      await slackPost("chat.postMessage", {
-        channel: ALERTS_CHANNEL_ID,
-        text: recovered,
-      }).catch((slackErr) => {
-        console.error("[cron sentry-alerts] recovery note failed:", slackErr);
-        Sentry.captureException(slackErr, {
-          tags: { action: "cron", job: JOB_NAME },
-        });
-      });
-    }
-
     // A failed read is NOT "nothing has been alerted yet" (#847). It empties
     // the dedup set, so every issue already reported is reported again, and
     // the stale-cleanup below then deletes rows it should have kept.
@@ -203,6 +189,21 @@ const handleSentryAlerts = withCronAlerting(
         `[cron sentry-alerts] alert log cleanup skipped: ${cleanup.skipped}`,
         "warning",
       );
+    }
+
+    // Last, so "has caught up" is only said of a run that did all its work.
+    const recovered = recoveryMessage({ lastSuccessAt, now });
+    if (recovered) {
+      // Best effort: the run's work is done and must not fail over this line.
+      await slackPost("chat.postMessage", {
+        channel: ALERTS_CHANNEL_ID,
+        text: recovered,
+      }).catch((slackErr) => {
+        console.error("[cron sentry-alerts] recovery note failed:", slackErr);
+        Sentry.captureException(slackErr, {
+          tags: { action: "cron", job: JOB_NAME },
+        });
+      });
     }
 
     return NextResponse.json({

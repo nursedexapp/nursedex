@@ -43,8 +43,8 @@ function retryDelayMs(retryAfter: string | null): number {
 }
 
 /**
- * Sentry itself could not answer: a busy or server error that outlasted the
- * retry, or a connection that never got a reply. The route pages once per
+ * Sentry itself could not answer: a server error that outlasted the retry, or
+ * a connection that never got a reply. The route pages once per
  * outage for this rather than once per run, so it must stay distinct from a
  * failure that is ours to fix (a bad token, a missing setting), which still
  * pages every time.
@@ -149,7 +149,9 @@ export async function getIssuesNeedingReview(
     }
     if (!res.ok) {
       const message = `Sentry issues fetch failed: ${res.status} ${await res.text()}`;
-      if (RETRYABLE_STATUS(res.status)) {
+      // A 5xx only: a rate limit that outlasts the retry may be our own
+      // over-use, so it is not announced as Sentry being down.
+      if (res.status >= 500) {
         throw new SentryUnavailableError(message, res.status);
       }
       throw new Error(message);

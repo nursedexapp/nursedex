@@ -15,7 +15,13 @@ const h = vi.hoisted(() => {
     loggedRows: Array<{ issue_id: string }>;
     lastSuccessAt: string | null;
     heartbeatError: unknown;
-  } = { loggedRows: [], lastSuccessAt: null, heartbeatError: null };
+    logReadError: unknown;
+  } = {
+    loggedRows: [],
+    lastSuccessAt: null,
+    heartbeatError: null,
+    logReadError: null,
+  };
   // A stand in with the real one's shape, so the route's instanceof check is
   // exercised rather than mocked away.
   class SentryUnavailableError extends Error {
@@ -52,6 +58,8 @@ function builder() {
       // Served a page at a time out of the state, so the loop's exit
       // condition is exercised rather than stubbed away (#984).
       const start = from as number;
+      if (h.state.logReadError)
+        return { data: null, error: h.state.logReadError };
       return {
         data: h.state.loggedRows.slice(start, start + ALERT_LOG_PAGE),
         error: null,
@@ -114,6 +122,7 @@ beforeEach(() => {
   // The run before each test got through, unless a test says otherwise.
   h.state.lastSuccessAt = minutesAgo(15);
   h.state.heartbeatError = null;
+  h.state.logReadError = null;
   h.calls.insert = [];
   h.calls.deleteIn = [];
   h.calls.ranges = [];
@@ -442,6 +451,18 @@ describe("when Sentry itself is down", () => {
     expect(slackTexts()).toEqual([
       expect.stringContaining("working again after 45 minutes"),
     ]);
+  });
+
+  // "Has caught up" is a claim about the whole run, so it waits for the run.
+  it("does not say it is working again when the rest of the run fails", async () => {
+    h.state.lastSuccessAt = minutesAgo(45);
+    h.state.logReadError = { message: "supabase unavailable" };
+    h.getIssuesNeedingReview.mockResolvedValue([]);
+
+    const res = await GET(cronRequest());
+
+    expect(res.status).toBe(500);
+    expect(slackTexts().join("\n")).not.toContain("working again");
   });
 
   it("says nothing extra on an ordinary run", async () => {
