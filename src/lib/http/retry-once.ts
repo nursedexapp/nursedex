@@ -50,6 +50,8 @@ export async function fetchRetryingOnce(
   const first = await doFetch();
   if (!isRetryableStatus(first.status) || !mayRetry()) return first;
   onRetry?.(first);
+  // An unread body holds its connection until garbage collection.
+  await first.body?.cancel().catch(() => {});
   await sleep(retryDelayMs(first.headers.get("retry-after")));
   return doFetch();
 }

@@ -60,6 +60,18 @@ describe("fetchRetryingOnce", () => {
     expect(onRetry.mock.calls[0][0].status).toBe(500);
   });
 
+  it("releases the refused answer's body before asking again", async () => {
+    // An unread body holds its connection open until garbage collection.
+    const cancel = vi.fn();
+    let calls = 0;
+    const doFetch = async () =>
+      calls++ === 0
+        ? new Response(new ReadableStream({ cancel }), { status: 500 })
+        : answer(200);
+    await fetchRetryingOnce(doFetch, { sleep: async () => {} });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it("does not retry when the caller's retry budget is spent", async () => {
     const { doFetch, calls } = answers(500, 200);
     const res = await fetchRetryingOnce(doFetch, {

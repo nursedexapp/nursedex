@@ -83,19 +83,35 @@ describe("createGitHubGet", () => {
 // Four scripts each carried a hand-written copy of this GET, and none retried,
 // so fixing one would have left three that fail on the same blip (L613). Any
 // new script reading the GitHub API goes through the shared one.
+//
+// Any mention of the API host counts, not only a literal fetch of it, so a URL
+// built in a variable is caught too (L96).
+const EXEMPT: Record<string, string> = {
+  "github-get.ts": "the shared read itself",
+  // Shares one request() with a Vercel promote POST, whose retry safety has
+  // not been checked yet.
+  "promote-transport.ts": "#1230",
+};
+
 describe("GitHub API reads in scripts/", () => {
   it("all go through createGitHubGet", () => {
     const dir = join(process.cwd(), "scripts");
     const offenders = readdirSync(dir)
-      .filter(
-        (f) =>
-          f.endsWith(".ts") && !f.endsWith(".test.ts") && f !== "github-get.ts",
-      )
+      .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
+      .filter((f) => !(f in EXEMPT))
       .filter((f) =>
-        /fetch\(\s*`https:\/\/api\.github\.com/.test(
-          readFileSync(join(dir, f), "utf8"),
-        ),
+        readFileSync(join(dir, f), "utf8").includes("api.github.com"),
       );
     expect(offenders).toEqual([]);
+  });
+
+  it("exempts only files that still mention the API", () => {
+    // An exemption outliving its reason hides the next copy in that file.
+    const dir = join(process.cwd(), "scripts");
+    for (const file of Object.keys(EXEMPT)) {
+      expect(readFileSync(join(dir, file), "utf8"), file).toContain(
+        "api.github.com",
+      );
+    }
   });
 });
