@@ -21,6 +21,7 @@ import {
   type PrRecord,
 } from "./stale-prs";
 import { announce } from "./slack-alert";
+import { createGitHubGet } from "./github-get";
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "";
 const TOKEN = process.env.GITHUB_TOKEN ?? "";
@@ -45,23 +46,7 @@ export interface CheckRunsResponse {
 /** The one GitHub read, injected everywhere below so the shapes can be tested. */
 export type ApiFn = <T>(path: string) => Promise<T>;
 
-async function api<T>(path: string): Promise<T> {
-  const res = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${TOKEN}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `GitHub API ${res.status} ${res.statusText} for ${path}` +
-        (body ? `: ${body.slice(0, 200)}` : ""),
-    );
-  }
-  return (await res.json()) as T;
-}
+const api = createGitHubGet(TOKEN);
 
 /**
  * Every open pull request, paged.

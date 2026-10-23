@@ -75,6 +75,20 @@ describe("the annotation titles", () => {
     expect(titles.length).toBe(3);
     expect(new Set(titles)).toEqual(new Set(["mergedTreeProof"]));
   });
+
+  // The counter reads only push runs for the proof because the proof step only
+  // runs on a push. If the step ever runs on pull requests too, the counter
+  // must start reading them, so the two are tied here.
+  it("the proof is read from the same event the proof step runs on", () => {
+    const CI = read(".github/workflows/ci.yml");
+    const step = CI.slice(CI.indexOf("- name: Check the merged tree proof"));
+    expect(step.slice(0, step.indexOf("run:"))).toMatch(
+      /if: github\.event_name == 'push'/,
+    );
+    expect(READER).toMatch(
+      /ANNOTATION_TITLES\.mergedTreeProof,\s*RUNS_TO_READ,\s*\{\s*event:\s*"push"\s*\}/,
+    );
+  });
 });
 
 describe("the CI Health workflow", () => {

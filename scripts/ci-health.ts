@@ -144,20 +144,37 @@ export async function findAnnotation(
   return null;
 }
 
-/** What each of the most recent completed runs of `workflow` reported. */
+/** GitHub's largest page of runs. */
+const FULL_PAGE = 100;
+
+/**
+ * What each of the most recent completed runs of `workflow` reported.
+ *
+ * With `event`, only runs of that event are read, up to `limit`, for a signal
+ * that only one event can emit. They are picked from a full page of the
+ * unfiltered list rather than asked for with `event=`, because GitHub's
+ * filtered run lists have answered from a stale index (#1140).
+ */
 export async function collectOutcomes(
   api: Api,
   repo: string,
   workflow: string,
   title: string,
   limit: number,
+  options: { event?: string } = {},
 ): Promise<RunOutcome[]> {
+  const { event } = options;
   const runs = (await api(
-    `/repos/${repo}/actions/workflows/${workflow}/runs?status=completed&per_page=${limit}`,
-  )) as { workflow_runs: Array<{ id: number }> };
+    `/repos/${repo}/actions/workflows/${workflow}/runs?status=completed` +
+      `&per_page=${event ? FULL_PAGE : limit}`,
+  )) as { workflow_runs: Array<{ id: number; event?: string }> };
+
+  const chosen = event
+    ? runs.workflow_runs.filter((run) => run.event === event).slice(0, limit)
+    : runs.workflow_runs;
 
   const outcomes: RunOutcome[] = [];
-  for (const run of runs.workflow_runs) {
+  for (const run of chosen) {
     outcomes.push({ runId: run.id, value: await findAnnotation(api, repo, run.id, title) });
   }
   return outcomes;

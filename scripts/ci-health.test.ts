@@ -190,6 +190,31 @@ describe("collectOutcomes", () => {
     expect(out).toHaveLength(2);
     expect(out.every((o) => o.runId > 0)).toBe(true);
   });
+
+  // The proof only runs on a push to main, so of the last 20 CI runs only about
+  // 5 could report. One GitHub 500 in those 5 was 20% and failed CI Health on
+  // 2026-10-19. Reading the last N PUSH runs keeps the denominator at N.
+  it("given an event, judges the newest runs of that event up to the limit", async () => {
+    const asked: string[] = [];
+    const listed = Array.from({ length: 12 }, (_, i) => ({
+      id: i + 1,
+      event: i % 3 === 0 ? "push" : "pull_request",
+    }));
+    const api = async (path: string) => {
+      asked.push(path);
+      if (path.includes("/runs?")) return { workflow_runs: listed };
+      if (path.includes("/jobs")) return { jobs: [] };
+      return [];
+    };
+    const out = await collectOutcomes(api, "o/r", "ci.yml", "T", 3, { event: "push" });
+    expect(out.map((o) => o.runId)).toEqual([1, 4, 7]);
+    // A full page, so enough pushes are in view, and not GitHub's event filter,
+    // which has answered from a stale index (#1140).
+    expect(asked[0]).toContain("per_page=100");
+    expect(asked[0]).not.toContain("event=");
+    // Pull request runs are never read, so they cannot count as silent.
+    expect(asked.filter((p) => p.includes("/jobs"))).toHaveLength(3);
+  });
 });
 
 describe("flakedInRun", () => {

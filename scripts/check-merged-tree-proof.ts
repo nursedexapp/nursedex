@@ -12,6 +12,7 @@ import { proveMergedTree, type ProofFacts } from "./merged-tree-proof";
 import { gatherProofFacts, type GetJson } from "./merged-tree-proof-facts";
 import { appendFileSync } from "node:fs";
 import { ANNOTATION_TITLES } from "./ci-annotations";
+import { createGitHubGet } from "./github-get";
 
 export type RunOptions = {
   gather: () => Promise<ProofFacts>;
@@ -134,26 +135,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const getJson: GetJson = async (path) => {
-    const response = await fetch(`https://api.github.com${path}`, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    });
-    if (!response.ok) {
-      // The body is the diagnosis when there is one, but a HEAD-like empty
-      // body must not read as "no information" (L520), so the status is always
-      // part of the message.
-      const body = await response.text().catch(() => "");
-      throw new Error(
-        `GitHub API ${response.status} ${response.statusText} for ${path}` +
-          (body ? `: ${body.slice(0, 300)}` : ""),
-      );
-    }
-    return response.json();
-  };
+  const getJson: GetJson = createGitHubGet(token as string);
 
   await runProofCheck({
     gather: () =>
