@@ -41,29 +41,14 @@ import {
   type AnnouncedState,
 } from "./scheduled-jobs";
 import { announce } from "./slack-alert";
+import { createGitHubGet } from "./github-get";
 
 const WORKFLOW_DIR = join(".github", "workflows");
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "";
 const TOKEN = process.env.GITHUB_TOKEN ?? "";
 
-async function api<T>(path: string): Promise<T> {
-  const response = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${TOKEN}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `GitHub API ${response.status} ${response.statusText} for ${path}` +
-        (body ? `: ${body.slice(0, 200)}` : ""),
-    );
-  }
-  return (await response.json()) as T;
-}
+const api = createGitHubGet(TOKEN);
 
 /**
  * Every scheduled workflow plus every Vercel cron, ready to be judged.

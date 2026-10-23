@@ -20,14 +20,16 @@ import {
   type NamedRate,
 } from "./ci-health";
 import { ANNOTATION_TITLES } from "./ci-annotations";
+import { createGitHubGet } from "./github-get";
 
 const REPO = process.env.GITHUB_REPOSITORY ?? "";
 const TOKEN = process.env.GITHUB_TOKEN ?? "";
 
 /**
- * How many recent runs to read. Twenty is about two weeks of merges here, long
- * enough for a rate to mean something and short enough that a fault fixed last
- * week stops being reported.
+ * How many recent runs to read. Twenty is about two weeks of E2E runs, or
+ * about three weeks of pushes for the proof, long enough for a rate to mean
+ * something and short enough that a fault fixed last month stops being
+ * reported.
  */
 const RUNS_TO_READ = 20;
 
@@ -41,31 +43,18 @@ const FLAKE_THRESHOLD = 0.4;
 
 /**
  * The proof should essentially always be evaluable. It was 100% unavailable
- * while the token lacked pull-requests:read, and 0% since. Anything above a
- * tenth means it is breaking, not merely unlucky.
+ * while the token lacked pull-requests:read, and almost never since: measured
+ * 2026-10-23 over the 32 pushes since 2026-09-14, 31 held and 1 was
+ * unavailable (a single GitHub 500, which the read now retries). Over 20 push
+ * runs a tenth allows two such blips and fails on the third, so one bad day
+ * cannot fire it and a breaking lookup still does within a few merges.
  */
 const PROOF_UNAVAILABLE_THRESHOLD = 0.1;
 
 /** Below this many reporting runs a proportion is noise, so it is not judged. */
 const MINIMUM_RUNS = 5;
 
-const api: Api = async (path) => {
-  const response = await fetch(`https://api.github.com${path}`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${TOKEN}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `GitHub API ${response.status} ${response.statusText} for ${path}` +
-        (body ? `: ${body.slice(0, 200)}` : ""),
-    );
-  }
-  return response.json();
-};
+const api: Api = createGitHubGet(TOKEN);
 
 async function main(): Promise<void> {
   if (!REPO || !TOKEN) {
@@ -82,7 +71,18 @@ async function main(): Promise<void> {
   );
 
   const proof = rateOf(
-    await collectOutcomes(api, REPO, "ci.yml", ANNOTATION_TITLES.mergedTreeProof, RUNS_TO_READ),
+    // Push runs only: the proof step runs only on a push to main, so a pull
+    // request run is silent by construction and only shrank the denominator.
+    // Over the last 20 runs of any kind that left about 5, where one GitHub
+    // 500 was 20% and failed this job on 2026-10-19.
+    await collectOutcomes(
+      api,
+      REPO,
+      "ci.yml",
+      ANNOTATION_TITLES.mergedTreeProof,
+      RUNS_TO_READ,
+      { event: "push" },
+    ),
     {
       isBad: proofWasUnavailable,
       threshold: PROOF_UNAVAILABLE_THRESHOLD,
