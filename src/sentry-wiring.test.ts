@@ -84,6 +84,13 @@ describe("Sentry wiring (#394, #395, #400)", () => {
     expect(source).toMatch(/denyUrls:\s*IGNORED_BROWSER_FRAME_URLS/);
   });
 
+  // Whether a Deno stack is really dropped is asserted in
+  // ignored-browser-errors.test.ts; this checks the SDK is handed the check.
+  it("drops events from a page run inside Deno, not a browser (NURSEDEX-SITE-18)", () => {
+    const source = read("src/instrumentation-client.ts");
+    expect(source).toMatch(/beforeSend:\s*dropNonBrowserRuntimeEvents/);
+  });
+
   it("does not record replays before consent: replay is not in Sentry.init", () => {
     const source = read("src/instrumentation-client.ts");
     const start = source.indexOf("Sentry.init(");

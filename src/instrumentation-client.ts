@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/nextjs";
 import {
   IGNORED_BROWSER_ERRORS,
   IGNORED_BROWSER_FRAME_URLS,
+  dropNonBrowserRuntimeEvents,
 } from "@/lib/sentry/ignored-browser-errors";
 import { analyticsAllowed } from "@/lib/consent/store";
 import { startSentryReplay } from "@/lib/consent/sentry-replay";
@@ -32,6 +33,9 @@ Sentry.init({
   // is how an in-app browser's injected script is told from our own code when
   // the message alone cannot do it (NURSEDEX-SITE-12).
   denyUrls: IGNORED_BROWSER_FRAME_URLS,
+  // Errors from a program running our page inside Deno rather than a browser,
+  // told by a Deno runtime frame anywhere in the stack (NURSEDEX-SITE-18).
+  beforeSend: dropNonBrowserRuntimeEvents,
 });
 
 // Replay records the session, so it waits for consent like PostHog. A visitor

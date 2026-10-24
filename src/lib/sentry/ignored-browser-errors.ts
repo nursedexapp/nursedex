@@ -56,3 +56,40 @@ export const IGNORED_BROWSER_ERRORS: RegExp[] = [
  * in-app browser; `app://` with an EMPTY host is Sentry relabelling us.
  */
 export const IGNORED_BROWSER_FRAME_URLS: RegExp[] = [/^app:\/\/(?!\/)/];
+
+// Only the fields read, so the event type of either bundled copy of
+// @sentry/core fits (@sentry/nextjs carries its own).
+type StackedEvent = {
+  exception?: {
+    values?: { stacktrace?: { frames?: { filename?: string }[] } }[];
+  };
+};
+
+/**
+ * Drops an event whose stack passes through the Deno runtime's own modules,
+ * which Deno loads from an `ext:` specifier (`ext:core/01_core.js`). No
+ * browser has such a frame, so the event came from a program running our page
+ * outside one, under a borrowed Chrome user agent.
+ *
+ * NURSEDEX-SITE-18 was one: a crawler fetched the homepage and its links,
+ * then crashed inside Next's server action handling because its fetch
+ * returned a Response with no `body`, something a browser's fetch never does.
+ * Across the 70 events Sentry held on 2026-10-24 it was the only one with an
+ * `ext:` frame; ours carry `app:///`, `src/` and `node:` frames.
+ *
+ * This cannot be a denyUrls entry. Sentry reads that against the THROWING
+ * frame only, which here is a nameless `<script>`, so the Deno frames
+ * beneath it are never consulted. Every frame of every exception is read
+ * instead. A nameless `<script>` alone is not enough to drop on, because it
+ * proves nothing we can name.
+ */
+export function dropNonBrowserRuntimeEvents<T extends StackedEvent>(
+  event: T,
+): T | null {
+  const fromDeno = (event.exception?.values ?? []).some((exception) =>
+    (exception.stacktrace?.frames ?? []).some((frame) =>
+      frame.filename?.startsWith("ext:"),
+    ),
+  );
+  return fromDeno ? null : event;
+}

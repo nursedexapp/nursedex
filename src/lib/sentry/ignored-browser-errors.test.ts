@@ -3,6 +3,7 @@ import { eventFiltersIntegration, type Event } from "@sentry/core";
 import {
   IGNORED_BROWSER_ERRORS,
   IGNORED_BROWSER_FRAME_URLS,
+  dropNonBrowserRuntimeEvents,
 } from "./ignored-browser-errors";
 
 /**
@@ -194,5 +195,134 @@ describe("the recorded SITE-12 event, verbatim", () => {
     const noDenyList = eventFiltersIntegration({ denyUrls: [] });
 
     expect(noDenyList.processEvent!(recorded, {}, client)).not.toBeNull();
+  });
+});
+
+/**
+ * NURSEDEX-SITE-18, 2026-10-24. `TypeError: Cannot read properties of
+ * undefined (reading 'getReader')`, one event, 0 users, from a client calling
+ * itself Chrome 145 on Windows. It was not a browser. The bottom of its stack
+ * is `ext:core/01_core.js eventLoopTick`, the event loop of the Deno runtime,
+ * and every frame of ours is a nameless `<script>`, where a real browser's
+ * reads `app:///_next/static/...` after Sentry relabels it. Something running
+ * our page inside Deno answered a server action's fetch with a Response that
+ * had no `body` property at all, which a browser's fetch never does (it is a
+ * stream or null).
+ *
+ * Copied from Sentry event a2d04ddb6da841ffaae517e8af068381, frames oldest
+ * first as the SDK sends them (L48).
+ */
+const site18: Event = {
+  exception: {
+    values: [
+      {
+        type: "TypeError",
+        value: "Cannot read properties of undefined (reading 'getReader')",
+        stacktrace: {
+          frames: [
+            {
+              filename: "ext:core/01_core.js",
+              function: "eventLoopTick",
+              lineno: 178,
+              colno: 7,
+            },
+            { filename: "ext:core/01_core.js", lineno: 294, colno: 9 },
+            { filename: "<script>", lineno: 1, colno: 100633 },
+            { filename: "<script>", function: "xm", lineno: 1, colno: 98865 },
+            { filename: "<script>", lineno: 2, colno: 24698 },
+            { filename: "<script>", function: "ep", lineno: 2, colno: 21450 },
+          ],
+        },
+        mechanism: {
+          type: "auto.browser.global_handlers.onunhandledrejection",
+          handled: false,
+        },
+      },
+    ],
+  },
+};
+
+function withFrames(...filenames: string[]): Event {
+  return {
+    exception: {
+      values: [
+        {
+          type: "TypeError",
+          value: "Cannot read properties of undefined (reading 'getReader')",
+          stacktrace: { frames: filenames.map((filename) => ({ filename })) },
+        },
+      ],
+    },
+  };
+}
+
+describe("events from a page run inside Deno, not a browser (NURSEDEX-SITE-18)", () => {
+  it("is not caught by the frame deny list, which reads only the throwing frame", () => {
+    // Why this needs its own check: Sentry's denyUrls reads the LAST frame,
+    // here a `<script>`, so the Deno frames below it are never consulted.
+    const both = eventFiltersIntegration({
+      ignoreErrors: IGNORED_BROWSER_ERRORS,
+      denyUrls: IGNORED_BROWSER_FRAME_URLS,
+    });
+
+    expect(both.processEvent!(site18, {}, client)).not.toBeNull();
+  });
+
+  it("drops the recorded SITE-18 event", () => {
+    expect(dropNonBrowserRuntimeEvents(site18)).toBeNull();
+  });
+
+  it("drops a Deno frame anywhere in the stack, not only at the bottom", () => {
+    expect(
+      dropNonBrowserRuntimeEvents(
+        withFrames("<script>", "ext:deno_fetch/26_fetch.js", "<script>"),
+      ),
+    ).toBeNull();
+  });
+
+  it("drops a Deno frame in a chained cause, not only the first exception", () => {
+    const chained: Event = {
+      exception: {
+        values: [
+          ...withFrames("app:///_next/static/chunks/main-app-abc123.js")
+            .exception!.values!,
+          ...site18.exception!.values!,
+        ],
+      },
+    };
+
+    expect(dropNonBrowserRuntimeEvents(chained)).toBeNull();
+  });
+
+  it("keeps our own bundle as @sentry/nextjs relabels it", () => {
+    const ours = withFrames(
+      "app:///_next/static/chunks/main-app-abc123.js",
+      "app:///_next/static/chunks/4bd1b696-def456.js",
+    );
+
+    expect(dropNonBrowserRuntimeEvents(ours)).toBe(ours);
+  });
+
+  it("keeps a stack of nameless scripts with no Deno frame", () => {
+    // `<script>` alone is not proof of anything we can name, so it reports.
+    const anonymous = withFrames("<script>", "<script>");
+
+    expect(dropNonBrowserRuntimeEvents(anonymous)).toBe(anonymous);
+  });
+
+  it("keeps a file of ours whose name merely contains ext:", () => {
+    const lookalike = withFrames("app:///_next/static/chunks/text:core.js");
+
+    expect(dropNonBrowserRuntimeEvents(lookalike)).toBe(lookalike);
+  });
+
+  it("keeps an event with no stack, and one with no exception", () => {
+    const noStack = withFrames();
+    const message: Event = {
+      message: "CSP violation: script-src blocked eval",
+    };
+
+    expect(dropNonBrowserRuntimeEvents(noStack)).toBe(noStack);
+    expect(dropNonBrowserRuntimeEvents(message)).toBe(message);
   });
 });
