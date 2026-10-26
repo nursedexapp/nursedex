@@ -2,8 +2,10 @@ import * as Sentry from "@sentry/nextjs";
 import {
   IGNORED_BROWSER_ERRORS,
   IGNORED_BROWSER_FRAME_URLS,
-  dropNonBrowserRuntimeEvents,
+  dropEventsNotFromOurCode,
 } from "@/lib/sentry/ignored-browser-errors";
+import { installTranslationGuard } from "@/lib/dom/translation-guard";
+import { createTranslationGuardReporter } from "@/lib/sentry/translation-guard-report";
 import { analyticsAllowed } from "@/lib/consent/store";
 import { startSentryReplay } from "@/lib/consent/sentry-replay";
 import { tracesSampleRateFor } from "@/lib/sentry/traces-sample-rate";
@@ -34,9 +36,17 @@ Sentry.init({
   // the message alone cannot do it (NURSEDEX-SITE-12).
   denyUrls: IGNORED_BROWSER_FRAME_URLS,
   // Errors from a program running our page inside Deno rather than a browser,
-  // told by a Deno runtime frame anywhere in the stack (NURSEDEX-SITE-18).
-  beforeSend: dropNonBrowserRuntimeEvents,
+  // told by a Deno runtime frame anywhere in the stack (NURSEDEX-SITE-18), and
+  // from a script a host app injected into the page, told by every frame
+  // sitting on the document with none from our bundle (NURSEDEX-SITE-1B).
+  beforeSend: dropEventsNotFromOurCode,
 });
+
+// Keeps the page working when the browser has machine translated it, which
+// otherwise crashes React's next update of the translated text (#1240). It
+// runs here, before the app's own code starts, so it is in place before React
+// first touches the DOM.
+installTranslationGuard(createTranslationGuardReporter());
 
 // Replay records the session, so it waits for consent like PostHog. A visitor
 // who accepted on an earlier visit gets it from the first frame; one who

@@ -1,6 +1,7 @@
 import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { fetchRetryingOnce, realSleep } from "@/lib/http/retry-once";
+import { TRANSLATION_GUARD_TAG } from "@/lib/sentry/translation-guard-report";
 
 // Sentry's free plan has no native Slack/webhook alerting (that requires
 // the paid Team tier, confirmed by the "Alert Rule Action" toggle being
@@ -17,8 +18,9 @@ import { fetchRetryingOnce, realSleep } from "@/lib/http/retry-once";
 // value, so an issue that has ever held an error answers `level:[error,fatal]`
 // for ever, and grouping keys on the stack trace, so rewording a message does
 // not start a fresh group either.
-export const NEEDS_REVIEW_QUERY =
-  "is:for_review level:[error,fatal] !action:cron !action:stripe-webhook";
+// The translation guard's reports are left out the same way (#1240): each one
+// is a page that kept working, counted in Sentry rather than paged.
+export const NEEDS_REVIEW_QUERY = `is:for_review level:[error,fatal] !action:cron !action:stripe-webhook !${TRANSLATION_GUARD_TAG.key}:${TRANSLATION_GUARD_TAG.value}`;
 
 const API = "https://sentry.io/api/0";
 

@@ -93,3 +93,51 @@ export function dropNonBrowserRuntimeEvents<T extends StackedEvent>(
   );
   return fromDeno ? null : event;
 }
+
+/**
+ * A frame on the page document itself, after @sentry/nextjs relabels our
+ * origin to `app:///`: the document's own path rather than a file under
+ * `/_next/`, which is where every line of our code is served from.
+ */
+const DOCUMENT_FRAME = /^app:\/\/\/(?!_next\/)/;
+
+/** The browser's own frames, which sit in any stack that calls into it. */
+const NATIVE_FRAME = "[native code]";
+
+/**
+ * Drops an event whose every frame sits on the page document itself, with no
+ * frame from our bundle or from any script we load (#1240).
+ *
+ * NURSEDEX-SITE-1B was one: a stack overflow in functions `Fk` and `Hk` at
+ * lines 193 to 229 of the homepage, from the Google app on an iPhone with the
+ * page translated. Our HTML is a single line and runs none of our code, so
+ * the only thing that can throw from deep inside it is a script the host app
+ * injected, which the browser files under the page's own address.
+ *
+ * The deny list cannot do this. A document frame has the same empty host that
+ * marks our own bundle, which IGNORED_BROWSER_FRAME_URLS must keep, so only
+ * the PATH tells them apart, and only by reading every frame: one frame from
+ * `/_next/` anywhere in the stack keeps the event, since then our code was
+ * involved. What this would also drop is an exception from an inline script
+ * of ours; ours are Next's payload pushes and JSON-LD, which do not throw.
+ */
+export function dropHostInjectedScriptEvents<T extends StackedEvent>(
+  event: T,
+): T | null {
+  const filenames = (event.exception?.values ?? [])
+    .flatMap((exception) => exception.stacktrace?.frames ?? [])
+    .map((frame) => frame.filename)
+    .filter((name): name is string => !!name && name !== NATIVE_FRAME);
+  const injected =
+    filenames.length > 0 &&
+    filenames.every((name) => DOCUMENT_FRAME.test(name));
+  return injected ? null : event;
+}
+
+/** The browser's beforeSend: every check for an event that is not ours. */
+export function dropEventsNotFromOurCode<T extends StackedEvent>(
+  event: T,
+): T | null {
+  const kept = dropNonBrowserRuntimeEvents(event);
+  return kept && dropHostInjectedScriptEvents(kept);
+}
