@@ -86,9 +86,18 @@ describe("Sentry wiring (#394, #395, #400)", () => {
 
   // Whether a Deno stack is really dropped is asserted in
   // ignored-browser-errors.test.ts; this checks the SDK is handed the check.
-  it("drops events from a page run inside Deno, not a browser (NURSEDEX-SITE-18)", () => {
+  it("drops events from a page run inside Deno or a host app's injected script (NURSEDEX-SITE-18, NURSEDEX-SITE-1B)", () => {
     const source = read("src/instrumentation-client.ts");
-    expect(source).toMatch(/beforeSend:\s*dropNonBrowserRuntimeEvents/);
+    expect(source).toMatch(/beforeSend:\s*dropEventsNotFromOurCode/);
+  });
+
+  // That the guard keeps a translated page alive is proved in the browser by
+  // e2e/translated-page.spec.ts; this checks it is installed, and reported.
+  it("installs the translation guard with its Sentry reporter (#1240)", () => {
+    const source = read("src/instrumentation-client.ts");
+    expect(source).toMatch(
+      /installTranslationGuard\(\s*createTranslationGuardReporter\(\)\s*\)/,
+    );
   });
 
   it("does not record replays before consent: replay is not in Sentry.init", () => {

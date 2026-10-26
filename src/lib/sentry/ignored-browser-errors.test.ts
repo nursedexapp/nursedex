@@ -4,6 +4,8 @@ import {
   IGNORED_BROWSER_ERRORS,
   IGNORED_BROWSER_FRAME_URLS,
   dropNonBrowserRuntimeEvents,
+  dropHostInjectedScriptEvents,
+  dropEventsNotFromOurCode,
 } from "./ignored-browser-errors";
 
 /**
@@ -324,5 +326,134 @@ describe("events from a page run inside Deno, not a browser (NURSEDEX-SITE-18)",
 
     expect(dropNonBrowserRuntimeEvents(noStack)).toBe(noStack);
     expect(dropNonBrowserRuntimeEvents(message)).toBe(message);
+  });
+});
+
+/**
+ * NURSEDEX-SITE-1B, 2026-10-25 (#1240). `RangeError: Maximum call stack size
+ * exceeded` on `/`, two events from one iPhone in the Google app with the page
+ * machine translated. Every one of its 50 frames sits on the page document
+ * itself (`app:///`, the homepage once @sentry/nextjs relabels it), at lines
+ * 193 to 229, in functions `Fk` and `Hk`. Our homepage HTML is a single line,
+ * measured the same day, and none of our code runs from it, so these are a
+ * script the Google app injected into the page and Sentry filed as ours (L477).
+ *
+ * Copied from Sentry event adc53251654141dfbeaef9ad2e88b564: its first four and
+ * last four frames, oldest first as the SDK sends them. The 42 between repeat
+ * the same Hk/Fk pair (L48).
+ */
+const site1b: Event = {
+  exception: {
+    values: [
+      {
+        type: "RangeError",
+        value: "Maximum call stack size exceeded.",
+        stacktrace: {
+          frames: [
+            { filename: "app:///", function: "Hk", lineno: 229, colno: 409 },
+            { filename: "app:///", function: "Fk", lineno: 229, colno: 63 },
+            { filename: "app:///", function: "Hk", lineno: 229, colno: 409 },
+            { filename: "app:///", function: "Fk", lineno: 229, colno: 63 },
+            { filename: "app:///", function: "Hk", lineno: 229, colno: 383 },
+            { filename: "app:///", lineno: 201, colno: 201 },
+            { filename: "app:///", lineno: 193, colno: 41 },
+            { filename: "app:///", lineno: 200, colno: 363 },
+          ],
+        },
+        mechanism: {
+          type: "auto.browser.global_handlers.onerror",
+          handled: false,
+        },
+      },
+    ],
+  },
+};
+
+describe("errors thrown by a script the host app injected into the page (NURSEDEX-SITE-1B)", () => {
+  it("is not caught by the frame deny list, which keeps an empty host on purpose", () => {
+    // `app:///` with no host is what Sentry makes of OUR origin, so the deny
+    // list must never match it (see IGNORED_BROWSER_FRAME_URLS).
+    const both = eventFiltersIntegration({
+      ignoreErrors: IGNORED_BROWSER_ERRORS,
+      denyUrls: IGNORED_BROWSER_FRAME_URLS,
+    });
+
+    expect(both.processEvent!(site1b, {}, client)).not.toBeNull();
+  });
+
+  it("drops the recorded SITE-1B event", () => {
+    expect(dropHostInjectedScriptEvents(site1b)).toBeNull();
+  });
+
+  it("drops the same script injected into any other page", () => {
+    expect(
+      dropHostInjectedScriptEvents(
+        withFrames("app:///signup/confirm", "app:///signup/confirm"),
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps our own bundle as @sentry/nextjs relabels it", () => {
+    const ours = withFrames(
+      "app:///_next/static/immutable/chunks/43b-38h6lg4qq.js",
+      "app:///_next/static/immutable/chunks/43b-38h6lg4qq.js",
+    );
+
+    expect(dropHostInjectedScriptEvents(ours)).toBe(ours);
+  });
+
+  it("keeps a stack where the injected script and our bundle meet", () => {
+    // Our code called from their script, or theirs from ours: either way one
+    // frame is ours, so it reports. Erring this way costs an alert, the other
+    // way a crash nobody hears about.
+    const mixed = withFrames(
+      "app:///",
+      "app:///_next/static/chunks/main-app-abc123.js",
+      "app:///",
+    );
+
+    expect(dropHostInjectedScriptEvents(mixed)).toBe(mixed);
+  });
+
+  it("keeps a script we load from another origin", () => {
+    const thirdParty = withFrames(
+      "app:///",
+      "https://us-assets.i.posthog.com/static/array.js",
+    );
+
+    expect(dropHostInjectedScriptEvents(thirdParty)).toBe(thirdParty);
+  });
+
+  it("keeps a stack of native code, nameless scripts, or no frames", () => {
+    const native = withFrames("[native code]");
+    const anonymous = withFrames("<script>", "<script>");
+    const noStack = withFrames();
+
+    expect(dropHostInjectedScriptEvents(native)).toBe(native);
+    expect(dropHostInjectedScriptEvents(anonymous)).toBe(anonymous);
+    expect(dropHostInjectedScriptEvents(noStack)).toBe(noStack);
+  });
+
+  it("ignores native and nameless frames when judging the rest", () => {
+    // The browser's own frames sit in a stack wherever the script calls it.
+    expect(
+      dropHostInjectedScriptEvents(withFrames("app:///", "[native code]")),
+    ).toBeNull();
+  });
+
+  it("keeps an event with no exception", () => {
+    const message: Event = { message: "CSP violation" };
+
+    expect(dropHostInjectedScriptEvents(message)).toBe(message);
+  });
+});
+
+describe("the browser's beforeSend, which applies both checks", () => {
+  it("drops SITE-18 and SITE-1B and keeps our own crash", () => {
+    const ours = withFrames("app:///_next/static/chunks/main-app-abc123.js");
+
+    expect(dropEventsNotFromOurCode(site18)).toBeNull();
+    expect(dropEventsNotFromOurCode(site1b)).toBeNull();
+    expect(dropEventsNotFromOurCode(ours)).toBe(ours);
   });
 });
