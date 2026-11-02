@@ -50,12 +50,12 @@ jobs:
         uses: ./.github/actions/setup-tsx
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
-          version: latest
-          # Resolving "latest" hits the GitHub API; without a token it uses the
-          # unauthenticated 60/hr limit and intermittently fails.
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Pinned, never latest: CLI v3 broke the drift check the day it shipped
+          # (#408). Bump in every workflow at once; scripts/supabase-cli-pin.test.ts
+          # holds the version.
+          version: 2.122.0
 
       # Read-only. A missing secret makes the CLI fail, which fails the job,
       # rather than quietly reporting a healthy production nobody looked at.
