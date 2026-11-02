@@ -109,10 +109,11 @@ jobs:
         if: steps.proof.outputs.proven != 'true'
         run: npm ci
 
-      # Migration 042 adds explicit Data API GRANTs for anon/authenticated/
-      # service_role, so we track the latest CLI again. (v2.106.0 stopped
-      # auto-exposing public tables, which broke every query with "permission
-      # denied" until those grants landed. See issue #354.)
+      # The CLI is pinned and bumped on purpose, by pull request. Twice an
+      # unpinned "latest" broke CI the day a release shipped: v2.106.0 stopped
+      # auto-exposing public tables, so every query failed with "permission
+      # denied" until migration 042 added explicit grants (#354), and v3.0.0
+      # rejected config.toml and broke the drift check (#408).
       - name: Setup Supabase CLI
         if: steps.proof.outputs.proven != 'true'
         uses: supabase/setup-cli@v3
@@ -140,8 +141,9 @@ jobs:
       # on a runner. Storage stays, for nurse photos and blog images.
       #
       # --exclude is a cobra string slice and silently ignores a name it does
-      # not know, so a typo, or a service renamed in a later CLI (this job
-      # tracks `latest`), would exclude nothing, cost the same 115 seconds, and
+      # not know, so a typo, or a service renamed by a CLI bump (the version
+      # is pinned, but a deliberate bump can still rename one), would exclude
+      # nothing, cost the same 115 seconds, and
       # look exactly like this working.
       #
       # So the exclusions are checked by what ends up RUNNING, after the fact,
