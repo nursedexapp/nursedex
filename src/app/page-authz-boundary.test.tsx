@@ -114,8 +114,8 @@ beforeEach(() => {
 // and requireSuperAdmin sends a plain admin to /admin.
 //
 // A layout is NOT the gate for the pages under it. This comment used to say it
-// was, and ten admin pages reading through the service role client relied on
-// it. A page renders alongside its layout, so its reads go out before the
+// was, and 14 admin pages relied on it, ten of them reading through the
+// service role client. A page renders alongside its layout, so its reads go out before the
 // layout redirects anybody, and a layout is not re-rendered on client
 // navigation at all (NURSEDEX-SITE-1D, 2026-11-10). Every admin page now calls
 // requireAdmin() itself, as its first await, which

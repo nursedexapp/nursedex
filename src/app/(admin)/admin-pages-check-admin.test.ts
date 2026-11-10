@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
  * Every admin page checks the role itself, before its first read.
  *
  * The admin layout calls requireAdmin(), and until 2026-11-10 that was the
- * only check on ten of these pages. A layout is not an auth boundary in this
+ * only check on 14 of these pages. A layout is not an auth boundary in this
  * version of Next: a page renders ALONGSIDE its layout, so the page's reads
  * start before the layout has redirected anybody, and a layout is not
  * re-rendered on client navigation at all
