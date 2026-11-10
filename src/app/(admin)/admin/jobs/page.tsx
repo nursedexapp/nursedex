@@ -14,7 +14,9 @@ export const dynamic = "force-dynamic";
 /**
  * Is everything running (#888).
  *
- * Guarded by (admin)/layout, like every other page in this section.
+ * Calls requireAdmin() itself as its first await, like every other page in
+ * this section: the layout's own check does not stop a page's reads, which
+ * go out alongside it (NURSEDEX-SITE-1D).
  *
  * The data comes from `job_heartbeats`, which every cron already writes, and
  * the staleness rule is the watchdog's own. If the read fails, getJobHealth
