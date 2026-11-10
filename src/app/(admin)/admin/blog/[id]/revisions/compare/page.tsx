@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { getRevision } from "@/lib/blog/revisions";
 import { diffRevisions } from "@/lib/blog/revision-diff";
 import { RevisionDiffView } from "@/components/admin/RevisionDiffView";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Compare revisions | NurseDex Admin",
@@ -30,6 +31,7 @@ export default async function ComparePage({
   params,
   searchParams,
 }: ComparePageProps) {
+  await requireAdmin();
   const { id } = await params;
   const { from: fromId, to: toId } = await searchParams;
   if (!fromId || !toId) notFound();

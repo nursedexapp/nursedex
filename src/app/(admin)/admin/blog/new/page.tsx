@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PostEditorForm } from "@/components/blog/PostEditorForm";
 import { getCategories, getTags } from "@/lib/blog/queries";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "New post | NurseDex Admin",
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function NewBlogPostPage() {
+  await requireAdmin();
   const [categories, allTags] = await Promise.all([getCategories(), getTags()]);
   return (
     <div className="mx-auto w-full max-w-3xl p-6 sm:p-8">

@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getDisputedReviews } from "@/lib/admin/queries";
 import { AdminReviewCard } from "@/components/admin/AdminReviewCard";
 import { DisputeDecisionDialog } from "@/components/admin/DisputeDecisionDialog";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Disputes | NurseDex Admin",
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminDisputesPage() {
+  await requireAdmin();
   const rows = await getDisputedReviews();
 
   return (

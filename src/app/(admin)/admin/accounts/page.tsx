@@ -12,6 +12,7 @@ import {
 } from "@/lib/admin/accounts-view";
 import { AccountRowActions } from "@/components/admin/AccountRowActions";
 import { MASK_PII } from "@/components/ui/private";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Accounts | NurseDex Admin",
@@ -25,6 +26,7 @@ interface AccountsPageProps {
 export default async function AdminAccountsPage({
   searchParams,
 }: AccountsPageProps) {
+  await requireAdmin();
   const params = await searchParams;
   const tab = resolveAccountsTab(params.tab);
 

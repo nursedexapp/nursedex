@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getJobHealth } from "@/lib/admin/job-health";
 import { JobHealthTable } from "./JobHealthTable";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Scheduled jobs | NurseDex Admin",
@@ -13,7 +14,9 @@ export const dynamic = "force-dynamic";
 /**
  * Is everything running (#888).
  *
- * Guarded by (admin)/layout, like every other page in this section.
+ * Calls requireAdmin() itself as its first await, like every other page in
+ * this section: the layout's own check does not stop a page's reads, which
+ * go out alongside it (NURSEDEX-SITE-1D).
  *
  * The data comes from `job_heartbeats`, which every cron already writes, and
  * the staleness rule is the watchdog's own. If the read fails, getJobHealth
@@ -22,6 +25,7 @@ export const dynamic = "force-dynamic";
  * broken database connection.
  */
 export default async function AdminJobsPage() {
+  await requireAdmin();
   const health = await getJobHealth();
 
   return (

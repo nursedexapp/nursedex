@@ -81,6 +81,11 @@ function applySecurityHeaders(
   return response;
 }
 
+/** The admin pages: /admin and below, never a path that merely starts "admin". */
+function isAdminPath(path: string): boolean {
+  return path === "/admin" || path.startsWith("/admin/");
+}
+
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = buildCsp(nonce);
@@ -133,7 +138,22 @@ export async function proxy(request: NextRequest) {
   });
 
   // Supabase session refresh for all other routes
-  const response = await updateSession(requestWithNonce);
+  const { response, signedIn } = await updateSession(requestWithNonce);
+
+  // Nobody without a session renders an admin page. The admin layout's
+  // requireAdmin() is not enough on its own: a page renders ALONGSIDE its
+  // layout, so the page's reads go out before the layout redirects anybody
+  // (NURSEDEX-SITE-1D, 2026-11-10). Each admin page also checks the role
+  // itself; this is the cheap first wall, since getUser() has already run.
+  if (!signedIn && isAdminPath(path)) {
+    const redirect = NextResponse.redirect(new URL("/login", request.url));
+    // Carry whatever the refresh set, so a session it cleared stays cleared.
+    for (const cookie of response.cookies.getAll()) {
+      redirect.cookies.set(cookie);
+    }
+    return applySecurityHeaders(redirect, csp);
+  }
+
   return applySecurityHeaders(response, csp);
 }
 

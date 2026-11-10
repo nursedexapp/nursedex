@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getTaxonomyForAdmin } from "@/lib/blog/queries";
 import { TaxonomyManager } from "@/components/admin/TaxonomyManager";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Categories & tags | NurseDex Admin",
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TaxonomyPage() {
+  await requireAdmin();
   const { categories, tags } = await getTaxonomyForAdmin();
 
   return (

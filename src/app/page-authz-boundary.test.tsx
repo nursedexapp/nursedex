@@ -8,9 +8,9 @@ import { fileURLToPath } from "node:url";
 //
 // src/lib/admin/authz-boundary.test.ts covers server ACTIONS. Pages were the
 // remaining hole: /dashboard and the admin screens are gated by their own
-// requireAuth / requireRole / requireAdmin call and nothing else. The proxy only
-// gates the brand password, not per-user auth, so that one line in the page is
-// the whole gate. Both dashboard page tests mocked it away, so nothing anywhere
+// requireAuth / requireRole / requireAdmin call. The proxy gates the brand
+// password and turns away a visitor with no session from /admin, but it never
+// checks a role, so that one line in the page is the whole role gate. Both dashboard page tests mocked it away, so nothing anywhere
 // proved a signed-out visitor is bounced.
 //
 // As in the action suite, the REAL guard runs here: the only seam mocked is the
@@ -113,13 +113,77 @@ beforeEach(() => {
 // caller to /login, requireRole and requireAdmin send a wrong-role caller to /,
 // and requireSuperAdmin sends a plain admin to /admin.
 //
-// A layout guards everything nested under it, so (admin)/layout.tsx is the gate
-// for the whole admin section.
+// A layout is NOT the gate for the pages under it. This comment used to say it
+// was, and 14 admin pages relied on it, ten of them reading through the
+// service role client. A page renders alongside its layout, so its reads go out before the
+// layout redirects anybody, and a layout is not re-rendered on client
+// navigation at all (NURSEDEX-SITE-1D, 2026-11-10). Every admin page now calls
+// requireAdmin() itself, as its first await, which
+// src/app/(admin)/admin-pages-check-admin.test.ts enforces; each is listed here
+// so its guard is seen to refuse.
+const ADMIN_PAGE = { refuse: "family", lands: "/" } as const;
+
 const PAGES = {
   "(admin)/layout": {
     load: () => import("./(admin)/layout"),
     refuse: "family",
     lands: "/",
+  },
+  "(admin)/admin/page": {
+    load: () => import("./(admin)/admin/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/accounts/page": {
+    load: () => import("./(admin)/admin/accounts/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/blog/page": {
+    load: () => import("./(admin)/admin/blog/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/blog/[id]/edit/page": {
+    load: () => import("./(admin)/admin/blog/[id]/edit/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/blog/[id]/revisions/page": {
+    load: () => import("./(admin)/admin/blog/[id]/revisions/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/blog/[id]/revisions/compare/page": {
+    load: () => import("./(admin)/admin/blog/[id]/revisions/compare/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/blog/comments/page": {
+    load: () => import("./(admin)/admin/blog/comments/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/blog/new/page": {
+    load: () => import("./(admin)/admin/blog/new/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/blog/newsletter/page": {
+    load: () => import("./(admin)/admin/blog/newsletter/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/blog/taxonomy/page": {
+    load: () => import("./(admin)/admin/blog/taxonomy/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/disputes/page": {
+    load: () => import("./(admin)/admin/disputes/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/jobs/page": {
+    load: () => import("./(admin)/admin/jobs/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/reviews/page": {
+    load: () => import("./(admin)/admin/reviews/page"),
+    ...ADMIN_PAGE,
+  },
+  "(admin)/admin/verifications/page": {
+    load: () => import("./(admin)/admin/verifications/page"),
+    ...ADMIN_PAGE,
   },
   "(admin)/admin/admins/page": {
     load: () => import("./(admin)/admin/admins/page"),

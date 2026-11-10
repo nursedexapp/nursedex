@@ -12,6 +12,7 @@ import {
   PendingReviewActions,
   RemovalRequestActions,
 } from "@/components/admin/ReviewActionButtons";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Reviews | NurseDex Admin",
@@ -25,6 +26,7 @@ interface ReviewsPageProps {
 export default async function AdminReviewsPage({
   searchParams,
 }: ReviewsPageProps) {
+  await requireAdmin();
   const { tab } = await searchParams;
   const active =
     tab === "removal-requests"

@@ -11,6 +11,7 @@ import { getBlogPostViews } from "@/lib/analytics/post-views";
 import { postHogCoverageCaption } from "@/lib/analytics/consent-launch";
 import { BLOG_POST_STATUS_LABELS, BlogPostStatus } from "@/types/enums";
 import { BlogPostActions } from "@/components/admin/BlogPostActions";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Blog | NurseDex Admin",
@@ -34,6 +35,7 @@ function formatDate(iso: string | null): string {
 }
 
 export default async function AdminBlogPage() {
+  await requireAdmin();
   const [posts, pendingComments, views] = await Promise.all([
     getAllPostsForAdmin(),
     getPendingCommentCount(),

@@ -9,6 +9,7 @@ import { getPostById } from "@/lib/blog/queries";
 import { getRevisions } from "@/lib/blog/revisions";
 import { extractPlainText } from "@/lib/blog/text";
 import { RestoreRevisionButton } from "@/components/admin/RestoreRevisionButton";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Revision history | NurseDex Admin",
@@ -30,6 +31,7 @@ interface RevisionsPageProps {
 }
 
 export default async function RevisionsPage({ params }: RevisionsPageProps) {
+  await requireAdmin();
   const { id } = await params;
   const post = await getPostById(id);
   if (!post) notFound();

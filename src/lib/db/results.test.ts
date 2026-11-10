@@ -264,3 +264,51 @@ describe("reportDbFailure", () => {
     });
   });
 });
+
+// A `head: true` count is an HTTP HEAD request, and a HEAD response has no
+// body. When PostgREST refuses one, supabase-js parses the empty body into
+// `{ message: "" }`, so the only fact left is the status. NURSEDEX-SITE-1D
+// (2026-11-10) arrived as "could not be read: " and nothing else, when the
+// response had been a 401 for a visitor who was not signed in.
+describe("a failure whose error carries no message", () => {
+  const refused = {
+    count: null,
+    data: null,
+    error: { message: "" },
+    status: 401,
+  };
+
+  it("names the HTTP status instead of ending in a blank", async () => {
+    await expect(unwrapCountOrThrow(refused, "the nurses")).rejects.toThrow(
+      "the nurses could not be read: HTTP 401, and the response carried no message",
+    );
+    await expect(unwrapOrThrow(refused, "the nurses")).rejects.toThrow(
+      "the nurses could not be read: HTTP 401, and the response carried no message",
+    );
+    await toTypedCount(refused, "the nurses");
+    await toTypedFailure(refused, "the nurses");
+    for (const [err] of h.captureException.mock.calls) {
+      expect((err as Error).message).toMatch(
+        /HTTP 401, and the response carried no message$/,
+      );
+    }
+    expect(h.captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it("says so plainly when there is no status either", async () => {
+    await expect(
+      unwrapOrThrow({ data: null, error: { message: "" } }, "the nurses"),
+    ).rejects.toThrow(
+      "the nurses could not be read: the error carried no message",
+    );
+  });
+
+  it("leaves a real message alone", async () => {
+    await expect(
+      unwrapCountOrThrow(
+        { count: null, error: { message: "boom" }, status: 500 },
+        "the nurses",
+      ),
+    ).rejects.toThrow(/could not be read: boom$/);
+  });
+});

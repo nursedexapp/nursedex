@@ -10,6 +10,7 @@ import {
   getTags,
   getTagsForPost,
 } from "@/lib/blog/queries";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Edit post | NurseDex Admin",
@@ -23,6 +24,7 @@ interface EditBlogPostPageProps {
 export default async function EditBlogPostPage({
   params,
 }: EditBlogPostPageProps) {
+  await requireAdmin();
   const { id } = await params;
   const post = await getPostById(id);
   if (!post) notFound();

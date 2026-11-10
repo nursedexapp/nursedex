@@ -96,13 +96,35 @@ export interface DbError {
 export interface DbResult<T> {
   data: T | null;
   error: DbError | null;
+  status?: number;
 }
 
 /** Anything shaped like a PostgREST result, including Supabase's own union. */
-type DbResultLike = { data: unknown; error: DbError | null };
+type DbResultLike = { data: unknown; error: DbError | null; status?: number };
 
 /** A `select("...", { count: "exact" })` result, whose answer is the count. */
-type DbCountLike = { count: number | null; error: DbError | null };
+type DbCountLike = {
+  count: number | null;
+  error: DbError | null;
+  status?: number;
+};
+
+/**
+ * The error's own words, or the HTTP status when it has none.
+ *
+ * A `head: true` count is an HTTP HEAD request, and a HEAD response has no
+ * body, so when PostgREST refuses one supabase-js parses the empty body into
+ * `{ message: "" }` and the status is the only fact left. NURSEDEX-SITE-1D
+ * (2026-11-10) arrived as "could not be read: " and nothing after it, when
+ * the response had been a 401. This says only what was measured: the status,
+ * and that the response carried no message, never a guess at the cause.
+ */
+function describeDbError(error: DbError, status?: number): string {
+  if (error.message) return error.message;
+  return status
+    ? `HTTP ${status}, and the response carried no message`
+    : "the error carried no message";
+}
 
 /**
  * Every helper takes the query as well as the awaited result, so a query
@@ -136,9 +158,9 @@ export async function assertNoWriteError(
   result: Awaitable<DbResult<unknown>>,
   context: string,
 ): Promise<void> {
-  const { error } = await result;
+  const { error, status } = await result;
   if (!error) return;
-  const message = `${context} could not be written: ${error.message}`;
+  const message = `${context} could not be written: ${describeDbError(error, status)}`;
   console.error(message);
   throw new Error(message);
 }
@@ -154,10 +176,10 @@ export async function unwrapOrThrow<R extends DbResultLike>(
   result: Awaitable<R>,
   context: string,
 ): Promise<R["data"]> {
-  const { data, error } = await result;
+  const { data, error, status } = await result;
   if (!error) return data;
   if (isRowNotFound(error)) return null;
-  const message = `${context} could not be read: ${error.message}`;
+  const message = `${context} could not be read: ${describeDbError(error, status)}`;
   console.error(message);
   throw new Error(message);
 }
@@ -173,13 +195,13 @@ export async function toTypedFailure<R extends DbResultLike>(
   context: string,
   userMessage: string = DB_FAILURE_MESSAGE,
 ): Promise<DbOutcome<R["data"]>> {
-  const { data, error } = await result;
+  const { data, error, status } = await result;
   if (!error) return { ok: true, data };
   if (isRowNotFound(error)) return { ok: true, data: null };
   // "failed" rather than "could not be read": a `"use server"` module reaches
   // here for its writes too, and there is no second helper for those, because
   // a write in an action must return to the control rather than throw at it.
-  const message = `${context} failed: ${error.message}`;
+  const message = `${context} failed: ${describeDbError(error, status)}`;
   console.error(message);
   Sentry.captureException(new Error(message), {
     tags: { db_operation: context },
@@ -208,10 +230,10 @@ export async function toTypedCount(
   context: string,
   userMessage: string = DB_FAILURE_MESSAGE,
 ): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
-  const { count, error } = await result;
+  const { count, error, status } = await result;
   if (!error && count !== null) return { ok: true, count };
   const message = error
-    ? `${context} failed: ${error.message}`
+    ? `${context} failed: ${describeDbError(error, status)}`
     : `${context} returned no count, so the query did not ask for one`;
   console.error(message);
   Sentry.captureException(new Error(message), {
@@ -225,10 +247,10 @@ export async function unwrapCountOrThrow(
   result: Awaitable<DbCountLike>,
   context: string,
 ): Promise<number> {
-  const { count, error } = await result;
+  const { count, error, status } = await result;
   if (!error && count !== null) return count;
   const message = error
-    ? `${context} could not be read: ${error.message}`
+    ? `${context} could not be read: ${describeDbError(error, status)}`
     : `${context} returned no count, so the query did not ask for one`;
   console.error(message);
   throw new Error(message);
@@ -250,7 +272,7 @@ export async function unwrapCountOrThrow(
  * returns.
  */
 export function reportDbFailure(context: string, error: DbError): void {
-  const message = `${context} could not be read: ${error.message}`;
+  const message = `${context} could not be read: ${describeDbError(error)}`;
   console.error(message);
   Sentry.captureException(new Error(message), {
     tags: { db_operation: context },
