@@ -8,6 +8,7 @@ import { SLA_HOURS, getSlaState, type SlaState } from "@/lib/admin/sla";
 import { CREDENTIAL_LABELS } from "@/types/enums";
 import type { Credential } from "@/types/enums";
 import { MASK_PII } from "@/components/ui/private";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Verifications | NurseDex Admin",
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function VerificationsPage() {
+  await requireAdmin();
   const queue = await getVerificationQueue();
 
   return (

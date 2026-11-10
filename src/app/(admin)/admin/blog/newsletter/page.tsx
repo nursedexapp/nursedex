@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getConfirmedSubscriberCount } from "@/lib/newsletter/queries";
 import { NewsletterComposer } from "@/components/admin/NewsletterComposer";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Newsletter | NurseDex Admin",
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 };
 
 export default async function NewsletterPage() {
+  await requireAdmin();
   const count = await getConfirmedSubscriberCount();
 
   return (

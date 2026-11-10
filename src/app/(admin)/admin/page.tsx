@@ -7,6 +7,7 @@ import { getDirectoryCoverage } from "@/lib/nurses/coverage";
 import { DirectoryCoverage } from "./DirectoryCoverage";
 import { getNudgeResponse } from "@/lib/nurses/nudge-response";
 import { NudgeResponse } from "./NudgeResponse";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Admin | NurseDex",
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminDashboardPage() {
+  await requireAdmin();
   const [counts, coverage, nudges] = await Promise.all([
     getAdminCounts(),
     getDirectoryCoverage(),

@@ -8,6 +8,7 @@ import { CommentModerationActions } from "@/components/admin/CommentModerationAc
 import { BlogCommentStatus } from "@/types/enums";
 import { cn } from "@/lib/utils";
 import { MASK_PII } from "@/components/ui/private";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Comments | NurseDex Admin",
@@ -61,6 +62,7 @@ interface CommentsPageProps {
 export default async function AdminBlogCommentsPage({
   searchParams,
 }: CommentsPageProps) {
+  await requireAdmin();
   const { status } = await searchParams;
   const active: Filter = FILTERS.includes(status as Filter)
     ? (status as Filter)

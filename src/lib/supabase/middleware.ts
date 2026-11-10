@@ -2,7 +2,16 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { authCookieOptions } from "./auth-cookie";
 
-export async function updateSession(request: NextRequest) {
+/**
+ * Refresh the session cookie, and say whether a signed in user came back.
+ *
+ * `signedIn` is what the proxy needs to keep a visitor with no session off
+ * the admin pages before anything renders (NURSEDEX-SITE-1D). It says nothing
+ * about the role: that takes a database read, and stays with requireAdmin().
+ */
+export async function updateSession(
+  request: NextRequest,
+): Promise<{ response: NextResponse; signedIn: boolean }> {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -30,7 +39,9 @@ export async function updateSession(request: NextRequest) {
   // Refresh the auth token. This call is critical: it reads the session
   // cookie and, if the access token is expired, uses the refresh token
   // to obtain a new pair. The new tokens are written back via setAll.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+  return { response: supabaseResponse, signedIn: user !== null };
 }

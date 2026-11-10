@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getJobHealth } from "@/lib/admin/job-health";
 import { JobHealthTable } from "./JobHealthTable";
+import { requireAdmin } from "@/lib/auth/helpers";
 
 export const metadata: Metadata = {
   title: "Scheduled jobs | NurseDex Admin",
@@ -22,6 +23,7 @@ export const dynamic = "force-dynamic";
  * broken database connection.
  */
 export default async function AdminJobsPage() {
+  await requireAdmin();
   const health = await getJobHealth();
 
   return (

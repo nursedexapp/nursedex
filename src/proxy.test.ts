@@ -11,7 +11,10 @@ const h = vi.hoisted(() => {
   // The CSP's Supabase origin is derived from this, also at import time.
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://abc123.supabase.co";
   return {
-    updateSession: vi.fn(async (_req: NextRequest) => NextResponse.next()),
+    updateSession: vi.fn(async (_req: NextRequest) => ({
+      response: NextResponse.next(),
+      signedIn: true,
+    })),
   };
 });
 
@@ -37,7 +40,10 @@ function fakeRequest(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.updateSession.mockImplementation(async () => NextResponse.next());
+  h.updateSession.mockImplementation(async () => ({
+    response: NextResponse.next(),
+    signedIn: true,
+  }));
 });
 
 describe("proxy security headers (#393)", () => {
@@ -259,5 +265,56 @@ describe("CSP worker policy", () => {
 
     expect(workerSrc).not.toContain("*");
     expect(workerSrc).not.toContain("http");
+  });
+});
+
+// The admin layout's requireAdmin() is not an auth boundary: Next renders a
+// page alongside its layout, so the page's own reads start before the layout
+// has redirected anybody (node_modules/next/dist/docs/01-app/02-guides/
+// authentication.md, "Layouts and auth checks"). On 2026-11-10 a visitor who
+// was not signed in loaded /admin, and the dashboard's count queries reached
+// the database as that visitor (NURSEDEX-SITE-1D). Nobody without a session
+// has any business rendering an admin page, so they never get as far as one.
+describe("the admin area turns away anyone not signed in", () => {
+  function signedOut() {
+    h.updateSession.mockImplementation(async () => ({
+      response: NextResponse.next(),
+      signedIn: false,
+    }));
+  }
+
+  it.each(["/admin", "/admin/blog", "/admin/blog/abc/edit"])(
+    "redirects %s to /login before anything renders",
+    async (path) => {
+      signedOut();
+      const res = await proxy(fakeRequest(path));
+      expect(res.status).toBe(307);
+      expect(new URL(res.headers.get("location")!).pathname).toBe("/login");
+      expect(res.headers.get("Content-Security-Policy")).toBeTruthy();
+    },
+  );
+
+  it("keeps any cookie the session refresh set, so a cleared session stays cleared", async () => {
+    h.updateSession.mockImplementation(async () => {
+      const response = NextResponse.next();
+      response.cookies.set("sb-auth", "", { maxAge: 0 });
+      return { response, signedIn: false };
+    });
+    const res = await proxy(fakeRequest("/admin"));
+    expect(res.status).toBe(307);
+    expect(res.cookies.get("sb-auth")).toBeDefined();
+  });
+
+  it("lets a signed in visitor through to the page, which checks the role itself", async () => {
+    const res = await proxy(fakeRequest("/admin"));
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("leaves pages outside the admin area open to signed out visitors", async () => {
+    signedOut();
+    for (const path of ["/nurses", "/administrator-jobs", "/login"]) {
+      const res = await proxy(fakeRequest(path));
+      expect(res.headers.get("location")).toBeNull();
+    }
   });
 });
