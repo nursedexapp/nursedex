@@ -135,12 +135,13 @@ describe("getSignedPhotoUrl", () => {
 });
 
 describe("firstNursePhotoUrl", () => {
-  const originalKey = process.env.SUPABASE_SECRET_KEY;
   let logged: unknown[][];
   let errorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    process.env.SUPABASE_SECRET_KEY = "test-secret-key-for-photo-tokens";
+    // stubEnv, not an assignment restored by hand: assigning a saved
+    // `undefined` back would leave the key set to the string "undefined".
+    vi.stubEnv("SUPABASE_SECRET_KEY", "test-secret-key-for-photo-tokens");
     logged = [];
     h.createSignedUrl.mockReset();
     errorSpy = vi
@@ -152,7 +153,7 @@ describe("firstNursePhotoUrl", () => {
 
   afterEach(() => {
     errorSpy.mockRestore();
-    process.env.SUPABASE_SECRET_KEY = originalKey;
+    vi.unstubAllEnvs();
   });
 
   it("is the stable photo route address of the first photo, with no call to Storage", () => {
@@ -168,7 +169,7 @@ describe("firstNursePhotoUrl", () => {
   });
 
   it("is null, and says so in the log, when the address cannot be built", () => {
-    delete process.env.SUPABASE_SECRET_KEY;
+    vi.stubEnv("SUPABASE_SECRET_KEY", undefined);
     expect(firstNursePhotoUrl([PATH])).toBeNull();
     expect(logged).toHaveLength(1);
     expect(String(logged[0][0])).toContain(PATH);
