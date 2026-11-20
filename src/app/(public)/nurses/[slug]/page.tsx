@@ -7,10 +7,10 @@ import {
   getNurseBySlugUnfiltered,
   getNurseContactInfo,
   getSlugRedirect,
-  getPublicPhotoUrls,
   getLicenseVerifyUrl,
   getDistanceBetweenZips,
 } from "@/lib/profile/queries";
+import { firstNursePhotoUrl } from "@/lib/profile/photos";
 import { createClient } from "@/lib/supabase/server";
 import { hasActiveFamilyAccess } from "@/lib/subscriptions/queries";
 import { hasRevealedNurse } from "@/lib/reveals/actions";
@@ -187,9 +187,12 @@ export default async function NurseProfilePage({
   // exposing the number itself.
   const { hasLicenseNumber } = redactNurseIdentity(nurse, canSeeIdentity);
 
-  // Fetch photo URLs, license verify URL, and approved reviews in parallel
-  const [photoUrls, licenseVerifyUrl, approvedReviews] = await Promise.all([
-    getPublicPhotoUrls(nurse.photos),
+  // The photo is the stable route address, as on the directory cards, so this
+  // page never waits on Storage and the photo can be cached (#871, #1321).
+  const photoUrl = firstNursePhotoUrl(nurse.photos);
+
+  // Fetch license verify URL and approved reviews in parallel
+  const [licenseVerifyUrl, approvedReviews] = await Promise.all([
     getLicenseVerifyUrl(nurse.credential),
     getApprovedReviews(nurse.user_id),
   ]);
@@ -235,14 +238,14 @@ export default async function NurseProfilePage({
         credentialLabel={credentialLabel}
         slug={nurse.slug}
         bio={nurse.bio}
-        photoUrl={photoUrls[0] ?? null}
+        photoUrl={photoUrl}
         avgRating={nurse.avg_rating}
         reviewCount={nurse.review_count}
       />
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <NurseProfilePublic
           nurse={nurse}
-          photoUrl={photoUrls[0] ?? null}
+          photoUrl={photoUrl}
           licenseVerifyUrl={licenseVerifyUrl}
           distanceMiles={distanceMiles}
           viewMode={viewMode}

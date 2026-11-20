@@ -45,7 +45,9 @@ export function NurseJsonLd({
   };
 
   if (bio) data.description = bio.slice(0, 500);
-  if (photoUrl) data.image = photoUrl;
+  // The photo arrives as an address from the site root (the stable photo
+  // route), and this block is read away from the page, so it gets the host.
+  if (photoUrl) data.image = new URL(photoUrl, profileUrl).toString();
 
   if (reviewCount > 0 && avgRating !== null) {
     data.aggregateRating = {

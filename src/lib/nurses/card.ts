@@ -1,4 +1,4 @@
-import { nursePhotoUrl } from "@/lib/profile/photos";
+import { firstNursePhotoUrl } from "@/lib/profile/photos";
 import { createClient } from "@/lib/supabase/server";
 
 import { reportDbFailure } from "@/lib/db/results";
@@ -448,32 +448,17 @@ export function toPublicNurseCard(card: InternalNurseCard): NurseSearchCard {
  *
  * No Supabase call happens here any more, so a page of 15 nurses no longer
  * makes 15 signing round trips before it can stream. A photo that cannot be
- * served fails at the route, which is where it is now reported.
+ * served fails at the route, which is where it is now reported. An address
+ * that cannot be built leaves the card in its no-photo state; see
+ * `firstNursePhotoUrl`, which the public profile page shares.
  */
 export async function attachNurseCardPhotos(
   cards: InternalNurseCard[],
 ): Promise<void> {
-  await Promise.all(
-    cards.map(async (card) => {
-      if (card.photos.length === 0) return;
-      try {
-        card.photo_url = nursePhotoUrl(card.photos[0]);
-      } catch (e) {
-        // Minting the address needs the server key. Losing a photo is bad;
-        // throwing here would take the whole directory down with a 500 for
-        // every visitor, so the card falls back to its no-photo state exactly
-        // as it did when a signing failure happened here. Logged, because that
-        // state is indistinguishable on screen from a nurse who never uploaded
-        // one, and a misconfigured deploy would otherwise read as an
-        // onboarding gap.
-        card.photo_url = null;
-        console.error(
-          `Could not build a photo URL for ${card.photos[0]}:`,
-          e instanceof Error ? e.message : e,
-        );
-      }
-    }),
-  );
+  for (const card of cards) {
+    if (card.photos.length === 0) continue;
+    card.photo_url = firstNursePhotoUrl(card.photos);
+  }
 }
 
 // ── Towns ─────────────────────────────────────────────────────
