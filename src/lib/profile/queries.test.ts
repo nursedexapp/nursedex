@@ -30,7 +30,6 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/service-role", () => ({
   createServiceRoleClient: vi.fn(),
 }));
-vi.mock("./photos", () => ({ getSignedPhotoUrl: vi.fn() }));
 
 import { getNurseContactInfo } from "./queries";
 

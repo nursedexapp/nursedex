@@ -1,6 +1,7 @@
 import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { fetchRetryingOnce, realSleep } from "@/lib/http/retry-once";
+import { ABSORBED_RETRY_TAG } from "@/lib/sentry/absorbed-retry";
 import { TRANSLATION_GUARD_TAG } from "@/lib/sentry/translation-guard-report";
 
 // Sentry's free plan has no native Slack/webhook alerting (that requires
@@ -20,7 +21,9 @@ import { TRANSLATION_GUARD_TAG } from "@/lib/sentry/translation-guard-report";
 // not start a fresh group either.
 // The translation guard's reports are left out the same way (#1240): each one
 // is a page that kept working, counted in Sentry rather than paged.
-export const NEEDS_REVIEW_QUERY = `is:for_review level:[error,fatal] !action:cron !action:stripe-webhook !${TRANSLATION_GUARD_TAG.key}:${TRANSLATION_GUARD_TAG.value}`;
+// So is a refusal that one retry absorbed (#1321): the visitor got the photo.
+// Two refusals in a row are reported without this tag, and those do post.
+export const NEEDS_REVIEW_QUERY = `is:for_review level:[error,fatal] !action:cron !action:stripe-webhook !${TRANSLATION_GUARD_TAG.key}:${TRANSLATION_GUARD_TAG.value} !${ABSORBED_RETRY_TAG.key}:${ABSORBED_RETRY_TAG.value}`;
 
 const API = "https://sentry.io/api/0";
 

@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { getSignedPhotoUrl } from "./photos";
 
 import { reportDbFailure, unwrapOrThrow } from "@/lib/db/results";
 /**
@@ -375,16 +374,6 @@ export async function getDistanceBetweenZips(
 
 function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
-}
-
-/**
- * Get signed photo URLs for a nurse's photos array.
- */
-export async function getPublicPhotoUrls(
-  photos: string[],
-): Promise<(string | null)[]> {
-  if (photos.length === 0) return [];
-  return Promise.all(photos.map((path) => getSignedPhotoUrl(path)));
 }
 
 /**

@@ -4,6 +4,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { PHOTO_UPLOAD } from "@/lib/constants";
 
 import { reportDbFailure, toTypedFailure } from "@/lib/db/results";
+import { isRetryableStatus, retryingOnce } from "@/lib/http/retry-once";
+import { reportAbsorbedRetry } from "@/lib/sentry/absorbed-retry";
 const BUCKET = "nurse-photos";
 
 // Magic bytes for allowed image types
@@ -61,28 +63,95 @@ export function nursePhotoUrl(path: string): string {
 }
 
 /**
+ * The stable address of the photo a card or a public profile shows: the
+ * nurse's first. Null when she has none.
+ *
+ * Minting the address needs the server key. Losing a photo is bad; throwing
+ * here would answer a whole page with a 500 for every visitor, so the page
+ * falls back to its no-photo state. Logged, because that state is
+ * indistinguishable on screen from a nurse who never uploaded one, and a
+ * misconfigured deploy would otherwise read as an onboarding gap.
+ */
+export function firstNursePhotoUrl(photos: string[]): string | null {
+  if (photos.length === 0) return null;
+  try {
+    return nursePhotoUrl(photos[0]);
+  } catch (e) {
+    console.error(
+      `Could not build a photo URL for ${photos[0]}:`,
+      e instanceof Error ? e.message : e,
+    );
+    return null;
+  }
+}
+
+const SIGNING = "a signed URL for a nurse's photo";
+
+// The wait before the one retry. A visitor is waiting on this call, so it is a
+// fraction of a second where the helper's own default is the two seconds a
+// cron job can spare. The spread is for the directory: its fifteen photos are
+// signed by fifteen concurrent requests, and refusals that arrived together
+// would otherwise all ask again in the same instant.
+const SIGN_RETRY_BASE_MS = 300;
+const SIGN_RETRY_SPREAD_MS = 300;
+
+export type SignPhotoDeps = {
+  /** Injected so tests never wait for real (L524). */
+  sleep?: (ms: number) => Promise<void>;
+  /** A number in [0, 1), as Math.random gives. Injected so the wait is exact in tests. */
+  random?: () => number;
+};
+
+/**
  * Get a signed URL to display a nurse photo.
  * Returns null if the photo cannot be signed.
  *
  * Uses the service-role client because the nurse-photos bucket is
  * private and anon callers can't sign their own URLs. The resulting
- * signed URL is short-lived and only ever embedded in server-rendered
- * markup that already gates which photos to surface.
+ * signed URL is short-lived. It is never put in a page a visitor reads:
+ * those use `nursePhotoUrl`, and photos.test.ts lists who may call this.
+ *
+ * Storage is asked once more after a 429 or a 5xx (#1321). On 2026-11-19 and
+ * again on 2026-11-20 it answered one call with 544, "The connection to the
+ * database timed out", while every call around it succeeded
+ * (NURSEDEX-SITE-1E). Each cost a visitor a photo and posted an alert nobody
+ * could act on. An absorbed refusal is counted; a second one is the error.
  */
-export async function getSignedPhotoUrl(path: string): Promise<string | null> {
+export async function getSignedPhotoUrl(
+  path: string,
+  deps: SignPhotoDeps = {},
+): Promise<string | null> {
   if (!path) return null;
+  const { sleep, random = Math.random } = deps;
 
   const supabase = createServiceRoleClient();
 
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .createSignedUrl(path, PHOTO_UPLOAD.SIGNED_URL_TTL_SECONDS);
+  const { data, error } = await retryingOnce(
+    () =>
+      supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(path, PHOTO_UPLOAD.SIGNED_URL_TTL_SECONDS),
+    {
+      // An error with no status is one supabase-js could not read, so nothing
+      // says the next call would go differently.
+      isRetryable: ({ error }) =>
+        typeof error?.status === "number" && isRetryableStatus(error.status),
+      delayMs: () =>
+        SIGN_RETRY_BASE_MS + Math.floor(random() * SIGN_RETRY_SPREAD_MS),
+      sleep,
+      onRetry: ({ error }) =>
+        reportAbsorbedRetry(
+          `Supabase Storage refused a photo signing call with ${error?.status}, retrying once`,
+          { db_operation: SIGNING },
+        ),
+    },
+  );
 
   // The null stays: every caller treats it as "no preview yet" and re-signs on
   // the next render, so throwing would fail a whole profile over one image.
   // What was missing is that the console was the only place this went (#1000).
   if (error) {
-    reportDbFailure("a signed URL for a nurse's photo", error);
+    reportDbFailure(SIGNING, error);
     return null;
   }
 
@@ -95,7 +164,7 @@ export async function getSignedPhotoUrl(path: string): Promise<string | null> {
 export async function getSignedPhotoUrls(
   paths: string[],
 ): Promise<(string | null)[]> {
-  return Promise.all(paths.map(getSignedPhotoUrl));
+  return Promise.all(paths.map((path) => getSignedPhotoUrl(path)));
 }
 
 /**

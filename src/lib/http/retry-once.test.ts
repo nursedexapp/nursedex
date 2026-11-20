@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from "vitest";
-import { fetchRetryingOnce, retryDelayMs } from "./retry-once";
+import { fetchRetryingOnce, retryDelayMs, retryingOnce } from "./retry-once";
 
 function answer(status: number, retryAfter?: string): Response {
   const headers = new Headers();
@@ -80,6 +80,70 @@ describe("fetchRetryingOnce", () => {
     });
     expect(res.status).toBe(500);
     expect(calls()).toBe(1);
+  });
+});
+
+// The same rule for a caller whose answer is not a Response: supabase-js hands
+// back `{ data, error }`, and the refusal is a field of the error.
+describe("retryingOnce", () => {
+  type Result = { refused: boolean; value: string };
+  const refusal: Result = { refused: true, value: "busy" };
+  const success: Result = { refused: false, value: "done" };
+
+  /** An attempt that gives each result in turn, counting how often it ran. */
+  function attempts(...results: Result[]) {
+    let calls = 0;
+    const attempt = async () => results[Math.min(calls++, results.length - 1)];
+    return { attempt, calls: () => calls };
+  }
+
+  const rule = {
+    isRetryable: (result: Result) => result.refused,
+    delayMs: () => 450,
+  };
+
+  it("asks again once after a retryable result, waiting as long as the caller says", async () => {
+    const { attempt, calls } = attempts(refusal, success);
+    const sleep = vi.fn(async (_ms: number) => {});
+    const result = await retryingOnce(attempt, { ...rule, sleep });
+    expect(result).toBe(success);
+    expect(calls()).toBe(2);
+    expect(sleep).toHaveBeenCalledExactlyOnceWith(450);
+  });
+
+  it("returns a result that asking again cannot change, without waiting", async () => {
+    const { attempt, calls } = attempts(success, refusal);
+    const sleep = vi.fn(async (_ms: number) => {});
+    const result = await retryingOnce(attempt, { ...rule, sleep });
+    expect(result).toBe(success);
+    expect(calls()).toBe(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("returns the second refusal rather than asking a third time", async () => {
+    const second: Result = { refused: true, value: "still busy" };
+    const { attempt, calls } = attempts(refusal, second, success);
+    const result = await retryingOnce(attempt, {
+      ...rule,
+      sleep: async () => {},
+    });
+    expect(result).toBe(second);
+    expect(calls()).toBe(2);
+  });
+
+  it("hands the refused result to the caller before it waits", async () => {
+    const { attempt } = attempts(refusal, success);
+    const order: string[] = [];
+    await retryingOnce(attempt, {
+      ...rule,
+      sleep: async () => {
+        order.push("sleep");
+      },
+      onRetry: (refused) => {
+        order.push(`counted ${refused.value}`);
+      },
+    });
+    expect(order).toEqual(["counted busy", "sleep"]);
   });
 });
 

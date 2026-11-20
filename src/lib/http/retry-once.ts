@@ -37,6 +37,38 @@ export type RetryOnceOptions = {
   mayRetry?: () => boolean;
 };
 
+export type RetryingOnceRule<T> = {
+  /** Whether asking again could change this result. */
+  isRetryable: (result: T) => boolean;
+  /** The wait before the retry, which only the caller can size. */
+  delayMs: (refused: T) => number;
+  /** Injected so tests never wait for real (L524). */
+  sleep?: (ms: number) => Promise<void>;
+  /** Called with the refused result before the wait. Callers count it here (L77). */
+  onRetry?: (refused: T) => void | Promise<void>;
+  /** False when the caller's own retry budget is already spent. */
+  mayRetry?: () => boolean;
+};
+
+/**
+ * The rule itself, for any result: calls `attempt`, and once more if the
+ * caller says the first result was a refusal asking again can fix. Returns
+ * whichever result came last. `fetchRetryingOnce` is this for a `Response`;
+ * a client that answers `{ data, error }`, as supabase-js does, uses it
+ * directly.
+ */
+export async function retryingOnce<T>(
+  attempt: () => Promise<T>,
+  rule: RetryingOnceRule<T>,
+): Promise<T> {
+  const { sleep = realSleep, mayRetry = () => true } = rule;
+  const first = await attempt();
+  if (!rule.isRetryable(first) || !mayRetry()) return first;
+  await rule.onRetry?.(first);
+  await sleep(rule.delayMs(first));
+  return attempt();
+}
+
 /**
  * Calls `doFetch`, and once more if the answer was a 429 or 5xx. Returns
  * whichever answer came last; deciding what a refusal means stays with the
@@ -46,12 +78,16 @@ export async function fetchRetryingOnce(
   doFetch: () => Promise<Response>,
   options: RetryOnceOptions = {},
 ): Promise<Response> {
-  const { sleep = realSleep, onRetry, mayRetry = () => true } = options;
-  const first = await doFetch();
-  if (!isRetryableStatus(first.status) || !mayRetry()) return first;
-  onRetry?.(first);
-  // An unread body holds its connection until garbage collection.
-  await first.body?.cancel().catch(() => {});
-  await sleep(retryDelayMs(first.headers.get("retry-after")));
-  return doFetch();
+  const { sleep, onRetry, mayRetry } = options;
+  return retryingOnce(doFetch, {
+    isRetryable: (res) => isRetryableStatus(res.status),
+    delayMs: (res) => retryDelayMs(res.headers.get("retry-after")),
+    sleep,
+    mayRetry,
+    onRetry: async (refused) => {
+      onRetry?.(refused);
+      // An unread body holds its connection until garbage collection.
+      await refused.body?.cancel().catch(() => {});
+    },
+  });
 }
